@@ -33,7 +33,7 @@ setup(
             "numpydoc",
             "nbsphinx",
             "sphinxcontrib-mermaid",
-            "sphinx-togglebutton"
+            "sphinx-togglebutton",
             "CTSRepo @ git+https://github.com/cta-sst-1m/CTS.git"
             ],
     },
