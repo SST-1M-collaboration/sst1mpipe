@@ -46,6 +46,7 @@ intersphinx_mapping = {
 # These links are ignored in the checks, necessary due to broken intersphinx for
 # these
 nitpick_ignore = [
+    ("py:class", "sst1mpipe.instrument.camera.Camera"),
     ("py:class", "cts_core.camera.Camera"),
     ("py:class", "ctapipe.instrument.camera.geometry.CameraGeometry"),
     ("py:class", "ctapipe.core.tool.Tool"),
