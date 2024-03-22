@@ -23,8 +23,12 @@ extensions = [
     'sphinx.ext.githubpages', 
     "numpydoc",
     "sphinx_rtd_theme",
-    "sphinx_togglebutton"
+    "sphinx_togglebutton",
+    "sphinx_automodapi.automodapi",
 ]
+
+numpydoc_show_class_members = False
+autosummary_generate = True
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']

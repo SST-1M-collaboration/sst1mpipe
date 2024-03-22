@@ -27,5 +27,11 @@ Github `repository <https://github.com/SST-1M-collaboration/sst1mpipe>`_
    sst1m_analysis_workflow
 
 
+.. toctree::
+  :maxdepth: 1
+  :caption: API Documentation
+  :name: _api_docs
+
+  sst1mpipe_api/index
 
    
