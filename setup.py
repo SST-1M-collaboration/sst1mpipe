@@ -33,7 +33,8 @@ setup(
             "numpydoc",
             "nbsphinx",
             "sphinxcontrib-mermaid",
-            "sphinx-togglebutton"
+            "sphinx-togglebutton",
+            "git+https://github.com/cta-sst-1m/CTS.git"
             ],
     },
     tests_require=[
