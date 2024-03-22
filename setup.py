@@ -18,7 +18,7 @@ setup(
         'seaborn~=0.13.0',
         'tables~=3.8.0',
         'pydantic>=1.4,<2.0',
-        'git+https://github.com/cta-sst-1m/CTS.git'
+        'CTSRepo @ git+https://github.com/cta-sst-1m/CTS.git'
     ],
     package_data={
         'sst1mpipe': [
