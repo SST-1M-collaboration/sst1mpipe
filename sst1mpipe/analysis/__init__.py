@@ -26,3 +26,8 @@ from .analysis import (
     get_camera_frame,
     get_theta_off_stereo
 )
+
+__all__ = [
+    'plot_mc_data',
+    'add_wobble_flag'
+]

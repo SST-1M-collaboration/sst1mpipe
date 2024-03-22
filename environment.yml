@@ -3,7 +3,7 @@ channels:
   - conda-forge
   - default
 dependencies:
-  - python=3.9
+  - python=3.8
   - pip
   - ctapipe=0.17
   - gammapy=1.0
