@@ -497,6 +497,8 @@ def get_edep_theta_cuts(
     efficiency: float
        Requested fraction of events left after the cut in each energy bin. E.g. 0.68 gives angular resolution.
 
+    For the moment works only in combination with global and efficiency gammaness cut
+
     Returns
     ------- 
     theta_cuts: astropy.table.Table
@@ -506,7 +508,7 @@ def get_edep_theta_cuts(
     requested_theta_efficiency = efficiency
 
     theta_cuts = calculate_percentile_cut(
-            dl2_gamma["theta"],
+            dl2_gamma["theta"].to(u.deg),
             dl2_gamma["reco_energy"] * u.TeV,
             bins=energy_bins,
             min_value=0.01 * u.deg,
@@ -539,7 +541,14 @@ def get_edep_theta_cuts(
         ax.set_ylim([0, 1.])
         fig.savefig(outdir + '/theta_edep_cuts_'+telescope+'.png', dpi=200)
 
-    return theta_cuts
+    theta2_cuts_bool = evaluate_binned_cut(
+		dl2_gamma["theta"].to(u.deg),
+		dl2_gamma["reco_energy"] * u.TeV,
+		theta_cuts,
+		operator.le,
+		)
+
+    return theta_cuts, theta_cuts_bool
 
 
 
@@ -762,7 +771,7 @@ def get_n_gammas_off(dl2_gamma, n_off=None, theta_cut=None):
 def sensitivity(
         input_file_gamma, input_file_proton, outdir=None, 
         config=None, telescope=None, save_fig=False, 
-        save_hdf=False, gammaness_cuts=False, source_detection='', 
+        save_hdf=False, gammaness_cuts=False, theta2_cuts=False, source_detection='', 
         energy_min=0.0, gamma_off=False):
     """
     Evaluates differential flux sensitivity on a point-like
@@ -799,6 +808,8 @@ def sensitivity(
     gammaness_cuts: string
         Gammaness cut method to be applied \'global\',
         \'efficiency\', \'significance\'
+    theta2_cuts: string
+	Theta2 cut method to be applied \'global\', \'efficiency\'
     source_detection: string
         If not empty time to the source detection is 
         calculated. Spectrum must be specified in 
@@ -857,11 +868,19 @@ def sensitivity(
 
     mask_gg, mask_gp = get_gammaness_cuts(dl2_gamma, dl2_proton, config=config, method=gammaness_cuts, save_hdf=save_hdf, save_fig=save_fig, outdir=outdir, energy_bins=energy_bins, telescope=telescope, gamma_off=gamma_off)
 
-    theta_cut = config['analysis']['global_theta_cut'] * u.deg
-    logging.info('Global theta cut used: %f', theta_cut.value)
+    if theta2_cuts == 'global':
+	theta_cut = config['analysis']['global_theta_cut'] * u.deg
+	logging.info('Global theta cut used: %f', theta_cut.value)
+	# Number of gammas in ON region after gammaness cut
+	mask = (dl2_gamma['theta'] < theta_cut) & mask_gg
+    elif theta2_cuts == 'efficiency':
+	theta2_cuts_efficiency = config['analysis']['theta2_efficiency']
+	theta_cut, theta_cut_bool = get_edep_theta_cuts(dl2_gamma, config=config, save_hdf=save_hdf, save_fig=save_fig, outdir=outdir, energy_bins=energy_bins, telescope=telescope, efficiency=theta2_cuts_efficiency)
+	mask = theta_cut_bool & mask_gg
+    else:
+	logging.error('Desired method of theta2 cut not implemented! Type \'sst1mpipe_mc_performance.py --help\' to see what is available')
+	exit()
 
-    # Number of gammas in ON region after gammaness cut
-    mask = (dl2_gamma['theta'] < theta_cut) & mask_gg
     gammas_on = dl2_gamma[mask]
     logging.info('N of simulated gamma-like point gammas in ON region: %d', len(gammas_on))
     N_observed_g = sum(gammas_on['weight'])
@@ -885,8 +904,15 @@ def sensitivity(
         else:
             logging.info('Estimation of gammas in the OFF region is not yet supported.')
 
-    area_ratio = theta_cut**2 / theta_cut_p**2
-    N_observed_p = sum(protons_off['weight']) * area_ratio
+    if theta2_cuts == 'global':
+	area_ratio = theta_cut**2 / theta_cut_p**2
+	N_observed_p = sum(protons_off['weight']) * area_ratio
+    elif theta2_cuts == 'efficiency':
+	area_ratio = theta_cut['cut']**2 / theta_cut_p**2
+	N_observed_p = 0
+	for i in range(len(energy_bins)-1):
+		maskp_theta = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
+		N_observed_p += (sum(protons_off[maskp_theta]['weight']) * area_ratio[i])
     logging.info(f'Rate of observed gamma-like diffuse protons in ON region: {(N_observed_p/obs_time).to(1/u.s)}, p+He DAMPE')
 
     # Sanity check on the number of reused events in each energy bin and in ON/OFF regions after all cuts
@@ -927,8 +953,13 @@ def sensitivity(
         N_simulated_g = len(gammas_on[maskg])
 
         maskp = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
-        N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio
-        N_simulated_p = len(protons_off[maskp])
+	
+	if theta_cuts == 'global':
+        	N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio
+        elif theta2_cuts == 'efficiency':
+		N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio[i]
+	
+	N_simulated_p = len(protons_off[maskp])
 
         # get approximate number of gammas in off regions
         if offset > 0.01 * u.deg and gamma_off:
@@ -1058,6 +1089,7 @@ def sensitivity(
             config=config, 
             telescope=telescope, 
             gammaness_cuts=gammaness_cuts, 
+            theta2_cuts=theta2_cuts,
             source=source_detection, 
             energy_min=energy_min)
 
@@ -1065,7 +1097,8 @@ def sensitivity(
 def source_time_to_detection(
         dl2_gamma, dl2_proton, mc_info_gamma=None, 
         mc_info_proton=None, config=None, telescope=None, 
-        gammaness_cuts=None, source=None, energy_min=0.0):
+        gammaness_cuts=None, theta2_cuts=None,
+	source=None, energy_min=0.0):
     """
     Provides time needed to detection of given source above
     certain energy.
@@ -1089,6 +1122,8 @@ def source_time_to_detection(
     gammaness_cuts: string
         Gammaness cut method to be applied \'global\',
         \'efficiency\', \'significance\'
+    theta2_cuts: string
+	Theta2 cut method to be applied \'global\', \'efficiency\'
     source: string
         Source spectrum defined in 
         sst1mpipe.performance.spectra
@@ -1131,11 +1166,20 @@ def source_time_to_detection(
 
     mask_gg, mask_gp = get_gammaness_cuts(dl2_gamma, dl2_proton, config=config, method=gammaness_cuts, energy_bins=energy_bins, telescope=telescope)
 
-    theta_cut = config['analysis']['global_theta_cut'] * u.deg
-    logging.info('Global theta cut used: %f', theta_cut.value)
+    if theta2_cuts == 'global':
+	theta_cut = config['analysis']['global_theta_cut'] * u.deg
+	logging.info('Global theta cut used: %f', theta_cut.value)
+	# Number of gammas in ON region after gammaness cut
+	mask = (dl2_gamma['theta'] < theta_cut) & mask_gg
+    elif theta2_cuts == 'efficiency':
+	theta2_cuts_efficiency = config['analysis']['theta2_efficiency']
+	theta_cut, theta_cut_bool = get_edep_theta_cuts(dl2_gamma, config=config, energy_bins=energy_bins, telescope=telescope, efficiency=theta2_cuts_efficiency)
+	mask = theta_cut_bool & mask_gg
+    else:
+	logging.error('Desired method of theta2 cut not implemented! Type \'sst1mpipe_mc_performance.py --help\' to see what is available.')
+	exit()
 
-    # Number of gammas in ON region after gammaness cut
-    mask = (dl2_gamma['theta'] < theta_cut) & mask_gg
+
     gammas_on = dl2_gamma[mask]
     logging.info('N of simulated gamma-like point gammas in ON region: %d', len(gammas_on))
     N_observed_g = sum(gammas_on['weight'])
@@ -1151,8 +1195,17 @@ def source_time_to_detection(
     protons_off = dl2_proton[mask]
     logging.info(f'N of simulated gamma-like diffuse protons in OFF region (r={theta_cut_p}): {len(protons_off)}')
 
-    area_ratio = theta_cut**2 / theta_cut_p**2
-    N_observed_p = sum(protons_off['weight']) * area_ratio
+
+    if theta2_cuts == 'global':
+	area_ratio = theta_cut**2 / theta_cut_p**2
+	N_observed_p = sum(protons_off['weight']) * area_ratio
+    elif theta2_cuts == 'efficiency':
+	area_ratio = theta_cut['cut']**2 / theta_cut_p**2
+	N_observed_p = 0
+	for i in range(len(energy_bins)-1):
+		maskp_theta = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
+		N_observed_p += (sum(protons_off[maskp_theta]['weight']) * area_ratio[i])
+
     logging.info(f'Rate of observed gamma-like diffuse protons in ON region: {(N_observed_p/obs_time).to(1/u.s)}, p+He DAMPE')
 
     # Time to reach 5 sigma for all energies integrated
