@@ -507,6 +507,9 @@ def get_edep_theta_cuts(
     min_events_bin = 100
     requested_theta_efficiency = efficiency
 
+    logging.info('Energy dependent theta2 cut used.')
+    logging.info('Requested gamma efficiency: %f', efficiency)
+
     theta_cuts = calculate_percentile_cut(
             dl2_gamma["theta"].to(u.deg),
             dl2_gamma["reco_energy"] * u.TeV,
