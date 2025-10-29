@@ -95,6 +95,13 @@ def parse_args():
                         default='global'
                         )
     parser.add_argument(
+			'--theta2-cuts',
+			action='store', type=str,
+			help='Select method of theta2 cuts to be applied: \'global\' (default), \'efficiency\'.',
+			dest='theta2_cuts',
+			default='global'
+			)
+    parser.add_argument(
                         '--rf-performance',
                         action='store_true',
                         help='Calculate energy and angular resolution, and ROC curves.',
@@ -142,6 +149,7 @@ def main():
     save_fig = args.save_fig
     save_hdf = args.save_hdf
     gammaness_cuts = args.gammaness_cuts
+    theta2_cuts = args.theta2_cuts
     get_rf_performance = args.rf_performance
     get_sensitivity = args.sensitivity
     source_detection = args.source_detection
@@ -181,7 +189,7 @@ def main():
             evaluate_performance(gamma_file=input_file_gamma, proton_file=input_file_proton, outdir=outdir, config=config, telescope=tel, save_fig=save_fig, save_hdf=save_hdf, gammaness_cuts=gammaness_cuts)
         if get_sensitivity:
             if input_file_proton is not None:
-                sensitivity(input_file_gamma, input_file_proton, outdir=outdir, config=config, telescope=tel, save_fig=save_fig, save_hdf=save_hdf, gammaness_cuts=gammaness_cuts, source_detection=source_detection, energy_min=energy_min, gamma_off=gamma_off)
+                sensitivity(input_file_gamma, input_file_proton, outdir=outdir, config=config, telescope=tel, save_fig=save_fig, save_hdf=save_hdf, gammaness_cuts=gammaness_cuts, theta2_cuts=theta2_cuts, source_detection=source_detection, energy_min=energy_min, gamma_off=gamma_off)
             else:
                 logging.error('DL2 proton file not specified. Sensitivity cannot be estimated.')
         if tel == "stereo":

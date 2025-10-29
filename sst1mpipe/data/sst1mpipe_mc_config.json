@@ -17,6 +17,7 @@
       "global_theta_cut": 0.2,
       "global_gammaness_cut": 0.6,
       "gamma_efficiency": 0.6,
+      "theta2_efficiency": 0.68,
       "stereo_delta_disp_cut_deg": null,
       "stereo_relative_std_reco_energy_cut": null,
       "stereo_std_gammaness_cut": null,
