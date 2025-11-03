@@ -799,7 +799,11 @@ def get_data_tel(params, tel=1):
         "camera_frame_hillas_intensity",
         "camera_frame_hillas_width",
         "camera_frame_hillas_length",
-        "leakage_intensity_width_2"
+        "leakage_intensity_width_2",
+        "camera_frame_hillas_wl", 
+        "camera_frame_hillas_skewness", 
+        "camera_frame_hillas_kurtosis", 
+        "camera_frame_timing_slope"
         ]]
 
     data_tel = data_tel.rename(
@@ -811,7 +815,11 @@ def get_data_tel(params, tel=1):
                             "camera_frame_hillas_intensity": "camera_frame_hillas_intensity_tel"+str(tel),
                             "camera_frame_hillas_width": "camera_frame_hillas_width_tel"+str(tel),
                             "camera_frame_hillas_length": "camera_frame_hillas_length_tel"+str(tel),
-                            "leakage_intensity_width_2": "leakage_intensity_width_2_tel"+str(tel)
+                            "leakage_intensity_width_2": "leakage_intensity_width_2_tel"+str(tel),
+                            "leakage_intensity_wl": "leakage_intensity_wl_tel"+str(tel),
+                            "camera_frame_hillas_skewness": "camera_frame_hillas_skewness_tel"+str(tel),
+                            "camera_frame_hillas_kurtosis": "camera_frame_hillas_kurtosis_tel"+str(tel),
+                            "camera_frame_timing_slope": "camera_frame_timing_slope_tel"+str(tel)
                             }
                 )
 
