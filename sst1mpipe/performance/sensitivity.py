@@ -872,17 +872,17 @@ def sensitivity(
     mask_gg, mask_gp = get_gammaness_cuts(dl2_gamma, dl2_proton, config=config, method=gammaness_cuts, save_hdf=save_hdf, save_fig=save_fig, outdir=outdir, energy_bins=energy_bins, telescope=telescope, gamma_off=gamma_off)
 
     if theta2_cuts == 'global':
-	    theta_cut = config['analysis']['global_theta_cut'] * u.deg
-	    logging.info('Global theta cut used: %f', theta_cut.value)
-	    # Number of gammas in ON region after gammaness cut
-	    mask = (dl2_gamma['theta'] < theta_cut) & mask_gg
+        theta_cut = config['analysis']['global_theta_cut'] * u.deg
+        logging.info('Global theta cut used: %f', theta_cut.value)
+        # Number of gammas in ON region after gammaness cut
+        mask = (dl2_gamma['theta'] < theta_cut) & mask_gg
     elif theta2_cuts == 'efficiency':
-	    theta2_cuts_efficiency = config['analysis']['theta2_efficiency']
-	    theta_cut, theta_cut_bool = get_edep_theta_cuts(dl2_gamma, config=config, save_hdf=save_hdf, save_fig=save_fig, outdir=outdir, energy_bins=energy_bins, telescope=telescope, efficiency=theta2_cuts_efficiency)
-	    mask = theta_cut_bool & mask_gg
+        theta2_cuts_efficiency = config['analysis']['theta2_efficiency']
+        theta_cut, theta_cut_bool = get_edep_theta_cuts(dl2_gamma, config=config, save_hdf=save_hdf, save_fig=save_fig, outdir=outdir, energy_bins=energy_bins, telescope=telescope, efficiency=theta2_cuts_efficiency)
+        mask = theta_cut_bool & mask_gg
     else:
-	    logging.error('Desired method of theta2 cut not implemented! Type \'sst1mpipe_mc_performance.py --help\' to see what is available')
-	    exit()
+        logging.error('Desired method of theta2 cut not implemented! Type \'sst1mpipe_mc_performance.py --help\' to see what is available')
+        exit()
 
     gammas_on = dl2_gamma[mask]
     logging.info('N of simulated gamma-like point gammas in ON region: %d', len(gammas_on))
@@ -957,7 +957,7 @@ def sensitivity(
 
         maskp = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
 	
-	if theta_cuts == 'global':
+    if theta_cuts == 'global':
         N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio
     elif theta2_cuts == 'efficiency':
         N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio[i]
@@ -1175,12 +1175,12 @@ def source_time_to_detection(
         # Number of gammas in ON region after gammaness cut
         mask = (dl2_gamma['theta'] < theta_cut) & mask_gg
     elif theta2_cuts == 'efficiency':
-	    theta2_cuts_efficiency = config['analysis']['theta2_efficiency']
-	    theta_cut, theta_cut_bool = get_edep_theta_cuts(dl2_gamma, config=config, energy_bins=energy_bins, telescope=telescope, efficiency=theta2_cuts_efficiency)
-	    mask = theta_cut_bool & mask_gg
+        theta2_cuts_efficiency = config['analysis']['theta2_efficiency']
+        theta_cut, theta_cut_bool = get_edep_theta_cuts(dl2_gamma, config=config, energy_bins=energy_bins, telescope=telescope, efficiency=theta2_cuts_efficiency)
+        mask = theta_cut_bool & mask_gg
     else:
-	    logging.error('Desired method of theta2 cut not implemented! Type \'sst1mpipe_mc_performance.py --help\' to see what is available.')
-	    exit()
+        logging.error('Desired method of theta2 cut not implemented! Type \'sst1mpipe_mc_performance.py --help\' to see what is available.')
+        exit()
 
 
     gammas_on = dl2_gamma[mask]
