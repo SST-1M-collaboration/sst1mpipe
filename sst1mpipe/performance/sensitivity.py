@@ -913,9 +913,9 @@ def sensitivity(
     elif theta2_cuts == 'efficiency':
 	    area_ratio = theta_cut['cut']**2 / theta_cut_p**2
 	    N_observed_p = 0
-	for i in range(len(energy_bins)-1):
-		maskp_theta = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
-		N_observed_p += (sum(protons_off[maskp_theta]['weight']) * area_ratio[i])
+	    for i in range(len(energy_bins)-1):
+		    maskp_theta = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
+		    N_observed_p += (sum(protons_off[maskp_theta]['weight']) * area_ratio[i])
     logging.info(f'Rate of observed gamma-like diffuse protons in ON region: {(N_observed_p/obs_time).to(1/u.s)}, p+He DAMPE')
 
     # Sanity check on the number of reused events in each energy bin and in ON/OFF regions after all cuts
@@ -1205,9 +1205,9 @@ def source_time_to_detection(
     elif theta2_cuts == 'efficiency':
 	    area_ratio = theta_cut['cut']**2 / theta_cut_p**2
 	    N_observed_p = 0
-	for i in range(len(energy_bins)-1):
-		maskp_theta = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
-		N_observed_p += (sum(protons_off[maskp_theta]['weight']) * area_ratio[i])
+        for i in range(len(energy_bins)-1):
+            maskp_theta = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
+            N_observed_p += (sum(protons_off[maskp_theta]['weight']) * area_ratio[i])
 
     logging.info(f'Rate of observed gamma-like diffuse protons in ON region: {(N_observed_p/obs_time).to(1/u.s)}, p+He DAMPE')
 
