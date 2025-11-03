@@ -1200,11 +1200,11 @@ def source_time_to_detection(
 
 
     if theta2_cuts == 'global':
-	    area_ratio = theta_cut**2 / theta_cut_p**2
-	    N_observed_p = sum(protons_off['weight']) * area_ratio
+        area_ratio = theta_cut**2 / theta_cut_p**2
+        N_observed_p = sum(protons_off['weight']) * area_ratio
     elif theta2_cuts == 'efficiency':
-	    area_ratio = theta_cut['cut']**2 / theta_cut_p**2
-	    N_observed_p = 0
+        area_ratio = theta_cut['cut']**2 / theta_cut_p**2
+        N_observed_p = 0
         for i in range(len(energy_bins)-1):
             maskp_theta = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
             N_observed_p += (sum(protons_off[maskp_theta]['weight']) * area_ratio[i])
