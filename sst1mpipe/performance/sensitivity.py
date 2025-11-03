@@ -962,7 +962,7 @@ def sensitivity(
     elif theta2_cuts == 'efficiency':
         N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio[i]
 
-	N_simulated_p = len(protons_off[maskp])
+        N_simulated_p = len(protons_off[maskp])
 
         # get approximate number of gammas in off regions
         if offset > 0.01 * u.deg and gamma_off:
