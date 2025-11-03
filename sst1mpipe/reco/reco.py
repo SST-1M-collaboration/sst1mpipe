@@ -620,6 +620,7 @@ def stereo_reconstruction(
     gammaness_average, gammaness_var, gammaness_wvar = get_average_param(params, param='gammaness', weights=weights)
 
     dl2 = get_stereo_dl2(params, ismc=ismc)
+
     dl2['log_reco_energy'] = energy_average
     dl2['reco_energy'] = 10**energy_average
     dl2['var_reco_energy'] = (np.log(10)*10**energy_average)**2 * energy_var
@@ -627,6 +628,25 @@ def stereo_reconstruction(
     dl2['gammaness'] = gammaness_average
     dl2['var_gammaness'] = gammaness_var
     dl2['wvar_gammaness'] = gammaness_wvar
+
+    mask_tel1 = params['tel_id'] == 1
+    mask_tel2 = params['tel_id'] == 2
+    hillas_tel1 = params[mask_tel1][["obs_id", "event_id", "HillasReconstructor_tel_impact_distance"]]
+    hillas_tel2 = params[mask_tel2][["obs_id", "event_id", "HillasReconstructor_tel_impact_distance"]]
+    hillas_tel1 = hillas_tel1.rename(
+        columns={"HillasReconstructor_tel_impact_distance":
+        "HillasReconstructor_tel_impact_distance_tel1"}
+        )
+    hillas_tel2 = hillas_tel2.rename(
+        columns={"HillasReconstructor_tel_impact_distance":
+        "HillasReconstructor_tel_impact_distance_tel2"}
+        )
+    
+    print(len(dl2), dl2.keys())
+    dl2 = dl2.merge(hillas_tel1, on=['obs_id', 'event_id'], how='left')
+    print(len(dl2), dl2.keys())
+    dl2 = dl2.merge(hillas_tel2, on=['obs_id', 'event_id'], how='left')
+    print(len(dl2), dl2.keys())
 
     # Arrival direction reconstruction
 
@@ -816,7 +836,7 @@ def get_data_tel(params, tel=1):
                             "camera_frame_hillas_width": "camera_frame_hillas_width_tel"+str(tel),
                             "camera_frame_hillas_length": "camera_frame_hillas_length_tel"+str(tel),
                             "leakage_intensity_width_2": "leakage_intensity_width_2_tel"+str(tel),
-                            "leakage_intensity_wl": "leakage_intensity_wl_tel"+str(tel),
+                            "camera_frame_hillas_wl": "camera_frame_hillas_wl_tel"+str(tel),
                             "camera_frame_hillas_skewness": "camera_frame_hillas_skewness_tel"+str(tel),
                             "camera_frame_hillas_kurtosis": "camera_frame_hillas_kurtosis_tel"+str(tel),
                             "camera_frame_timing_slope": "camera_frame_timing_slope_tel"+str(tel)
