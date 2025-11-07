@@ -28,6 +28,7 @@ from astroquery.simbad import Simbad
 import pkg_resources
 from os import path
 import re
+from astropy.coordinates import angular_separation
 
 
 def get_target(file, force_pointing=False):
@@ -1893,3 +1894,16 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
     plt.ylabel('observation time [h]')
     plt.xticks(rotation=45)
     return f,ax
+
+def calculate_misdirection(dl2):
+    
+    dl2['misdirection'] = angular_separation(
+        dl2['true_az'].values * u.deg,
+        dl2['true_alt'].values * u.deg,
+        dl2["reco_az"].values * u.deg,
+        dl2["reco_alt"].values * u.deg,
+    ).to_value(u.deg)
+    
+    dl2['log_misdirection'] = np.log10(dl2['misdirection'])
+    
+    return dl2

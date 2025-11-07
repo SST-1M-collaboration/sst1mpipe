@@ -1000,6 +1000,12 @@ def write_dl2_table(
 
     with tables.open_file(output_file, mode=mode) as f:
 
+        full_node_path = f"{table_path}/{table_name}"
+        if full_node_path in f:
+            logging.info("Removing existing node %s", full_node_path)
+            f.remove_node(table_path, name=table_name, recursive=True)
+
+        logging.info("Creating new node %s", full_node_path)
         t = f.create_table(
             table_path,
             table_name,

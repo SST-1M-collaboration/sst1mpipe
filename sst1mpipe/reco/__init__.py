@@ -19,5 +19,9 @@ from .reco import (
     get_average_param,
     get_stereo_dl2,
     find_coincidence_offset,
-    make_dl1_stereo
+    make_dl1_stereo,
+    train_rf_misdirection,
+    reco_misdirection,
+    get_evttype_edges,
+    classify_evt_types
 )
