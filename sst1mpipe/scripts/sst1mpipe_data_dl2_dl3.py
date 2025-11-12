@@ -6,6 +6,7 @@ per-run files into per-wobble DL3 fits files. It also finds proper IRF
 based on zenith, azimuth and NSB level. It also creates per-night index files.
 - Input is a directory with DL2 files and directory with IRFs
 - Outputs are DL3 files and hdu indexes
+- If list of event classes is provided, the DL3 files are calculated for all of them and stored in separate subdirs event_class_X
 
 Usage:
 
@@ -18,6 +19,7 @@ $> python sst1mpipe_data_dl2_dl3.py
 --target-ra 85.0
 --target-dec 25.0
 --gammaness-cut-dir /gammaness_cuts/
+--event-classes
 
 """
 
@@ -97,7 +99,13 @@ def parse_args():
                     help='Dir with gammaness cuts optimized on MC. The subdir structure should follow the same logic as the RF model directories. By default global gammaness cut from the config file is used.',
                     default=None
                     )
-                    
+    parser.add_argument(
+                    '--event-classes', type=int,
+                    dest='event_classes',
+                    nargs='+',
+                    default=[],
+                    help='Event classes to process, e.g. --event-classes 1 2 3 4. If used, DL3 files are created for each event class in the list (if proper IRFs are found). If not used, event classes are ignored completely.')
+
     args = parser.parse_args()
     return args
 
@@ -113,6 +121,7 @@ def main():
     target_ra = args.target_ra
     target_dec = args.target_dec
     gammaness_cuts_dir = args.gammaness_cuts_dir
+    event_classes = args.event_classes
 
     check_outdir(outdir)
 
@@ -129,18 +138,25 @@ def main():
     target_pos, target_name = get_target_pos(target_name=target_name, ra=target_ra, dec=target_dec)
 
     dl3_files = dl2_dir_to_dl3(
-                   target_name = target_name,
-                   target_pos = target_pos,
-                   dl2_dir       = dl2_dir,
-                   config_file   = args.config_file,
-                   out_dir       = outdir,
-                   gammaness_cuts = gammaness_cuts_dir
-                   )
-
-    create_hdu_index(dl3_files, out_dir=outdir, irf_dir=irf_dir)
-
-    data_store = DataStore.from_dir(outdir)
-    print(data_store.obs_table)
+                target_name = target_name,
+                target_pos = target_pos,
+                dl2_dir       = dl2_dir,
+                config_file   = args.config_file,
+                out_dir       = outdir,
+                gammaness_cuts = gammaness_cuts_dir,
+                event_classes=event_classes
+                )
+    
+    if len(event_classes):
+        for evtclass in event_classes:
+            outdir_c = outdir + '/event_class_' + str(evtclass)
+            create_hdu_index(dl3_files['event_class_'+str(evtclass)], out_dir=outdir_c, irf_dir=irf_dir)
+            data_store = DataStore.from_dir(outdir_c)
+            print(data_store.obs_table)
+    else:
+        create_hdu_index(dl3_files['all'], out_dir=outdir, irf_dir=irf_dir)
+        data_store = DataStore.from_dir(outdir)
+        print(data_store.obs_table)
 
 if __name__ == "__main__":
     main()

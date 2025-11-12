@@ -11,7 +11,7 @@ from sst1mpipe.utils import (
     get_GTIs,
 )
 from sst1mpipe.analysis import add_reco_ra_dec
-from sst1mpipe.io import load_config, load_more_dl2_files
+from sst1mpipe.io import load_config, load_more_dl2_files, check_outdir
 
 from ctapipe.coordinates import TelescopeFrame
 
@@ -32,7 +32,8 @@ def photon_df_to_fits(dl2_photons,
                       RF_used = None,
                       start_t = None,
                       end_t   = None,
-                      gammaness_cuts = None
+                      gammaness_cuts = None,
+                      event_class    = None,
                       ):
     """
     Create HDU list to be stored in the DL3 fits file
@@ -58,7 +59,8 @@ def photon_df_to_fits(dl2_photons,
         Flags the IRF assigned to 
         given DL3 file. If None, global gammaness 
         cut from the config file is applied.
-
+    event_class: int
+        Event class in given photon list to find a proper IRF
     Returns
     -------
     hdu_list: 
@@ -123,8 +125,11 @@ def photon_df_to_fits(dl2_photons,
         name = RF_used.split('_nsb')[0]
     except:
         name = RF_used
-    logging.info('Expected IRF name for given DL3 file: %s', name)
-    irf_name = "{}_gc{}".format(name, gammaness_cut)
+    if event_class is not None:
+        ec_str = "_ec{}".format(event_class)
+    else: ec_str = ""
+    irf_name = "{}_gc{}{}".format(name, gammaness_cut, ec_str)
+    logging.info('Expected IRF name for given DL3 file: %s', irf_name)
     pipeline_version = dl2_photons["sst1mpipe_version"].iloc[0]
 
     ########### Build TABLE
@@ -292,6 +297,7 @@ def dl2_dir_to_dl3(target_name   = None,
                    config_file   = None,
                    out_dir       = None,
                    gammaness_cuts= None,
+                   event_classes   = None,
                    ):
     """
     Process all DL2 files in given directory in DL3. DL2 files
@@ -318,16 +324,18 @@ def dl2_dir_to_dl3(target_name   = None,
         on MC. A set of gammaness cut for given zenith angle
         and NSB is found authomaticaly. The subdir structure 
         should follow the same logic as the RF model directories.
-
+    event_classes: list of ints
+        classes in DL2 column event_type to be processed.
     Returns
     -------
     created_files: list of paths
 
     """
-
+    
     config = load_config(config_file)
 
-    created_files, irfs = [], []
+    created_files = {}
+    created_files['all'] = []
 
     all_files = glob.glob(dl2_dir+'/*dl2.h5')
     all_files.sort()
@@ -348,11 +356,14 @@ def dl2_dir_to_dl3(target_name   = None,
                 gammaness_cut=gammaness_cuts
                 )
     df_dl2 = df_dl2_unsort.copy().sort_values("local_time").reset_index()
-    times = np.array(times_unsort)
-    times.sort()
+    #times = np.array(times_unsort)
+    #times.sort()
 
-    # It the event rate is very low, it seems to be safer to use pointing direction, not the time difference
-    #GTIs = get_GTIs(times)
+    # check outdirs
+    if len(event_classes):
+        for evtclass in event_classes:
+            outdir = out_dir + '/event_class_' + str(evtclass)
+            check_outdir(outdir)
 
     logging.info("{} GTIs (i.e. wobbles) in total.".format(len(GTIs.T)-1))
     
@@ -383,19 +394,55 @@ def dl2_dir_to_dl3(target_name   = None,
 
             ## better deefinition of obs_id ?
             obs_id = df_tt["obs_id"].min()
-            hdulist = photon_df_to_fits(df_tt,
-                                        obs_id           = obs_id,
-                                        target_name      = target_name,
-                                        target_pos       = target_pos,
-                                        config           = config,
-                                        RF_used          = RF_used,
-                                        start_t = start_t,
-                                        end_t   = end_t,
-                                        gammaness_cuts = gammaness_cuts
-                                        )
 
-            outname = os.path.join(out_dir,"SST1M_{}_obs_id_{}_dl3.fits".format(target_name,obs_id))
-            fits.HDUList(hdulist).writeto(outname, overwrite=True)
-            created_files.append(outname)
+            if len(event_classes):
+                for evtclass in event_classes:
+                    out_dir_c = out_dir + '/event_class_' + str(evtclass)
+
+                    logging.info("Making DL3s for event class {}".format(evtclass))
+                    df_tt_c = df_tt[df_tt['event_type'] == evtclass]
+                    logging.info("{} events of class {}".format(len(df_tt_c), evtclass))
+
+                    # If there are no photons, the DL3 file is not created. This may potentialy
+                    # raise some issues with exposure not being properly calculated.
+                    if len(df_tt_c):
+                        hdulist = photon_df_to_fits(df_tt_c,
+                                                    obs_id           = obs_id,
+                                                    target_name      = target_name,
+                                                    target_pos       = target_pos,
+                                                    config           = config,
+                                                    RF_used          = RF_used,
+                                                    start_t          = start_t,
+                                                    end_t            = end_t,
+                                                    gammaness_cuts   = gammaness_cuts,
+                                                    event_class      = evtclass,
+                                                    )
+                        outname = os.path.join(out_dir_c,"SST1M_{}_obs_id_{}_dl3.fits".format(target_name,obs_id))
+                        fits.HDUList(hdulist).writeto(outname, overwrite=True)
+                        key = 'event_class_'+str(evtclass)
+                        if key not in created_files:
+                            created_files[key] = []
+                        created_files[key].append(outname)
+                    else:
+                        outname = os.path.join(out_dir_c,"SST1M_{}_obs_id_{}_dl3.fits".format(target_name,obs_id))
+                        logging.warning("No events of class {}, file {} not created!".format(evtclass,outname))
+            else:
+                if len(df_tt):
+                    hdulist = photon_df_to_fits(df_tt,
+                                                    obs_id           = obs_id,
+                                                    target_name      = target_name,
+                                                    target_pos       = target_pos,
+                                                    config           = config,
+                                                    RF_used          = RF_used,
+                                                    start_t          = start_t,
+                                                    end_t            = end_t,
+                                                    gammaness_cuts = gammaness_cuts
+                                                    )
+                    outname = os.path.join(out_dir,"SST1M_{}_obs_id_{}_dl3.fits".format(target_name,obs_id))
+                    fits.HDUList(hdulist).writeto(outname, overwrite=True)
+                    created_files['all'].append(outname)
+                else:
+                    outname = os.path.join(out_dir,"SST1M_{}_obs_id_{}_dl3.fits".format(target_name,obs_id))
+                    logging.warning("No events for this wobble/RF, file {} not created!".format(outname))
 
     return created_files

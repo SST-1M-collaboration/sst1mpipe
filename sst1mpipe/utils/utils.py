@@ -28,6 +28,7 @@ from astroquery.simbad import Simbad
 import pkg_resources
 from os import path
 import re
+from astropy.coordinates import angular_separation
 
 
 def get_target(file, force_pointing=False):
@@ -1223,24 +1224,27 @@ def stereo_var_cuts(data, config=None):
     mask_gammaness = np.ones(len(data), dtype=bool)
     mask_energy = np.ones(len(data), dtype=bool)
 
-    if (config['analysis']['stereo_delta_disp_cut_deg'] is not None) and ('min_distance' in data.columns):
-        mask_disp = data['min_distance']*180/np.pi < config['analysis']['stereo_delta_disp_cut_deg']
-        logging.info('{} deg cut on min disp distance applied.'.format(config['analysis']['stereo_delta_disp_cut_deg']))
-        logging.info('N of events of stereo after delta disp cut: {} '.format(sum(mask_disp)))
+    if ('stereo_delta_disp_cut_deg' in config['analysis']) and ('min_distance' in data.columns):
+        if config['analysis']['stereo_delta_disp_cut_deg'] is not None:
+            mask_disp = data['min_distance']*180/np.pi < config['analysis']['stereo_delta_disp_cut_deg']
+            logging.info('{} deg cut on min disp distance applied.'.format(config['analysis']['stereo_delta_disp_cut_deg']))
+            logging.info('N of events of stereo after delta disp cut: {} '.format(sum(mask_disp)))
     else:
         logging.info('No cut on min disp distance applied.')
 
-    if (config['analysis']['stereo_relative_std_reco_energy_cut'] is not None) and ('var_reco_energy' in data.columns):
-        mask_energy = np.sqrt(data['var_reco_energy'])/data['reco_energy'] < config['analysis']['stereo_relative_std_reco_energy_cut']
-        logging.info('{} cut on max relative std of reco energy applied.'.format(config['analysis']['stereo_relative_std_reco_energy_cut']))
-        logging.info('N of events of stereo after relative std reco energy cut: {} '.format(sum(mask_energy)))
+    if ('stereo_relative_std_reco_energy_cut' in config['analysis']) and ('var_reco_energy' in data.columns):
+        if config['analysis']['stereo_relative_std_reco_energy_cut'] is not None:
+            mask_energy = np.sqrt(data['var_reco_energy'])/data['reco_energy'] < config['analysis']['stereo_relative_std_reco_energy_cut']
+            logging.info('{} cut on max relative std of reco energy applied.'.format(config['analysis']['stereo_relative_std_reco_energy_cut']))
+            logging.info('N of events of stereo after relative std reco energy cut: {} '.format(sum(mask_energy)))
     else:
         logging.info('No cut on max relative std reco energy applied.')
 
-    if (config['analysis']['stereo_std_gammaness_cut'] is not None) and ('var_gammaness' in data.columns):
-        mask_gammaness = np.sqrt(data['var_gammaness']) < config['analysis']['stereo_std_gammaness_cut']
-        logging.info('{} cut on max std of reco gammaness applied.'.format(config['analysis']['stereo_std_gammaness_cut']))
-        logging.info('N of events of stereo after std reco gammaness cut: {} '.format(sum(mask_gammaness)))
+    if ('stereo_std_gammaness_cut' in config['analysis']) and ('var_gammaness' in data.columns):
+        if config['analysis']['stereo_std_gammaness_cut'] is not None:
+            mask_gammaness = np.sqrt(data['var_gammaness']) < config['analysis']['stereo_std_gammaness_cut']
+            logging.info('{} cut on max std of reco gammaness applied.'.format(config['analysis']['stereo_std_gammaness_cut']))
+            logging.info('N of events of stereo after std reco gammaness cut: {} '.format(sum(mask_gammaness)))
     else:
         logging.info('No cut on max std reco gammaness applied.')
 
@@ -1893,3 +1897,16 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
     plt.ylabel('observation time [h]')
     plt.xticks(rotation=45)
     return f,ax
+
+def calculate_misdirection(dl2):
+    
+    dl2['misdirection'] = angular_separation(
+        dl2['true_az'].values * u.deg,
+        dl2['true_alt'].values * u.deg,
+        dl2["reco_az"].values * u.deg,
+        dl2["reco_alt"].values * u.deg,
+    ).to_value(u.deg)
+    
+    dl2['log_misdirection'] = np.log10(dl2['misdirection'])
+    
+    return dl2

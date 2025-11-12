@@ -4,6 +4,8 @@
 A script to create IRFs from DL2 MC files.
 - Inputs are DL2 point gammas and DL2 diffuse proton files.
 - Outputs are IRFs in a format compatible with gammapy.
+- Can create biased IRFs in true energy for systematics studies
+- Can create separate IRFs for different event classes
 
 Usage:
 
@@ -13,14 +15,15 @@ $> python sst1mpipe_mc_make_irfs.py
 --config sst1mpipe_config.json
 --output-dir ./
 --gammaness-cut-dir ./
-
+--event-classes
+--scale-true-energies
 """
 
 import argparse
 import sys
 
 from sst1mpipe.utils import get_telescopes
-from sst1mpipe.io import check_outdir
+from sst1mpipe.io import check_outdir, load_dl2_sst1m, load_config
 from sst1mpipe.performance import irf_maker
 import sst1mpipe
 import logging
@@ -58,17 +61,23 @@ def parse_args():
                         )
     
     parser.add_argument(
-                    '--gammaness-cut-dir', type=str,
-                    dest='gammaness_cut_dir',
-                    help='Directory with gammaness cut tables optimized on MC. If empty, global gammaness cut from the config file is used.',
-                    default=None
-                    )
+                        '--gammaness-cut-dir', type=str,
+                        dest='gammaness_cut_dir',
+                        help='Directory with gammaness cut tables optimized on MC. If empty, global gammaness cut from the config file is used.',
+                        default=None
+                        )
     parser.add_argument(
                         '--scale-true-energies',
                         action='store_true',
                         help='Enables scaling of true energy for production of a biased IRFs. If used, a global scale on true energy of each shower is applied from config[\"analysis\"][\"true_energy_scaling_factor\"]. Note that this does not modify the true energy values stored in the DL2 files.',
                         dest='true_energy_scaling'
                         )
+    parser.add_argument(
+                        '--event-classes',
+                        action='store_true',
+                        dest='event_classes',
+                        help='If used, IRFs are created for each event class found in the input DL2 files.',
+                        )           
     args = parser.parse_args()
     return args
 
@@ -82,6 +91,7 @@ def main():
     outdir = args.outdir
     gammaness_cut_dir = args.gammaness_cut_dir
     true_energy_scaling = args.true_energy_scaling
+    event_classes = args.event_classes
 
     check_outdir(outdir)
 
@@ -108,17 +118,43 @@ def main():
         else:
             gammaness_cuts = None
 
-        maker = irf_maker(config_filename = args.config_file,
-                            mc_gamma_filename  = input_file_gamma,
-                            mc_proton_filename = input_file_proton,
-                            mc_tel_setup = tel,
-                            point_like_offset = None,
-                            output_dir = outdir,
-                            gammaness_cuts = gammaness_cuts,
-                            true_energy_scaling = true_energy_scaling,
-                            )
+        if event_classes:
+            config = load_config(args.config_file)
+            dl2_mc_gamma  = load_dl2_sst1m(input_file_gamma,
+                                       config=config,
+                                       tel=tel,
+                                       table='pandas')
+            evttypes = dl2_mc_gamma['event_type'].unique()
 
-        maker.make_all_irfs()
+        else: evttypes = []
+
+        if len(evttypes):
+            for event_class in evttypes:
+
+                maker = irf_maker(config_filename = args.config_file,
+                                    mc_gamma_filename  = input_file_gamma,
+                                    mc_proton_filename = input_file_proton,
+                                    mc_tel_setup = tel,
+                                    point_like_offset = None,
+                                    output_dir = outdir,
+                                    gammaness_cuts = gammaness_cuts,
+                                    true_energy_scaling = true_energy_scaling,
+                                    event_class = event_class,
+                                    )
+
+                maker.make_all_irfs()
+        else:
+                maker = irf_maker(config_filename = args.config_file,
+                                    mc_gamma_filename  = input_file_gamma,
+                                    mc_proton_filename = input_file_proton,
+                                    mc_tel_setup = tel,
+                                    point_like_offset = None,
+                                    output_dir = outdir,
+                                    gammaness_cuts = gammaness_cuts,
+                                    true_energy_scaling = true_energy_scaling,
+                                    )
+
+                maker.make_all_irfs()
 
 if __name__ == "__main__":
     main()

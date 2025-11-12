@@ -1,6 +1,8 @@
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
+from astropy.table import QTable
+
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
 import joblib
@@ -34,7 +36,10 @@ from sst1mpipe.io import (
 )
 from sst1mpipe.analysis import add_reco_ra_dec
 
-from ctaplot.ana import angular_separation_altaz
+from ctaplot.ana import (
+    angular_separation_altaz, 
+    logbin_mean
+)
 import logging
 
 from ctapipe.reco import ShowerProcessor
@@ -321,6 +326,27 @@ def train_rf_separation(
     del clf
 
 
+def train_rf_misdirection(
+    data, config=None,
+    outdir=None, telescope=None,
+    plot=None):
+
+    regression_args = config['random_forest_regressor_args']
+    if telescope == 'stereo':
+        features = config['misdirection_regression_features_stereo']
+    else:
+        features = config['misdirection_regression_features_mono']
+
+    reg = RandomForestRegressor(**regression_args)
+    reg.fit(data[features], data['log_misdirection'])
+    
+    if plot:
+        plot_feature_importance(reg, features=features, outfile=outdir + '/reg_mis_features_' + str(telescope) + '.png', telescope=tel)
+
+    joblib.dump(reg, outdir + '/reg_misdirection_' + str(telescope) + '.sav', compress=3)
+    del reg
+
+
 def train_models(
         params_gamma, params_protons, config=None, 
         plot=None, outdir=None, telescope=None, 
@@ -412,6 +438,92 @@ def train_models(
     else:
         logging.warning('RF classifier cannot be trained, dus to missing input DL1 proton file!')
     logging.info('All Random Forest models trained and stored here: %s', outdir)
+
+
+def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
+
+    if telescope == 'stereo':
+
+        # In data, we need to rename columns _tel21 -> tel1, tel22 -> tel2
+        for tt,ttn in zip(['_tel21', '_tel22'], ['_tel1', '_tel2']):
+            cols_to_rename = dl2.columns[dl2.columns.str.contains(tt)]
+            rename_dict = {col: col.replace(tt, ttn) for col in cols_to_rename}
+            dl2 = dl2.rename(columns=rename_dict)
+
+        dl2['log_camera_frame_hillas_intensity_tel1'] = np.log10(dl2['camera_frame_hillas_intensity_tel1'])
+        dl2['log_camera_frame_hillas_intensity_tel2'] = np.log10(dl2['camera_frame_hillas_intensity_tel2'])
+
+    if telescope == 'stereo':
+        features = config['misdirection_regression_features_stereo']
+    else:
+        features = config['misdirection_regression_features_mono']
+    
+    # Check finite
+    mask = np.ones(len(dl2), dtype=bool)
+    for key in features:
+        try:
+            mask &= np.isfinite(dl2[key])
+        except:
+            logging.warning('{} column not in data.'.format(key))
+    dl2_finite = dl2[mask].copy()
+
+    mis_mono_re = joblib.load(models_dir + '/reg_misdirection_'+telescope+'.sav')
+    logging.info('Misdirection reconstruction..')
+    dl2_finite['log_reco_misdirection'] = mis_mono_re.predict(dl2_finite[features])
+    return dl2_finite
+
+
+def get_evttype_edges(dl2, config=None, percentiles=[25, 50, 75]):
+    
+    ebins = np.logspace(config['analysis']["log_energy_min_tev"], config['analysis']["log_energy_max_tev"], config['analysis']["n_energy_bins"])
+    energy_center = logbin_mean(ebins)
+
+    edges = []
+    for i in range(len(ebins)-1):
+        mask = (dl2['reco_energy'] > ebins[i]) & (dl2['reco_energy'] < ebins[i+1])
+
+        if sum(mask):
+            evttype_edges = np.percentile(
+                    dl2['log_reco_misdirection'][mask],
+                    percentiles
+                )
+            evttype_edges = np.concatenate(
+                ([-np.inf], evttype_edges, [np.inf])
+            )
+        else:
+            evttype_edges = np.array([np.nan, np.nan, np.nan, np.nan, np.nan])
+        edges.append(evttype_edges)
+    edges = np.array(edges)
+
+    
+    cut_table = QTable()
+    cut_table["low"] = ebins[:-1]
+    cut_table["high"] = ebins[1:]
+    cut_table["center"] = energy_center
+    for i in range(len(percentiles)+2):
+        key = 'log_midirection_edge_' + str(i)
+        cut_table[key] = np.asanyarray(np.nan, edges.dtype)
+        cut_table[key].value[:] = edges[:,i]
+
+    return cut_table
+
+
+def classify_evt_types(dl2, edges=None):
+    
+    dl2['event_type'] = 0
+    ebins_low = edges["low"]
+    ebins_high = edges["high"]
+
+    evttype_edges = [s for s in edges.keys() if 'log_midirection_' in s]
+
+    for i in range(len(ebins_low)):
+        mask_e = (dl2['reco_energy'] > ebins_low[i]) & (dl2['reco_energy'] < ebins_high[i])
+
+        for j in range(len(evttype_edges)-1):
+            mask_class = (dl2['log_reco_misdirection'] > edges[evttype_edges[j]][i]) & (dl2['log_reco_misdirection'] <= edges[evttype_edges[j+1]][i])
+            dl2.loc[mask_e & mask_class, 'event_type'] = j+1
+
+    return dl2
 
 
 def apply_models(
@@ -629,8 +741,13 @@ def stereo_reconstruction(
     dl2['var_gammaness'] = gammaness_var
     dl2['wvar_gammaness'] = gammaness_wvar
 
-    mask_tel1 = params['tel_id'] == 1
-    mask_tel2 = params['tel_id'] == 2
+    # We need to add these for event types classificantion
+    if ismc:
+        mask_tel1 = params['tel_id'] == 1
+        mask_tel2 = params['tel_id'] == 2
+    else:
+        mask_tel1 = params['tel_id'] == 21
+        mask_tel2 = params['tel_id'] == 22
     hillas_tel1 = params[mask_tel1][["obs_id", "event_id", "HillasReconstructor_tel_impact_distance"]]
     hillas_tel2 = params[mask_tel2][["obs_id", "event_id", "HillasReconstructor_tel_impact_distance"]]
     hillas_tel1 = hillas_tel1.rename(
@@ -641,12 +758,8 @@ def stereo_reconstruction(
         columns={"HillasReconstructor_tel_impact_distance":
         "HillasReconstructor_tel_impact_distance_tel2"}
         )
-    
-    print(len(dl2), dl2.keys())
     dl2 = dl2.merge(hillas_tel1, on=['obs_id', 'event_id'], how='left')
-    print(len(dl2), dl2.keys())
     dl2 = dl2.merge(hillas_tel2, on=['obs_id', 'event_id'], how='left')
-    print(len(dl2), dl2.keys())
 
     # Arrival direction reconstruction
 
@@ -825,7 +938,7 @@ def get_data_tel(params, tel=1):
         "camera_frame_hillas_kurtosis", 
         "camera_frame_timing_slope"
         ]]
-
+        
     data_tel = data_tel.rename(
                     columns={
                             "reco_alt_sign_p": "reco_alt_sign_p_tel"+str(tel),

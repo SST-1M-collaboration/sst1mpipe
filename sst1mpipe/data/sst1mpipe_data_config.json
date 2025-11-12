@@ -275,6 +275,39 @@
         "leakage_intensity_width_2"
       ],
 
+      "misdirection_regression_features_mono": [
+        "log_camera_frame_hillas_intensity",
+        "camera_frame_hillas_width",
+        "camera_frame_hillas_length",
+        "camera_frame_hillas_wl",
+        "camera_frame_hillas_skewness",
+        "camera_frame_hillas_kurtosis",
+        "camera_frame_timing_slope",
+        "leakage_intensity_width_2"
+      ],
+
+      "misdirection_regression_features_stereo": [
+        "log_camera_frame_hillas_intensity_tel1",
+        "camera_frame_hillas_width_tel1",
+        "camera_frame_hillas_length_tel1",
+        "camera_frame_hillas_wl_tel1",
+        "camera_frame_hillas_skewness_tel1",
+        "camera_frame_hillas_kurtosis_tel1",
+        "camera_frame_timing_slope_tel1",
+        "leakage_intensity_width_2_tel1",
+        "HillasReconstructor_tel_impact_distance_tel1",
+        "log_camera_frame_hillas_intensity_tel2",
+        "camera_frame_hillas_width_tel2",
+        "camera_frame_hillas_length_tel2",
+        "camera_frame_hillas_wl_tel2",
+        "camera_frame_hillas_skewness_tel2",
+        "camera_frame_hillas_kurtosis_tel2",
+        "camera_frame_timing_slope_tel2",
+        "leakage_intensity_width_2_tel2",
+        "HillasReconstructor_tel_impact_distance_tel2",
+        "HillasReconstructor_h_max"
+      ],
+
     "mean_charge_to_nsb_rate": {
         "tel_021": [
           {

@@ -142,7 +142,7 @@ def evaluate_performance(
                 dl2_gamma_table = get_weights(dl2_gamma_table, mc_info=mc_info_gamma, obs_time=obs_time, target_spectrum=CRAB_HEGRA)
                 dl2_proton_table = get_weights(dl2_proton_table, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=DAMPE_P_He_SPECTRUM)
 
-            mask, _ = get_gammaness_cuts(dl2_gamma_table, dl2_proton_table, config=config, method=gammaness_cuts, energy_bins=energy_bins, telescope=telescope)
+            mask, _ = get_gammaness_cuts(dl2_gamma_table, dl2_proton_table, config=config, method=gammaness_cuts, telescope=telescope)
             dl2_gamma = dl2_gamma[mask].copy()
         else:
             logging.info('Energy and angular resolution are calculated only for gammas which passed GLOBAL GAMMANESS > %f cut.', config["analysis"]["global_gammaness_cut"])
@@ -701,6 +701,7 @@ class irf_maker:
                  output_dir = './data/',
                  gammaness_cuts = None,
                  true_energy_scaling = False,
+                 event_class = None,
                  ):
 
         # This is arbitrary as the background is normalized in the analysis
@@ -775,15 +776,25 @@ class irf_maker:
                                     mc_info  = sim_info_proton, 
                                     obs_time = self.bg_obstime, 
                                     target_spectrum = DAMPE_P_He_SPECTRUM)
-                            
-        self.gamma_event_dict  = self.table_to_selectedEvt_dict(dl2_mc_gamma)
-        self.proton_event_dict = self.table_to_selectedEvt_dict(dl2_mc_proton)
+        
+        if event_class is not None:
+            logging.info("Making IRFs for event class {}".format(event_class))
+            dl2_mc_gamma_c = dl2_mc_gamma[dl2_mc_gamma['event_type'] == event_class]
+            dl2_mc_proton_c = dl2_mc_proton[dl2_mc_proton['event_type'] == event_class]
+            logging.info("{} gammas of event class {}".format(len(dl2_mc_gamma_c), event_class))
+            logging.info("{} protons of event class {}".format(len(dl2_mc_proton_c), event_class))
+        else:
+            dl2_mc_gamma_c = dl2_mc_gamma
+            dl2_mc_proton_c = dl2_mc_proton
+
+        self.gamma_event_dict  = self.table_to_selectedEvt_dict(dl2_mc_gamma_c)
+        self.proton_event_dict = self.table_to_selectedEvt_dict(dl2_mc_proton_c)
 
         logging.info("{} gamma events after selection".format(len(self.gamma_event_dict['true_energy'])))
         logging.info("{} proton events after selection".format(len(self.proton_event_dict['true_energy'])))
 
         ######################## Set outdir and out filenames ########################
-        tel_ze, tel_az = get_avg_pointing(dl2_mc_gamma)
+        tel_ze, tel_az = get_avg_pointing(dl2_mc_gamma_c)
         self.zenith_angle      = int(round(tel_ze/10.)*10)
         self.azimuth      = int(round(tel_az/10.)*10)
 
@@ -794,19 +805,25 @@ class irf_maker:
         #                                                            self.zenith_angle,
         #                                                            self.azimuth,
         #                                                            self.gammaness_cut_tag)
-        self.outdir = output_dir + '/data/sst1m_{}/{}/bcf/ze{}_az{}_gc{}/'.format(self.tel_setup,
+        if event_class is not None:
+            ec_str = "_ec{}".format(event_class)
+        else: ec_str = ""
+        self.outdir = output_dir + '/data/sst1m_{}/{}/bcf/ze{}_az{}_gc{}{}/'.format(self.tel_setup,
                                                                     self.pipeline_version,
                                                                     self.zenith_angle,
                                                                     self.azimuth,
-                                                                    self.gammaness_cut_tag)
+                                                                    self.gammaness_cut_tag,
+                                                                    ec_str)
+
         if point_like_offset is not None :
             ptlk_str = "_pointlike_{}deg".format(point_like_offset)
         else:
             ptlk_str = ""
-        self.out_fits_filename = "SST1M_{}_Zen{}deg_gcut{}{}_irfs.fits".format(self.tel_setup,
+        self.out_fits_filename = "SST1M_{}_Zen{}deg_gcut{}{}{}_irfs.fits".format(self.tel_setup,
                                                                                self.zenith_angle,
                                                                                self.gammaness_cut_tag,
-                                                                               ptlk_str)
+                                                                               ptlk_str,
+                                                                               ec_str)
         
     ##################################################################################
     ##################################### "BINS" #####################################

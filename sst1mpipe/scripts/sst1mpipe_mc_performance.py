@@ -6,7 +6,8 @@ A script to get SST-1M performance from DL2 MC files.
 - Outputs are hdf tables and plots for energy and angular resolution, sensitivity and ROC curve. 
 It can also print a time needed for detection of a source of selection. If application of energy 
 dependent gammaness cut is selected, the cuts are stored in separate hdf file. This can be used
-to produce IRFs and DL3 files.
+to produce IRFs and DL3 files. If --edep-gammaness-only switch is used, only edep gammaness cuts
+are calculated and stored.
 
 Usage:
 
@@ -23,7 +24,7 @@ $> python sst1mpipe_mc_performance.py
 --rf-performance
 --sensitivity
 --gamma-off-correction
-
+--edep-gammaness-only
 """
 
 import sst1mpipe
@@ -39,12 +40,19 @@ from sst1mpipe.utils import (
 )
 from sst1mpipe.io import (
     load_config,
-    check_outdir
+    check_outdir,
+    load_dl2_sst1m
 )
 from sst1mpipe.performance import (
     evaluate_performance,
-    sensitivity
+    sensitivity,
+    calculate_gammaness_cuts_efficiency,
+    plot_gammaness_cuts
 )
+
+from astropy.io.misc.hdf5 import write_table_hdf5
+from astropy.table import Table
+from astropy.coordinates import angular_separation
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluation of performance from reconstructed MC DL2 files")
@@ -95,12 +103,12 @@ def parse_args():
                         default='global'
                         )
     parser.add_argument(
-			'--theta2-cuts',
-			action='store', type=str,
-			help='Select method of theta2 cuts to be applied: \'global\' (default), \'efficiency\'.',
-			dest='theta2_cuts',
-			default='global'
-			)
+                        '--theta2-cuts',
+                        action='store', type=str,
+                        help='Select method of theta2 cuts to be applied: \'global\' (default), \'efficiency\'.',
+                        dest='theta2_cuts',
+                        default='global'
+                        )
     parser.add_argument(
                         '--rf-performance',
                         action='store_true',
@@ -135,6 +143,14 @@ def parse_args():
                         dest='gamma_off_correction',
                         default=False
                         )
+    parser.add_argument(
+                        '--edep-gammaness-only',
+                        action='store_true',
+                        help='Returns only file with energy dependent gammaness cuts.',
+                        dest='edep_gammaness_only',
+                        default=False
+                        )
+                        
     args = parser.parse_args()
     return args
 
@@ -155,6 +171,7 @@ def main():
     source_detection = args.source_detection
     energy_min = args.energy_min
     gamma_off = args.gamma_off_correction
+    edep_gammaness_only = args.edep_gammaness_only
 
     if len(source_detection) > 0 and not get_sensitivity:
         logging.error('Time to source detection is calculated in the sensitivity module. It cannot be calculated alone. Use the switch \'--sensitivity\' as well.')
@@ -186,12 +203,38 @@ def main():
     for tel in telescopes:
 
         if get_rf_performance:
-            evaluate_performance(gamma_file=input_file_gamma, proton_file=input_file_proton, outdir=outdir, config=config, telescope=tel, save_fig=save_fig, save_hdf=save_hdf, gammaness_cuts=gammaness_cuts)
+            if (gammaness_cuts == 'global') or ((gammaness_cuts != 'global') and (input_file_proton is not None)):
+                evaluate_performance(gamma_file=input_file_gamma, proton_file=input_file_proton, outdir=outdir, config=config, telescope=tel, save_fig=save_fig, save_hdf=save_hdf, gammaness_cuts=gammaness_cuts)
+            else:
+                logging.error('DL2 proton file not specified. Performance with enegy dependent cuts cannot be estimated.')
+
         if get_sensitivity:
             if input_file_proton is not None:
                 sensitivity(input_file_gamma, input_file_proton, outdir=outdir, config=config, telescope=tel, save_fig=save_fig, save_hdf=save_hdf, gammaness_cuts=gammaness_cuts, theta2_cuts=theta2_cuts, source_detection=source_detection, energy_min=energy_min, gamma_off=gamma_off)
             else:
                 logging.error('DL2 proton file not specified. Sensitivity cannot be estimated.')
+
+        if edep_gammaness_only:
+            if (gammaness_cuts == 'efficiency'):
+                dl2_gamma = load_dl2_sst1m(input_file_gamma, tel=tel, config=config, table='pandas')
+
+                dl2_gamma['reco_offset'] = angular_separation(
+                                        dl2_gamma['true_az_tel'].values * u.deg,
+                                        dl2_gamma['true_alt_tel'].values * u.deg,
+                                        dl2_gamma["reco_az"].values * u.deg,
+                                        dl2_gamma["reco_alt"].values * u.deg,
+                                    ).to_value(u.deg)
+                                    
+                dl2_gamma_table = Table.from_pandas(dl2_gamma)
+                mask = dl2_gamma_table['reco_offset'] < 4.0
+                cuts = calculate_gammaness_cuts_efficiency(dl2_gamma_table[mask], config=config)
+
+                outfile = outdir + '/gammaness_cuts_'+gammaness_cuts+'_'+tel+'.h5'
+                write_table_hdf5(cuts, outfile, path='gammaness_cuts', overwrite=True, append=True, serialize_meta=True)
+                plot_gammaness_cuts(cuts, outfile=outdir + '/gammaness_cuts_'+gammaness_cuts+'_'+tel+'.png')
+            else:
+                logging.error('So far only efficiency-based gammaness cuts are implemented in combination with --edep-gammaness-only switch.')
+        
         if tel == "stereo":
             break
 
