@@ -41,6 +41,25 @@ from sst1mpipe.utils import (
 from .spectra import *
 
 
+def plot_gammaness_cuts(gammaness_cuts, outfile=None):
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 7))
+    ax.errorbar(gammaness_cuts['center'], 
+                gammaness_cuts['cut'], 
+                xerr=(gammaness_cuts['center'] - gammaness_cuts['low'], gammaness_cuts['high'] - gammaness_cuts['center']),
+                fmt='o')
+
+    energy_center = gammaness_cuts['center']
+    ax.set_ylabel('gammaness cut')
+    ax.set_xlabel(rf'$E_R$ [{energy_center.unit.to_string("latex")}]')
+    ax.set_xscale('log')
+    ax.grid(True, which='both')
+    ax.set_xlim([min(gammaness_cuts['low'].value), max(gammaness_cuts['high'].value)])
+    ax.set_ylim([0, 1.])
+    
+    if outfile is not None:
+        fig.savefig(outfile, dpi=200)
+
 def get_mc_info(input_file, config=None):
     """
     Extracts MC simulation setup (energy range, N thrown 
@@ -355,7 +374,7 @@ def check_spectrum(source):
 def get_gammaness_cuts(
         dl2_gamma, dl2_proton, config=None, 
         method='global', save_hdf=False, save_fig=False, 
-        outdir=None, energy_bins=None, telescope=None, 
+        outdir=None, telescope=None, 
         gamma_off=False):
     """
     Provide gammaness cuts (masks) on input gamma and 
@@ -380,7 +399,6 @@ def get_gammaness_cuts(
         If True it stores a plot of energy dependent
         gammaness cuts
     outdir: string
-    energy_bins: astropy.units.quantity.Quantity
     telescope: string
     gamma_off: bool
         If True it takes into account badly reconstructed 
@@ -406,27 +424,11 @@ def get_gammaness_cuts(
 
     elif method == 'efficiency':
 
-        logging.info('Gammaness efficiency-based gammaness cut used.')
-        min_events_bin = 100
-
-        requested_gamma_efficiency = config['analysis']['gamma_efficiency']
-        logging.info('Requested gamma efficiency %f', requested_gamma_efficiency)
-
-        gammaness_cuts = calculate_percentile_cut(
-                dl2_gamma["gammaness"],
-                dl2_gamma["reco_energy"] * u.TeV,
-                bins=energy_bins,
-                min_value=0.1,
-                max_value=0.95,
-                fill_value=dl2_gamma["gammaness"].max(),
-                percentile=100 * (1 - requested_gamma_efficiency),
-                smoothing=None,
-                min_events=min_events_bin,
-            )
+        gammaness_cuts = calculate_gammaness_cuts_efficiency(dl2_gamma, config=config)
 
     elif method == 'significance':
 
-        gammaness_cuts = calculate_gammaness_cuts_significance(dl2_gamma, dl2_proton, config=config, energy_bins=energy_bins, save_fig=save_fig, outdir=outdir, telescope=telescope, gamma_off=gamma_off)
+        gammaness_cuts = calculate_gammaness_cuts_significance(dl2_gamma, dl2_proton, config=config, save_fig=save_fig, outdir=outdir, telescope=telescope, gamma_off=gamma_off)
 
     else:
         logging.error('Desired method of gammaness cut not implemented! Type \'sst1mpipe_mc_performance.py --help\' to see what is available.')
@@ -440,20 +442,7 @@ def get_gammaness_cuts(
 
     if save_fig and (method != 'global'):
 
-        fig, ax = plt.subplots(1, 1, figsize=(8, 7))
-        ax.errorbar(gammaness_cuts['center'], 
-                    gammaness_cuts['cut'], 
-                    xerr=(gammaness_cuts['center'] - gammaness_cuts['low'], gammaness_cuts['high'] - gammaness_cuts['center']),
-                    fmt='o')
-
-        energy_center = gammaness_cuts['center']
-        ax.set_ylabel('gammaness cut')
-        ax.set_xlabel(rf'$E_R$ [{energy_center.unit.to_string("latex")}]')
-        ax.set_xscale('log')
-        ax.grid(True, which='both')
-        ax.set_xlim([min(gammaness_cuts['low'].value), max(gammaness_cuts['high'].value)])
-        ax.set_ylim([0, 1.])
-        fig.savefig(outdir + '/gammaness_cuts_'+method+'_'+telescope+'.png', dpi=200)
+        plot_gammaness_cuts(gammaness_cuts, outfile=outdir + '/gammaness_cuts_'+method+'_'+telescope+'.png')
 
     if method != 'global':
         mask_gg = evaluate_binned_cut(
@@ -588,6 +577,34 @@ def get_theta(dl2, zero_alt=None, zero_az=None):
 
     return dl2
 
+def calculate_gammaness_cuts_efficiency(
+    dl2_gamma, config=None):
+
+    energy_bins = np.logspace(
+    config["analysis"]["log_energy_min_tev"], 
+    config["analysis"]["log_energy_max_tev"],
+    config["analysis"]["n_energy_bins"]
+    ) * u.TeV
+
+    logging.info('Gammaness efficiency-based gammaness cut used.')
+    min_events_bin = 100
+
+    requested_gamma_efficiency = config['analysis']['gamma_efficiency']
+    logging.info('Requested gamma efficiency %f', requested_gamma_efficiency)
+
+    gammaness_cuts = calculate_percentile_cut(
+            dl2_gamma["gammaness"],
+            dl2_gamma["reco_energy"] * u.TeV,
+            bins=energy_bins,
+            min_value=0.1,
+            max_value=0.95,
+            fill_value=dl2_gamma["gammaness"].max(),
+            percentile=100 * (1 - requested_gamma_efficiency),
+            smoothing=None,
+            min_events=min_events_bin,
+        )
+    return gammaness_cuts
+
 
 def calculate_gammaness_cuts_significance(
         dl2_gamma, dl2_proton, config=None, 
@@ -614,7 +631,6 @@ def calculate_gammaness_cuts_significance(
         If True it stores a plot of energy dependent
         gammaness cuts
     outdir: string
-    energy_bins: astropy.units.quantity.Quantity
     telescope: string
     gamma_off: bool
         If True it takes into account badly reconstructed 
@@ -628,6 +644,12 @@ def calculate_gammaness_cuts_significance(
     astropy.table.QTable
 
     """
+
+    energy_bins = np.logspace(
+    config["analysis"]["log_energy_min_tev"], 
+    config["analysis"]["log_energy_max_tev"],
+    config["analysis"]["n_energy_bins"]
+    ) * u.TeV
 
     offset = angular_separation(dl2_gamma['true_az_tel'][0] * u.deg, dl2_gamma['true_alt_tel'][0] * u.deg, dl2_gamma['true_az'][0] * u.deg, dl2_gamma['true_alt'][0] * u.deg).to(u.deg)
     theta_cut = config['analysis']['global_theta_cut'] * u.deg

@@ -1008,8 +1008,8 @@ def plot_astri_sens(ax=None):
 
 def plot_theta2_dl3(ax=None, theta2_axis=None, counts_on=None, counts_off=None, alpha=None, theta_cut=None, event_counts=None):
 
-    ax.errorbar(theta2_axis.center, counts_on, yerr=np.sqrt(counts_on), fmt='o', ms=5, label='ON data')
-    ax.errorbar(theta2_axis.center, alpha*counts_off, yerr=alpha*np.sqrt(counts_off), fmt='o', ms=5, label='OFF data')
+    ax.errorbar(theta2_axis.center, counts_on, yerr=np.sqrt(counts_on), fmt='o', ms=8, label='ON data')
+    ax.errorbar(theta2_axis.center, alpha*counts_off, yerr=alpha*np.sqrt(counts_off), fmt='o', ms=8, label='OFF data')
     ax.set_xlabel("$\\theta^{2} [deg^{2}]$")
     ax.set_ylabel("Counts")
     ax.grid(ls='dashed')
@@ -1034,6 +1034,6 @@ def plot_theta2_dl3(ax=None, theta2_axis=None, counts_on=None, counts_off=None, 
                                                         event_counts.significance_lima)
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.95)
-    txt = ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=10,
+    txt = ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=13,
                 verticalalignment='top', bbox=props)
     ax.legend(bbox_to_anchor=(0.1, 0.95), fontsize=10)

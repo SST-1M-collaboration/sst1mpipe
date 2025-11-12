@@ -437,7 +437,7 @@ def camera_to_altaz(
     return horizon
 
 
-def get_theta2_from_dl3(dl3_path, target_coords=None, theta2_axis=None, n_off=5, norm_range=[0.5, 0.7]*u.deg, theta_cut=0.1*u.deg):
+def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_axis=None, n_off=5, norm_range=[0.5, 0.7]*u.deg, theta_cut=0.1*u.deg):
 
     data_store = DataStore.from_dir(dl3_path)
     theta2_off = np.zeros([len(theta2_axis.edges)-1, n_off])
@@ -454,7 +454,12 @@ def get_theta2_from_dl3(dl3_path, target_coords=None, theta2_axis=None, n_off=5,
     N_off = 0
     t_elapsed = 0
 
-    observations = data_store.get_observations()
+    if good_obsids is not None:
+        obsid_mask = [obsid in list(good_obsids.astype(int)) for obsid in data_store.obs_table["OBS_ID"]]
+        good_obs_list = data_store.obs_table[obsid_mask]['OBS_ID']
+        observations = data_store.get_observations(good_obs_list)
+    else:
+        observations = data_store.get_observations()
 
     for observation in observations:
         

@@ -66,6 +66,7 @@ def main():
         dl3_file_list.append(np.array(glob.glob(flist)))
     list_flattened = [item for row in dl3_file_list for item in row]
 
+    #print(list_flattened)
     create_hdu_index(list_flattened, out_dir=outdir, irf_dir=irf_dir)
 
     data_store = DataStore.from_dir(outdir)

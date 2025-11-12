@@ -443,6 +443,13 @@ def train_models(
 def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
 
     if telescope == 'stereo':
+
+        # In data, we need to rename columns _tel21 -> tel1, tel22 -> tel2
+        for tt,ttn in zip(['_tel21', '_tel22'], ['_tel1', '_tel2']):
+            cols_to_rename = dl2.columns[dl2.columns.str.contains(tt)]
+            rename_dict = {col: col.replace(tt, ttn) for col in cols_to_rename}
+            dl2 = dl2.rename(columns=rename_dict)
+
         dl2['log_camera_frame_hillas_intensity_tel1'] = np.log10(dl2['camera_frame_hillas_intensity_tel1'])
         dl2['log_camera_frame_hillas_intensity_tel2'] = np.log10(dl2['camera_frame_hillas_intensity_tel2'])
 
@@ -451,10 +458,19 @@ def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
     else:
         features = config['misdirection_regression_features_mono']
     
+    # Check finite
+    mask = np.ones(len(dl2), dtype=bool)
+    for key in features:
+        try:
+            mask &= np.isfinite(dl2[key])
+        except:
+            logging.warning('{} column not in data.'.format(key))
+    dl2_finite = dl2[mask].copy()
+
     mis_mono_re = joblib.load(models_dir + '/reg_misdirection_'+telescope+'.sav')
     logging.info('Misdirection reconstruction..')
-    dl2['log_reco_misdirection'] = mis_mono_re.predict(dl2[features])
-    return dl2
+    dl2_finite['log_reco_misdirection'] = mis_mono_re.predict(dl2_finite[features])
+    return dl2_finite
 
 
 def get_evttype_edges(dl2, config=None, percentiles=[25, 50, 75]):
@@ -726,8 +742,12 @@ def stereo_reconstruction(
     dl2['wvar_gammaness'] = gammaness_wvar
 
     # We need to add these for event types classificantion
-    mask_tel1 = params['tel_id'] == 1
-    mask_tel2 = params['tel_id'] == 2
+    if ismc:
+        mask_tel1 = params['tel_id'] == 1
+        mask_tel2 = params['tel_id'] == 2
+    else:
+        mask_tel1 = params['tel_id'] == 21
+        mask_tel2 = params['tel_id'] == 22
     hillas_tel1 = params[mask_tel1][["obs_id", "event_id", "HillasReconstructor_tel_impact_distance"]]
     hillas_tel2 = params[mask_tel2][["obs_id", "event_id", "HillasReconstructor_tel_impact_distance"]]
     hillas_tel1 = hillas_tel1.rename(
@@ -918,7 +938,7 @@ def get_data_tel(params, tel=1):
         "camera_frame_hillas_kurtosis", 
         "camera_frame_timing_slope"
         ]]
-
+        
     data_tel = data_tel.rename(
                     columns={
                             "reco_alt_sign_p": "reco_alt_sign_p_tel"+str(tel),

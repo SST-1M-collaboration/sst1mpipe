@@ -1,5 +1,16 @@
 #!/usr/bin/env python
 
+"""
+This script has two use cases:
+- It can be used to calculate the edges of event classes based 
+on percentile cut aplied on misdirection in DL2 MC filee, and 
+to store them in output HDF file.
+- Having the event classes already defined, it can be used to 
+clasify events in any DL2 files (MC/data).
+
+The script can automaticaly find the closest node in alt,az,nsb
+for models and class edges, similar to the DL1_DL2 script.
+"""
 
 import sst1mpipe
 import argparse
@@ -15,7 +26,8 @@ from sst1mpipe.io import (
 
 from sst1mpipe.utils import (
     get_telescopes, 
-    check_mc
+    check_mc,
+    get_closest_rf_model
 )
 from sst1mpipe.reco import (
     reco_misdirection,
@@ -96,7 +108,20 @@ def main():
     for tel in tels:
         
         dl2 = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
-        dl2 = reco_misdirection(dl2, models_dir=misdirection_models_dir, config=config, telescope=tel)
+
+        models_dir_auto = get_closest_rf_model(dl2, models_dir=misdirection_models_dir)
+
+        if not ismc:
+            if '21' in tel:
+                telescope_model = 'tel_001'
+            elif '22' in tel:
+                telescope_model = 'tel_002'
+            else:
+                telescope_model = tel
+        else:
+            telescope_model = tel
+
+        dl2 = reco_misdirection(dl2, models_dir=models_dir_auto, config=config, telescope=telescope_model)
 
         if ismc and edges_dir is None:
             logging.info('Determining edges of misdirection classes..')
@@ -122,7 +147,9 @@ def main():
         elif edges_dir is not None:
             logging.info('Determining event classes in the file.')
 
-            edges_file = edges_dir + '/misdirection_edges_'+tel+'.h5'
+            edges_dir_auto = get_closest_rf_model(dl2, models_dir=edges_dir)
+
+            edges_file = edges_dir_auto + '/misdirection_edges_'+telescope_model+'.h5'
             edges = read_table_hdf5(edges_file, path='misdirection_edges')
             dl2 = classify_evt_types(dl2, edges=edges)
             # We just update the DL2 table in the original file with new columns

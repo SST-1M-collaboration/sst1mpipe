@@ -23,5 +23,7 @@ from .sensitivity import (
     source_time_to_detection,
     check_spectrum,
     get_gammaness_cuts,
-    get_edep_theta_cuts
+    get_edep_theta_cuts,
+    calculate_gammaness_cuts_efficiency,
+    plot_gammaness_cuts
 )
