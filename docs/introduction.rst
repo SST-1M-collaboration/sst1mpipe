@@ -31,13 +31,13 @@ or
 For users
 ~~~~~~~~~
 
-- download stable version of **sst1mpipe** (latest version = 0.8.1)
+- download stable version of **sst1mpipe** (latest version = 0.9.0)
 - create and activate **conda** environment
 - install **sst1mpipe**
 
 .. code-block:: console
 
-    SST1MPIPE_VER=0.8.1
+    SST1MPIPE_VER=0.9.0
 
     wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz
     tar -xvf v$SST1MPIPE_VER.tar.gz
