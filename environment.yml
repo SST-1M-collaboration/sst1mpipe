@@ -1,4 +1,4 @@
-name: sst1m-0.9.0
+name: sst1m-dev
 channels:
   - conda-forge
   - default
