@@ -988,7 +988,7 @@ def write_dl2_table(
 
     for key in dl2.keys():
 
-        if dl2[key].dtypes == object:
+        if dl2[key].dtypes is object:
             logging.info('Removing key: %s, with content: %s', key, str(dl2[key].iloc[0]))
             logging.info('Because object saving is not supported in table')
             del dl2[key]

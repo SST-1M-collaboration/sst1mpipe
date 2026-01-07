@@ -423,7 +423,7 @@ def plot_energy_resolution(
     energy_center = ctaplot.ana.logbin_mean(e_bins['energy_bins'])
     
     marker_size = 6
-    if markers == None:
+    if markers is None:
         markers = len(labels) * ['o']
         
     if len(axes) == 2:
@@ -569,7 +569,7 @@ def plot_angular_resolution(
     energy_center = ctaplot.ana.logbin_mean(e_bins['energy_bins'])
     
     marker_size = 6
-    if markers == None:
+    if markers is None:
         markers = len(labels) * ['o']
 
     if preliminary:
@@ -630,7 +630,7 @@ def plot_roc(
     if preliminary:
         plot_preliminary(ax=ax)
 
-    if linestyles == None:
+    if linestyles is None:
         linestyles = len(labels) * ['-']
 
     for table, label, linestyle in zip(roc_tables, labels, linestyles):
@@ -690,7 +690,7 @@ def plot_sensitivity(
         plot_preliminary(ax=ax)
 
     marker_size = 6
-    if markers == None:
+    if markers is None:
         markers = len(labels) * ['o']
     
     for table, label, marker in zip(sens_tables, labels, markers):
