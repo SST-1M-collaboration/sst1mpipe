@@ -516,7 +516,7 @@ def main():
                 fractional_seconds.append((localtime % S_TO_NS) / S_TO_NS)
 
 
-        if max_events == None and source.is_simulation:
+        if max_events is None and source.is_simulation:
             writer.write_simulation_histograms(source)
 
     if not source.is_simulation and precise_timestamps:

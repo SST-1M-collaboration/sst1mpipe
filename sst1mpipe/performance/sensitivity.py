@@ -29,7 +29,6 @@ from sst1mpipe.io import (
     check_outdir
 )
 from sst1mpipe.utils import (
-    get_primary_type,
     correct_number_simulated_showers,
     mc_correct_shower_reuse,
     check_same_shower_fraction,

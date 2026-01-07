@@ -480,20 +480,20 @@ class mes_fitter:
         Yerr  = np.sqrt(Y)
         Yerr[Yerr==0] = 1
         # least_squares = LeastSquares(X, Y, Yerr, self.spe_spectrum_function)
-        def likelihood(l       ,
+        def likelihood(logL       ,
                        xt,
                        g       ,
                        sigma_pe,
                        sigma_el,
                        x_el
                        ):
-            preds = self.spe_spectrum_function(X,l,xt,g,sigma_pe,sigma_el,x_el)
+            preds = self.spe_spectrum_function(X,logL,xt,g,sigma_pe,sigma_el,x_el)
             # l =  np.sum( [np.log(scipy.stats.poisson(preds[ii]).pmf(Y[ii])) for ii in range(len(Y)) ] )
             if ((preds>0).all()) & (np.isreal(preds).all()):
-                l =  np.sum( np.log(preds)*Y-preds-scipy.special.gammaln(Y+1) )
+                logL =  np.sum( np.log(preds)*Y-preds-scipy.special.gammaln(Y+1) )
             else:
-                l=-10000
-            return -2*l
+                logL=-10000
+            return -2*logL
         
         m = Minuit(likelihood,
                    l        = .2,      # lambda
