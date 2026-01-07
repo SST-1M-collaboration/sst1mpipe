@@ -228,15 +228,15 @@ def plot_theta2(
     significance_lima = stat.sqrt_ts
 
     textstr = r'N$_{{\rm on}}$ = {:.0f} '\
-                f'\n'\
+                '\n'\
                 r'N$_{{\rm off}}$ = {:.0f} '\
-                f'\n'\
+                '\n'\
                 r'N$_{{\rm excess}}$ = {:.0f} '\
-                f'\n'\
+                '\n'\
                 r'n$_{{\rm off \, regions}}$ = {:.0f} '\
-                f'\n'\
+                '\n'\
                 r'Time = {:.1f}'\
-                f'\n'\
+                '\n'\
                 r'LiMa Significance = {:.1f} $\sigma$ '.format(N_on,
                                                           N_off,
                                                           N_excess,
@@ -1017,15 +1017,15 @@ def plot_theta2_dl3(ax=None, theta2_axis=None, counts_on=None, counts_off=None, 
     ax.set_xlim(theta2_axis.bounds[0].value, theta2_axis.bounds[1].value)
 
     textstr = r'N$_{{\rm on}}$ = {:.0f} '\
-                f'\n'\
+                '\n'\
                 r'N$_{{\rm off}}$ = {:.0f} '\
-                f'\n'\
+                '\n'\
                 r'N$_{{\rm excess}}$ = {:.0f} '\
-                f'\n'\
+                '\n'\
                 r'n$_{{\rm off \, regions}}$ = {:.0f} '\
-                f'\n'\
+                '\n'\
                 r'Time = {:.1f}'\
-                f'\n'\
+                '\n'\
                 r'LiMa Significance = {:.1f} $\sigma$ '.format(event_counts.N_on,
                                                         event_counts.N_off,
                                                         event_counts.N_excess,

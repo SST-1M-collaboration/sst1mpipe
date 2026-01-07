@@ -1,7 +1,5 @@
 from astropy.coordinates import (
     SkyCoord, 
-    EarthLocation, 
-    AltAz, 
     Angle, 
     SkyOffsetFrame
 )
@@ -14,7 +12,6 @@ from gammapy.stats import WStatCountsStatistic
 import math
 
 from sst1mpipe.utils import (
-    clip_alt,
     get_horizon_frame,
 )
 

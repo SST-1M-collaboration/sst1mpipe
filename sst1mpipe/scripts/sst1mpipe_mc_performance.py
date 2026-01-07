@@ -31,7 +31,6 @@ import sst1mpipe
 import os
 import sys
 import argparse
-import numpy as np
 import astropy.units as u
 import shutil
 import logging

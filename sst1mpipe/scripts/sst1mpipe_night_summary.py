@@ -51,7 +51,6 @@ from sst1mpipe.utils import (
 from sst1mpipe.io import load_distributions_sst1m
 
 import astropy.units as u
-from ctapipe.io import read_table
 from astropy.time import Time
 from sst1mpipe.utils.NSB_tools import plot_average_nsb_VS_time
 from astropy.table import vstack

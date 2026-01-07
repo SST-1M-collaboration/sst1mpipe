@@ -7,13 +7,12 @@ from ctapipe.containers import (
     SchedulingBlockContainer,
     ObservationBlockContainer,
     PointingMode,
-    CoordinateFrameType,
 )
 from ctapipe.instrument import (
     SubarrayDescription,
 )
 from ctapipe.instrument.subarray import EarthLocation
-from ctapipe.core.traits import Bool, Float, Enum, Path
+from ctapipe.core.traits import Bool, Float
 
 from sst1mpipe.constants import (
     REFERENCE_LOCATION,

@@ -60,16 +60,12 @@ from ctapipe.visualization import CameraDisplay
 # from ctapipe.image import hillas_parameters, tailcuts_clean
 
 import matplotlib.pyplot as plt
-import datetime
 
 import scipy
-from scipy.special import factorial
-import astropy.units as u
 import scipy.stats as scst
 import scipy.special as scsp
 
 import multiprocessing as mp
-from scipy.ndimage import convolve1d
 
 
 from iminuit import Minuit

@@ -22,7 +22,6 @@ import pandas as pd
 import numpy as np
 import glob
 
-from sst1mpipe.io import load_config
 
 from sst1mpipe.io import (
     load_dl1_sst1m,

@@ -47,7 +47,6 @@ import sys
 import argparse
 import logging
 
-from astropy.table import Table
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Data DL1 to DL1 stereo")

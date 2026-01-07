@@ -1,9 +1,7 @@
 import argparse
-from pkg_resources import resource_filename
 import os
 from os import path
 import glob
-import warnings
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
@@ -11,25 +9,21 @@ import pkg_resources
 
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.visualization import CameraDisplay
-from ctapipe.instrument import CameraGeometry
-from ctapipe.image import hillas_parameters, tailcuts_clean
-from ctapipe.image.cleaning import dilate, number_of_islands, fact_image_cleaning
+from ctapipe.image import tailcuts_clean
+from ctapipe.image.cleaning import number_of_islands
 
 
-from ctapipe.image.muon import kundu_chaudhuri_circle_fit, ring_completeness
+from ctapipe.image.muon import ring_completeness
 
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
-from sst1mpipe.utils.NSB_tools import VAR_to_Idrop,  VAR_to_NSB
+from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
 from sst1mpipe.io import load_config
 from sst1mpipe.calib.calib import get_default_window
 
-from scipy.optimize import curve_fit, minimize
-from scipy.special import factorial
-from scipy.stats import gaussian_kde
+from scipy.optimize import minimize
 from scipy.ndimage import convolve1d
-import astropy.units as u
 
 
 import matplotlib.pyplot as plt

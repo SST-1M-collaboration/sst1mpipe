@@ -1,10 +1,8 @@
-from ctapipe.io import read_table
 from astropy.io.misc.hdf5 import write_table_hdf5
 from astropy.table import Table, QTable
 import numpy as np
 import pandas as pd
 import astropy.units as u
-import tables
 import ctaplot
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -13,7 +11,6 @@ import logging
 
 import shutil
 
-from pathlib import Path
 
 from astropy.io import fits
 from astropy.coordinates import AltAz
@@ -26,7 +23,6 @@ from sst1mpipe.io import(
     load_config
 )
 from sst1mpipe.utils import (
-    check_same_shower_fraction,
     get_avg_pointing,
 )
 
@@ -40,8 +36,7 @@ from .sensitivity import (
 
 from pyirf.simulations import SimulatedEventsInfo
 
-from pyirf.irf import (effective_area, 
-                       effective_area_per_energy,
+from pyirf.irf import (effective_area_per_energy,
                        effective_area_per_energy_and_fov, 
                        psf_table,
                        background_2d,
@@ -51,7 +46,6 @@ from pyirf.io import (
     create_aeff2d_hdu,
     create_psf_table_hdu,
     create_energy_dispersion_hdu,
-    create_rad_max_hdu,
     create_background_2d_hdu,
 )
 from astropy.io.misc.hdf5 import read_table_hdf5

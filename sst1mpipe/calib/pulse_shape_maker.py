@@ -8,43 +8,28 @@ Created on Wed Mar 23 16:36:22 2022
 
 
 import argparse
-from pkg_resources import resource_filename
 import os
-import glob
-import warnings
 import numpy as np
-import pandas as pd
 
 #from cts_core.camera import Camera
 #from digicampipe.instrument import geometry
 #from digicampipe.io.event_stream import event_stream, add_slow_data
 
-from ctapipe.visualization import CameraDisplay
-from ctapipe.instrument import CameraGeometry
-from ctapipe.image import hillas_parameters, tailcuts_clean
 from ctapipe.io import EventSource
 
 import matplotlib.pyplot as plt
 import datetime
 
-import scipy
-from scipy.optimize import curve_fit
-from scipy.special import factorial
 import astropy.units as u
 
-import seaborn as sns
 
-import iminuit
-from iminuit import Minuit
-from iminuit.cost import LeastSquares
 
-from scipy.interpolate import interp1d, UnivariateSpline
+from scipy.interpolate import UnivariateSpline
 from scipy.optimize import minimize
 
 
 #from spe_mc_v6 import mes_fitter_mc
 from astropy.io import ascii as asc
-import astropy.units as u
 
 from PulseTemplate import GetTemplate3
 

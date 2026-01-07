@@ -6,15 +6,12 @@ Created June 01 2024
 
 import pandas as pd
 import numpy as np
-import scipy
 import matplotlib.pyplot as plt
 import glob
 
 import astropy.units as u
-import astropy.constants as c
 
 import matplotlib.dates as mdates
-from datetime import datetime
 
 from astropy.time import Time
 from astropy.io import fits
@@ -27,7 +24,7 @@ from ctapipe.io import read_table
 
 from sst1mpipe.performance import get_mc_info, get_weights
 from sst1mpipe.performance.spectra import DAMPE_P_He_SPECTRUM
-from sst1mpipe.io import load_dl1_sst1m,load_dl2_sst1m, load_config
+from sst1mpipe.io import load_dl1_sst1m,load_config
 
 from scipy.optimize import curve_fit
 

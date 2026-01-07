@@ -38,7 +38,6 @@ from sst1mpipe.utils import (
     get_tel_string,
 )
 
-import os
 import sys
 import argparse
 import numpy as np

@@ -21,7 +21,6 @@ import os
 import sys
 import argparse
 import shutil
-import pandas as pd
 import logging
 
 from sst1mpipe.utils import (

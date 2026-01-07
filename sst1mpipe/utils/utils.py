@@ -11,7 +11,6 @@ from ctapipe.instrument import SubarrayDescription
 
 import ctaplot
 from astropy.time import Time
-from astropy.table import Table
 from astropy.io import fits
 import astropy.constants as c
 import numpy as np

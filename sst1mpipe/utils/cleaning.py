@@ -6,11 +6,6 @@ from ctapipe.image import (
     number_of_islands
 )
 
-from ctapipe.core.traits import (
-    BoolTelescopeParameter,
-    FloatTelescopeParameter,
-    IntTelescopeParameter,
-)
 
 from ctapipe.containers import (
     CameraHillasParametersContainer,

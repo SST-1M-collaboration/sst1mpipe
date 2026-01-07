@@ -6,13 +6,10 @@ from astropy.coordinates import (
 )
 import numpy as np
 import astropy.units as u
-import tables
 import ctaplot
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import logging
 import operator
-from scipy import special
 from scipy.interpolate import make_smoothing_spline
 
 from pyirf.spectral import (

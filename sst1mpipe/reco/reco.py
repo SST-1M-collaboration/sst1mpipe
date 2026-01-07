@@ -16,15 +16,13 @@ from sst1mpipe.utils import (
     disp_vector, 
     mix_gamma_proton,
     remove_stereo,
-    get_event_pos_in_camera,
     get_event_sample,
     get_telescopes,
     event_hillas_add_units,
     get_wr_timestamp,
     get_stereo_method,
     get_horizon_frame,
-    get_finite,
-    get_tel_string
+    get_finite
 )
 from sst1mpipe.io import (
     load_more_dl1_tables_mono,

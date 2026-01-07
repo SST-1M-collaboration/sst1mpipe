@@ -23,10 +23,8 @@ $> python sst1mpipe_data_dl2_dl3.py
 
 """
 
-import numpy as np
 import argparse
 import sys
-import os
 import logging
 
 import sst1mpipe

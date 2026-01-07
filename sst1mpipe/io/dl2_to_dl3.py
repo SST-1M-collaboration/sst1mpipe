@@ -1,14 +1,11 @@
 from astropy.table import Table
 import numpy as np
-import pandas as pd
 import logging
 import os
 import glob
 
 from sst1mpipe.utils import (
-    get_telescopes,
     get_horizon_frame,
-    get_GTIs,
 )
 from sst1mpipe.analysis import add_reco_ra_dec
 from sst1mpipe.io import load_config, load_more_dl2_files, check_outdir
@@ -19,7 +16,6 @@ import astropy.units as u
 from astropy.io import fits
 from astropy.coordinates import SkyCoord, AltAz
 from astropy.time import Time
-from astropy.io.misc.hdf5 import read_table_hdf5
 
 from gammapy.data import DataStore
 

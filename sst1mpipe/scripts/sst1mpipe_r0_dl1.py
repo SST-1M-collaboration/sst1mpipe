@@ -33,7 +33,6 @@ from sst1mpipe.utils import (
     get_subarray,
     image_cleaner_setup,
     swap_modules_59_88,
-    VAR_to_Idrop,
     get_swap_flag
 )
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
@@ -43,12 +42,10 @@ from sst1mpipe.io import (
     write_extra_parameters,
     load_config,
     check_outdir,
-    write_r1_dl1_cfg,
     write_assumed_pointing,
     write_pixel_charges_table,
     write_charge_images,
     read_charge_images,
-    write_wr_timestamps,
     write_charge_fraction,
     write_dl1_info,
     get_used_qe_simtel,
@@ -65,10 +62,8 @@ from sst1mpipe.calib import (
 
 from ctapipe.io import EventSource
 from ctapipe.calib import CameraCalibrator
-from ctapipe.image import ImageProcessor
 from ctapipe.reco import ShowerProcessor
 from ctapipe.io import DataWriter
-from ctapipe.instrument import SubarrayDescription
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
@@ -78,15 +73,9 @@ import argparse
 import numpy as np
 import logging
 
-from os import path
 
-from ctapipe.io import (
-    TableLoader, 
-    read_table
-)
 
 import astropy.units as u
-from astropy.time import Time
 
 def parse_args():
 

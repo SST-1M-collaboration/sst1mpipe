@@ -1531,5 +1531,5 @@ def get_pde_correction_factors():
                 pde_corr = Config(json.load(json_file))
         return pde_corr
     except:
-        logging.error('%s file not found! Either make sure it is there, or turn off the PDE correction in the cfg file!'.format(pde_corr_file))
+        logging.error('%s file not found! Either make sure it is there, or turn off the PDE correction in the cfg file!')
         exit()

@@ -18,7 +18,6 @@ $> python rate_scans_extraction.py
 
 import os
 import numpy as np
-from astropy.io import fits
 from astropy.time import Time
 import matplotlib.pyplot as plt
 import matplotlib as mpl

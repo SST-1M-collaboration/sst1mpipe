@@ -26,7 +26,6 @@ from ctapipe.containers import (
 # from ctapipe.serializer import Serializer
 # from ctapipe.containers import MCEventContainer, ReconstructedContainer, \
     # MCHeaderContainer, CentralTriggerContainer
-from matplotlib import pyplot as plt
 
 from tables import *
 

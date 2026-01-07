@@ -26,7 +26,6 @@ import argparse
 import shutil
 import pandas as pd
 import logging
-import numpy as np
 from sst1mpipe.reco import (
     apply_models,
     stereo_reconstruction
@@ -40,7 +39,6 @@ from sst1mpipe.utils import (
 from sst1mpipe.io import (
     load_dl1_sst1m, 
     write_dl2,
-    write_dl2_table,
     load_config,
     check_outdir,
     write_dl2_info

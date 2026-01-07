@@ -15,7 +15,6 @@ for models and class edges, similar to the DL1_DL2 script.
 import sst1mpipe
 import argparse
 import sys
-import os
 import logging
 from sst1mpipe.io import (
     load_dl2_sst1m,
@@ -35,7 +34,6 @@ from sst1mpipe.reco import (
     classify_evt_types
 )
 
-import numpy as np
 from astropy.io.misc.hdf5 import write_table_hdf5, read_table_hdf5
 import matplotlib.pyplot as plt
 

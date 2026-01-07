@@ -19,7 +19,6 @@ $> python sst1mpipe_get_tunning_params.py
 """
 
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import numpy as np
 
 import glob
