@@ -39,10 +39,10 @@ class sliding_pedestals:
         if self.get_n_events() == 0:
             logging.warning("No pedestal events found in firsts events. Cleaned shower/NSB events used instead.")
             self.load_firsts_fake_pedestals()
-            logging.info("{} fake pedestals events loaded in buffer".format(self.get_n_events()))
+            logging.info(f"{self.get_n_events()} fake pedestals events loaded in buffer")
             self.pedestals_in_file = False
         else:
-            logging.info("{} pedestals events loaded in buffer".format(self.get_n_events()))
+            logging.info(f"{self.get_n_events()} pedestals events loaded in buffer")
             self.pedestals_in_file = True
 
     def add_ped_evt(self, evt, cleaning_mask=None, store_image=True):

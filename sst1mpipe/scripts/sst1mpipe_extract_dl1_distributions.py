@@ -160,7 +160,7 @@ def main():
             rate = data / t_elapsed
             differential_rate = rate / bins_width
 
-            print('Integration time for obsid {}: {}'.format(obsid, t_elapsed.to(u.hour)))
+            print(f'Integration time for obsid {obsid}: {t_elapsed.to(u.hour)}')
 
             t_table = QTable()
             t_table['t_elapsed'] = np.array([t_elapsed.to(u.hour).value])
@@ -222,7 +222,7 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
                 # find fraction of pedestals in log
                 ped = 'Fraction of pedestal'
                 reclean = 'raised picture threshold'
-                with open(log_file, 'r') as fp:
+                with open(log_file) as fp:
                     # read all lines in a list
                     lines = fp.readlines()
                     ped_fraction = 100

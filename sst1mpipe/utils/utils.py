@@ -559,7 +559,10 @@ def check_same_shower_fraction(dl2, energy_bins):
         #n_same_events = dl2[mask].groupby('true_energy').size()
         if len(dl2[mask]) > 0:
             total_events = len(dl2[mask])
-            fractions = ["%.2E" % elem for elem in list(np.histogram(n_same_events, bins=n_reuse_bins)[0] / total_events)]
+            fractions = [
+                f"{elem:.2E}"
+                for elem in (np.histogram(n_same_events, bins=n_reuse_bins)[0] / total_events)
+            ]
             fraction_used_more = sum(np.histogram(n_same_events, bins=n_reuse_bins)[0][1:] / total_events)
             logging.info('E_R [%.2f, %.2f] TeV, total events: %d, frac used N>1: %.2E, fracs: %s', energy_bins[i].value, energy_bins[i + 1].value, total_events, fraction_used_more, fractions)
             result.append([energy_bins[i].value, energy_bins[i + 1].value, fraction_used_more])
@@ -1236,7 +1239,7 @@ def stereo_var_cuts(data, config=None):
         if config['analysis']['stereo_delta_disp_cut_deg'] is not None:
             mask_disp = data['min_distance']*180/np.pi < config['analysis']['stereo_delta_disp_cut_deg']
             logging.info('{} deg cut on min disp distance applied.'.format(config['analysis']['stereo_delta_disp_cut_deg']))
-            logging.info('N of events of stereo after delta disp cut: {} '.format(sum(mask_disp)))
+            logging.info(f'N of events of stereo after delta disp cut: {sum(mask_disp)} ')
     else:
         logging.info('No cut on min disp distance applied.')
 
@@ -1244,7 +1247,7 @@ def stereo_var_cuts(data, config=None):
         if config['analysis']['stereo_relative_std_reco_energy_cut'] is not None:
             mask_energy = np.sqrt(data['var_reco_energy'])/data['reco_energy'] < config['analysis']['stereo_relative_std_reco_energy_cut']
             logging.info('{} cut on max relative std of reco energy applied.'.format(config['analysis']['stereo_relative_std_reco_energy_cut']))
-            logging.info('N of events of stereo after relative std reco energy cut: {} '.format(sum(mask_energy)))
+            logging.info(f'N of events of stereo after relative std reco energy cut: {sum(mask_energy)} ')
     else:
         logging.info('No cut on max relative std reco energy applied.')
 
@@ -1252,7 +1255,7 @@ def stereo_var_cuts(data, config=None):
         if config['analysis']['stereo_std_gammaness_cut'] is not None:
             mask_gammaness = np.sqrt(data['var_gammaness']) < config['analysis']['stereo_std_gammaness_cut']
             logging.info('{} cut on max std of reco gammaness applied.'.format(config['analysis']['stereo_std_gammaness_cut']))
-            logging.info('N of events of stereo after std reco gammaness cut: {} '.format(sum(mask_gammaness)))
+            logging.info(f'N of events of stereo after std reco gammaness cut: {sum(mask_gammaness)} ')
     else:
         logging.info('No cut on max std reco gammaness applied.')
 
@@ -1285,7 +1288,7 @@ def get_finite(data, config=None, stereo=False):
         try:
             mask &= np.isfinite(data[key])
         except Exception:
-            logging.warning('{} column not in data.'.format(key))
+            logging.warning(f'{key} column not in data.')
 
     N_finite = len(data[mask])
 
@@ -1417,7 +1420,7 @@ def get_survived_ped_fraction(dl1_files, logs=None, tel=None):
 
         # find fraction of pedestals in log
         word = 'Fraction of pedestal'
-        with open(log_file, 'r') as fp:
+        with open(log_file) as fp:
             # read all lines in a list
             lines = fp.readlines()
             for line in lines:
@@ -1899,7 +1902,7 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
         if obj not in ignore_sources:
             plt.plot([datetime.fromtimestamp(t) for t in d_obs[obj][0]],
                      [np.sum(d_obs[obj][1][:ii])/60/60 for ii in range(len(d_obs[obj][1]))],
-                     label=r'{} : {:} h'.format(obj.ljust(11),np.round(np.sum(d_obs[obj][1])/60/60,1)))
+                     label=rf'{obj.ljust(11)} : {np.round(np.sum(d_obs[obj][1])/60/60,1)} h')
     plt.legend()
     plt.grid()
     plt.ylabel('observation time [h]')

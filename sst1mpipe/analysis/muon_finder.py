@@ -193,7 +193,7 @@ class muon_finder:
 
         if self.ismc:
             data_stream = EventSource(self.filename,max_events=self.max_evt)
-            print("file {} opened".format(self.filename))
+            print(f"file {self.filename} opened")
         else :
             data_stream = SST1MEventSource(
                 filelist    = [self.filename],
@@ -207,7 +207,7 @@ class muon_finder:
                 print("No pedestal events found in firsts events. Skipping run")
                 return
             else:
-                print("{} pedestals events loaded in buffer".format(pedestal_info.get_n_events()))
+                print(f"{pedestal_info.get_n_events()} pedestals events loaded in buffer")
 
         #####################################
         ### Loop in all events to find muons:
@@ -234,10 +234,7 @@ class muon_finder:
                     #                                      start_date.year,
                     #                                      start_date.hour,
                     #                                      start_date.minute)
-                    night_datestr = "{}-{}/{}/{}".format(start_date.day,
-                                                   start_date.day+1,
-                                                   start_date.month,
-                                                   start_date.year)
+                    night_datestr = f"{start_date.day}-{start_date.day+1}/{start_date.month}/{start_date.year}"
                     
                     
                     print("night : "+night_datestr)
@@ -424,15 +421,13 @@ class muon_finder:
                             pass
                     if (self.plot) and (np.random.randint(100)<110) and (np.median(self.bsstd)>11) and (rc>0.6):
                         f,axs = self.plot_event(Q_sum_window,final_mask,mu_mask)
-                        f.savefig(self.plot_dir+'d{}_f{}_ev_{}_ismuontest_rc{:.4}.png'.format(self.date_str,
-                                                                                      self.file_n,
-                                                                                      ii,rc) )
+                        f.savefig(self.plot_dir+f'd{self.date_str}_f{self.file_n}_ev_{ii}_ismuontest_rc{rc:.4}.png' )
                         plt.close(f)
                         
                     if  len(self.mu_data['event_id'])%500==0 and False: 
                         df = pd.DataFrame.from_dict(self.mu_data)
                         df.to_hdf(os.path.join('./',
-                                               'mudata_tel{}_t.h5'.format(self.tel)),
+                                               f'mudata_tel{self.tel}_t.h5'),
                                                "df")
                     
                                     
@@ -450,7 +445,7 @@ class muon_finder:
         image[mask]=Q_sum[mask]
         disp = CameraDisplay(self.geom,ax=axs[1])
         disp.image = image
-        axs[1].set_title("Qtot = {} \n Qmax = {} (b std ={:.3})".format(Q_sum.sum(), Q_sum.max(),np.median(self.bsstd) ))
+        axs[1].set_title(f"Qtot = {Q_sum.sum()} \n Qmax = {Q_sum.max()} (b std ={np.median(self.bsstd):.3})")
         disp.add_colorbar(ax=axs[1])
         
         
@@ -464,7 +459,7 @@ class muon_finder:
         
         ttt = ""
         for key in ['radius','5pe_ratio','Q_mu','Q_nmu']:
-            ttt = ttt+("{} : {:.4} \n".format(key,self.mu_data[key][-1]) )
+            ttt = ttt+(f"{key} : {self.mu_data[key][-1]:.4} \n" )
             
         tetas = np.linspace(0,2*np.pi,30)
         Cx,Cy,Cr = [self.mu_data[key][-1] for key in ['x','y','radius']]
@@ -515,7 +510,7 @@ if __name__ == "__main__":
         try:
             finder.get_muons()
         except Exception:
-            print("file {} FAILED".format(filename))
+            print(f"file {filename} FAILED")
             
 
         return finder.mu_data
@@ -545,13 +540,13 @@ if __name__ == "__main__":
     # df = pd.DataFrame(dict(results)).sort_values(by=['time'])
     df = pd.DataFrame(dict(results)).sort_values(by=['toa'])
     if args.ismc:
-        df.to_hdf(os.path.join('{}'.format(args.table_dir),
+        df.to_hdf(os.path.join(f'{args.table_dir}',
                                'MC_{}_{}_mudataV30_tel{}.h5'.format(args.data_path.split("/")[-3],
                                                                   args.data_path.split("/")[-2],
                                                                   args.tel)),
                                "df")
     else:
-        df.to_hdf(os.path.join('{}'.format(args.table_dir),
+        df.to_hdf(os.path.join(f'{args.table_dir}',
                                '{}{}{}_mudataV30_tel{}.h5'.format(args.data_path.split("/")[7],
                                                                   args.data_path.split("/")[8],
                                                                   args.data_path.split("/")[9],

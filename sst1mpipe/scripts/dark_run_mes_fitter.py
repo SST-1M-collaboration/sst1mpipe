@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Wed Mar 23 16:36:22 2022
 @author: TT 
@@ -113,17 +112,17 @@ class mes_fitter:
         """
 
         self.tel        = tel
-        self.date_str   = '{:04d}{:02d}{:02d}'.format(year,month,day)
+        self.date_str   = f'{year:04d}{month:02d}{day:02d}'
         self.save_dir   = save_dir
         self.data_path  = data_path
         self.files_path  = os.path.join(data_path,
-                                         'cs{}'.format(tel),
+                                         f'cs{tel}',
                                          'data',
                                          'raw',
-                                         '{:04d}'.format(year),
-                                         '{:02d}'.format(month),
-                                         '{:02d}'.format(day),
-                                         'SST1M{}'.format(tel))
+                                         f'{year:04d}',
+                                         f'{month:02d}',
+                                         f'{day:02d}',
+                                         f'SST1M{tel}')
         self.first_file_n = first_file_n
         self.n_files      = n_files
         self.plot_dir     = plot_dir
@@ -145,19 +144,15 @@ class mes_fitter:
         self.n_pixels = self.geom.n_pixels
         self.pixels   = np.arange(self.n_pixels)
         
-        self.save_str = self.date_str+"_{:04d}_{:04d}_Tel{}_".format(first_file_n,
-                                                             first_file_n+n_files-1,
-                                                             tel)
+        self.save_str = self.date_str+f"_{first_file_n:04d}_{first_file_n+n_files-1:04d}_Tel{tel}_"
 
         self.file_list = []
         for n in range(first_file_n, first_file_n+n_files):
-            filepath = os.path.join(self.files_path,'SST1M{}_{}_{:04d}.fits.fz'.format(tel,
-                                                                                       self.date_str,
-                                                                                       n))
+            filepath = os.path.join(self.files_path,f'SST1M{tel}_{self.date_str}_{n:04d}.fits.fz')
             if os.path.isfile(filepath):
                 self.file_list.append(filepath)
             else:
-                print('file {} not found'.format(filepath))
+                print(f'file {filepath} not found')
         if len(self.file_list) == 0:
             print("Warning : no files")
             
@@ -246,8 +241,8 @@ class mes_fitter:
                     
                     
 
-        print("{} evts proceeded".format(ii+1))
-        print("{} evts in histogram".format(tot_evts))
+        print(f"{ii+1} evts proceeded")
+        print(f"{tot_evts} evts in histogram")
         self.tot_evts = tot_evts
         self.binwidth = centers_adcsum[1]-centers_adcsum[0]
         self.centers_adcsum = centers_adcsum
@@ -593,7 +588,7 @@ class mes_fitter:
         pool.close()
         self.n_failed = (self.res['calib_flag']<1).sum()
         print('Calibration Done!')
-        print('Calibration failed for {}  pixels ({:.3} %)'.format(self.n_failed,self.n_failed/self.n_pixels*100))
+        print(f'Calibration failed for {self.n_failed}  pixels ({self.n_failed/self.n_pixels*100:.3} %)')
         
         return 
 
@@ -611,11 +606,11 @@ class mes_fitter:
                 if nan_failed:
                     image[self.res['calib_flag']==0] = np.nan
                 disp.image = image
-                ax.set_title(key+" Tel {}".format(self.tel))
+                ax.set_title(key+f" Tel {self.tel}")
                 #disp.set_limits_percent(95)
                 disp.set_limits_minmax(image.min()*0.95,image.max()*1.05)
                 if save_plots:
-                    f.savefig(self.plot_dir+'cam_{}_tel{}.png'.format(key,self.data_path[-2]))
+                    f.savefig(self.plot_dir+f'cam_{key}_tel{self.data_path[-2]}.png')
             except Exception:
                 print("Failed")
                 return
@@ -663,7 +658,7 @@ class mes_fitter:
         ax.grid()
         ax.legend()
         ax.set_xlabel('$\Sigma$ ADC')
-        ax.set_title('SPE spectrum -- Tel {} -- pix {}'.format(self.tel,pix))
+        ax.set_title(f'SPE spectrum -- Tel {self.tel} -- pix {pix}')
         
         return f,ax
 
@@ -683,7 +678,7 @@ class mes_fitter:
 
             ax.hist(self.res[key][mask],
                 bins=bins,
-                label = 'tel2 -- median = {:.3}'.format(np.median(self.res[key])),
+                label = f'tel2 -- median = {np.median(self.res[key]):.3}',
                 **kwargs)
             if show_uncal:
                 ax.hist(self.res[key][~mask],
@@ -699,7 +694,7 @@ class mes_fitter:
             if key =='gain':
                 ax.set_xlabel('ADC / p.e.')
             if save_plot:
-                f.savefig(self.plot_dir+'hist_{}.png'.format(key))
+                f.savefig(self.plot_dir+f'hist_{key}.png')
 
     ##############################################
 

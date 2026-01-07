@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created Feb 29 2024
 """
@@ -66,13 +65,13 @@ def VAR_to_shift(baseline_VAR,ntel):
     return shift
 
 def NSB_to_BLS(NSB_MHz,ntel):
-    A = NSB_MHz*Gain_0['tel{}'.format(ntel)]*BINWIDTH
-    return A/(1-Vdrop_lin_aprox['gain_tel{}'.format(ntel)]*A)
+    A = NSB_MHz*Gain_0[f'tel{ntel}']*BINWIDTH
+    return A/(1-Vdrop_lin_aprox[f'gain_tel{ntel}']*A)
 
 def make_drop_func(param_name,ntel):
     
     def drop_func(B_shift):
-        slope   = Vdrop_lin_aprox[param_name+'_tel{}'.format(ntel)]
+        slope   = Vdrop_lin_aprox[param_name+f'_tel{ntel}']
         #return max(slope*B_shift+1, 0)
         return slope*B_shift+1
     return drop_func
@@ -82,8 +81,8 @@ def VAR_to_Idrop(baseline_VAR,ntel):
     ## Usage :
     ## I_corr = I / I_drop
     try:
-        slope   = Vdrop_lin_aprox['gain_tel{}'.format(ntel)]+ \
-                  Vdrop_lin_aprox['PDE_tel{}'.format(ntel)]
+        slope   = Vdrop_lin_aprox[f'gain_tel{ntel}']+ \
+                  Vdrop_lin_aprox[f'PDE_tel{ntel}']
     except Exception:
         print("ERROR ntel should be 21 or 22")
     return VAR_to_shift(baseline_VAR,ntel)*slope+1
@@ -93,8 +92,8 @@ def BLS_to_Idrop(baseline_shift,ntel):
     ## Usage :
     ## I_corr = I / I_drop
     try:
-        slope   = Vdrop_lin_aprox['gain_tel{}'.format(ntel)]+ \
-                  Vdrop_lin_aprox['PDE_tel{}'.format(ntel)]
+        slope   = Vdrop_lin_aprox[f'gain_tel{ntel}']+ \
+                  Vdrop_lin_aprox[f'PDE_tel{ntel}']
     except Exception:
         print("ERROR ntel should be 21 or 22")
     return baseline_shift*slope+1
@@ -104,7 +103,7 @@ def VAR_to_Gdrop(baseline_VAR,ntel):
     ## Usage :
     ## G_corr = G / G_drop
     try:
-        slope   = Vdrop_lin_aprox['gain_tel{}'.format(ntel)]
+        slope   = Vdrop_lin_aprox[f'gain_tel{ntel}']
     except Exception:
         print("ERROR ntel should be 21 or 22")
 
@@ -122,8 +121,8 @@ def gain_drop_th(nsb_rate, cell_capacitance=85. * u.fF, bias_resistance=2.4 * u.
     
 def BLS_to_NSB(baseline_shift,ntel,gain=None):
     if gain is None:
-        gain = Gain_0['tel{}'.format(ntel)]
-    Gdrop = baseline_shift * Vdrop_lin_aprox['gain_tel{}'.format(ntel)]+1
+        gain = Gain_0[f'tel{ntel}']
+    Gdrop = baseline_shift * Vdrop_lin_aprox[f'gain_tel{ntel}']+1
     NSB_rate = get_simple_nsbrate(baseline_shift,
                                   gain * Gdrop)
     return NSB_rate
@@ -131,10 +130,10 @@ def BLS_to_NSB(baseline_shift,ntel,gain=None):
 def BLS_to_NSB_photon_rate(baseline_shift,ntel,gain=None):
     PDE_0 = 0.35 ## aprox. TODO : get some better estimation
     if gain is None:
-        gain = Gain_0['tel{}'.format(ntel)]
+        gain = Gain_0[f'tel{ntel}']
 
-    slope   = Vdrop_lin_aprox['gain_tel{}'.format(ntel)]+ \
-              Vdrop_lin_aprox['PDE_tel{}'.format(ntel)]
+    slope   = Vdrop_lin_aprox[f'gain_tel{ntel}']+ \
+              Vdrop_lin_aprox[f'PDE_tel{ntel}']
 
     Idrop = baseline_shift*slope+1
     NSB_rate = get_simple_nsbrate(baseline_shift,
@@ -144,7 +143,7 @@ def BLS_to_NSB_photon_rate(baseline_shift,ntel,gain=None):
 
 def VAR_to_NSB(baseline_VAR,ntel,gain=None):
     if gain is None:
-        gain = Gain_0['tel{}'.format(ntel)]
+        gain = Gain_0[f'tel{ntel}']
     NSB_rate = BLS_to_NSB(VAR_to_shift(baseline_VAR,ntel),
                           ntel,
                           gain=gain)
@@ -152,7 +151,7 @@ def VAR_to_NSB(baseline_VAR,ntel,gain=None):
 
 def VAR_to_NSB_photon_rate(baseline_VAR,ntel,gain=None):
     if gain is None:
-        gain = Gain_0['tel{}'.format(ntel)]
+        gain = Gain_0[f'tel{ntel}']
     NSB_rate = BLS_to_NSB_photon_rate(VAR_to_shift(baseline_VAR,ntel),
                                       ntel,
                                       gain=gain)
@@ -169,7 +168,7 @@ def find_dark_files(data_dir):
             f = astropy.io.fits.open(file_path)
             target = f[2].header['TARGET'] 
         except Exception:
-            print('failed reading {}'.format(file_path))
+            print(f'failed reading {file_path}')
             continue
         if target in dark_names:
             dark_files.append(file_path)
@@ -208,14 +207,14 @@ def get_ped_table(file_list):
                 bline_table = read_table(dl1file,
                                          '/dl1/monitoring/telescope/pedestal')
             except Exception:
-                print("pedestal not found in {}".format(dl1file))
+                print(f"pedestal not found in {dl1file}")
         else :
             try:
                 bline_table = astropy.table.vstack([bline_table,
                                                    read_table(dl1file,
                                                               '/dl1/monitoring/telescope/pedestal')])
             except Exception:
-                print("pedestal not found in {}".format(dl1file))
+                print(f"pedestal not found in {dl1file}")
     return bline_table
 
 def get_ped_table_low_res(file_list):
@@ -228,14 +227,14 @@ def get_ped_table_low_res(file_list):
                 bline_table = read_table(dl1file,
                                          '/dl1/monitoring/telescope/pedestal')[-1]
             except Exception:
-                print("pedestal not found in {}".format(dl1file))
+                print(f"pedestal not found in {dl1file}")
         else :
             try:
                 bline_table = astropy.table.vstack([bline_table,
                                                    read_table(dl1file,
                                                               '/dl1/monitoring/telescope/pedestal')[-1]])
             except Exception:
-                print("pedestal not found in {}".format(dl1file))
+                print(f"pedestal not found in {dl1file}")
     return bline_table
 
 
@@ -254,7 +253,7 @@ def plot_average_nsb_photon_rate_VS_time(ped_table,ntel,ax=None):
     Dates = [Time(t,scale='utc',format='unix').to_datetime() for t in  ped_table['pedestal_sample_time']]
     if ax is None:
         f,ax = plt.subplots(figsize=(10,5))
-    ax.plot(Dates,NSB,'.',label='tel {}'.format(ntel%20))
+    ax.plot(Dates,NSB,'.',label=f'tel {ntel%20}')
     plt.xlabel('Time')
     plt.ylabel('NSB photons [MHz]')
     return ax

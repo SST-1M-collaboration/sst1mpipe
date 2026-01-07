@@ -1080,7 +1080,7 @@ def load_slow_data_bias_curve(file):
     merge_data = {'timestamp': [], 'date': [],'biasCurveTriggerRate': [], 'biasCurveReadoutRate': [],
                   'biasCurvePatch7Threshold': [], 'biasCurveDroppedRate': [], 'appStatus': []}
 
-    print("Loading file %s" % file)
+    print(f"Loading file {file}")
     hdul = fits.open(file)
     bc_thr = hdul[1].data['biasCurvePatch7Threshold']
     bc_t = hdul[1].data['biasCurveTriggerRate']
@@ -1262,7 +1262,7 @@ def load_more_dl2_files(files, config=None,
         try:
             tel_setup=get_telescopes(input_file, data_level="dl2")[0]
         except Exception:
-            logging.warning("No DL2 data in file : {}".format(input_file) )
+            logging.warning(f"No DL2 data in file : {input_file}" )
             continue
 
         # Here we apply gammaness cut directly during the merge to save some memory.
@@ -1273,7 +1273,7 @@ def load_more_dl2_files(files, config=None,
 
             # If there is no event in the file after selection cuts we skip it completely.
             if len(df0) == 0:
-                logging.warning("No events in the file {} after selection cuts. SKIPPING (and not taking the time interval into account) ".format(input_file))
+                logging.warning(f"No events in the file {input_file} after selection cuts. SKIPPING (and not taking the time interval into account) ")
                 continue
 
             times = df0['local_time']
@@ -1285,7 +1285,7 @@ def load_more_dl2_files(files, config=None,
             p_ra = np.unique(pointing['array_ra'])
             p_dec = np.unique(pointing['array_dec'])
             if (p_ra.shape[0]>1) or (p_dec.shape[0]>1):
-                logging.warning('Multiple ra dec pointing in file {} -- we expect ony one!'.format(input_file))
+                logging.warning(f'Multiple ra dec pointing in file {input_file} -- we expect ony one!')
             df0['array_ra']  = (p_ra[0]  * pointing['array_ra' ].unit).to_value('deg')
             df0['array_dec'] = (p_dec[0] * pointing['array_dec'].unit).to_value('deg')
 
@@ -1313,10 +1313,10 @@ def load_more_dl2_files(files, config=None,
 
             if gammaness_cut is not None:
                 if isfloat(gammaness_cut):
-                    logging.info('Global gammaness cut {} applied.'.format(gammaness_cut))
+                    logging.info(f'Global gammaness cut {gammaness_cut} applied.')
                     mask = df0['gammaness'] > gammaness_cut
                     df = df0[mask].copy()
-                    logging.info('N of events after gammaness cut: {}'.format(len(df)))
+                    logging.info(f'N of events after gammaness cut: {len(df)}')
                 else:
                     logging.info('Energy dependent gammaness cut applied.')
 
@@ -1329,10 +1329,10 @@ def load_more_dl2_files(files, config=None,
                         tel_mc = tel_setup
                     try:
                         cut_file = glob.glob(gammaness_cut + '/' + RF_used + '/gammaness_cuts_*' + tel_mc + '*.h5')[0]
-                        logging.info('Energy dendent cut table used: {}'.format(cut_file))
+                        logging.info(f'Energy dendent cut table used: {cut_file}')
                         cut_table = read_table_hdf5(cut_file, path='gammaness_cuts')
                     except Exception:
-                        logging.warning("Cannot read gammaness cut file in the path: {}".format(cut_file))
+                        logging.warning(f"Cannot read gammaness cut file in the path: {cut_file}")
                         cut_table = None
 
                     # This works only on pandas dataframe
@@ -1344,7 +1344,7 @@ def load_more_dl2_files(files, config=None,
                         operator.ge,
                     )
                     df = df0[mask_gg].copy()
-                    logging.info('N of events after gammaness cut: {}'.format(len(df)))
+                    logging.info(f'N of events after gammaness cut: {len(df)}')
             else:
                 df = df0
 
@@ -1352,10 +1352,10 @@ def load_more_dl2_files(files, config=None,
             df['RF_used'] = RF_used
             v1 = info['sst1mpipe_version'][0].split('.')[0]
             v2 = info['sst1mpipe_version'][0].split('.')[1]
-            df['sst1mpipe_version'] = '{}_{}'.format(v1,v2)
+            df['sst1mpipe_version'] = f'{v1}_{v2}'
             df['tel_setup'] = tel_setup
         except Exception:
-            logging.warning("Some problem with file {}".format(input_file))
+            logging.warning(f"Some problem with file {input_file}")
             continue
 
         if dl2_data is None:

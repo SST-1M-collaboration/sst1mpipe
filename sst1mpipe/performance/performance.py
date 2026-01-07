@@ -709,7 +709,7 @@ class irf_maker:
         self.point_like_offset = point_like_offset
         v1 = sst1mpipe.__version__.split('.')[0]
         v2 = sst1mpipe.__version__.split('.')[1]
-        self.pipeline_version = '{}_{}'.format(v1,v2)
+        self.pipeline_version = f'{v1}_{v2}'
 
         self.hdu_list = [fits.PrimaryHDU()]
 
@@ -721,7 +721,7 @@ class irf_maker:
             tel_setup=mc_tel_setup
         self.tel_setup = tel_setup
 
-        logging.info("Making IRFs for telescope {}".format(self.tel_setup))
+        logging.info(f"Making IRFs for telescope {self.tel_setup}")
 
     ##################################### "dl2 tables" #####################################
 
@@ -757,11 +757,11 @@ class irf_maker:
                                     target_spectrum = DAMPE_P_He_SPECTRUM)
         
         if event_class is not None:
-            logging.info("Making IRFs for event class {}".format(event_class))
+            logging.info(f"Making IRFs for event class {event_class}")
             dl2_mc_gamma_c = dl2_mc_gamma[dl2_mc_gamma['event_type'] == event_class]
             dl2_mc_proton_c = dl2_mc_proton[dl2_mc_proton['event_type'] == event_class]
-            logging.info("{} gammas of event class {}".format(len(dl2_mc_gamma_c), event_class))
-            logging.info("{} protons of event class {}".format(len(dl2_mc_proton_c), event_class))
+            logging.info(f"{len(dl2_mc_gamma_c)} gammas of event class {event_class}")
+            logging.info(f"{len(dl2_mc_proton_c)} protons of event class {event_class}")
         else:
             dl2_mc_gamma_c = dl2_mc_gamma
             dl2_mc_proton_c = dl2_mc_proton
@@ -785,25 +785,16 @@ class irf_maker:
         #                                                            self.azimuth,
         #                                                            self.gammaness_cut_tag)
         if event_class is not None:
-            ec_str = "_ec{}".format(event_class)
+            ec_str = f"_ec{event_class}"
         else: 
             ec_str = ""
-        self.outdir = output_dir + '/data/sst1m_{}/{}/bcf/ze{}_az{}_gc{}{}/'.format(self.tel_setup,
-                                                                    self.pipeline_version,
-                                                                    self.zenith_angle,
-                                                                    self.azimuth,
-                                                                    self.gammaness_cut_tag,
-                                                                    ec_str)
+        self.outdir = output_dir + f'/data/sst1m_{self.tel_setup}/{self.pipeline_version}/bcf/ze{self.zenith_angle}_az{self.azimuth}_gc{self.gammaness_cut_tag}{ec_str}/'
 
         if point_like_offset is not None :
-            ptlk_str = "_pointlike_{}deg".format(point_like_offset)
+            ptlk_str = f"_pointlike_{point_like_offset}deg"
         else:
             ptlk_str = ""
-        self.out_fits_filename = "SST1M_{}_Zen{}deg_gcut{}{}{}_irfs.fits".format(self.tel_setup,
-                                                                               self.zenith_angle,
-                                                                               self.gammaness_cut_tag,
-                                                                               ptlk_str,
-                                                                               ec_str)
+        self.out_fits_filename = f"SST1M_{self.tel_setup}_Zen{self.zenith_angle}deg_gcut{self.gammaness_cut_tag}{ptlk_str}{ec_str}_irfs.fits"
         
     ##################################################################################
     ##################################### "BINS" #####################################
@@ -850,7 +841,7 @@ class irf_maker:
     def table_to_selectedEvt_dict(self, dl2_data):
 
         if isfloat(self.gammaness_cut):
-            logging.info('Global gammaness cut {} applied.'.format(self.gammaness_cut))
+            logging.info(f'Global gammaness cut {self.gammaness_cut} applied.')
             mask_gg = dl2_data['gammaness'] > self.gammaness_cut
         else:
             logging.info('Energy dependent gammaness cut applied.')
@@ -984,7 +975,7 @@ class irf_maker:
             # Config file cannot be placed in the directory with IRFs, because otherwise HDU indexer 
             # is not able to do the match
             shutil.copy(self.config_filename,self.output_dir)
-            logging.info("IRFs stored in: {}".format(self.outdir))
+            logging.info(f"IRFs stored in: {self.outdir}")
 
 def isfloat(num):
     try:

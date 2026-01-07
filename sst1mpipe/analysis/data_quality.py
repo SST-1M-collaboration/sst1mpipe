@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created June 01 2024
 """
@@ -47,15 +46,7 @@ def get_slow_data_table(dl3_file,file_radical='DIGICAM',root_dir='/net'):
     tstart = Time(dl3[1].header['TSTART'],format='unix',scale='utc')
     tstop  = Time(dl3[1].header['TSTOP'],format='unix',scale='utc')
     
-    files = glob.glob('{}/cs{}/data/aux/{}/{}/{}/SST1M_TEL{}/{}{}_{}_*.fits'.format(root_dir,
-                                                                                    itel,
-                                                                                    oyear,
-                                                                                    omonth,
-                                                                                    oday,
-                                                                                    itel,
-                                                                                    file_radical,
-                                                                                    itel,
-                                                                                    datestr))
+    files = glob.glob(f'{root_dir}/cs{itel}/data/aux/{oyear}/{omonth}/{oday}/SST1M_TEL{itel}/{file_radical}{itel}_{datestr}_*.fits')
     table = vstack([ Table(fits.open(f)[1].data) for f in files])
     t_mask = (table['TIMESTAMP']>tstart.unix*1000) & (table['TIMESTAMP']<tstop.unix*1000)
     return table[t_mask]
@@ -92,7 +83,7 @@ def plot_rates_from_slow_data(dl3_files):
                      table['rate_swat_arrevent_nreads'],
                      '.',
                      alpha=.3,
-                     label='obs_id : {}'.format(obs_id),
+                     label=f'obs_id : {obs_id}',
                      #label='rate_swat_arrevent_nreads (rate of array events successfully read from SWAT)'
                      )
 
@@ -170,7 +161,7 @@ def write_MC_dist(tel_setup,
         res_dict["diff_rate_zenCorected_"+tel] = diff_rates_mc
         
     res_df = pd.DataFrame(res_dict)
-    outfile = outdir+'/MC_{}_intensity_hist.h5'.format(tel_setup)
+    outfile = outdir+f'/MC_{tel_setup}_intensity_hist.h5'
     res_df.to_hdf(outfile,'intensity_hist')
 
 def getmask(key,sel_dict,DQ_table):
@@ -212,7 +203,7 @@ def make_DQ_table(tel_setup,
         res_dict["qual_flag"]          = []
 
         MC_hist  = pd.read_hdf(mc_hist_file)
-        rates_mc = MC_hist['diff_rate_zenCorected_tel_00{}'.format(tel[-1])]
+        rates_mc = MC_hist[f'diff_rate_zenCorected_tel_00{tel[-1]}']
         Q_bins_c = MC_hist['center']
 
         fitmask = (Q_bins_c>Q_min) & (Q_bins_c<Q_max)
@@ -255,8 +246,8 @@ def make_DQ_table(tel_setup,
 
         res = pd.DataFrame(res_dict)
         res["qual_flag"] = make_selection(res,sel_dict=sel_dict)
-        outfile = outdir+'/DQ_table_{}.h5'.format(tel_setup)
-        res.to_hdf(outfile,'DQ_table_{}'.format(tel))
+        outfile = outdir+f'/DQ_table_{tel_setup}.h5'
+        res.to_hdf(outfile,f'DQ_table_{tel}')
     
     return
 

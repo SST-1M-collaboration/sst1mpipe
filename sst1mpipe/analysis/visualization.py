@@ -116,8 +116,7 @@ def plot_count_maps(
 
 
 def cycle(iterable):
-    for item in itertools.cycle(iterable):
-        yield item
+    yield from itertools.cycle(iterable)
 
 
 def plot_sigma_time(data, sigma, times, obsid, alphas, nights):
@@ -227,22 +226,17 @@ def plot_theta2(
     stat = WStatCountsStatistic(n_on=N_on, n_off=N_off, alpha=alpha)
     significance_lima = stat.sqrt_ts
 
-    textstr = r'N$_{{\rm on}}$ = {:.0f} '\
+    textstr = rf'N$_{{\rm on}}$ = {N_on:.0f} '\
                 '\n'\
-                r'N$_{{\rm off}}$ = {:.0f} '\
+                rf'N$_{{\rm off}}$ = {N_off:.0f} '\
                 '\n'\
-                r'N$_{{\rm excess}}$ = {:.0f} '\
+                rf'N$_{{\rm excess}}$ = {N_excess:.0f} '\
                 '\n'\
-                r'n$_{{\rm off \, regions}}$ = {:.0f} '\
+                rf'n$_{{\rm off \, regions}}$ = {n_off:.0f} '\
                 '\n'\
-                r'Time = {:.1f}'\
+                rf'Time = {t_elapsed.to(u.h):.1f}'\
                 '\n'\
-                r'LiMa Significance = {:.1f} $\sigma$ '.format(N_on,
-                                                          N_off,
-                                                          N_excess,
-                                                          n_off,
-                                                          t_elapsed.to(u.h),
-                                                          significance_lima)
+                rf'LiMa Significance = {significance_lima:.1f} $\sigma$ '
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.95)
     
@@ -1017,22 +1011,17 @@ def plot_theta2_dl3(ax=None, theta2_axis=None, counts_on=None, counts_off=None, 
     ax.axvline(theta_cut.to_value()**2, color='black',ls='--',alpha=0.75)
     ax.set_xlim(theta2_axis.bounds[0].value, theta2_axis.bounds[1].value)
 
-    textstr = r'N$_{{\rm on}}$ = {:.0f} '\
+    textstr = rf'N$_{{\rm on}}$ = {event_counts.N_on:.0f} '\
                 '\n'\
-                r'N$_{{\rm off}}$ = {:.0f} '\
+                rf'N$_{{\rm off}}$ = {event_counts.N_off:.0f} '\
                 '\n'\
-                r'N$_{{\rm excess}}$ = {:.0f} '\
+                rf'N$_{{\rm excess}}$ = {event_counts.N_excess:.0f} '\
                 '\n'\
-                r'n$_{{\rm off \, regions}}$ = {:.0f} '\
+                rf'n$_{{\rm off \, regions}}$ = {event_counts.n_off_regions:.0f} '\
                 '\n'\
-                r'Time = {:.1f}'\
+                rf'Time = {event_counts.t_elapsed:.1f}'\
                 '\n'\
-                r'LiMa Significance = {:.1f} $\sigma$ '.format(event_counts.N_on,
-                                                        event_counts.N_off,
-                                                        event_counts.N_excess,
-                                                        event_counts.n_off_regions,
-                                                        event_counts.t_elapsed,
-                                                        event_counts.significance_lima)
+                rf'LiMa Significance = {event_counts.significance_lima:.1f} $\sigma$ '
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.95)
     ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=13,

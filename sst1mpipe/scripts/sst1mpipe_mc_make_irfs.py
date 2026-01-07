@@ -115,7 +115,7 @@ def main():
 
         if gammaness_cut_dir is not None:
             gammaness_cuts = glob.glob(gammaness_cut_dir + '/gammaness_cuts*' + tel + '*h5')[0]
-            logging.info('Gammaness cut file used: {}'.format(gammaness_cuts))
+            logging.info(f'Gammaness cut file used: {gammaness_cuts}')
         else:
             gammaness_cuts = None
 

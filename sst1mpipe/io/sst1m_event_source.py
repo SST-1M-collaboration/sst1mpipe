@@ -216,8 +216,7 @@ class SST1MEventSource(EventSource):
     def _generator(self):
         """
         """
-        for array_event in self.get_array_event(self.filelist):
-            yield array_event
+        yield from self.get_array_event(self.filelist)
 
     def get_array_event(self, input_path : str):
         """
@@ -248,11 +247,11 @@ class SST1MEventSource(EventSource):
                     try:
                         unsorted_baseline = event.hiGain.waveforms.baselines
                     except AttributeError:
-                        warnings.warn((
+                        warnings.warn(
                             "Could not read `hiGain.waveforms.baselines`"
-                            "for event:{} (eventNumber {})\n"
-                            "of file:{}\n".format(event_counter, event.eventNumber, self.input_url)
-                        ))
+                            f"for event:{event_counter} (eventNumber {event.eventNumber})\n"
+                            f"of file:{self.input_url}\n"
+                        )
                         return np.ones(n_pixels) * np.nan
 
                     if tel_id not in loaded_telescopes:

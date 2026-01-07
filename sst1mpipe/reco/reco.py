@@ -457,7 +457,7 @@ def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
         try:
             mask &= np.isfinite(dl2[key])
         except KeyError:
-            logging.warning('{} column not in data.'.format(key))
+            logging.warning(f'{key} column not in data.')
     dl2_finite = dl2[mask].copy()
 
     mis_mono_re = joblib.load(models_dir + '/reg_misdirection_'+telescope+'.sav')
@@ -1329,7 +1329,7 @@ def make_dl1_stereo(
                     datestr  = str(tel2_event['date'].iloc[0])
                     filestr  = str(tel2_event['obs_id'].iloc[0]).replace(datestr,'')
 
-                    dl1_t2_filename = glob.glob(input_dir_tel2+'/SST1M2*{}*{}*{}*.h5'.format(datestr, filestr, file_pattern))[0].split('/')[-1]
+                    dl1_t2_filename = glob.glob(input_dir_tel2+f'/SST1M2*{datestr}*{filestr}*{file_pattern}*.h5')[0].split('/')[-1]
                     logging.info('Coincident events from TEL ' + str(tel_2) + ' was found in file: ' + dl1_t2_filename)
                     dl1_t2_file = os.path.join(input_dir_tel2, dl1_t2_filename)
                     

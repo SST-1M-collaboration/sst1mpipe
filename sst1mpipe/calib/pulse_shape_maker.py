@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Wed Mar 23 16:36:22 2022
 
@@ -54,18 +53,18 @@ class shape_maker:
         
         self.tel=tel
         self.pix = pix
-        date_str = '{:04d}{:02d}{:02d}'.format(year,month,day)
+        date_str = f'{year:04d}{month:02d}{day:02d}'
         self.sample_size = sample_size
         
         self.data_path = data_path
         self.files_path   = os.path.join(data_path,
-                                         'cs{}'.format(tel),
+                                         f'cs{tel}',
                                          'data',
                                          'raw',
-                                         '{:04d}'.format(year),
-                                         '{:02d}'.format(month),
-                                         '{:02d}'.format(day),
-                                         'SST1M{}'.format(tel))
+                                         f'{year:04d}',
+                                         f'{month:02d}',
+                                         f'{day:02d}',
+                                         f'SST1M{tel}')
         self.first_file_n = first_file_n
         self.n_files      = n_files
         self.plot_dir     = plot_dir
@@ -87,13 +86,11 @@ class shape_maker:
             self.file_list.append(MC_filename)
         else:
             for n in range(first_file_n, first_file_n+n_files):
-                filepath = os.path.join(self.files_path,'SST1M{}_{}_{:04d}.fits.fz'.format(self.tel,
-                                                                                           date_str,
-                                                                                           n))
+                filepath = os.path.join(self.files_path,f'SST1M{self.tel}_{date_str}_{n:04d}.fits.fz')
                 if os.path.isfile(filepath):
                     self.file_list.append(filepath)
                 else:
-                    print('file {} not found'.format(filepath))
+                    print(f'file {filepath} not found')
             if len(self.file_list) == 0:
                 print("Warning : no files")
             
@@ -277,7 +274,7 @@ class shape_maker:
                         #print(np.argmax(ttt))
         self.tot_evts = tot_evts
         t_0 = np.argmax(pulseshape)/float(n_rebin)
-        print('T_0 : {} ns'.format(t_0))
+        print(f'T_0 : {t_0} ns')
         rebins = np.linspace(0,50-(1/n_rebin),50*n_rebin)
         
         ##ManualShift is here to set the TOM at 30 nanosec (or any val)

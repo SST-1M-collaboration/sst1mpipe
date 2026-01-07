@@ -68,11 +68,9 @@ def r0_dl1_1file(arg):
         python binding of sst1mpipe_r0_dl1
         """
 
-        cmd = 'sst1mpipe_r0_dl1 --input-file {} \
-               --config {} \
-               --output-dir {} --precise-timestamps'.format(arg.input_file,
-                                                            arg.config_file,
-                                                            arg.out_dir)
+        cmd = f'sst1mpipe_r0_dl1 --input-file {arg.input_file} \
+               --config {arg.config_file} \
+               --output-dir {arg.out_dir} --precise-timestamps'
         logging.info(cmd)
         os.system(cmd)
 
@@ -80,14 +78,11 @@ def dl1_dl1_1file(arg):
         """
         python binding of sst1mpipe_data_dl1_dl1_stereo
         """
-        cmd = 'sst1mpipe_data_dl1_dl1_stereo \
-               --input-file {} \
-               --config {} \
-               --input-dir-tel2 {} \
-               --output-dir {}'.format(arg.input_file,
-                                       arg.config_file,
-                                       arg.tel2_dir,
-                                       arg.out_dir)
+        cmd = f'sst1mpipe_data_dl1_dl1_stereo \
+               --input-file {arg.input_file} \
+               --config {arg.config_file} \
+               --input-dir-tel2 {arg.tel2_dir} \
+               --output-dir {arg.out_dir}'
         logging.info(cmd)
         os.system(cmd)
 
@@ -96,14 +91,11 @@ def dl1_dl2_1file(arg):
         """
         python binding of sst1mpipe_dl1_dl2
         """
-        cmd = 'sst1mpipe_dl1_dl2 \
-               --input-file {} \
-               --config {} \
-               --models-dir {} \
-               --output-dir {} --stereo'.format(arg.input_file,
-                                         arg.config_file,
-                                         arg.models_dir,
-                                         arg.out_dir)
+        cmd = f'sst1mpipe_dl1_dl2 \
+               --input-file {arg.input_file} \
+               --config {arg.config_file} \
+               --models-dir {arg.models_dir} \
+               --output-dir {arg.out_dir} --stereo'
         logging.info(cmd)
         os.system(cmd)
 
@@ -113,14 +105,11 @@ def dl1_dl2_1file_1tel(arg):
         python binding of sst1mpipe_dl1_dl2
         """
 
-        cmd = 'sst1mpipe_dl1_dl2 \
-               --input-file {} \
-               --config {} \
-               --models-dir {} \
-               --output-dir {}'.format(arg.input_file,
-                                       arg.config_file,
-                                       arg.models_dir,
-                                       arg.out_dir)
+        cmd = f'sst1mpipe_dl1_dl2 \
+               --input-file {arg.input_file} \
+               --config {arg.config_file} \
+               --models-dir {arg.models_dir} \
+               --output-dir {arg.out_dir}'
         logging.info(cmd)
         os.system(cmd)
 
@@ -129,22 +118,16 @@ def dl2_dl3_1dir(arg):
         python binding of sst1mpipe_data_dl2_dl3
         """
 
-        cmd = 'sst1mpipe_data_dl2_dl3 \
-               --input-dir {} \
-               --irf-dir {} \
-               --config {} \
-               --target-name {} \
-               --target-ra {} \
-               --target-dec {} \
-               --output-dir {}'.format(arg.input_dir,
-                                       arg.irf_dir,
-                                       arg.config_file,
-                                       arg.target_name,
-                                       arg.target_ra,
-                                       arg.target_dec,
-                                       arg.out_dir)
+        cmd = f'sst1mpipe_data_dl2_dl3 \
+               --input-dir {arg.input_dir} \
+               --irf-dir {arg.irf_dir} \
+               --config {arg.config_file} \
+               --target-name {arg.target_name} \
+               --target-ra {arg.target_ra} \
+               --target-dec {arg.target_dec} \
+               --output-dir {arg.out_dir}'
         if arg.gammaness_cut_dir is not None:
-            cmd = cmd + " --gammaness-cut-dir {}".format(arg.gammaness_cut_dir)
+            cmd = cmd + f" --gammaness-cut-dir {arg.gammaness_cut_dir}"
         logging.info(cmd)
         os.system(cmd)
 
@@ -154,15 +137,12 @@ def extract_dl1_distributions(arg):
         python binding of sst1mpipe_extract_dl1_distributions
         """
 
-        cmd = 'sst1mpipe_extract_dl1_distributions \
-               --dl1-dir {} \
-               --date {} \
-               --output-dir {} \
+        cmd = f'sst1mpipe_extract_dl1_distributions \
+               --dl1-dir {arg.dl1_dir} \
+               --date {arg.date_str} \
+               --output-dir {arg.out_dir} \
                --histogram-bins 100 \
-               --dl3-index-dir {}'.format(arg.dl1_dir,
-                                          arg.date_str,
-                                          arg.out_dir,
-                                          arg.dl3_dir)
+               --dl3-index-dir {arg.dl3_dir}'
         logging.info(cmd)
         os.system(cmd)
 
@@ -185,12 +165,12 @@ def make_runlist_allfiles(itel,year,month,day,rootdir='/net/'):
         -------
         list of raw data file paths    
         """
-        basedir = rootdir+'/cs{}/data/raw/'.format(itel)
-        filerad = 'SST1M{}'.format(itel)
+        basedir = rootdir+f'/cs{itel}/data/raw/'
+        filerad = f'SST1M{itel}'
         filedir = os.path.join(basedir,
                                        str(year),
-                                       "{:02d}".format(month),
-                                       "{:02d}".format(day),
+                                       f"{month:02d}",
+                                       f"{day:02d}",
                                        filerad
                                        )
         return glob.glob(filedir+"/"+filerad+"*.fits.fz")
@@ -260,7 +240,7 @@ def run_daily_ana(daily_config):
     eff_cut_dir_mono   = daily_config["eff_cut_dir_mono"]
     eff_cut_dir_stereo = daily_config["eff_cut_dir_stereo"]
     try:
-        output_logfile = os.path.join(ana_dir, "logs", 'daily_ana_{:04d}{:02d}{:02d}.log'.format(year,month,day))
+        output_logfile = os.path.join(ana_dir, "logs", f'daily_ana_{year:04d}{month:02d}{day:02d}.log')
     except Exception:
         output_logfile = os.path.join(ana_dir, "logs", 'default_daily_ana.log')
     
@@ -280,7 +260,7 @@ def run_daily_ana(daily_config):
         month = (datetime.datetime.now()-datetime.timedelta(days=1)).month
         day   = (datetime.datetime.now()-datetime.timedelta(days=1)).day
     logging.info("---------------------------------------------")
-    logging.info("Daily analysis ({:04d}/{:02d}/{:02d}) START ".format(year,month,day))
+    logging.info(f"Daily analysis ({year:04d}/{month:02d}/{day:02d}) START ")
     
     ## get raw file list 
     raw_file_list_t1 = make_runlist_allfiles(itel = 1,
@@ -313,13 +293,13 @@ def run_daily_ana(daily_config):
     target_list = np.unique(list(dict_list_t1.keys())+list(dict_list_t2.keys()))
     logging.info("Target found ::")
     for target in target_list:
-        logging.info('{} :'.format(target))
+        logging.info(f'{target} :')
         try :
-            logging.info('CS1 : {}'.format(len(dict_list_t1[target]) ))
+            logging.info(f'CS1 : {len(dict_list_t1[target])}')
         except Exception:
            logging.warning('no CS1 data')
         try :
-            logging.info('CS2 : {}'.format(len(dict_list_t2[target]) ))
+            logging.info(f'CS2 : {len(dict_list_t2[target])}')
         except Exception:
            logging.warning('no CS2 data')
 
@@ -327,7 +307,7 @@ def run_daily_ana(daily_config):
 
     ## make direcotory
     datedir = os.path.join(ana_dir,
-                           '{:04d}{:02d}{:02d}'.format(year,month,day) )
+                           f'{year:04d}{month:02d}{day:02d}' )
     Path(datedir).mkdir(exist_ok=True)
 
     ## copy config files
@@ -341,7 +321,7 @@ def run_daily_ana(daily_config):
         if target in ['DARK','Transition','UNKNOWN','BIAS','WRtest',"TRANSITION","transition","dark"]:
             continue
         target_dir = os.path.join(datedir,
-                                  '{}'.format(target) )
+                                  f'{target}' )
         Path(target_dir).mkdir(exist_ok=True)
 
         ## yes, this have a low probability to work!
@@ -572,7 +552,7 @@ def run_daily_ana(daily_config):
 
 
         ## EXTRACT RATE DISTRIBUTION
-        aargs.date_str = "{:04d}{:02d}{:02d}".format(year,month,day)
+        aargs.date_str = f"{year:04d}{month:02d}{day:02d}"
         if cs1 & run_data_qual:
             aargs.dl1_dir = cs1_dl1_dir
             aargs.dl3_dir = cs1_dl3_dir
@@ -590,7 +570,7 @@ def run_daily_ana(daily_config):
             extract_dl1_distributions(aargs)       
 
         ## EXTRACT RATE DISTRIBUTION EFF
-        aargs.date_str = "{:04d}{:02d}{:02d}".format(year,month,day)
+        aargs.date_str = f"{year:04d}{month:02d}{day:02d}"
         if cs1 & run_data_qual_eff:
             aargs.dl1_dir = cs1_dl1_dir
             aargs.dl3_dir = cs1_dl3_dir_eff
@@ -608,7 +588,7 @@ def run_daily_ana(daily_config):
             extract_dl1_distributions(aargs)  
     
 
-    logging.info("Daily analysis ({:04d}/{:02d}/{:02d}) ended ".format(year,month,day))
+    logging.info(f"Daily analysis ({year:04d}/{month:02d}/{day:02d}) ended ")
 
 if __name__ == '__main__':
 
