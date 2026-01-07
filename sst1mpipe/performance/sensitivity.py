@@ -35,7 +35,7 @@ from sst1mpipe.utils import (
     check_same_shower_fraction,
 )
 
-from .spectra import *
+from sst1mpipe.performance import spectra
 
 
 def plot_gammaness_cuts(gammaness_cuts, outfile=None):
@@ -872,10 +872,10 @@ def sensitivity(
     # Traditionaly, the point gammas are weighted on Crab HEGRA Power-Law spectrum, not the MAGIC LogParabola,
     # but for the resulting flux sensitivity it doesn't matter.
     logging.info('CRAB_HEGRA spectrum is used for purposes of sensitivity estimation.')
-    target_gamma_spectrum = CRAB_HEGRA # CRAB_HEGRA, CRAB_MAGIC_JHEAP2015
+    target_gamma_spectrum = spectra.CRAB_HEGRA # CRAB_HEGRA, CRAB_MAGIC_JHEAP2015
     #target_gamma_spectrum = CRAB_MAGIC_JHEAP2015
     dl2_gamma = get_weights(dl2_gamma, mc_info=mc_info_gamma, obs_time=obs_time, target_spectrum=target_gamma_spectrum)
-    dl2_proton = get_weights(dl2_proton, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=DAMPE_P_He_SPECTRUM)
+    dl2_proton = get_weights(dl2_proton, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=spectra.DAMPE_P_He_SPECTRUM)
 
     # for point gammas, theta2 is calculated wrt the true simulated source position
     dl2_gamma = get_theta(dl2_gamma, zero_alt=dl2_gamma['true_alt'][0], zero_az=dl2_gamma['true_az'][0])
@@ -1078,7 +1078,7 @@ def sensitivity(
                     )
         # Crab
         energy_smooth = np.logspace(-1, 3, 200) * u.TeV
-        crab_flux = CRAB_MAGIC_JHEAP2015(energy_smooth)
+        crab_flux = spectra.CRAB_MAGIC_JHEAP2015(energy_smooth)
         plt.plot(energy_smooth, (crab_flux * energy_smooth**2).to(u.TeV / (u.cm ** 2 * u.s)), color='grey', label="Crab (JHEAP2015)")
 
         plt.xlim([10**-1, 5*10**2])
@@ -1177,7 +1177,7 @@ def source_time_to_detection(
     # https://bobbyhadz.com/blog/python-call-function-by-string-name
     target_spectrum = globals()[source]
     dl2_gamma = get_weights(dl2_gamma, mc_info=mc_info_gamma, obs_time=obs_time, target_spectrum=target_spectrum)
-    dl2_proton = get_weights(dl2_proton, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=DAMPE_P_He_SPECTRUM)
+    dl2_proton = get_weights(dl2_proton, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=spectra.DAMPE_P_He_SPECTRUM)
 
     # for point gammas, theta2 is calculated wrt the true simulated source position
     dl2_gamma = get_theta(dl2_gamma, zero_alt=dl2_gamma['true_alt'][0], zero_az=dl2_gamma['true_az'][0])

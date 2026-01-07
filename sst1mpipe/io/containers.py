@@ -27,7 +27,14 @@ from ctapipe.containers import (
 # from ctapipe.containers import MCEventContainer, ReconstructedContainer, \
     # MCHeaderContainer, CentralTriggerContainer
 
-from tables import *
+from tables import (
+    IsDescription,
+    StringCol,
+    Float64Col,
+    Int64Col,
+    BoolCol,
+)
+
 
 __all__ = ['CameraEventType',
            'InstrumentContainer',
