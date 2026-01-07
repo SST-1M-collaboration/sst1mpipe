@@ -571,28 +571,28 @@ def write_r1_dl1_cfg(file, config=None):
 
         for tel in telescope_coords.keys():
 
-            t = f.create_table(
+            f.create_table(
                 '/configuration/r1_dl1/telescope_coords',
                 tel,
                 pd.DataFrame(config['telescope_coords'][tel], index=[0]).to_records(index=False),
                 createparents=True,
             )
 
-        t = f.create_table(
+        f.create_table(
             '/configuration/r1_dl1/CameraCalibrator',
             calibrator,
             pd.DataFrame(config['CameraCalibrator'][calibrator], index=[0]).to_records(index=False),
             createparents=True,
         )
 
-        t = f.create_table(
+        f.create_table(
             '/configuration/r1_dl1/ImageProcessor',
             image_processor,
             pd.DataFrame(config['ImageProcessor'][image_processor], index=[0]).to_records(index=False),
             createparents=True,
         )
 
-        t = f.create_table(
+        f.create_table(
             '/configuration/r1_dl1',
             'Emin_cuts',
             pd.DataFrame({'emin_cut_g_tev': emin_cut_g, 'emin_cut_p_tev': emin_cut_p}, index=[0]).to_records(index=False),
@@ -1266,6 +1266,7 @@ def load_more_dl2_files(files, config=None,
 
     dl2_data = None
     pointing0 = None
+    times0 = None
     GTI_start, GTI_stop = [], []
     for input_file in files:
 
@@ -1443,7 +1444,7 @@ def load_distributions_sst1m(dist_path=None, dl3_path=None):
     for table in tables:
         obsid = table.split('/')[-1].split('.')[0].split('_')[-1]
         hist = read_table(table, 'intensity_hist')
-        t_elapsed = read_table(table, 't_elapsed')
+        #t_elapsed = read_table(table, 't_elapsed')
         try:
             zenith = read_table(table, 'zenith')
         except:

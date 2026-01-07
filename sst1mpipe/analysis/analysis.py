@@ -393,8 +393,8 @@ def get_theta_off(
                     axx = ax[i-1]
                 else:
                     axx = ax
-                h = axx.hist(data['theta']**2, bins=12, range=[0, 0.5], alpha=0.5, color='blue', label='ON')
-                h2 = axx.hist(dl2_photon_list_off['theta']**2, bins=12, range=[0, 0.5], alpha=0.5, color='orange', label='OFF')
+                axx.hist(data['theta']**2, bins=12, range=[0, 0.5], alpha=0.5, color='blue', label='ON')
+                axx.hist(dl2_photon_list_off['theta']**2, bins=12, range=[0, 0.5], alpha=0.5, color='orange', label='OFF')
                 axx.set_xlabel("$\\theta^{2} [deg^{2}]$")
                 axx.legend()
 
@@ -437,8 +437,6 @@ def camera_to_altaz(
 def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_axis=None, n_off=5, norm_range=[0.5, 0.7]*u.deg, theta_cut=0.1*u.deg):
 
     data_store = DataStore.from_dir(dl3_path)
-    theta2_off = np.zeros([len(theta2_axis.edges)-1, n_off])
-    off_radec = []
     counts_all_on = []
     counts_all_all_off=[]
 

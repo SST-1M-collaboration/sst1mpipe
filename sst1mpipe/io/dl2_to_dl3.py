@@ -95,14 +95,14 @@ def photon_df_to_fits(dl2_photons,
     ## reco direction in FOV
     tel_pointing = AltAz(alt = np.array(dl2_photons['true_alt_tel']) * u.deg,
                          az  = np.array(dl2_photons['true_az_tel'])*u.deg)
-    mean_zen = 90 - dl2_photons['true_alt_tel'].mean()
+    #mean_zen = 90 - dl2_photons['true_alt_tel'].mean()
 
     telescopeframe = TelescopeFrame(telescope_pointing=tel_pointing)
     reco_altaz = AltAz(alt= np.array(dl2_photons['reco_alt'])*u.deg,
                        az = np.array(dl2_photons['reco_az'])*u.deg)
 
-    offset = tel_pointing.separation(AltAz(alt = np.array(dl2_photons['reco_alt'])*u.deg,
-                                           az =  np.array(dl2_photons['reco_az'])*u.deg))
+    #offset = tel_pointing.separation(AltAz(alt = np.array(dl2_photons['reco_alt'])*u.deg,
+    #                                       az =  np.array(dl2_photons['reco_az'])*u.deg))
 
     if ('reco_ra' not in dl2_photons.keys()) or ('reco_dec' not in dl2_photons.keys()):
         horizon_frame = get_horizon_frame(config=config, telescope='tel_021', times=Time(dl2_photons['local_time'], format='unix'))
@@ -129,7 +129,7 @@ def photon_df_to_fits(dl2_photons,
     pipeline_version = dl2_photons["sst1mpipe_version"].iloc[0]
 
     ########### Build TABLE
-    dl3_columns =["EVENT_ID","TIME","RA","DEC","ENERGY","DETX","DETY"]
+    #dl3_columns =["EVENT_ID","TIME","RA","DEC","ENERGY","DETX","DETY"]
     T_event = Table()
     T_event.add_column(dl2_photons['event_id'],name="EVENT_ID")
     T_event.add_column(np.array(dl2_photons['local_time'])*u.s,name="TIME")

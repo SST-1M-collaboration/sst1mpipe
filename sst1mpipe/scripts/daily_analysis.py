@@ -185,10 +185,7 @@ def make_runlist_allfiles(itel,year,month,day,rootdir='/net/'):
         -------
         list of raw data file paths    
         """
-        runlist = []
         basedir = rootdir+'/cs{}/data/raw/'.format(itel)
-        tel_str = 'tel{}'.format(itel)
-        datestr = "{}{:02d}{:02d}".format(year,month,day)
         filerad = 'SST1M{}'.format(itel)
         filedir = os.path.join(basedir,
                                        str(year),
@@ -434,7 +431,7 @@ def run_daily_ana(daily_config):
             
 
             pool = mp.Pool(n_proc)
-            pool_results = pool.map(r0_dl1_1file,
+            pool.map(r0_dl1_1file,
                                 args_maker(aargs,
                                            dict_list_t1[target]))
             pool.close()
@@ -444,7 +441,7 @@ def run_daily_ana(daily_config):
             aargs.out_dir     = cs2_dl1_dir
 
             pool = mp.Pool(n_proc)
-            pool_results = pool.map(r0_dl1_1file,
+            pool.map(r0_dl1_1file,
                                 args_maker(aargs,
                                            dict_list_t2[target]))
             pool.close()
@@ -457,7 +454,7 @@ def run_daily_ana(daily_config):
                 aargs.out_dir     = cs1_dl2_dir
 
                 pool = mp.Pool(n_proc)
-                pool_results = pool.map(dl1_dl2_1file_1tel,
+                pool.map(dl1_dl2_1file_1tel,
                                     args_maker(aargs,
                                                glob.glob(cs1_dl1_dir+'/*.h5')))
                 pool.close()
@@ -496,7 +493,7 @@ def run_daily_ana(daily_config):
                 aargs.out_dir     = cs2_dl2_dir
 
                 pool = mp.Pool(n_proc)
-                pool_results = pool.map(dl1_dl2_1file_1tel,
+                pool.map(dl1_dl2_1file_1tel,
                                     args_maker(aargs,
                                                glob.glob(cs2_dl1_dir+'/*.h5')))
                 pool.close()
@@ -534,8 +531,7 @@ def run_daily_ana(daily_config):
                 aargs.out_dir     = stereo_dl1_dir
                 aargs.tel2_dir    = cs2_dl1_dir
                 pool = mp.Pool(n_proc)
-                pool_results = pool.map(dl1_dl1_1file,
-                                        args_maker(aargs,
+                pool.map(dl1_dl1_1file, args_maker(aargs,
                                                    glob.glob(cs1_dl1_dir+'/*.h5')))
                 pool.close()       
             if run_dl2:
@@ -543,8 +539,7 @@ def run_daily_ana(daily_config):
                 aargs.models_dir = stereo_model_dir
 
                 pool = mp.Pool(n_proc)
-                pool_results = pool.map(dl1_dl2_1file,
-                                        args_maker(aargs,
+                pool.map(dl1_dl2_1file, args_maker(aargs,
                                                    glob.glob(stereo_dl1_dir+'/*.h5')))
                 pool.close()
             ## DL3

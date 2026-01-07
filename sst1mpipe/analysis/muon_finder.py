@@ -211,11 +211,9 @@ class muon_finder:
             pedestal_info.load_firsts_pedestals()
             if pedestal_info.get_n_events() == 0:
                 print("No pedestal events found in firsts events. Skipping run")
-                pedestals_in_file = False
                 return
             else:
                 print("{} pedestals events loaded in buffer".format(pedestal_info.get_n_events()))
-                pedestals_in_file = True
 
         #####################################
         ### Loop in all events to find muons:
@@ -521,7 +519,7 @@ if __name__ == "__main__":
                               gain         = gains)
 
         try:
-            bt =finder.get_muons()
+            finder.get_muons()
         except:
             print("file {} FAILED".format(filename))
             

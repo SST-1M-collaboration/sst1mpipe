@@ -164,7 +164,7 @@ def find_dark_files(data_dir):
     file_list=glob.glob(data_dir+"/*.fits.fz")
 
     for ii,file_path in enumerate(file_list):
-        run_number = int(file_path.split("_")[-1].split('.')[0])
+        #run_number = int(file_path.split("_")[-1].split('.')[0])
         try :
             f = astropy.io.fits.open(file_path)
             target = f[2].header['TARGET'] 

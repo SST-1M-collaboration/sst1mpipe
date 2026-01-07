@@ -94,7 +94,7 @@ def plot_rates_from_slow_data(dl3_files):
         table = get_slow_data_table(dl3_file)
         table_dsc = get_slow_data_table(dl3_file,file_radical='DigicamSlowControl')
 
-        p = ax.plot([Time(tt/1000.,format='unix').to_datetime() for tt in table['TIMESTAMP'] ] ,
+        ax.plot([Time(tt/1000.,format='unix').to_datetime() for tt in table['TIMESTAMP'] ] ,
                      table['rate_swat_arrevent_nreads'],
                      '.',
                      alpha=.3,
@@ -129,7 +129,6 @@ def get_MC_dist_mono(tel_setup,
                      zenith,
                      Q_bins):
     
-    Q_bins_c = (Q_bins[1:]+Q_bins[:-1])/2.
     mc_config = load_config(config_file)
     dl2_mc_proton = load_dl1_sst1m(MC_proton_file,
                                   tel=tel_setup,

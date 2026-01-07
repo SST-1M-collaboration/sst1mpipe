@@ -432,7 +432,7 @@ def check_mc(file):
     """
 
     try:
-        mc = read_table(file, "/configuration/simulation/run")
+        read_table(file, "/configuration/simulation/run")
         logging.info('This is MC file.')
         return True
     except tables.exceptions.NoSuchNodeError:
@@ -962,7 +962,7 @@ def check_output_dl1(file):
     """
 
     try:
-        hist = read_table(file, "/simulation/service/shower_distribution")
+        read_table(file, "/simulation/service/shower_distribution")
     except tables.exceptions.NoSuchNodeError:
         logging.error("EOFError reading simtel file. The file might be truncated and resulting DL1 file cannot be produced.")
         os.remove(file)

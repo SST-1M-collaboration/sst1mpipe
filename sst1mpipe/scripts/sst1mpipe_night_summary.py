@@ -488,7 +488,7 @@ def main():
                     ax10[1].pcolormesh(X, Y, h22_tot)
                     t_diff_all = np.concatenate(t_diff_all)
                     times_all = np.concatenate(times_all)
-                    h = ax12[0].hist(t_diff_all, bins=100, range=[-1000, 1000])
+                    ax12[0].hist(t_diff_all, bins=100, range=[-1000, 1000])
                     ax12[1].plot(times_all, t_diff_all, '.')
 
             if is_dl2:
@@ -682,38 +682,38 @@ def main():
             ax6[1].set_title('Livetime of each wobble')
 
             if is_dist and (tt==21):
-                p = ax4[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
+                ax4[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
                 ax4[0].set_xscale('log')
                 ax4[0].set_yscale('log')
                 ax4[0].axvline(50)
                 ax4[0].set_xlim([10, 10**5])
                 ax4[0].grid()
 
-                h = ax4[1].hist(livetimes, bins=20)
+                ax4[1].hist(livetimes, bins=20)
                 ax4[1].grid()
                 fig4.suptitle(tel, fontsize=16)
 
             if is_dist and (tt==22):
-                p = ax5[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
+                ax5[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
                 ax5[0].set_xscale('log')
                 ax5[0].set_yscale('log')
                 ax5[0].axvline(50)
                 ax5[0].set_xlim([10, 10**5])
                 ax5[0].grid()
 
-                h = ax5[1].hist(livetimes, bins=20)
+                ax5[1].hist(livetimes, bins=20)
                 ax5[1].grid()
                 fig5.suptitle(tel, fontsize=16)
 
             if is_dist and (tt==0):
-                p = ax6[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
+                ax6[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
                 ax6[0].set_xscale('log')
                 ax6[0].set_yscale('log')
                 ax6[0].axvline(50)
                 ax6[0].set_xlim([10, 10**5])
                 ax6[0].grid()
 
-                h = ax6[1].hist(livetimes, bins=20)
+                ax6[1].hist(livetimes, bins=20)
                 ax6[1].grid()
                 fig6.suptitle(tel, fontsize=16)
 
@@ -773,7 +773,7 @@ def main():
                     time_unix = ax11.get_xticklabels()[i].get_position()[0]
                     new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
                 ax11.set_xticks(ax11.get_xticks())
-                t = ax11.set_xticklabels(new_times) #, rotation='vertical')
+                ax11.set_xticklabels(new_times) #, rotation='vertical')
                 ax11.grid()
                 ax11.legend()
                 
@@ -787,7 +787,7 @@ def main():
                     time_unix = ax.get_xticklabels()[i].get_position()[0]
                     new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
                 ax.set_xticks(ax.get_xticks())
-                t = ax.set_xticklabels(new_times) #, rotation='vertical')
+                ax.set_xticklabels(new_times) #, rotation='vertical')
                 ax.grid()
                 ax.legend()
 
@@ -801,7 +801,7 @@ def main():
                     time_unix = ax1.get_xticklabels()[i].get_position()[0]
                     new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
                 ax1.set_xticks(ax1.get_xticks())
-                t = ax1.set_xticklabels(new_times) #, rotation='vertical')
+                ax1.set_xticklabels(new_times) #, rotation='vertical')
                 ax1.grid()
                 ax1.legend()
                 ax1.set_ylim([0, 2*max(median1)])
@@ -817,7 +817,7 @@ def main():
                     time_unix = ax2.get_xticklabels()[i].get_position()[0]
                     new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
                 ax2.set_xticks(ax2.get_xticks())
-                t = ax2.set_xticklabels(new_times) #, rotation='vertical')
+                ax2.set_xticklabels(new_times) #, rotation='vertical')
                 ax2.set_ylim([0, 2*max(median2)])
                 ax2.grid()
                 ax2.legend()

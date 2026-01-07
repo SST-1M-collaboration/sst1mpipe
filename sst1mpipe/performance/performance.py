@@ -847,7 +847,7 @@ class irf_maker:
         source_offset_max = self.config['analysis']["source_offset_max_deg"]
         nbins_fov = self.config['analysis']["nbins_fov_offset"]
         nbins_fov_bg = self.config['analysis']["nbins_fov_offset_bg"]
-        nbins_offset = self.config['analysis']["nbins_source_offset"]
+        #nbins_offset = self.config['analysis']["nbins_source_offset"]
 
         self.fov_offset_bins_bg    = np.linspace(0, fov_offset_bg_max, nbins_fov_bg) * u.deg
         self.source_offset_bins =    np.linspace(0, source_offset_max, nbins_fov_bg)* u.deg

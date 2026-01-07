@@ -89,7 +89,7 @@ def get_mc_info(input_file, config=None):
     # at the r1->dl1 level in the future!
     mc = mc_correct_shower_reuse(mc, histograms)
 
-    particle_type = get_primary_type(input_file)
+    #particle_type = get_primary_type(input_file)
     simulated_event_info = QTable()
 
     for tel in ["tel_001", "stereo"]:
@@ -359,9 +359,7 @@ def check_spectrum(source):
 
     """
 
-    try:
-        target_spectrum = globals()[source]
-    except KeyError:
+    if source not in globals():
         logging.error('Desired spectrum is not implemented! \
         You can implement whatever you wish in \
         sst1mpipe.performance.spectra.')

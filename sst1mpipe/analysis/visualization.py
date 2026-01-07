@@ -49,7 +49,7 @@ def plot_count_maps(
     
     fig, ax = plt.subplots(1, 2, figsize=(17,7))
 
-    h = ax[0].hist2d(data.reco_ra, 
+    ax[0].hist2d(data.reco_ra, 
                    data.reco_dec, 
                    bins=bins_raw, 
                    range=range_d
@@ -81,9 +81,9 @@ def plot_count_maps(
     # Convoluted image
     edge = int(0.05*bins_conv) # We do not plot the borders affected by convolution artefacts
     if edge > 0:
-        img = ax[1].pcolor(xedges[edge:-edge], yedges[edge:-edge], image[edge:-edge, edge:-edge].T)
+        ax[1].pcolor(xedges[edge:-edge], yedges[edge:-edge], image[edge:-edge, edge:-edge].T)
     else:
-        img = ax[1].pcolor(xedges, yedges, image.T)
+        ax[1].pcolor(xedges, yedges, image.T)
 
     ax[1].set_xlabel('RA [deg]')
     ax[1].set_ylabel('DEC [deg]')
@@ -256,7 +256,7 @@ def plot_theta2(
     ax.set_ylabel("Counts")
     ax.legend(bbox_to_anchor=(0.1, 0.95))
 
-    txt = ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=15,
+    ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=15,
             verticalalignment='top', bbox=props)
 
 
@@ -1034,6 +1034,6 @@ def plot_theta2_dl3(ax=None, theta2_axis=None, counts_on=None, counts_off=None, 
                                                         event_counts.significance_lima)
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.95)
-    txt = ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=13,
+    ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=13,
                 verticalalignment='top', bbox=props)
     ax.legend(bbox_to_anchor=(0.1, 0.95), fontsize=10)
