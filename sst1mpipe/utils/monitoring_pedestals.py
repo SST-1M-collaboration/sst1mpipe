@@ -244,7 +244,7 @@ class sliding_pedestals:
 
             # here we apply gain drop correction
             event = calibrator_r0_r1.calibrate(event, pedestal_info=self)
-            event.r1.tel[tel].selected_gain_channel = np.zeros(data_stream.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
+            event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
 
             r1_dl1_calibrator(event)
             image_processor(event)
@@ -270,7 +270,7 @@ class sliding_pedestals:
 
               self.add_ped_evt(event)
 
-              if len(self.ped_img_array) >= max_n_img:
+              if len(self.ped_img_array) >= self.max_images_array:
                   break
 
         self.max_array_size = keep_size

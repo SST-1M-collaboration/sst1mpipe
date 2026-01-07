@@ -339,7 +339,7 @@ def train_rf_misdirection(
     reg.fit(data[features], data['log_misdirection'])
     
     if plot:
-        plot_feature_importance(reg, features=features, outfile=outdir + '/reg_mis_features_' + str(telescope) + '.png', telescope=tel)
+        plot_feature_importance(reg, features=features, outfile=outdir + '/reg_mis_features_' + str(telescope) + '.png', telescope=telescope)
 
     joblib.dump(reg, outdir + '/reg_misdirection_' + str(telescope) + '.sav', compress=3)
     del reg

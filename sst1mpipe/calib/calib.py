@@ -37,7 +37,7 @@ def get_default_window(telescope=None):
         logging.info('Window file used: ' + default_window_file_tel2)
         window_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_window_file_tel2)) 
     else:
-        logging.error('Telescope {} not known'.format(tel))
+        logging.error('Telescope {} not known'.format(telescope))
     window_corr = np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
     return window_corr, window_file
 
@@ -385,7 +385,7 @@ class Calibrator_R0_R1:
             logging.info('Calib file used: ' + default_calib_file_tel2)
             self.calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_calib_file_tel2)) 
         else:
-            logging.error('Telescope {} not known'.format(tel))
+            logging.error('Telescope {} not known'.format(self.telescope))
         self.calibration_parameters = pd.read_hdf(self.calibration_file)
 
 
