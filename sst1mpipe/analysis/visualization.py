@@ -7,7 +7,6 @@ from astropy.convolution import convolve
 from astropy.convolution.kernels import Gaussian2DKernel
 from astropy.visualization.wcsaxes import SphericalCircle
 import ctaplot
-from sst1mpipe.performance.spectra import *
 
 
 def plot_count_maps(
