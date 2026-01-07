@@ -106,7 +106,8 @@ def main():
     # load all DL1 for given date
     files = glob.glob(data_path_dl1 + '/*_stereo.h5')
     stereo = False
-    if len(files) > 0: stereo = True
+    if len(files) > 0: 
+        stereo = True
 
     logs = glob.glob(data_path_dl1 + "/*.log")
 
@@ -245,8 +246,10 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
             continue
         try:
             pt = load_dl1_pedestals(input_file)
-            if '1' in tel: cs=21
-            else: cs=22
+            if '1' in tel: 
+                cs=21
+            else: 
+                cs=22
             NSB = VAR_to_NSB(pt['pedestal_charge_std'].mean(axis=1)**2, cs)
             nsb.append(NSB.mean())
         except Exception:

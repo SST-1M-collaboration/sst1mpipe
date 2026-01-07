@@ -532,7 +532,8 @@ def plot_energy_resolution(
             axes[0].set_ylabel(r"bias (median($E_\mathrm{reco}/E_\mathrm{true}$ - 1)")
             axes[0].set_xlabel(r'$E_\mathrm{true}$' + ' [' + energy_center_unit + ']')
 
-        else: print('Set plot=resolution or plot=bias.')
+        else: 
+            print('Set plot=resolution or plot=bias.')
 
 
 def plot_angular_resolution(

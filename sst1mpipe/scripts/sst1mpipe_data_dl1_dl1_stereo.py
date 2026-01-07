@@ -133,7 +133,8 @@ def main():
                                                 config=config, 
                                                 save_figures=True
                                                 )
-    else: time_offset = 0
+    else: 
+        time_offset = 0
 
     dl1_data_t1 = load_dl1_sst1m(input_file_tel1, tel='tel_021')
     pointing_tel1 = get_pointing_radec(input_file_tel1)

@@ -1305,7 +1305,8 @@ def make_dl1_stereo(
                 if diff[idx] < window:
                     mask_concidence = diff == diff[idx]
                     tel2_event = dl1_data_tel2[mask_concidence]
-                else: tel2_event = np.array([])
+                else: 
+                    tel2_event = np.array([])
 
             tel_1 = evt.trigger.tels_with_trigger[0]
             tel1_idx = telescope_list.index(tel_1)

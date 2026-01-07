@@ -123,7 +123,8 @@ def photon_df_to_fits(dl2_photons,
         name = RF_used
     if event_class is not None:
         ec_str = "_ec{}".format(event_class)
-    else: ec_str = ""
+    else: 
+        ec_str = ""
     irf_name = "{}_gc{}{}".format(name, gammaness_cut, ec_str)
     logging.info('Expected IRF name for given DL3 file: %s', irf_name)
     pipeline_version = dl2_photons["sst1mpipe_version"].iloc[0]

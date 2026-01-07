@@ -126,7 +126,8 @@ def main():
                                        table='pandas')
             evttypes = dl2_mc_gamma['event_type'].unique()
 
-        else: evttypes = []
+        else: 
+            evttypes = []
 
         if len(evttypes):
             for event_class in evttypes:

@@ -95,10 +95,12 @@ def get_mc_info(input_file, config=None):
     for tel in ["tel_001", "stereo"]:
         try:
             params = read_table(input_file, "/dl2/event/telescope/parameters/" + tel)
-        except Exception: pass
+        except Exception: 
+            pass
         try:
             params = read_table(input_file, "/dl1/event/telescope/parameters/" + tel)
-        except Exception: pass
+        except Exception: 
+            pass
             
 
     if 'min_true_energy_cut' in params.keys():

@@ -521,7 +521,8 @@ def main():
 
     if not source.is_simulation and precise_timestamps:
         wr_timestamps = np.column_stack((full_seconds, fractional_seconds))
-    else: wr_timestamps=None
+    else: 
+        wr_timestamps=None
 
     # Write additional params in the DL1 file
     # - these are not defined in the ctapipe containers, but are necessary for (mono) reconstruction

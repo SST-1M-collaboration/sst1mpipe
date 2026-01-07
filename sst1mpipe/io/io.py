@@ -419,8 +419,10 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=[]):
             merged['true_az_tel'] = np.zeros(len(merged)).astype(np.float64)
             merged['true_alt_tel'] = np.zeros(len(merged)).astype(np.float64)
 
-            if tel == 'tel_021': params_tel = dl1_data_tabs[0]
-            elif tel == 'tel_022': params_tel = dl1_data_tabs[1]
+            if tel == 'tel_021': 
+                params_tel = dl1_data_tabs[0]
+            elif tel == 'tel_022': 
+                params_tel = dl1_data_tabs[1]
 
             # we cannot merge based on obs_id/event_id, because tel1/tel2 data has the same ids in the output file, but not in the input ones!
             # We also cannot merge based on only one parameter, because it turned out that the probability od having e.g. two events with the

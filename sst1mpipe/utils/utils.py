@@ -1151,8 +1151,10 @@ def add_true_impact(
 
     array_info = read_table(input_file, "/configuration/instrument/subarray/layout")
 
-    if tel == 'tel_001': index = 0
-    else:  index = 1
+    if tel == 'tel_001': 
+        index = 0
+    else:  
+        index = 1
     params['true_tel_impact_distance'] = np.sqrt((array_info['pos_x'][index] - params['true_core_x'])**2 + (array_info['pos_y'][index] - params['true_core_y'])**2) * u.m
     return params
 

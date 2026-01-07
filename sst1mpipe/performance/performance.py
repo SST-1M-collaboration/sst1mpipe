@@ -712,7 +712,8 @@ class irf_maker:
         if true_energy_scaling:
             self.scaling_factor = float(self.config["analysis"]["true_energy_scaling_factor"])
             logging.warning('True energies in IRFs scaled by a factor of %f.', self.scaling_factor)
-        else: self.scaling_factor = 1.
+        else: 
+            self.scaling_factor = 1.
 
         if gammaness_cuts is None:
             self.gammaness_cut = self.config['analysis']['global_gammaness_cut']
@@ -801,7 +802,8 @@ class irf_maker:
         #                                                            self.gammaness_cut_tag)
         if event_class is not None:
             ec_str = "_ec{}".format(event_class)
-        else: ec_str = ""
+        else: 
+            ec_str = ""
         self.outdir = output_dir + '/data/sst1m_{}/{}/bcf/ze{}_az{}_gc{}{}/'.format(self.tel_setup,
                                                                     self.pipeline_version,
                                                                     self.zenith_angle,
