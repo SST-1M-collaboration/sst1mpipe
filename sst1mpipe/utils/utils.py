@@ -3,31 +3,38 @@ Copyright (c) 2024 SST-1M collaboration
 Licensed under the 3-clause BSD style license.
 """
 
-from ctapipe.io import read_table
-from astropy.coordinates import AltAz, SkyCoord, EarthLocation, get_moon, get_sun, get_body
+import logging
+import os
+import re
+from datetime import datetime
+from os import path
+
+import astropy.constants as c
+import astropy.units as u
+import ctaplot
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pkg_resources
+import tables
+from astropy.coordinates import (
+    AltAz,
+    EarthLocation,
+    SkyCoord,
+    angular_separation,
+    get_body,
+    get_moon,
+    get_sun,
+)
+from astropy.io import fits
+from astropy.time import Time
+from astroquery.simbad import Simbad
 from ctapipe.coordinates import CameraFrame
 from ctapipe.image import camera_to_shower_coordinates
 from ctapipe.instrument import SubarrayDescription
-
-import ctaplot
-from astropy.time import Time
-from astropy.io import fits
-import astropy.constants as c
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import h5py
-import logging
-import tables
-import os
-from datetime import datetime
-import matplotlib.pyplot as plt
+from ctapipe.io import read_table
 from gammapy.data import DataStore
-from astroquery.simbad import Simbad
-import pkg_resources
-from os import path
-import re
-from astropy.coordinates import angular_separation
 
 
 def get_target(file, force_pointing=False):

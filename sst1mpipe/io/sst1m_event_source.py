@@ -1,34 +1,35 @@
 
-from ctapipe.io import (
-    EventSource,
-)
-from ctapipe.io.datalevels import DataLevel
+import warnings
+
+import numpy as np
+from astropy import units as u
+from astropy.time import Time
 from ctapipe.containers import (
-    SchedulingBlockContainer,
     ObservationBlockContainer,
     PointingMode,
+    SchedulingBlockContainer,
 )
+from ctapipe.core.traits import Bool, Float
 from ctapipe.instrument import (
     SubarrayDescription,
 )
 from ctapipe.instrument.subarray import EarthLocation
-from ctapipe.core.traits import Bool, Float
+from ctapipe.io import (
+    EventSource,
+)
+from ctapipe.io.datalevels import DataLevel
+from protozfits import File, MultiZFitsFiles
 
 from sst1mpipe.constants import (
-    REFERENCE_LOCATION,
     PATCH_ID_INPUT_SORT_IDS,
-    PATCH_ID_OUTPUT_SORT_IDS
+    PATCH_ID_OUTPUT_SORT_IDS,
+    REFERENCE_LOCATION,
 )
 from sst1mpipe.instrument import camera
 from sst1mpipe.io.containers import (
     SST1MArrayEventContainer,
 )
 
-from protozfits import File, MultiZFitsFiles
-import numpy as np
-from astropy import units as u
-from astropy.time import Time
-import warnings
 # from tqdm import tqdm
 
 # from sst1mpipe.io.zfits import (

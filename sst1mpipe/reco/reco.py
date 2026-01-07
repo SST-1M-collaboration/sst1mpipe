@@ -1,48 +1,43 @@
-import numpy as np
-import astropy.units as u
-from astropy.time import Time
-from astropy.table import QTable
+import glob
+import logging
+import os
 
+import astropy.units as u
+import joblib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from astropy.table import QTable
+from astropy.time import Time
+from ctapipe.io import DataWriter, HDF5EventSource
+from ctapipe.reco import ShowerProcessor
+from ctaplot.ana import angular_separation_altaz, logbin_mean
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
-import joblib
-import glob
-import os
-import matplotlib.pyplot as plt
-import pandas as pd
-from sst1mpipe.utils import (
-    camera_to_altaz, 
-    disp_to_pos, 
-    disp_vector, 
-    mix_gamma_proton,
-    remove_stereo,
-    get_event_sample,
-    get_telescopes,
-    event_hillas_add_units,
-    get_wr_timestamp,
-    get_stereo_method,
-    get_horizon_frame,
-    get_finite
-)
+
+from sst1mpipe.analysis import add_reco_ra_dec
 from sst1mpipe.io import (
-    load_more_dl1_tables_mono,
-    load_dl1_sst1m,
     check_outdir,
     get_dl1_info,
     load_dl1_pedestals,
-    write_dl1_pedestals
+    load_dl1_sst1m,
+    load_more_dl1_tables_mono,
+    write_dl1_pedestals,
 )
-from sst1mpipe.analysis import add_reco_ra_dec
-
-from ctaplot.ana import (
-    angular_separation_altaz, 
-    logbin_mean
+from sst1mpipe.utils import (
+    camera_to_altaz,
+    disp_to_pos,
+    disp_vector,
+    event_hillas_add_units,
+    get_event_sample,
+    get_finite,
+    get_horizon_frame,
+    get_stereo_method,
+    get_telescopes,
+    get_wr_timestamp,
+    mix_gamma_proton,
+    remove_stereo,
 )
-import logging
-
-from ctapipe.reco import ShowerProcessor
-from ctapipe.io import HDF5EventSource
-from ctapipe.io import DataWriter
 
 
 def plot_feature_importance(

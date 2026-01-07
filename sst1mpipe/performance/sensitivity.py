@@ -1,40 +1,28 @@
-from ctapipe.io import read_table
-from astropy.io.misc.hdf5 import write_table_hdf5
-from astropy.table import Table, QTable
-from astropy.coordinates import (
-    angular_separation,
-)
-import numpy as np
+import logging
+import operator
+
 import astropy.units as u
 import ctaplot
 import matplotlib.pyplot as plt
-import logging
-import operator
+import numpy as np
+from astropy.coordinates import (
+    angular_separation,
+)
+from astropy.io.misc.hdf5 import write_table_hdf5
+from astropy.table import QTable, Table
+from ctapipe.io import read_table
+from gammapy.stats import WStatCountsStatistic
+from pyirf.cuts import calculate_percentile_cut, evaluate_binned_cut
+from pyirf.spectral import PowerLaw, calculate_event_weights
 from scipy.interpolate import make_smoothing_spline
 
-from pyirf.spectral import (
-    calculate_event_weights,
-    PowerLaw
-)
-
-from pyirf.cuts import (
-    calculate_percentile_cut,
-    evaluate_binned_cut
-)
-
-from gammapy.stats import WStatCountsStatistic
-
-from sst1mpipe.io import (
-    load_dl2_sst1m,
-    check_outdir
-)
+from sst1mpipe.io import check_outdir, load_dl2_sst1m
+from sst1mpipe.performance import spectra
 from sst1mpipe.utils import (
+    check_same_shower_fraction,
     correct_number_simulated_showers,
     mc_correct_shower_reuse,
-    check_same_shower_fraction,
 )
-
-from sst1mpipe.performance import spectra
 
 
 def plot_gammaness_cuts(gammaness_cuts, outfile=None):

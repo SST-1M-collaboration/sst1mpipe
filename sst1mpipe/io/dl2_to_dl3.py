@@ -1,23 +1,21 @@
-from astropy.table import Table
-import numpy as np
+import glob
 import logging
 import os
-import glob
 
+import astropy.units as u
+import numpy as np
+from astropy.coordinates import AltAz, SkyCoord
+from astropy.io import fits
+from astropy.table import Table
+from astropy.time import Time
+from ctapipe.coordinates import TelescopeFrame
+from gammapy.data import DataStore
+
+from sst1mpipe.analysis import add_reco_ra_dec
+from sst1mpipe.io import check_outdir, load_config, load_more_dl2_files
 from sst1mpipe.utils import (
     get_horizon_frame,
 )
-from sst1mpipe.analysis import add_reco_ra_dec
-from sst1mpipe.io import load_config, load_more_dl2_files, check_outdir
-
-from ctapipe.coordinates import TelescopeFrame
-
-import astropy.units as u
-from astropy.io import fits
-from astropy.coordinates import SkyCoord, AltAz
-from astropy.time import Time
-
-from gammapy.data import DataStore
 
 
 def photon_df_to_fits(dl2_photons,

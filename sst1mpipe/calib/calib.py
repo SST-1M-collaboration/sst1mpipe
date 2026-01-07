@@ -1,12 +1,11 @@
-import numpy as np
-import pkg_resources
-import pandas as pd
-from os import path
 import logging
-from sst1mpipe.utils import (
-    get_tel_string, 
-    VAR_to_Idrop
-    )
+from os import path
+
+import numpy as np
+import pandas as pd
+import pkg_resources
+
+from sst1mpipe.utils import VAR_to_Idrop, get_tel_string
 
 
 def get_default_window(telescope=None):

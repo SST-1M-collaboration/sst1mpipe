@@ -18,17 +18,14 @@ $> python sst1mpipe_get_tunning_params.py
 
 """
 
+import argparse
+import glob
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-import glob
-import argparse
+from sst1mpipe.io import check_outdir, read_charges_data, read_charges_mc
 
-from sst1mpipe.io import (
-    read_charges_data,
-    read_charges_mc,
-    check_outdir
-)
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Extraction of MC tunning parameters from pixel charge histograms")

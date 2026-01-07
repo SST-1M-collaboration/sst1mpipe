@@ -27,31 +27,27 @@ $> python sst1mpipe_mc_performance.py
 --edep-gammaness-only
 """
 
-import sst1mpipe
-import os
-import sys
 import argparse
-import astropy.units as u
-import shutil
 import logging
-from sst1mpipe.utils import (
-    get_telescopes
-)
-from sst1mpipe.io import (
-    load_config,
-    check_outdir,
-    load_dl2_sst1m
-)
-from sst1mpipe.performance import (
-    evaluate_performance,
-    sensitivity,
-    calculate_gammaness_cuts_efficiency,
-    plot_gammaness_cuts
-)
+import os
+import shutil
+import sys
 
+import astropy.units as u
+from astropy.coordinates import angular_separation
 from astropy.io.misc.hdf5 import write_table_hdf5
 from astropy.table import Table
-from astropy.coordinates import angular_separation
+
+import sst1mpipe
+from sst1mpipe.io import check_outdir, load_config, load_dl2_sst1m
+from sst1mpipe.performance import (
+    calculate_gammaness_cuts_efficiency,
+    evaluate_performance,
+    plot_gammaness_cuts,
+    sensitivity,
+)
+from sst1mpipe.utils import get_telescopes
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluation of performance from reconstructed MC DL2 files")

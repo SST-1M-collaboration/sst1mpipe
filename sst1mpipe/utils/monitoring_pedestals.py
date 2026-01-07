@@ -1,24 +1,20 @@
-import numpy as np
-import astropy.units as u
-
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-
-from sst1mpipe.calib import (
-    Calibrator_R0_R1,
-    window_transmittance_correction,
-    get_window_corr_factors,
-    saturated_charge_correction
-)
-from ctapipe.calib import CameraCalibrator
-from ctapipe.image import ImageProcessor
-from sst1mpipe.utils import (
-    get_subarray,
-    get_swap_flag
-)
-
 import logging
 from collections import deque
 from statistics import mean
+
+import astropy.units as u
+import numpy as np
+from ctapipe.calib import CameraCalibrator
+from ctapipe.image import ImageProcessor
+
+from sst1mpipe.calib import (
+    Calibrator_R0_R1,
+    get_window_corr_factors,
+    saturated_charge_correction,
+    window_transmittance_correction,
+)
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.utils import get_subarray, get_swap_flag
 
 MON_EVT_TYPE = 8
 class sliding_pedestals:

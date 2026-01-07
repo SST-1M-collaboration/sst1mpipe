@@ -12,30 +12,18 @@ The script can automaticaly find the closest node in alt,az,nsb
 for models and class edges, similar to the DL1_DL2 script.
 """
 
-import sst1mpipe
 import argparse
-import sys
 import logging
-from sst1mpipe.io import (
-    load_dl2_sst1m,
-    load_config,
-    check_outdir,
-    write_dl2
-)
+import sys
 
-from sst1mpipe.utils import (
-    get_telescopes, 
-    check_mc,
-    get_closest_rf_model
-)
-from sst1mpipe.reco import (
-    reco_misdirection,
-    get_evttype_edges,
-    classify_evt_types
-)
-
-from astropy.io.misc.hdf5 import write_table_hdf5, read_table_hdf5
 import matplotlib.pyplot as plt
+from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
+
+import sst1mpipe
+from sst1mpipe.io import check_outdir, load_config, load_dl2_sst1m, write_dl2
+from sst1mpipe.reco import classify_evt_types, get_evttype_edges, reco_misdirection
+from sst1mpipe.utils import check_mc, get_closest_rf_model, get_telescopes
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="MC train RFs")

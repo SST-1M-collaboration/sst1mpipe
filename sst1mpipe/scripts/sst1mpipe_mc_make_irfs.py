@@ -20,14 +20,15 @@ $> python sst1mpipe_mc_make_irfs.py
 """
 
 import argparse
+import glob
+import logging
 import sys
 
-from sst1mpipe.utils import get_telescopes
-from sst1mpipe.io import check_outdir, load_dl2_sst1m, load_config
-from sst1mpipe.performance import irf_maker
 import sst1mpipe
-import logging
-import glob
+from sst1mpipe.io import check_outdir, load_config, load_dl2_sst1m
+from sst1mpipe.performance import irf_maker
+from sst1mpipe.utils import get_telescopes
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="IRF maker")

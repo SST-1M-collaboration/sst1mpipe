@@ -1,12 +1,13 @@
+import itertools
+
+import astropy.units as u
+import ctaplot
 import matplotlib.pyplot as plt
 import numpy as np
-from gammapy.stats import WStatCountsStatistic
-import astropy.units as u
-import itertools 
 from astropy.convolution import convolve
 from astropy.convolution.kernels import Gaussian2DKernel
 from astropy.visualization.wcsaxes import SphericalCircle
-import ctaplot
+from gammapy.stats import WStatCountsStatistic
 
 
 def plot_count_maps(

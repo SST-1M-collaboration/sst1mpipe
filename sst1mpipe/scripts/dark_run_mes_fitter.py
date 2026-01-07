@@ -47,28 +47,24 @@ Created on Wed Mar 23 16:36:22 2022
 """
 
 import argparse
-from pkg_resources import resource_filename
+import multiprocessing as mp
 import os
+
+# from ctapipe.instrument import CameraGeometry
+# from ctapipe.image import hillas_parameters, tailcuts_clean
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy
+import scipy.special as scsp
+import scipy.stats as scst
+from ctapipe.instrument import SubarrayDescription
+from ctapipe.visualization import CameraDisplay
+from iminuit import Minuit
+from pkg_resources import resource_filename
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
-from ctapipe.instrument import SubarrayDescription
-from ctapipe.visualization import CameraDisplay
-# from ctapipe.instrument import CameraGeometry
-# from ctapipe.image import hillas_parameters, tailcuts_clean
-
-import matplotlib.pyplot as plt
-
-import scipy
-import scipy.stats as scst
-import scipy.special as scsp
-
-import multiprocessing as mp
-
-
-from iminuit import Minuit
 #from iminuit.cost import LeastSquares
 
 

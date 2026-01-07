@@ -4,29 +4,22 @@
 Created June 01 2024
 """
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 import glob
 
 import astropy.units as u
-
 import matplotlib.dates as mdates
-
-from astropy.time import Time
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from astropy.io import fits
 from astropy.table import Table, vstack
-
+from astropy.time import Time
 from ctapipe.io import read_table
+from scipy.optimize import curve_fit
 
-
-
-
+from sst1mpipe.io import load_config, load_dl1_sst1m
 from sst1mpipe.performance import get_mc_info, get_weights
 from sst1mpipe.performance.spectra import DAMPE_P_He_SPECTRUM
-from sst1mpipe.io import load_dl1_sst1m,load_config
-
-from scipy.optimize import curve_fit
 
 DEFAULT_CUTS = {}
 DEFAULT_CUTS["zenith"]             = [0,70]

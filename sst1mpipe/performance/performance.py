@@ -1,58 +1,42 @@
-from astropy.io.misc.hdf5 import write_table_hdf5
-from astropy.table import Table, QTable
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import ctaplot
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-from sklearn import metrics
 import logging
-
+import operator
 import shutil
 
-
-from astropy.io import fits
+import astropy.units as u
+import ctaplot
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from astropy.coordinates import AltAz
+from astropy.io import fits
+from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
+from astropy.table import QTable, Table
+from pyirf.cuts import evaluate_binned_cut
+from pyirf.io import (
+    create_aeff2d_hdu,
+    create_background_2d_hdu,
+    create_energy_dispersion_hdu,
+    create_psf_table_hdu,
+)
+from pyirf.irf import (
+    background_2d,
+    effective_area_per_energy,
+    effective_area_per_energy_and_fov,
+    energy_dispersion,
+    psf_table,
+)
+from pyirf.simulations import SimulatedEventsInfo
+from sklearn import metrics
 
 import sst1mpipe
-
-from sst1mpipe.io import(
-    load_dl2_sst1m,
-    check_outdir,
-    load_config
-)
+from sst1mpipe.io import check_outdir, load_config, load_dl2_sst1m
 from sst1mpipe.utils import (
     get_avg_pointing,
 )
 
-from .spectra import DAMPE_P_He_SPECTRUM, CRAB_HEGRA
-from .sensitivity import (
-    get_mc_info,
-    get_weights,
-    get_gammaness_cuts,
-    get_theta
-)
-
-from pyirf.simulations import SimulatedEventsInfo
-
-from pyirf.irf import (effective_area_per_energy,
-                       effective_area_per_energy_and_fov, 
-                       psf_table,
-                       background_2d,
-                       energy_dispersion
-                      )
-from pyirf.io import (
-    create_aeff2d_hdu,
-    create_psf_table_hdu,
-    create_energy_dispersion_hdu,
-    create_background_2d_hdu,
-)
-from astropy.io.misc.hdf5 import read_table_hdf5
-from pyirf.cuts import (
-    evaluate_binned_cut
-)
-import operator
+from .sensitivity import get_gammaness_cuts, get_mc_info, get_theta, get_weights
+from .spectra import CRAB_HEGRA, DAMPE_P_He_SPECTRUM
 
 
 def evaluate_performance(

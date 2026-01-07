@@ -8,34 +8,28 @@ Created on Wed Mar 23 16:36:22 2022
 
 
 import argparse
-import os
-import numpy as np
-
-#from cts_core.camera import Camera
-#from digicampipe.instrument import geometry
-#from digicampipe.io.event_stream import event_stream, add_slow_data
-
-from ctapipe.io import EventSource
-
-import matplotlib.pyplot as plt
 import datetime
+import os
 
 import astropy.units as u
-
-
-
-from scipy.interpolate import UnivariateSpline
-from scipy.optimize import minimize
-
+import matplotlib.pyplot as plt
+import numpy as np
 
 #from spe_mc_v6 import mes_fitter_mc
 from astropy.io import ascii as asc
 
+#from cts_core.camera import Camera
+#from digicampipe.instrument import geometry
+#from digicampipe.io.event_stream import event_stream, add_slow_data
+from ctapipe.io import EventSource
 from PulseTemplate import GetTemplate3
+from scipy.interpolate import UnivariateSpline
+from scipy.optimize import minimize
 
-from sst1mpipe.utils import get_cam_geom
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.calib import get_default_calibration
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.utils import get_cam_geom
+
 
 class shape_maker:
     def __init__(self,

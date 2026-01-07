@@ -16,27 +16,22 @@ $> python sst1mpipe_data_get_photon_list.py
 
 """
 
-import sst1mpipe
-import os
-import sys
 import argparse
-import shutil
 import logging
+import os
+import shutil
+import sys
 
-from sst1mpipe.utils import (
-    get_telescopes,
-    get_horizon_frame,
-)
-
-from sst1mpipe.io import (
-    load_dl2_sst1m, 
-    write_photon_list,
-    load_config,
-    check_outdir
-)
-
-from sst1mpipe.analysis import add_reco_ra_dec
 from astropy.time import Time
+
+import sst1mpipe
+from sst1mpipe.analysis import add_reco_ra_dec
+from sst1mpipe.io import check_outdir, load_config, load_dl2_sst1m, write_photon_list
+from sst1mpipe.utils import (
+    get_horizon_frame,
+    get_telescopes,
+)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Extract candidate photon events from data.")

@@ -5,27 +5,18 @@ A script to train random forests for reconstruction of misdirection
 events into different classes.
 """
 
-import sst1mpipe
 import argparse
-import sys
-import os
 import logging
+import os
 import shutil
-from sst1mpipe.io import (
-    load_dl2_sst1m,
-    load_config,
-    check_outdir
-)
-from sst1mpipe.reco import (
-    train_rf_misdirection
-)
-
-from sst1mpipe.utils import (
-    get_telescopes, 
-    calculate_misdirection
-)
+import sys
 
 import numpy as np
+
+import sst1mpipe
+from sst1mpipe.io import check_outdir, load_config, load_dl2_sst1m
+from sst1mpipe.reco import train_rf_misdirection
+from sst1mpipe.utils import calculate_misdirection, get_telescopes
 
 
 def parse_args():

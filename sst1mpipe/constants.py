@@ -1,8 +1,6 @@
+import numpy as np
 from astropy import units as u
 from ctapipe.instrument.subarray import EarthLocation
-
-import numpy as np
-
 
 # Should be SST1M position - #TODO
 REFERENCE_LOCATION = EarthLocation(

@@ -4,17 +4,17 @@
 Created Feb 29 2024
 """
 
-import numpy as np
-import astropy.units as u
-from astropy.time import Time
-from ctapipe.io import read_table
+import glob
 
 import astropy
+import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.time import Time
+from ctapipe.io import read_table
 from scipy import interpolate
 
-import matplotlib.pyplot as plt 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-import glob
 
 ## spline aprox NSB : VAR[ADC]->SHIFT[ADC]
 

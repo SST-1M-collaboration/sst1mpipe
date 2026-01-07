@@ -16,28 +16,25 @@ $> python sst1mpipe_extract_dl1_distributions.py
 
 """
 
-import astropy.units as u
-
-import pandas as pd
-import numpy as np
+import argparse
 import glob
 
+import astropy.units as u
+import numpy as np
+import pandas as pd
+from astropy.io.misc.hdf5 import write_table_hdf5
+from astropy.table import QTable
+from gammapy.data import DataStore
 
 from sst1mpipe.io import (
+    check_outdir,
+    load_dl1_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
-    check_outdir,
-    load_dl1_pedestals
 )
 from sst1mpipe.utils import get_telescopes
 from sst1mpipe.utils.NSB_tools import VAR_to_NSB
 
-from gammapy.data import DataStore
-
-from astropy.io.misc.hdf5 import write_table_hdf5
-from astropy.table import QTable
-
-import argparse
 
 def parse_args():
 

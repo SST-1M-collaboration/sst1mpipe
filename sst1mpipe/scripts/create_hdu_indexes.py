@@ -16,10 +16,13 @@ $> python create_hdu_indexes.py
 
 import argparse
 import glob
+
+import numpy as np
+from gammapy.data import DataStore
+
 from sst1mpipe.io import check_outdir
 from sst1mpipe.io.dl2_to_dl3 import create_hdu_index
-from gammapy.data import DataStore
-import numpy as np
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Makes index files for all input DL3 files.")

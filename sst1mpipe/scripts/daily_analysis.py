@@ -1,18 +1,18 @@
-import os
-import multiprocessing as mp
-import numpy as np
-import glob
 import copy
-import sys
+import datetime
+import glob
 import json
-import shutil
 import logging
-import datetime 
-
+import multiprocessing as mp
+import os
+import shutil
+import sys
 from pathlib import Path
-from astropy.io import fits
-from astropy.coordinates import SkyCoord
+
 import astropy.units as u
+import numpy as np
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
 
 '''
 this run the analysis pipeline up to stereo dl2 on Calculus.

@@ -1,21 +1,20 @@
-from ctapipe.image import (
-    ImageCleaner,
-    ImageProcessor,
-    tailcuts_clean, 
-    apply_time_delta_cleaning,
-    number_of_islands
-)
-
-
-from ctapipe.containers import (
-    CameraHillasParametersContainer,
-    CameraTimingParametersContainer,
-    ImageParametersContainer
-)
+import logging
 from copy import deepcopy
 
 import numpy as np
-import logging
+from ctapipe.containers import (
+    CameraHillasParametersContainer,
+    CameraTimingParametersContainer,
+    ImageParametersContainer,
+)
+from ctapipe.image import (
+    ImageCleaner,
+    ImageProcessor,
+    apply_time_delta_cleaning,
+    number_of_islands,
+    tailcuts_clean,
+)
+
 
 def get_only_main_island_mask(geom, cleaning_mask):
             

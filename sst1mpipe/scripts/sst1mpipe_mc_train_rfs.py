@@ -24,20 +24,16 @@ $> python sst1mpipe_mc_train_rfs.py
 
 """
 
-import sst1mpipe
 import argparse
-import sys
-import os
 import logging
+import os
 import shutil
-from sst1mpipe.io import (
-    load_dl1_sst1m,
-    load_config,
-    check_outdir
-)
-from sst1mpipe.reco import (
-    train_models
-)
+import sys
+
+import sst1mpipe
+from sst1mpipe.io import check_outdir, load_config, load_dl1_sst1m
+from sst1mpipe.reco import train_models
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="MC train RFs")

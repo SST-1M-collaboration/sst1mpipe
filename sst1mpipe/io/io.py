@@ -1,58 +1,45 @@
-from ctapipe.io import read_table
-from astropy.table import Table, QTable
+import glob
+import json
+import logging
+import operator
+import os
+from datetime import datetime
+from os import path
+
+import astropy.units as u
 import numpy as np
 import pandas as pd
-import astropy.units as u
-from astropy.table import join
-import tables
-import json
-import os
-from os import path
-from traitlets.config import Config
-import logging
-from astropy.io.misc.hdf5 import (
-    write_table_hdf5,
-    read_table_hdf5
-    )
-from datetime import datetime
-
-from sst1mpipe.utils import (
-    add_pointing_mc,
-    add_features,
-    add_timing_features,
-    add_log_true_energy,
-    add_disp,
-    event_selection,
-    add_miss,
-    get_telescopes,
-    add_true_impact,
-    get_location,
-    add_event_id,
-    get_tel_string,
-    get_finite,
-    get_pointing_radec,
-    stereo_var_cuts
-)
-
-from astropy.io import fits
-
-import sst1mpipe 
-
-from sst1mpipe.io.containers import (
-    DL1_info,
-    DL2_info
-)
-from pyirf.cuts import (
-    evaluate_binned_cut
-)
-
-import operator
-
-from astropy.coordinates import SkyCoord, AltAz
-from astropy.time import Time
-import glob
-from gammapy.data import DataStore
 import pkg_resources
+import tables
+from astropy.coordinates import AltAz, SkyCoord
+from astropy.io import fits
+from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
+from astropy.table import QTable, Table, join
+from astropy.time import Time
+from ctapipe.io import read_table
+from gammapy.data import DataStore
+from pyirf.cuts import evaluate_binned_cut
+from traitlets.config import Config
+
+import sst1mpipe
+from sst1mpipe.io.containers import DL1_info, DL2_info
+from sst1mpipe.utils import (
+    add_disp,
+    add_event_id,
+    add_features,
+    add_log_true_energy,
+    add_miss,
+    add_pointing_mc,
+    add_timing_features,
+    add_true_impact,
+    event_selection,
+    get_finite,
+    get_location,
+    get_pointing_radec,
+    get_tel_string,
+    get_telescopes,
+    stereo_var_cuts,
+)
 
 
 def read_charges_data(file):

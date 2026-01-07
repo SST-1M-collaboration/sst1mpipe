@@ -1,6 +1,7 @@
-from astropy import units as u
 import numpy as np
+from astropy import units as u
 from ctapipe.instrument.camera import CameraGeometry
+
 # from ctapipe.instrument.camera import find_neighbor_pixels
 from cts_core import camera as cam
 

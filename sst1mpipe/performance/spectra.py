@@ -1,14 +1,13 @@
-import numpy as np
 import astropy.units as u
-
+import numpy as np
 from pyirf.spectral import (
-    PowerLaw,
-    LogParabola,
     CRAB_HEGRA,
     CRAB_MAGIC_JHEAP2015,
-    DAMPE_P_He_SPECTRUM,
+    DIFFUSE_FLUX_UNIT,
     POINT_SOURCE_FLUX_UNIT,
-    DIFFUSE_FLUX_UNIT
+    DAMPE_P_He_SPECTRUM,
+    LogParabola,
+    PowerLaw,
 )
 
 __all__ = [

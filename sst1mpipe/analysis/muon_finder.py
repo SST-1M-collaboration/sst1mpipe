@@ -1,35 +1,29 @@
 import argparse
+import datetime
+import glob
+import multiprocessing as mp
 import os
 from os import path
-import glob
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import multiprocessing as mp
 import pkg_resources
-
-from ctapipe.instrument import SubarrayDescription
-from ctapipe.visualization import CameraDisplay
 from ctapipe.image import tailcuts_clean
 from ctapipe.image.cleaning import number_of_islands
-
-
 from ctapipe.image.muon import ring_completeness
+from ctapipe.instrument import SubarrayDescription
+from ctapipe.io import EventSource
+from ctapipe.visualization import CameraDisplay
+from scipy.ndimage import convolve1d
+from scipy.optimize import minimize
 
-
+from sst1mpipe.calib.calib import get_default_window
+from sst1mpipe.io import load_config
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
 from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
-from sst1mpipe.io import load_config
-from sst1mpipe.calib.calib import get_default_window
 
-from scipy.optimize import minimize
-from scipy.ndimage import convolve1d
-
-
-import matplotlib.pyplot as plt
-import datetime
-
-from ctapipe.io import EventSource
 DEFAULT_CONFIG_FILE = pkg_resources.resource_filename(
                             'sst1mpipe',
                             path.join(

@@ -20,32 +20,23 @@ $> python sst1mpipe_data_dl1_dl1_stereo.py
 
 """
 
+import argparse
 import glob
+import logging
+import os
+import sys
 
 import sst1mpipe
 from sst1mpipe.io import (
-    load_config,
+    add_wr_dl1_stereo,
     check_outdir,
+    load_config,
+    load_dl1_sst1m,
     load_more_dl1_tables_mono,
     write_extra_parameters,
-    load_dl1_sst1m,
-    add_wr_dl1_stereo,
 )
-
-from sst1mpipe.reco import (
-    find_coincidence_offset,
-    make_dl1_stereo
-)
-
-from sst1mpipe.utils import (
-    get_stereo_method,
-    get_pointing_radec
-)
-
-import os
-import sys
-import argparse
-import logging
+from sst1mpipe.reco import find_coincidence_offset, make_dl1_stereo
+from sst1mpipe.utils import get_pointing_radec, get_stereo_method
 
 
 def parse_args():

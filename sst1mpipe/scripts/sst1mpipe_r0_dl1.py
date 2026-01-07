@@ -20,62 +20,56 @@ $> python sst1mpipe_r0_dl1.py
 
 """
 
+import argparse
+import logging
+import os
+import sys
+
+import astropy.units as u
+import numpy as np
+from ctapipe.calib import CameraCalibrator
+from ctapipe.io import DataWriter, EventSource
+from ctapipe.reco import ShowerProcessor
+
 import sst1mpipe
+from sst1mpipe.calib import (
+    Calibrator_R0_R1,
+    correct_MC_for_PDE_drop,
+    get_window_corr_factors,
+    saturated_charge_correction,
+    window_transmittance_correction,
+)
+from sst1mpipe.io import (
+    check_outdir,
+    get_pde_correction_factors,
+    get_used_qe_simtel,
+    load_config,
+    read_charge_images,
+    write_assumed_pointing,
+    write_charge_fraction,
+    write_charge_images,
+    write_dl1_info,
+    write_extra_parameters,
+    write_pixel_charges_table,
+)
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import (
-    correct_true_image, 
-    energy_min_cut,
-    remove_bad_pixels,
-    add_pointing_to_events,
     add_event_id,
+    add_pointing_to_events,
     add_trigger_time,
-    get_tel_string,
+    correct_true_image,
+    energy_min_cut,
     get_location,
     get_subarray,
+    get_swap_flag,
+    get_tel_string,
     image_cleaner_setup,
+    remove_bad_pixels,
     swap_modules_59_88,
-    get_swap_flag
 )
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
 from sst1mpipe.utils.monitoring_r0_dl1 import Monitoring_R0_DL1
 
-from sst1mpipe.io import (
-    write_extra_parameters,
-    load_config,
-    check_outdir,
-    write_assumed_pointing,
-    write_pixel_charges_table,
-    write_charge_images,
-    read_charge_images,
-    write_charge_fraction,
-    write_dl1_info,
-    get_used_qe_simtel,
-    get_pde_correction_factors
-)
-
-from sst1mpipe.calib import (
-    window_transmittance_correction,
-    get_window_corr_factors,
-    saturated_charge_correction,
-    Calibrator_R0_R1,
-    correct_MC_for_PDE_drop
-)
-
-from ctapipe.io import EventSource
-from ctapipe.calib import CameraCalibrator
-from ctapipe.reco import ShowerProcessor
-from ctapipe.io import DataWriter
-
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-
-import os
-import sys
-import argparse
-import numpy as np
-import logging
-
-
-
-import astropy.units as u
 
 def parse_args():
 

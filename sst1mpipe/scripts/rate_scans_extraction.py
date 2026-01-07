@@ -16,18 +16,16 @@ $> python rate_scans_extraction.py
 
 """
 
+import argparse
 import os
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 from astropy.time import Time
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import argparse
 
-from sst1mpipe.io import (
-    check_outdir,
-    load_slow_data_bias_curve,
-    load_drive_data
-)
+from sst1mpipe.io import check_outdir, load_drive_data, load_slow_data_bias_curve
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Extraction of bias curves from slow control data")

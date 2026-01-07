@@ -1,23 +1,19 @@
-from astropy.coordinates import (
-    SkyCoord, 
-    Angle, 
-    SkyOffsetFrame
-)
-from astropy.time import Time
-from ctapipe.coordinates import CameraFrame
-import astropy.units as u
-import numpy as np
-import matplotlib.pyplot as plt
-from gammapy.stats import WStatCountsStatistic
+import logging
 import math
 
+import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.coordinates import Angle, SkyCoord, SkyOffsetFrame
+from astropy.time import Time
+from ctapipe.coordinates import CameraFrame
+from gammapy.data import DataStore
+from gammapy.stats import WStatCountsStatistic
+
+from sst1mpipe.performance import get_theta
 from sst1mpipe.utils import (
     get_horizon_frame,
 )
-
-from sst1mpipe.performance import get_theta
-import logging
-from gammapy.data import DataStore
 
 
 def add_reco_ra_dec(data, horizon_frame=None):
