@@ -190,7 +190,7 @@ class sliding_pedestals:
                     break
 
         self.max_array_size = keep_size
-        for i in range(len(self.timestamps)-keep_size):
+        for _ in range(len(self.timestamps)-keep_size):
             self.ped_mean_array.pop()
             self.ped_std_array.pop()
             self.timestamps.pop()
@@ -270,7 +270,7 @@ class sliding_pedestals:
                   break
 
         self.max_array_size = keep_size
-        for i in range(len(self.timestamps)-keep_size):
+        for _ in range(len(self.timestamps)-keep_size):
             self.ped_mean_array.pop()
             self.ped_std_array.pop()
             self.timestamps.pop()

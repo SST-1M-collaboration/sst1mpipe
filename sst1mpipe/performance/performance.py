@@ -282,7 +282,7 @@ def angular_resolution_per_energy(
 
     logging.info(f"Out of {len(reco_alt)}, in {sum(~(np.isfinite(reco_alt) & np.isfinite(reco_az)))} events the altitude or azimuth was not reconstructed")
 
-    for i, e in enumerate(bins[:-1]):
+    for i, _ in enumerate(bins[:-1]):
         mask = (energy > bins[i]) & (energy <= bins[i + 1]) & np.isfinite(reco_alt) & np.isfinite(reco_az)
         res.append(ctaplot.ana.angular_resolution(true_alt[mask], reco_alt[mask], true_az[mask], reco_az[mask],
                                             percentile=percentile,
@@ -616,7 +616,7 @@ def roc_curve(
 
         # ROC and gammaness in reco energy bins
         energy = gh_testing_dataset['reco_energy']
-        for i, e in enumerate(e_bins[:-1]):
+        for i, _ in enumerate(e_bins[:-1]):
 
             mask_e = (energy > e_bins[i]) & (energy <= e_bins[i + 1])
             if (sum(mask_e) > 10) & (sum(gh_testing_dataset[mask_e].true_shower_primary_id == 0) > 0) & (sum(gh_testing_dataset[mask_e].true_shower_primary_id == 101) > 0):

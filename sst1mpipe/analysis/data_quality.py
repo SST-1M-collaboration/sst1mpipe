@@ -58,7 +58,7 @@ def get_bad_intervals(table,gapmax=2000,tpas=60000):
     tt = t0  = table['TIMESTAMP'][~sat_mask][0]
     NGTI =[]
 
-    for ii,t in enumerate(table['TIMESTAMP'][~sat_mask]):
+    for _,t in enumerate(table['TIMESTAMP'][~sat_mask]):
         if np.abs(t-tt) > tpas:
             NGTI.append([t0,tt])
             t0=t
@@ -69,7 +69,7 @@ def get_bad_intervals(table,gapmax=2000,tpas=60000):
 
 
 def plot_rates_from_slow_data(dl3_files):
-    f,ax =plt.subplots(figsize=(15,6))
+    _,ax =plt.subplots(figsize=(15,6))
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
@@ -216,7 +216,7 @@ def make_DQ_table(tel_setup,
             return lin(x-shift,*mc_fit)
 
 
-        for ii,filename in enumerate(file_list):
+        for _ ,filename in enumerate(file_list):
             if tel in filename:
                 int_hist = read_table(filename,'intensity_hist')
                 zenith   = read_table(filename,'zenith')[0][0]

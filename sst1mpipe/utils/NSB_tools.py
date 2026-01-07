@@ -162,7 +162,7 @@ def find_dark_files(data_dir):
     dark_names=['dark','DARK','drak','DRAK',"Dark","Drak"]
     file_list=glob.glob(data_dir+"/*.fits.fz")
 
-    for ii,file_path in enumerate(file_list):
+    for _,file_path in enumerate(file_list):
         #run_number = int(file_path.split("_")[-1].split('.')[0])
         try :
             f = astropy.io.fits.open(file_path)
@@ -182,7 +182,7 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
        
         data_stream = SST1MEventSource([filename],
                                        max_events=max_evt)
-        for ii,event in enumerate(data_stream):
+        for _,event in enumerate(data_stream):
                     tel = event.sst1m.r0.tels_with_data[0]
                     r0data = event.sst1m.r0.tel[tel]
 

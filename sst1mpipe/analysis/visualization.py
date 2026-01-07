@@ -157,7 +157,7 @@ def plot_sigma_time(data, sigma, times, obsid, alphas, nights):
 
     colors = ['r', 'b', 'g', 'y', 'm']
 
-    for i, c in zip(range(len(nights)), cycle(colors)):
+    for i, c in enumerate(cycle(colors)):
         if i < len(nights)-1:
             mask = (obsid >= nights[i]) & (obsid <= nights[i+1])
         else:
@@ -427,7 +427,7 @@ def plot_energy_resolution(
             plot_preliminary(ax=axes[0])
             plot_preliminary(ax=axes[1])
 
-        for table, label, marker in zip(e_tables, labels, markers):
+        for table, label, marker in zip(e_tables, labels, markers, strict=False):
 
             energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
             table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
@@ -472,7 +472,7 @@ def plot_energy_resolution(
             if preliminary:
                 plot_preliminary(ax=axes[0])
             
-            for table, label, marker in zip(e_tables, labels, markers):
+            for table, label, marker in zip(e_tables, labels, markers, strict=False):
 
                 energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
                 table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
@@ -501,7 +501,7 @@ def plot_energy_resolution(
             if preliminary:
                 plot_preliminary(ax=axes[0])
 
-            for table, label, marker in zip(e_tables, labels, markers):
+            for table, label, marker in zip(e_tables, labels, markers, strict=False):
 
                 energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
                 table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
@@ -570,7 +570,7 @@ def plot_angular_resolution(
     if preliminary:
         plot_preliminary(ax=ax)
 
-    for table, label, marker in zip(a_tables, labels, markers):
+    for table, label, marker in zip(a_tables, labels, markers, strict=False):
         
         energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
         table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
@@ -628,7 +628,7 @@ def plot_roc(
     if linestyles is None:
         linestyles = len(labels) * ['-']
 
-    for table, label, linestyle in zip(roc_tables, labels, linestyles):
+    for table, label, linestyle in zip(roc_tables, labels, linestyles, strict=False):
         
         ax.plot(table['false_positive_rate'], 
                 table['true_positive_rate'], 
@@ -688,7 +688,7 @@ def plot_sensitivity(
     if markers is None:
         markers = len(labels) * ['o']
     
-    for table, label, marker in zip(sens_tables, labels, markers):
+    for table, label, marker in zip(sens_tables, labels, markers, strict=False):
 
         if bands:
             ax.fill_between(table['energy'],

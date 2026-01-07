@@ -354,7 +354,7 @@ def get_theta_off(
     if plot:
         fig, ax = plt.subplots(1, len(angles)-1, figsize=(25,5))
 
-    for i, angle in zip(range(len(angles)), angles):
+    for i, angle in enumerate(angles):
 
         if angle > 0:
             x_off = np.cos(angle) * true_source_position[0] - np.sin(angle) * true_source_position[1]
@@ -479,7 +479,7 @@ def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_a
         rotations_off = pos_angle + rotations_off
         
         counts_all_off = []
-        for i_off, rotation in enumerate(rotations_off, start=0):
+        for _, rotation in enumerate(rotations_off, start=0):
             position_off = observation.pointing_radec.directional_offset_by(rotation, sep_angle)
             separation_off = position_off.separation(observation.events.radec)
             N_off += sum(separation_off < theta_cut)

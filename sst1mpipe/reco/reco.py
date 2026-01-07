@@ -1275,7 +1275,7 @@ def make_dl1_stereo(
                     ) as writer:
 
         
-        for jj, evt in enumerate(source):
+        for _, evt in enumerate(source):
         
             logging.info('TEL1 event: ' + str(evt.index.event_id))
 
