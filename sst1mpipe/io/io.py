@@ -23,7 +23,7 @@ from traitlets.config import Config
 
 import sst1mpipe
 from sst1mpipe.io.containers import DL1_info, DL2_info
-from sst1mpipe.utils import (
+from sst1mpipe.utils.utils import (
     add_disp,
     add_event_id,
     add_features,
