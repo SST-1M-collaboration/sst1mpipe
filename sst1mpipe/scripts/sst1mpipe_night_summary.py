@@ -130,11 +130,11 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
                 if not stereo:
                     try:
                         pt = load_dl1_pedestals(input_file)
-                    except: 
+                    except Exception: 
                         pass
             elif level == 'dl2':
                 df = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
-        except:
+        except Exception:
             logging.warning("Broken file %s", input_file)
             continue
         if i == 0:
@@ -142,18 +142,18 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
             if (level == 'dl1') and not stereo:
                 try:
                     ped_table = pt
-                except:
+                except Exception:
                     pass
         else:
             try:
                 data = pd.concat([data, df])
-            except:
+            except Exception:
                 logging.warning("Broken file %s", input_file)
                 continue
             if (level == 'dl1') and not stereo:
                 try:
                     ped_table = vstack([ped_table, pt])
-                except:
+                except Exception:
                     logging.warning("No pedestal monitoring in file %s", input_file)
                     continue
         i += 1
@@ -197,7 +197,7 @@ def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
         try:
             df = load_dl1_sst1m(dl1_files[ind], tel=tel, config=config, table='pandas', stereo=stereo)
             first_loaded = True
-        except:
+        except Exception:
             logging.warning('Broken file')
             ind += 1
             if ind > 50: 
@@ -210,7 +210,7 @@ def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
         try:
             df = load_dl1_sst1m(dl1_files[len(dl1_files)-ind], tel=tel, config=config, table='pandas', stereo=stereo)
             last_loaded = True
-        except:
+        except Exception:
             logging.warning('Broken file')
             ind += 1
             if ind > 50: 
@@ -266,7 +266,7 @@ def main():
         try:
             source_catalog = load_source_catalog(source_catalog_file)
             is_catalog = True
-        except:
+        except Exception:
             logging.warning('Source catalog file not found!')
     else:
         logging.warning('Source catalog file not specified!')
@@ -590,7 +590,7 @@ def main():
                 try:
                     target_coords = SkyCoord.from_name(source)
                     plot_theta2 = True
-                except:
+                except Exception:
                     logging.info('%s coordinates cannot be guessed authomaticaly, using source catalog file %s.', source, source_catalog_file)
                     if is_catalog:
                         if len(source_catalog[source]):

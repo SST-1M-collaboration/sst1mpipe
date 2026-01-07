@@ -73,7 +73,7 @@ class ImageCleanerSST(ImageCleaner):
         try:
             self.frac_rised = sum(pic_thr > picture_threshold_pe)/float(len(pic_thr))
             self.raised += pic_thr > picture_threshold_pe
-        except:
+        except Exception:
             self.frac_rised = 0.0
 
         mask_tailcuts = tailcuts_clean(

@@ -240,7 +240,7 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
 
             elif data_level == 'dl2':
                 df = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
-        except:
+        except Exception:
             print('Broken file: ' + input_file + ', skipping.')
             continue
         try:
@@ -249,7 +249,7 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
             else: cs=22
             NSB = VAR_to_NSB(pt['pedestal_charge_std'].mean(axis=1)**2, cs)
             nsb.append(NSB.mean())
-        except:
+        except Exception:
             print('No pedestals in : ' + input_file + '.')
             nsb.append(np.nan)
 

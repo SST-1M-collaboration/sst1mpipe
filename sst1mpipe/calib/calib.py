@@ -240,7 +240,7 @@ def correct_MC_for_PDE_drop(event, simtel_config_qe=None, pde_corr_factors=None)
             mask = [i in simtel_config_qe for i in stored_qe]
             VI = pde_corr_factors['mc_correction_for_PDE'][get_tel_string(tel, mc=True)][np.array(list(stored_qe))[mask][0]]
             event.r1.tel[tel].waveform /= VI
-        except:
+        except (KeyError, IndexError, TypeError, ZeroDivisionError):
             logging.error('PDE correction factors in the calibration file were not found in the simtel file header. Are you sure that you have listed the correct PDE factor in the mc_pde_correction_factors.json file?')
             exit()
 

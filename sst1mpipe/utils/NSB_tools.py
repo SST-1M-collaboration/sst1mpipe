@@ -84,7 +84,7 @@ def VAR_to_Idrop(baseline_VAR,ntel):
     try:
         slope   = Vdrop_lin_aprox['gain_tel{}'.format(ntel)]+ \
                   Vdrop_lin_aprox['PDE_tel{}'.format(ntel)]
-    except:
+    except Exception:
         print("ERROR ntel should be 21 or 22")
     return VAR_to_shift(baseline_VAR,ntel)*slope+1
 
@@ -95,7 +95,7 @@ def BLS_to_Idrop(baseline_shift,ntel):
     try:
         slope   = Vdrop_lin_aprox['gain_tel{}'.format(ntel)]+ \
                   Vdrop_lin_aprox['PDE_tel{}'.format(ntel)]
-    except:
+    except Exception:
         print("ERROR ntel should be 21 or 22")
     return baseline_shift*slope+1
 
@@ -105,7 +105,7 @@ def VAR_to_Gdrop(baseline_VAR,ntel):
     ## G_corr = G / G_drop
     try:
         slope   = Vdrop_lin_aprox['gain_tel{}'.format(ntel)]
-    except:
+    except Exception:
         print("ERROR ntel should be 21 or 22")
 
     return VAR_to_shift(baseline_VAR,ntel)*slope+1
@@ -168,7 +168,7 @@ def find_dark_files(data_dir):
         try :
             f = astropy.io.fits.open(file_path)
             target = f[2].header['TARGET'] 
-        except:
+        except Exception:
             print('failed reading {}'.format(file_path))
             continue
         if target in dark_names:
@@ -207,14 +207,14 @@ def get_ped_table(file_list):
             try:
                 bline_table = read_table(dl1file,
                                          '/dl1/monitoring/telescope/pedestal')
-            except:
+            except Exception:
                 print("pedestal not found in {}".format(dl1file))
         else :
             try:
                 bline_table = astropy.table.vstack([bline_table,
                                                    read_table(dl1file,
                                                               '/dl1/monitoring/telescope/pedestal')])
-            except:
+            except Exception:
                 print("pedestal not found in {}".format(dl1file))
     return bline_table
 
@@ -227,14 +227,14 @@ def get_ped_table_low_res(file_list):
             try:
                 bline_table = read_table(dl1file,
                                          '/dl1/monitoring/telescope/pedestal')[-1]
-            except:
+            except Exception:
                 print("pedestal not found in {}".format(dl1file))
         else :
             try:
                 bline_table = astropy.table.vstack([bline_table,
                                                    read_table(dl1file,
                                                               '/dl1/monitoring/telescope/pedestal')[-1]])
-            except:
+            except Exception:
                 print("pedestal not found in {}".format(dl1file))
     return bline_table
 

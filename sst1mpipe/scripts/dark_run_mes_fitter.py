@@ -620,7 +620,7 @@ class mes_fitter:
                 disp.set_limits_minmax(image.min()*0.95,image.max()*1.05)
                 if save_plots:
                     f.savefig(self.plot_dir+'cam_{}_tel{}.png'.format(key,self.data_path[-2]))
-            except:
+            except Exception:
                 print("Failed")
                 return
     ##############################################

@@ -119,7 +119,7 @@ def photon_df_to_fits(dl2_photons,
     # Removing NSB info from the RF_used string
     try:
         name = RF_used.split('_nsb')[0]
-    except:
+    except AttributeError:
         name = RF_used
     if event_class is not None:
         ec_str = "_ec{}".format(event_class)
@@ -266,7 +266,7 @@ def create_hdu_index(file_list, out_dir=None, irf_dir=None):
 
     try:
         data_store = DataStore.from_events_files(file_list)
-    except:
+    except Exception:
         logging.error("Likely, No IRFs exists for those DL3 file... We cant create HDU-index")
         exit()
     ## Hack to load proper name of the irf in hdu tables (for now hard coded in gammapy)

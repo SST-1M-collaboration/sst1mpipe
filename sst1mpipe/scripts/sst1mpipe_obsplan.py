@@ -137,7 +137,7 @@ def main():
 
     try:
         source_catalog = load_source_catalog(source_catalog_file)
-    except:
+    except Exception:
         logging.warning('Source catalog file not found!')
         source_catalog = {}
     if (ra is not None) and (dec is not None):

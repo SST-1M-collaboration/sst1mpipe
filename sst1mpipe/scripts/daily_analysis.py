@@ -217,7 +217,7 @@ def refine_file_list(file_list):
         f = fits.open(fitsfile)
         try:
             target=f[2].header['TARGET'].split(',')[0].split('_')[0].replace(" ", "")
-        except:
+        except Exception:
             target='UNKNOWN'
         if target not in list_dict.keys():
             list_dict[target]    = []
@@ -261,7 +261,7 @@ def run_daily_ana(daily_config):
     eff_cut_dir_stereo = daily_config["eff_cut_dir_stereo"]
     try:
         output_logfile = os.path.join(ana_dir, "logs", 'daily_ana_{:04d}{:02d}{:02d}.log'.format(year,month,day))
-    except:
+    except Exception:
         output_logfile = os.path.join(ana_dir, "logs", 'default_daily_ana.log')
     
     Path(ana_dir + '/logs/').mkdir(exist_ok=True)
@@ -316,11 +316,11 @@ def run_daily_ana(daily_config):
         logging.info('{} :'.format(target))
         try :
             logging.info('CS1 : {}'.format(len(dict_list_t1[target]) ))
-        except :
+        except Exception:
            logging.warning('no CS1 data')
         try :
             logging.info('CS2 : {}'.format(len(dict_list_t2[target]) ))
-        except :
+        except Exception:
            logging.warning('no CS2 data')
 
  
@@ -349,7 +349,7 @@ def run_daily_ana(daily_config):
         ## is ok, we don't realy use this for now
         try:
             target_pos = SkyCoord.from_name(target)
-        except:
+        except Exception:
             logging.info("Cant guess the target position!")
             target_pos = SkyCoord(0*u.deg,0*u.deg)
 
@@ -470,7 +470,7 @@ def run_daily_ana(daily_config):
                     aargs.irf_dir = daily_config["irf_dir"]
                     aargs.gammaness_cut_dir = None
                     dl2_dl3_1dir(aargs)
-                except:
+                except Exception:
                     logging.error("CS1 : DL2 > DL3 failed")
 
             ## efficiency cuts
@@ -484,7 +484,7 @@ def run_daily_ana(daily_config):
                     aargs.irf_dir = daily_config["irf_dir"]
                     aargs.gammaness_cut_dir = eff_cut_dir_mono
                     dl2_dl3_1dir(aargs)
-                except:
+                except Exception:
                     logging.error("CS1 : DL2 > DL3_eff failed")
 
         # cs2
@@ -508,7 +508,7 @@ def run_daily_ana(daily_config):
                     aargs.irf_dir = daily_config["irf_dir"]
                     aargs.gammaness_cut_dir = None
                     dl2_dl3_1dir(aargs)
-                except:
+                except Exception:
                     logging.error("CS2 : DL2 > DL3 failed")
 
             ## efficiency cuts
@@ -522,7 +522,7 @@ def run_daily_ana(daily_config):
                     aargs.irf_dir = daily_config["irf_dir"]
                     aargs.gammaness_cut_dir = eff_cut_dir_mono
                     dl2_dl3_1dir(aargs)
-                except:
+                except Exception:
                     logging.error("CS2 : DL2 > DL3_eff failed")
 
         ## STEREO
@@ -553,7 +553,7 @@ def run_daily_ana(daily_config):
                     aargs.irf_dir     = daily_config["irf_dir"]
                     aargs.gammaness_cut_dir = None
                     dl2_dl3_1dir(aargs)
-                except:
+                except Exception:
                     logging.error("STEREO : DL2 > DL3 failed")
 
             ## efficiency cuts
@@ -567,7 +567,7 @@ def run_daily_ana(daily_config):
                     aargs.irf_dir     = daily_config["irf_dir"]
                     aargs.gammaness_cut_dir = eff_cut_dir_stereo
                     dl2_dl3_1dir(aargs)
-                except:
+                except Exception:
                     logging.error("STEREO : DL2 > DL3 failed")
 
 

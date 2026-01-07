@@ -669,7 +669,7 @@ def load_more_dl1_tables_mono(
                             dl1_data = pd.concat([dl1_data, df])
                             good_files += 1
                             tel_file_list.append(dl1_file)
-                        except:
+                        except Exception:
                             logging.warning("Skipping broken file: " + dl1_file)
                             bad_files += 1
                 else:
@@ -738,13 +738,13 @@ def load_dl1_sst1m(
     if 'true_alt_tel' not in events.keys():
         try:
             pointing = read_table(input_file, "/dl1/monitoring/telescope/pointing/" + tel)
-        except:
+        except Exception:
             logging.error('Adding pointing information failed! Pointing information is probably not stored in DL1 file.')
             exit()
         try:
             events['true_az_tel'] = pointing['azimuth'].to(u.deg).value
             events['true_alt_tel'] = pointing['altitude'].to(u.deg).value
-        except:
+        except Exception:
             logging.error('Adding pointing information failed! Length of params and pointing tables probably dont match. Broken file.')
             exit()
 
@@ -950,7 +950,7 @@ def write_dl1_pedestals(input_file, pedestal_table=None):
             append=True, path='/dl1/monitoring/telescope/pedestal', 
             serialize_meta=False
             )
-    except:
+    except Exception:
         logging.warning('Writing pedestals into the file failed!')
 
 
@@ -1272,7 +1272,7 @@ def load_more_dl2_files(files, config=None,
 
         try:
             tel_setup=get_telescopes(input_file, data_level="dl2")[0]
-        except:
+        except Exception:
             logging.warning("No DL2 data in file : {}".format(input_file) )
             continue
 
@@ -1342,7 +1342,7 @@ def load_more_dl2_files(files, config=None,
                         cut_file = glob.glob(gammaness_cut + '/' + RF_used + '/gammaness_cuts_*' + tel_mc + '*.h5')[0]
                         logging.info('Energy dendent cut table used: {}'.format(cut_file))
                         cut_table = read_table_hdf5(cut_file, path='gammaness_cuts')
-                    except:
+                    except Exception:
                         logging.warning("Cannot read gammaness cut file in the path: {}".format(cut_file))
                         cut_table = None
 
@@ -1365,7 +1365,7 @@ def load_more_dl2_files(files, config=None,
             v2 = info['sst1mpipe_version'][0].split('.')[1]
             df['sst1mpipe_version'] = '{}_{}'.format(v1,v2)
             df['tel_setup'] = tel_setup
-        except:
+        except Exception:
             logging.warning("Some problem with file {}".format(input_file))
             continue
 
@@ -1376,7 +1376,7 @@ def load_more_dl2_files(files, config=None,
             try:
                 dl2_data = pd.concat([dl2_data, df])
                 times_all = pd.concat([times_all, times])
-            except:
+            except Exception:
                 logging.warning("Broken file", input_file)
                 continue
 
@@ -1392,7 +1392,7 @@ def isfloat(num):
     try:
         float(num)
         return True
-    except:
+    except (TypeError, ValueError):
         return False
 
 
@@ -1447,7 +1447,7 @@ def load_distributions_sst1m(dist_path=None, dl3_path=None):
         #t_elapsed = read_table(table, 't_elapsed')
         try:
             zenith = read_table(table, 'zenith')
-        except:
+        except KeyError:
             zenith = read_table(table, 'z_elapsed')
 
         # so that the pedestal fraction cut does not remove data for which we do not have pedestals (in those distribution files there is pedestal_frac=100.)
@@ -1531,6 +1531,6 @@ def get_pde_correction_factors():
         with open(pde_corr_file) as json_file:
                 pde_corr = Config(json.load(json_file))
         return pde_corr
-    except:
+    except Exception:
         logging.error('%s file not found! Either make sure it is there, or turn off the PDE correction in the cfg file!')
         exit()

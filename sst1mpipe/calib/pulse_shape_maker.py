@@ -247,7 +247,7 @@ class shape_maker:
 
                             
                             
-                        except:
+                        except Exception:
                             print("fit failed : skippyng")
                             continue
                         

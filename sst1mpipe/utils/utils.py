@@ -497,7 +497,7 @@ def get_closest_rf_model(
                     model_coords[2].split('nsb')[1],
                     dir_ze_az
                     ])
-            except:
+            except Exception:
                 logging.warning('%s does not follow the naming convention for RF model subdirectories, skipping..', os.path.join(models_dir, dir_ze_az))
         models_tab = np.array(models_tab)
         logging.info('%d RF nodes found in %s.',len(models_tab), models_dir)
@@ -1275,7 +1275,7 @@ def get_finite(data, config=None, stereo=False):
     for key in features:
         try:
             mask &= np.isfinite(data[key])
-        except:
+        except Exception:
             logging.warning('{} column not in data.'.format(key))
 
     N_finite = len(data[mask])
@@ -1488,7 +1488,7 @@ def get_target_pos(target_name=None, ra=None, dec=None):
         target_name = 'UNKNOWN'
     try:
         target_pos = SkyCoord.from_name(target_name)
-    except:
+    except Exception:
         logging.warning('Target not recognized. Manual coordinate input required.')
 
         if (ra is not None) and (dec is not None):

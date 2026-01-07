@@ -461,7 +461,7 @@ def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
     for key in features:
         try:
             mask &= np.isfinite(dl2[key])
-        except:
+        except KeyError:
             logging.warning('{} column not in data.'.format(key))
     dl2_finite = dl2[mask].copy()
 
@@ -1353,7 +1353,7 @@ def make_dl1_stereo(
                         try:
                             while evt_t2.index.event_id != t2_event_id :
                                 evt_t2 = next(source_t2)
-                        except:
+                        except StopIteration:
                             pass
                     else:
                         logging.warning('This event from TEL ' + str(tel_2) + 'was already used! Skipping')
@@ -1397,5 +1397,5 @@ def make_dl1_stereo(
     try:
         pedestals = load_dl1_pedestals(dl1_file_tel1)
         write_dl1_pedestals(output_path, pedestal_table=pedestals)
-    except:
+    except Exception:
         logging.warning('No pedestals found in tel1 DL1 file!')

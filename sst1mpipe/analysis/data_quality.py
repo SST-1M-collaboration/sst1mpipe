@@ -47,8 +47,9 @@ def get_slow_data_table(dl3_file,file_radical='DIGICAM',root_dir='/net'):
     oday    = str(dl3[1].header["OBS_ID"])[6:8]
     try:
         itel = int(dl3[1].header['TELESCOP'][-2:])%20
-    except:
+    except (IndexError, KeyError, ValueError, TypeError):
         print("This dont work for setereo DL3")
+        itel = None
     
     tstart = Time(dl3[1].header['TSTART'],format='unix',scale='utc')
     tstop  = Time(dl3[1].header['TSTOP'],format='unix',scale='utc')
@@ -236,6 +237,13 @@ def make_DQ_table(tel_setup,
                 int_hist = read_table(filename,'intensity_hist')
                 zenith   = read_table(filename,'zenith')[0][0]
                 obs_id   = filename.split('_')[-1].split('.')[0]
+                res_dict["obs_id"].append(int(obs_id))
+                res_dict["zenith"].append(zenith)
+                res_dict["livetime"].append(read_table(filename,'t_elapsed')[0][0])
+                res_dict["ped_fraction"].append(read_table(filename,'survived_pedestal_frac')[0][0])
+                res_dict["tc_raised_fraction"].append(read_table(filename,'recleaned_fraction')[0][0])
+                res_dict["NSB"].append(read_table(filename,'NSB')[0][0])
+                res_dict["qual_flag"].append(0)
                 try:
                     Q_bins = np.append(int_hist['low'],int_hist['high'][-1])
                     Q_bins_c = (Q_bins[1:]+Q_bins[:-1])/2.
@@ -244,28 +252,12 @@ def make_DQ_table(tel_setup,
                     popt,corr= curve_fit(shifted_lin,
                                          np.log10(int_hist['center'][no_z_mask]),
                                          np.log10(int_hist['diff_rate'][no_z_mask]),
-                                         )
-
-
-                    res_dict["obs_id"].append(int(obs_id))
-                    res_dict["zenith"].append(zenith)
-                    res_dict["livetime"].append(read_table(filename,'t_elapsed')[0][0])
-                    res_dict["ped_fraction"].append(read_table(filename,'survived_pedestal_frac')[0][0])
-                    res_dict["tc_raised_fraction"].append(read_table(filename,'recleaned_fraction')[0][0])
-                    res_dict["NSB"].append(read_table(filename,'NSB')[0][0])
+                                         )  
                     res_dict["MC_rate_ratio"].append(10**popt[0]/np.cos(zenith*u.deg).to_value())
                     res_dict["failed_fit"].append(0)
-                    res_dict["qual_flag"].append(0)
-                except:
-                    res_dict["obs_id"].append(int(obs_id))
-                    res_dict["zenith"].append(zenith)
-                    res_dict["livetime"].append(read_table(filename,'t_elapsed')[0][0])
-                    res_dict["ped_fraction"].append(read_table(filename,'survived_pedestal_frac')[0][0])
-                    res_dict["tc_raised_fraction"].append(read_table(filename,'recleaned_fraction')[0][0])
-                    res_dict["NSB"].append(read_table(filename,'NSB')[0][0])
+                except (RuntimeError, ValueError, TypeError):
                     res_dict["MC_rate_ratio"].append(0)
-                    res_dict["failed_fit"].append(1)
-                    res_dict["qual_flag"].append(0)
+                    res_dict["failed_fit"].append(1)       
                     print("fit failed",filename)
 
         res = pd.DataFrame(res_dict)

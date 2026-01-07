@@ -154,7 +154,7 @@ def main():
             models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
                 dl2_0 = pd.concat([dl2_0, apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)])
-            except:
+            except Exception:
                 logging.error('RF application failed.')
                 os.remove(output_file)
                 exit()
@@ -173,7 +173,7 @@ def main():
         # This is probably not in accordance with the ctapipe datamodel and should be changed in the future
         try:
             write_dl2(dl2, output_file=output_file, telescope='stereo', config=config, mode='a')
-        except:
+        except Exception:
             logging.error('Writting DL2 file failed.')
             os.remove(output_file)
             exit()
@@ -193,21 +193,21 @@ def main():
             models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
                 dl2 = apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)
-            except:
+            except Exception:
                 logging.error('RF application failed.')
                 os.remove(output_file)
                 exit()
 
             try:
                 write_dl2(dl2, output_file=output_file, telescope=tel, config=config, mode='a')
-            except:
+            except Exception:
                 logging.error('Writting DL2 file failed.')
                 os.remove(output_file)
                 exit()
 
     try:
         write_dl2_info(output_file, rfs_used=models_dir_auto)
-    except:
+    except Exception:
         logging.error('Writting DL2 info failed.')
         os.remove(output_file)
         exit()

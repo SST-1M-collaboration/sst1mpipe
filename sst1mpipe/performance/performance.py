@@ -891,10 +891,8 @@ class irf_maker:
         event_dict['reco_source_fov_offset'] = tel_altaz.separation(evt_reco_altaz).to(u.deg)
         event_dict['true_source_fov_offset'] = tel_altaz.separation(evt_true_altaz).to(u.deg)
         event_dict['theta'] = evt_reco_altaz.separation(evt_true_altaz).to(u.deg)
-        try:
+        if 'weight' in dl2_selected:
             event_dict['weight'] = dl2_selected['weight']
-        except:
-            pass
         return event_dict
 ###################################################
 ###################################################

@@ -426,7 +426,7 @@ class muon_finder:
                     for key in self.mu_data.keys():
                         try:
                             print(key+str(self.mu_data[key][-1]))
-                        except:
+                        except (IndexError, TypeError):
                             pass
                     if (self.plot) and (np.random.randint(100)<110) and (np.median(self.bsstd)>11) and (rc>0.6):
                         f,axs = self.plot_event(Q_sum_window,final_mask,mu_mask)
@@ -520,7 +520,7 @@ if __name__ == "__main__":
 
         try:
             finder.get_muons()
-        except:
+        except Exception:
             print("file {} FAILED".format(filename))
             
 
