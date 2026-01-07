@@ -517,7 +517,7 @@ def get_edep_theta_cuts(
         ax.set_ylim([0, 1.])
         fig.savefig(outdir + '/theta_edep_cuts_'+telescope+'.png', dpi=200)
 
-    theta2_cuts_bool = evaluate_binned_cut(
+    theta_cuts_bool = evaluate_binned_cut(
             dl2_gamma["theta"].to(u.deg),
             dl2_gamma["reco_energy"] * u.TeV,
             theta_cuts,
@@ -963,7 +963,7 @@ def sensitivity(
 
         maskp = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
 
-        if theta_cuts == 'global':
+        if theta2_cuts == 'global':
             N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio
         elif theta2_cuts == 'efficiency':
             N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio[i]
