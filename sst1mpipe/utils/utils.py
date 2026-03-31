@@ -28,7 +28,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from gammapy.data import DataStore
 from astroquery.simbad import Simbad
-import pkg_resources
+import importlib.resources as resources
 from os import path
 import re
 from astropy.coordinates import angular_separation
@@ -1775,13 +1775,11 @@ def get_pointing_radec(input_file):
 
 def get_subarray():
 
-    subarray_file = pkg_resources.resource_filename(
-                            'sst1mpipe',
-                            path.join(
+    subarray_file = resources.files(
+                            'sst1mpipe').joinpath(
                                 'data',
                                 'sst1m_array.h5'
                             )
-                        )
     subarray = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
     return subarray
 

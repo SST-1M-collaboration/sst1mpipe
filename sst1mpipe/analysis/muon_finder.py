@@ -1,5 +1,4 @@
 import argparse
-from pkg_resources import resource_filename
 import os
 from os import path
 import glob
@@ -7,7 +6,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import multiprocessing as mp
-import pkg_resources
+import importlib.resources as resources
 
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.visualization import CameraDisplay
@@ -36,13 +35,11 @@ import matplotlib.pyplot as plt
 import datetime
 
 from ctapipe.io import EventSource
-DEFAULT_CONFIG_FILE = pkg_resources.resource_filename(
-                            'sst1mpipe',
-                            path.join(
+DEFAULT_CONFIG_FILE = resources.files(
+                            'sst1mpipe').joinpath(
                                 'data',
                                 'sst1mpipe_data_config.json'
                             )
-                        )
 DEFAULT_CONFIG = load_config(DEFAULT_CONFIG_FILE, ismc=False)
 def swap_r0_modules_59_88(event, tel=None):
 
@@ -153,13 +150,11 @@ class muon_finder:
 
         
 
-        subarray_file = pkg_resources.resource_filename(
-                            'sst1mpipe',
-                            path.join(
+        subarray_file = resources.files(
+                            'sst1mpipe').joinpath(
                                 'data',
                                 'sst1m_array.h5'
                             )
-                        )
 
         subarray  = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
         self.geom = subarray.camera_types[0].geometry

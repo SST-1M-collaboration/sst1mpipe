@@ -19,8 +19,6 @@ $> python sst1mpipe_pointing_check.py
 
 """
 
-import pkg_resources
-
 import sst1mpipe
 from sst1mpipe.io import (
     load_config,

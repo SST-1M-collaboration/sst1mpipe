@@ -1,5 +1,5 @@
 import numpy as np
-import pkg_resources
+import importlib.resources as resources
 import pandas as pd
 from os import path
 import logging
@@ -33,11 +33,11 @@ def get_default_window(telescope=None):
     if (telescope == 21) or (telescope == 1):
         default_window_file_tel1 = 'corr_factor_1st_wdw.txt'
         logging.info('Window file used: ' + default_window_file_tel1)
-        window_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_window_file_tel1))
+        window_file = resources.files('sst1mpipe').joinpath('data', default_window_file_tel1)
     elif (telescope == 22) or (telescope == 2):
         default_window_file_tel2 = 'corr_factor_2nd_wdw.txt'
         logging.info('Window file used: ' + default_window_file_tel2)
-        window_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_window_file_tel2)) 
+        window_file = resources.files('sst1mpipe').joinpath('data', default_window_file_tel2)
     else:
         logging.error('Telescope {} not known'.format(tel))
     window_corr = np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
@@ -371,10 +371,10 @@ class Calibrator_R0_R1:
 
         if (self.telescope == 21) or (self.telescope == 1):
             logging.info('Calib file used: ' + default_calib_file_tel1)
-            self.calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_calib_file_tel1))
+            self.calibration_file = resources.files('sst1mpipe').joinpath('data', default_calib_file_tel1)
         elif (self.telescope == 22) or (self.telescope == 2):
             logging.info('Calib file used: ' + default_calib_file_tel2)
-            self.calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_calib_file_tel2)) 
+            self.calibration_file = resources.files('sst1mpipe').joinpath('data', default_calib_file_tel2)
         else:
             logging.error('Telescope {} not known'.format(tel))
         self.calibration_parameters = pd.read_hdf(self.calibration_file)

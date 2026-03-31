@@ -52,7 +52,7 @@ from astropy.coordinates import SkyCoord, AltAz
 from astropy.time import Time
 import glob
 from gammapy.data import DataStore
-import pkg_resources
+import importlib.resources as resources
 
 
 def read_charges_data(file):
@@ -139,7 +139,7 @@ def load_config(cfg_file, ismc=False):
             default_config = 'sst1mpipe_mc_config.json'
         else:
             default_config = 'sst1mpipe_data_config.json'
-        cfg_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_config))
+        cfg_file = resources.files('sst1mpipe').joinpath('data', default_config)
 
     with open(cfg_file) as json_file:
             config = Config(json.load(json_file))
@@ -1525,7 +1525,7 @@ def get_pde_correction_factors():
 
     try:
         default_pde_corr_file = 'mc_pde_correction_factors.json'
-        pde_corr_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_pde_corr_file))
+        pde_corr_file = resources.files('sst1mpipe').joinpath('data', default_pde_corr_file)
 
         with open(pde_corr_file) as json_file:
                 pde_corr = Config(json.load(json_file))
