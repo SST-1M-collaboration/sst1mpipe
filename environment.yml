@@ -1,16 +1,16 @@
-name: sst1m-dev
+name: sst1m-dev2
 channels:
   - conda-forge
   - default
 dependencies:
-  - python=3.8
+  - python>=3.13
   - pip
-  - ctapipe=0.17
-  - gammapy=1.0
+  - ctapipe=0.30
+  - gammapy
   - jupyter
-  - protozfits=2.0
+  - protozfits==2.11
   - astroquery=0.4.6
-  - pydantic<2.0
+  - pydantic
   - sphinx
   - sphinx-automodapi
   - sphinx-design
