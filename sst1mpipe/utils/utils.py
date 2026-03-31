@@ -4,7 +4,8 @@ Licensed under the 3-clause BSD style license.
 """
 
 from ctapipe.io import read_table
-from astropy.coordinates import AltAz, SkyCoord, EarthLocation, get_moon, get_sun, get_body
+from astropy.coordinates import AltAz, SkyCoord, EarthLocation, get_sun, get_body
+get_moon = lambda *args, **kwargs: get_body('moon', *args, **kwargs)
 from ctapipe.coordinates import CameraFrame
 from ctapipe.image import camera_to_shower_coordinates
 from ctapipe.instrument import SubarrayDescription
