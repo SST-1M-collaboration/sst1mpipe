@@ -6,19 +6,6 @@ from setuptools import setup, find_packages
 setup(
     version="0.9.0-dev",
     packages=find_packages(),
-    install_requires=[
-        'h5py',
-        'ctapipe~=0.17.0',
-        'ctaplot~=0.6.2',
-        'gammapy~=1.0',
-        'pyirf~=0.8.0',
-        'jupyterlab~=3.5.2',
-        'scikit-learn~=1.2.2',
-        'astroquery~=0.4.6',
-        'seaborn~=0.13.0',
-        'tables~=3.8.0',
-        'pydantic>=1.4,<2.0'
-    ],
     package_data={
         'sst1mpipe': [
             'data/*',
