@@ -11,6 +11,7 @@ dependencies:
   - protozfits==2.11
   - astroquery=0.4.6
   - pydantic
+  - pytest
   - setuptools
   - sphinx
   - sphinx-automodapi
