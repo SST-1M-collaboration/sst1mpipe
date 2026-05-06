@@ -54,7 +54,7 @@ def generate_geometry_from_camera(
         pix_id,
         pix_x * u.mm - source_x,
         pix_y * u.mm - source_y,
-        np.ones(1296) * 400.,
+        np.ones(len(camera.Pixels)) * 400. * u.mm**2, #TODO this should be given from configuration
         pix_type='hexagonal',
         # neighbors=neighbors_pix
     )
