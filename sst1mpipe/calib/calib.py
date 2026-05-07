@@ -167,8 +167,8 @@ def saturated_charge_correction(event, processing_info=None):
                 n_samples = mask_width.shape[0]
 
                 max_adc = max(w)
-                mask_integration = w > integration_level * max_adc
-                integration_start = np.arange(0, n_samples)[w >= integration_level * max_adc][0]
+                mask_integration = w >= integration_level * max_adc
+                integration_start = np.arange(0, n_samples)[mask_integration][0]
 
                 # This is needed to avoid secondary peaks (it looks for first drop below 20 percent after maximum)
                 # We also select the first one, if there is a plato in the small peak in the wavefrom, which sometimes happen

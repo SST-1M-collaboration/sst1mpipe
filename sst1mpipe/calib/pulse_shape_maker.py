@@ -126,12 +126,12 @@ class shape_maker:
             #~ ttmp = [tmpf.integral(t,t+1) + t1_val for t,t1_val in enumerate(t1)]
             ttmp =[]
             pp =0
-            pp0 =0
+            # pp0 =0
             for t,t1_val in enumerate(t1):
                 #print(tmpf.integral(t,t+1))
                 try :
                     pp = tmpf(t+1)
-                    pp0 = tmpf(t)
+                    # pp0 = tmpf(t)
                     tttmp = tmpf.integral(t,t+1) + t1_val
                 except ValueError:
                     tttmp = t1_val + pp
