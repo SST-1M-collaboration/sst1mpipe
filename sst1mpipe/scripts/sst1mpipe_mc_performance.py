@@ -3,8 +3,8 @@
 """
 A script to get SST-1M performance from DL2 MC files.
 - Inputs are DL2 point gammas and DL2 diffuse proton files.
-- Outputs are hdf tables and plots for energy and angular resolution, sensitivity and ROC curve. 
-It can also print a time needed for detection of a source of selection. If application of energy 
+- Outputs are hdf tables and plots for energy and angular resolution, sensitivity and ROC curve.
+It can also print a time needed for detection of a source of selection. If application of energy
 dependent gammaness cut is selected, the cuts are stored in separate hdf file. This can be used
 to produce IRFs and DL3 files. If --edep-gammaness-only switch is used, only edep gammaness cuts
 are calculated and stored.

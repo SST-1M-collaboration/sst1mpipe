@@ -46,10 +46,10 @@ def plot_gammaness_cuts(gammaness_cuts, outfile=None):
 
 def get_mc_info(input_file, config=None):
     """
-    Extracts MC simulation setup (energy range, N thrown 
+    Extracts MC simulation setup (energy range, N thrown
     showers, etc.) from the input DL1/DL2 MC files and
     applies some non trivial corrections which are necessary
-    due to a small bug in CORSIKA or when DL1 resulting from 
+    due to a small bug in CORSIKA or when DL1 resulting from
     several different MC productions are combined.
 
     Parameters
@@ -59,7 +59,7 @@ def get_mc_info(input_file, config=None):
     config: dict
 
     Returns
-    ------- 
+    -------
     astropy.table.QTable
 
     """
@@ -120,14 +120,14 @@ def get_weights(
         data, mc_info=None, obs_time=None,
         target_spectrum=None):
     """
-    Calculate event weights to MC event distribution for 
-    any source. Weights are stored as extra column in the 
+    Calculate event weights to MC event distribution for
+    any source. Weights are stored as extra column in the
     data table.
 
     Parameters
     ----------
     data: astropy.table.Table
-        DL1/DL2 MC table 
+        DL1/DL2 MC table
     mc_info: astropy.table.QTable
         Table with information about simulated distribution
         of MC events
@@ -137,7 +137,7 @@ def get_weights(
     sst1mpipe.performance.spectra.PowerLawExpCutoff
 
     Returns
-    ------- 
+    -------
     astropy.table.Table
 
     """
@@ -157,7 +157,7 @@ def get_weights(
 
 def relative_sensitivity(n_signal, n_background, alpha):
     """
-    Calculates relative differential sensitivity in 
+    Calculates relative differential sensitivity in
     units of Crab flux (usualy in a single energy bin).
 
     Parameters
@@ -165,14 +165,14 @@ def relative_sensitivity(n_signal, n_background, alpha):
     n_signal: float
         Number of gammas in signal region
     n_background: float
-        Number of gamma-like protons and 
-        misreconstructed gammas in the background 
+        Number of gamma-like protons and
+        misreconstructed gammas in the background
         regions.
     alpha: float
         Background normalization = 1/n_off_regions
 
     Returns
-    ------- 
+    -------
     n_excesses_5sigma: float
         Number of excess events to reach 5 sigma in
         given energy bin.
@@ -204,7 +204,7 @@ def sensitivity_to_flux(
         sensitivity, energy,
         target_spectrum=None):
     """
-    Converts sensitivity in percent of give source 
+    Converts sensitivity in percent of give source
     flux into differential sensitivity in flux units.
 
     Parameters
@@ -217,7 +217,7 @@ def sensitivity_to_flux(
     sst1mpipe.performance.spectra.PowerLawExpCutoff
 
     Returns
-    ------- 
+    -------
     astropy.units.quantity.Quantity
 
     """
@@ -232,7 +232,7 @@ def get_time_to_detection(
         rate_background=None, err_rate_background=None,
         alpha=None, max_time=50 * u.hour):
     """
-    Provides time needed to detection of given source 
+    Provides time needed to detection of given source
     providing certain event rate on the background
     defined by event rate in the OFF regions.
 
@@ -250,11 +250,11 @@ def get_time_to_detection(
         Background normalization = 1/n_off_regions
     max_time: astropy.units.quantity.Quantity
         Upper limit on time to detection above
-        which the source is considered as 
+        which the source is considered as
         undetectable
 
     Returns
-    ------- 
+    -------
     astropy.units.quantity.Quantity
         Time to source detection
     astropy.units.quantity.Quantity
@@ -305,7 +305,7 @@ def get_time_to_detection(
 
 def get_significance(n_signal=None, n_off=None, alpha=None):
     """
-    Calculates statistical significance of the excess for 
+    Calculates statistical significance of the excess for
     each pair of n_signal and n_off.
 
     Parameters
@@ -318,7 +318,7 @@ def get_significance(n_signal=None, n_off=None, alpha=None):
         Background normalization = 1/n_off_regions
 
     Returns
-    ------- 
+    -------
     numpy.ndarray
         Statistical significance of the excess
         per energy bin
@@ -335,7 +335,7 @@ def get_significance(n_signal=None, n_off=None, alpha=None):
 
 def check_spectrum(source):
     """
-    Checks it the source spectrum is implemented 
+    Checks it the source spectrum is implemented
     in sst1mpipe.performance.spectra
 
     Parameters
@@ -344,7 +344,7 @@ def check_spectrum(source):
         E.g. \'CRAB_MAGIC_2020\'
 
     Returns
-    ------- 
+    -------
 
     """
 
@@ -361,8 +361,8 @@ def get_gammaness_cuts(
         outdir=None, telescope=None,
         gamma_off=False):
     """
-    Provide gammaness cuts (masks) on input gamma and 
-    proton tables. Different methods of cutting 
+    Provide gammaness cuts (masks) on input gamma and
+    proton tables. Different methods of cutting
     may be selected.
 
     Parameters
@@ -376,7 +376,7 @@ def get_gammaness_cuts(
         Gammaness cut method to be applied \'global\',
         \'efficiency\', \'significance\'
     save_hdf: bool
-        If True it stores energy dependent gammaness 
+        If True it stores energy dependent gammaness
         cut table. It can be further used IRF production
         or in DL2->DL3 step in the data analysis
     save_fig: bool
@@ -385,14 +385,14 @@ def get_gammaness_cuts(
     outdir: string
     telescope: string
     gamma_off: bool
-        If True it takes into account badly reconstructed 
-        gammas which fall into the OFF region and 
-        contribute to the background. It only works for 
+        If True it takes into account badly reconstructed
+        gammas which fall into the OFF region and
+        contribute to the background. It only works for
         point-like gammas simulated with non-zero offset.
         So far it does not work for stereo sensitivity.
 
     Returns
-    ------- 
+    -------
     mask_gg:numpy.ndarray[bool]
         Gammaness mask for DL2 gamma table
     mask_gp: numpy.ndarray[bool]
@@ -458,7 +458,7 @@ def get_edep_theta_cuts(
         DL2 MC point-like gamma table
     config: dict
     save_hdf: bool
-        If True it stores energy dependent gammaness 
+        If True it stores energy dependent gammaness
         cut table. It can be further used IRF production
         or in DL2->DL3 step in the data analysis
     save_fig: bool
@@ -473,7 +473,7 @@ def get_edep_theta_cuts(
     For the moment works only in combination with global and efficiency gammaness cut
 
     Returns
-    ------- 
+    -------
     theta_cuts: astropy.table.Table
 
     """
@@ -596,12 +596,12 @@ def calculate_gammaness_cuts_significance(
         telescope=None, gamma_off=False):
     """
     Calculates energy dependent gammaness cut
-    optimized to reach the best significance of 
-    a source detection in each energy bin. This 
-    cut estimator is biased towards detection of 
-    a source with given spectrum and should be 
-    used carefully. The DL2 input tables have to 
-    already contain \'weight\' column to take 
+    optimized to reach the best significance of
+    a source detection in each energy bin. This
+    cut estimator is biased towards detection of
+    a source with given spectrum and should be
+    used carefully. The DL2 input tables have to
+    already contain \'weight\' column to take
     the source and background SED into account.
 
     Parameters
@@ -617,14 +617,14 @@ def calculate_gammaness_cuts_significance(
     outdir: string
     telescope: string
     gamma_off: bool
-        If True it takes into account badly reconstructed 
-        gammas which fall into the OFF region and 
-        contribute to the background. It only works for 
+        If True it takes into account badly reconstructed
+        gammas which fall into the OFF region and
+        contribute to the background. It only works for
         point-like gammas simulated with non-zero offset.
         So far it does not work for stereo sensitivity.
 
     Returns
-    ------- 
+    -------
     astropy.table.QTable
 
     """
@@ -723,7 +723,7 @@ def calculate_gammaness_cuts_significance(
 
 def get_n_gammas_off(dl2_gamma, n_off=None, theta_cut=None):
     """
-    Finds number of gammas which leak into the OFF 
+    Finds number of gammas which leak into the OFF
     regions due to imperfect reconstruction
 
     Parameters
@@ -733,14 +733,14 @@ def get_n_gammas_off(dl2_gamma, n_off=None, theta_cut=None):
     n_off: int
         Number of OFF regions
     theta_cut: astropy.units.quantity.Quantity
-        Cut on theta angle defining size of the 
+        Cut on theta angle defining size of the
         signal region and individual background
         regions.
 
     Returns
     -------
     int
-        Number of gammas leaking in the OFF 
+        Number of gammas leaking in the OFF
         regions
 
     """
@@ -787,15 +787,15 @@ def sensitivity(
     source. It also calculates optimal gammaness cuts
     and stores them in hdf table to be further used
     in IRF production and in DL2->DL3 on data. If spectrum
-    of any point-like source is specified it provides 
+    of any point-like source is specified it provides
     also estimated time to detection. Number of simulated
     events and re-used event fraction in each energy bin is
     listed to monitor sanity of pruduced results.
 
-    Sensitivity in given energy bin is only computed if 
-    N_simulated_gammas > 10 & N_simulated_protons > 10 
-    in respective regions after the cuts. Otherwise the CTA 
-    criteria on flux sensitivity in each energy bin are applied: 
+    Sensitivity in given energy bin is only computed if
+    N_simulated_gammas > 10 & N_simulated_protons > 10
+    in respective regions after the cuts. Otherwise the CTA
+    criteria on flux sensitivity in each energy bin are applied:
         - significance >=5 sigma
         - excess > 5\\% of background
         - N excess >= 10
@@ -820,17 +820,17 @@ def sensitivity(
     theta2_cuts: string
         Theta2 cut method to be applied \'global\', \'efficiency\'
     source_detection: string
-        If not empty time to the source detection is 
-        calculated. Spectrum must be specified in 
+        If not empty time to the source detection is
+        calculated. Spectrum must be specified in
         performance.spectra
     energy_min: float
         Additional cut on minimum reconstructed energy
         in TeV. Only applied on estimated time to
         detect a source.
     gamma_off: bool
-        If True it takes into account badly reconstructed 
-        gammas which fall into the OFF region and 
-        contribute to the background. It only works for 
+        If True it takes into account badly reconstructed
+        gammas which fall into the OFF region and
+        contribute to the background. It only works for
         point-like gammas simulated with non-zero offset.
         So far it does not work for stereo sensitivity.
 
@@ -1107,13 +1107,13 @@ def source_time_to_detection(
         dl2_gamma, dl2_proton, mc_info_gamma=None,
         mc_info_proton=None, config=None, telescope=None,
         gammaness_cuts=None, theta2_cuts=None,
-	source=None, energy_min=0.0):
+	    source=None, energy_min=0.0):
     """
     Provides time needed to detection of given source above
     certain energy.
 
     Here we basicaly recalculate sensitivity from DL2 MC tables.
-    In the future, this should be calculated with the use of 
+    In the future, this should be calculated with the use of
     previously calculated IRFs.
 
     Parameters
@@ -1134,7 +1134,7 @@ def source_time_to_detection(
     theta2_cuts: string
         Theta2 cut method to be applied \'global\', \'efficiency\'
     source: string
-        Source spectrum defined in 
+        Source spectrum defined in
         sst1mpipe.performance.spectra
     energy_min: float
         Additional cut on minimum reconstructed energy

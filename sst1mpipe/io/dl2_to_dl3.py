@@ -36,10 +36,10 @@ def photon_df_to_fits(dl2_photons,
     Parameters
     ----------
     dl2_photons: pandas.DataFrame
-        Merged DL2 table with gammaness cut applied 
+        Merged DL2 table with gammaness cut applied
         (photon list) for one single GTI
     obs_id: float
-        Usualy obs_id of the first DL2 file in given 
+        Usualy obs_id of the first DL2 file in given
         bunch after the merge
     target_name: string
     target_pos: astropy.coordinates.SkyCoord
@@ -50,14 +50,14 @@ def photon_df_to_fits(dl2_photons,
     end_t: float
         GTI time bin edge
     gammaness_cuts: None or string
-        Flags the IRF assigned to 
-        given DL3 file. If None, global gammaness 
+        Flags the IRF assigned to
+        given DL3 file. If None, global gammaness
         cut from the config file is applied.
     event_class: int
         Event class in given photon list to find a proper IRF
     Returns
     -------
-    hdu_list: 
+    hdu_list:
         list of astropy.io.fits.hdu.table.BinTableHDU
 
     """
@@ -214,7 +214,7 @@ def photon_df_to_fits(dl2_photons,
 
 def GTI_df_to_hdu(GTI):
     """
-    Creates HDU table from GTI array containing 
+    Creates HDU table from GTI array containing
     time bin edges for each observation block
 
     Parameters
@@ -252,8 +252,8 @@ def create_hdu_index(file_list, out_dir=None, irf_dir=None):
         DL3 file list
     out_dir: string
     irf_dir: string
-        Top level directory with IRFs. Specific IRF file in 
-        ../data/ is found authomaticaly to all given observing 
+        Top level directory with IRFs. Specific IRF file in
+        ../data/ is found authomaticaly to all given observing
         blocks.
 
     Returns
@@ -296,7 +296,7 @@ def dl2_dir_to_dl3(target_name   = None,
                    ):
     """
     Process all DL2 files in given directory in DL3. DL2 files
-    are merged into several bunches indexed by \'obs_id\'. 
+    are merged into several bunches indexed by \'obs_id\'.
     The clustering is driven by GTIs and mostly result in
     one DL3 file per wobble, but there are also other criteria
     such as RF used (wobble can be further split if the pointing
@@ -315,9 +315,9 @@ def dl2_dir_to_dl3(target_name   = None,
         Gammaness cut to be applied when loading and merging
         DL2 files (optional). If None, global gammaness cut
         is applied. Alternatively, it can be a string with
-        path to the directory with gammaness cuts optimized 
+        path to the directory with gammaness cuts optimized
         on MC. A set of gammaness cut for given zenith angle
-        and NSB is found authomaticaly. The subdir structure 
+        and NSB is found authomaticaly. The subdir structure
         should follow the same logic as the RF model directories.
     event_classes: list of ints
         classes in DL2 column event_type to be processed.

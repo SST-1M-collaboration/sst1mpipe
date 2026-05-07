@@ -32,7 +32,7 @@ def get_only_main_island_mask(geom, cleaning_mask):
 
 
 class ImageCleanerSST(ImageCleaner):
-    """ 
+    """
     Reclean images using the LST-like cleaning, i.e. dynamic picture/boundary technique + time delta. See
     `ctapipe.image.tailcuts_clean`
     `ctapipe.image.apply_time_delta_cleaning`
@@ -104,7 +104,7 @@ class ImageCleanerSST(ImageCleaner):
 
 
 class ImageCleanerSST_MC(ImageCleaner):
-    """ 
+    """
     Reclean images using the LST-like cleaning, i.e. dynamic picture/boundary technique + time delta. See
     `ctapipe.image.tailcuts_clean`
     `ctapipe.image.apply_time_delta_cleaning`

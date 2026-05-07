@@ -394,9 +394,9 @@ def plot_energy_resolution(
     e_tables: list of astropy.table.table.Table
     labels: list of strings
     markers: list of strings
-        List of markers 
+        List of markers
     axes: numpy.ndarray of matplotlib.axes._axes.Axes
-        Axes to plot the figure in 
+        Axes to plot the figure in
     plot: str
         If not provided with two axes, user must
         select whether to plot \'resolution\'
@@ -544,9 +544,9 @@ def plot_angular_resolution(
     a_tables: list of astropy.table.table.Table
     labels: list of strings
     markers: list of strings
-        List of markers 
+        List of markers
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
     preliminary: bool
         Add preliminary watermark
     skip_bins_first: float
@@ -607,7 +607,7 @@ def plot_roc(
     roc_tables: list of astropy.table.table.Table
     labels: list of strings
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
     gammaness_cut: float
         Highlights one point on the ROC curve
     preliminary: bool
@@ -664,7 +664,7 @@ def plot_sensitivity(
     markers:
         List of markers
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
     xlim: list of floats
     ylim: list of floats
     bands: bool
@@ -759,7 +759,7 @@ def plot_source_sed(
         Designation of source spectra as defined in
         sst1mpipe.performance.spectra
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
     fraction: float
         Scaling of plotted SED
     linestyle: string
@@ -792,7 +792,7 @@ def plot_lhaaso_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------
@@ -833,7 +833,7 @@ def plot_hawc_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------
@@ -884,7 +884,7 @@ def plot_veritas_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------
@@ -925,7 +925,7 @@ def plot_hess_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------
@@ -971,7 +971,7 @@ def plot_astri_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------

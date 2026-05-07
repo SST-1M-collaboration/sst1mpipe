@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-A script to create DL3 data files from DL2 data files. It merges DL2 HDF 
+A script to create DL3 data files from DL2 data files. It merges DL2 HDF
 per-run files into per-wobble DL3 fits files. It also finds proper IRF
 based on zenith, azimuth and NSB level. It also creates per-night index files.
 - Input is a directory with DL2 files and directory with IRFs

@@ -19,10 +19,10 @@ class Monitoring_R0_DL1:
         target: string
             Observed source
         force_pointing: bool
-            Pointing coordinates entered manualy 
+            Pointing coordinates entered manualy
             (i.e. not read from the raw FITS file)
         pointing_manual: bool
-            Pointing coordinates entered manualy 
+            Pointing coordinates entered manualy
             (i.e. not read from the raw FITS file)
         input_file: string
             Input file path
@@ -34,7 +34,7 @@ class Monitoring_R0_DL1:
         calibration_file: string
             Calibration file used
         window_file: string
-            Window file used  
+            Window file used
         n_saturated: int
             Total number of saturated events in the file
         n_pedestal: int
@@ -46,7 +46,7 @@ class Monitoring_R0_DL1:
         n_triggered_tel2: int
             Total number of TEL2 triggered events in the file
         swat_event_ids_used: bool
-            If true, coincident events from given night have 
+            If true, coincident events from given night have
             exactly the same event ID
     """
 

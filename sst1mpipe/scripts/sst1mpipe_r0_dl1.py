@@ -2,7 +2,7 @@
 
 """
 A script to calibrate raw data (R0) or MC (R1) in DL1.
-- Inputs are a single raw .fits.fz data file (containing single telescope data) 
+- Inputs are a single raw .fits.fz data file (containing single telescope data)
 or .simtel.gz output file of sim_telarray (may contain more telescopes).
 - Output is hdf file with a table of DL1 parameters.
 

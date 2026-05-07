@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A script to train random forests for reconstruction of misdirection 
+A script to train random forests for reconstruction of misdirection
 (goodness of direction reconstruction), which can be used to classify
 events into different classes.
 """

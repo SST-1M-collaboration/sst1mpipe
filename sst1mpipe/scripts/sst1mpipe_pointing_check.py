@@ -3,7 +3,7 @@
 """
 A script to manually check the telescope pointing.
 - Input is a single raw .fits.fz data file (containing single telescope data).
-- Output is a png image showing a mean waveform std in each pixel together with 
+- Output is a png image showing a mean waveform std in each pixel together with
 position of brigth stars in the FoV
 
 Usage:

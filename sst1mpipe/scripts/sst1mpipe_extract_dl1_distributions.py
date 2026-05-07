@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-A script to calculate DL1 Hillas Intensity rates per obs ID (~wobble). This is needed 
+A script to calculate DL1 Hillas Intensity rates per obs ID (~wobble). This is needed
 for run selection, and cannot be done per-file due to statistics.
 - Inputs are a directory with DL1 real data files and a directory with DL3 index files.
 - Outputs are per-obsid intensity distributions stored in HDF tables.

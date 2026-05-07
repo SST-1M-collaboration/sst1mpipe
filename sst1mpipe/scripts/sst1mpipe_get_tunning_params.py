@@ -2,10 +2,10 @@
 
 """
 A script to calculate NSB tunning parameters for MC.
-- Inputs are charge distribution files calculated from pedestal events in real data 
+- Inputs are charge distribution files calculated from pedestal events in real data
 (usualy in the same dir as DL1 tables), and a directory with charge distributions
 from MC.
-- Outputs are tunning parameters for each data file, and images comparing MC/data 
+- Outputs are tunning parameters for each data file, and images comparing MC/data
 charge distributions.
 
 Usage:

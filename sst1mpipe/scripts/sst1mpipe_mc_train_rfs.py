@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
 """
-A script to train Random Forests on training MC DL1 files. It can train 
-both mono and stereo models. Both are trained per telescope as in the stereo 
-reconstruction the resulting parameters are just averaged. For stereo reconstruction, 
-however, one may use additional features such as h_max or impact_distance as results 
+A script to train Random Forests on training MC DL1 files. It can train
+both mono and stereo models. Both are trained per telescope as in the stereo
+reconstruction the resulting parameters are just averaged. For stereo reconstruction,
+however, one may use additional features such as h_max or impact_distance as results
 of geometrical reconstruction.
-- Inputs are MC DL1 diffuse gamma file and MC DL1 diffuse proton file. These are usualy 
-merged from individual DL1 files using sst1mpipe_merge_hdf5 script to reach satisfactory 
+- Inputs are MC DL1 diffuse gamma file and MC DL1 diffuse proton file. These are usualy
+merged from individual DL1 files using sst1mpipe_merge_hdf5 script to reach satisfactory
 statistics for RF training
 - Outputs are trained models in scikit.learn format (.sav)
 

@@ -20,7 +20,7 @@ USAGE :
 
 nohup python daily_analysis.py /path/to/some/ana_config.json 2>daily_ana.err 1>daily_ana.out &
 
-or 
+or
 
 for auto proccessing of the last night data :
 python daily_analysis.py 2>daily_ana.err 1>daily_ana.out
@@ -32,7 +32,7 @@ DEFAULT_CONFIG_FILE = '/data/work/analysis/Daily_analysis/default_daily_ana_conf
 
 class iargs:
     """
-    dummy object made to handle arguments to 
+    dummy object made to handle arguments to
     be passed to the multiprocessing pool.
     """
     def __init__(self):
@@ -49,7 +49,7 @@ def args_maker(arg,file_list):
             padded to sst1mpipe scripts
 
         file_list: list
-            list of file paths 
+            list of file paths
     '''
 
     args_list = []
@@ -163,7 +163,7 @@ def make_runlist_allfiles(itel,year,month,day,rootdir='/net/'):
 
         Returns
         -------
-        list of raw data file paths    
+        list of raw data file paths
         """
         basedir = rootdir+f'/cs{itel}/data/raw/'
         filerad = f'SST1M{itel}'
@@ -183,10 +183,10 @@ def refine_file_list(file_list):
         ----------
         file_list : list
             list of raw data file paths
-            
+
         Returns
         -------
-        dict of raw data file paths   
+        dict of raw data file paths
     """
 
     list_dict = dict()
@@ -207,12 +207,12 @@ def refine_file_list(file_list):
 
 def run_daily_ana(daily_config):
     """
-    run daily r0 to dl3 analysis 
+    run daily r0 to dl3 analysis
 
     Parameters
     ----------
     daily_config : json config object
-            
+
     Returns
     -------
     None

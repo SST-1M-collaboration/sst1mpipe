@@ -4,9 +4,9 @@
 A script to create DL1 stereo data, where each event contains data from both
 telescopes. For each DL1 file for tel1, coincident events are searched for
 in tel2 DL1 data. Only coincident events are stored in resulting DL1 files.
-- Input is a single DL1 file from tel1 and a directory with all relevant 
+- Input is a single DL1 file from tel1 and a directory with all relevant
 DL1 files for tel2.
-- Output is a DL1 file with coincident events only, to be used in 
+- Output is a DL1 file with coincident events only, to be used in
 sst1mpipe_dl1_dl2 for stereo reconstruction.
 
 Usage:

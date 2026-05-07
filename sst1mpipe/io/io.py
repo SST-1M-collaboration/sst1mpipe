@@ -44,7 +44,7 @@ from sst1mpipe.utils.utils import (
 
 def read_charges_data(file):
     """
-    Read pixel charges distribution from 
+    Read pixel charges distribution from
     histogram files stored with sst1mpipe_r0_dl1
     from real data files
 
@@ -70,9 +70,9 @@ def read_charges_data(file):
 
 def read_charges_mc(file, tel=None):
     """
-    Read pixel charges distribution from 
+    Read pixel charges distribution from
     histogram files stored with sst1mpipe_r0_dl1
-    from MC files (where we have distributions for 
+    from MC files (where we have distributions for
     all simulated telescopes in single histogram
     file)
 
@@ -434,20 +434,20 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=[]):
 
 def write_wr_timestamps(file, event_source=None):
     """
-    Writes WR timestamps with high numerical precision as two 
+    Writes WR timestamps with high numerical precision as two
     additional columns in the output DL1 table: time_wr_full_seconds,
-    time_wr_frac_seconds. This is neccessary because the timestamp with 
-    sufficient numerical precision can be extracted from event source only. 
-    It is stored automaticaly in  dl1/event/subarray/trigger, from where 
-    it can be read by ctapipe.io.read_table, but with low precision. 
-    Therefore, if we want to have the timestamp in dl1, we need to read 
+    time_wr_frac_seconds. This is neccessary because the timestamp with
+    sufficient numerical precision can be extracted from event source only.
+    It is stored automaticaly in  dl1/event/subarray/trigger, from where
+    it can be read by ctapipe.io.read_table, but with low precision.
+    Therefore, if we want to have the timestamp in dl1, we need to read
     it again from event source and store it in the existing dl1 file
 
     Parameters
     ----------
     file: string
         Path
-    event_source: 
+    event_source:
         sst1mpipe.io.sst1m_event_source.SST1MEventSource
 
     Returns
@@ -491,12 +491,12 @@ def write_wr_timestamps(file, event_source=None):
 def write_assumed_pointing(
         processing_info, config=None):
     """
-    Writes pointing info (per event true_tel_az, true_tel_alt) 
+    Writes pointing info (per event true_tel_az, true_tel_alt)
     in the main DL1 table.
 
     Parameters
     ----------
-    processing_info: 
+    processing_info:
         Class Monitoring_R0_DL1
     config: dict
 
@@ -594,9 +594,9 @@ def load_more_dl1_tables_mono(
         time_min=0, time_max=np.inf, quality_cuts=False,
         pointing_sel=None):
     """
-    Loads and merges DL1 tables from multiple HDF DL1 mono files. 
+    Loads and merges DL1 tables from multiple HDF DL1 mono files.
     Tables are joined according to different criteria, such as
-    time window or telescope pointing direction. 
+    time window or telescope pointing direction.
 
     Parameters
     ----------
@@ -607,19 +607,19 @@ def load_more_dl1_tables_mono(
         performed.
     time_min: float
         Adds DL1 table from given file to the merged table
-        only if it at least partially overlaps with the 
+        only if it at least partially overlaps with the
         time interval specified by \'time_min\' and
         \'time_max\'. Unix time in seconds.
     time_max: float
         See \'time_min\'
     quality_cuts: bool
-        If True event selection from the config 
+        If True event selection from the config
         file is applied.
     pointing_sel: astropy.coordinates.SkyCoord
         Adds DL1 table from given file to the merged table
-        only if the telescope pointing was within 0.2 deg 
+        only if the telescope pointing was within 0.2 deg
         from the \'pointing_sel\' direction
-     
+
     Returns
     -------
     dl1_data: pandas.DataFrame
@@ -696,19 +696,19 @@ def load_dl1_sst1m(
         Either \'tel_00{1,2}\' (MC) or \'tel_02{1,2}\' (data)
     config: dict
     table: string
-        Type of the output table: \'astropy\' 
+        Type of the output table: \'astropy\'
         or \'pandas\'
     check_finite: bool
         If True finite check of RF features is
         performed.
     stereo: bool
         If True, extra columns with geometricaly reconstructed
-        stereo quantities are added to the output table 
+        stereo quantities are added to the output table
     quality_cuts: bool
-        If True event selection from the config 
+        If True event selection from the config
         file is applied.
     scale_intensities: bool
-        If True a global scale on Hillas Intensity of each shower 
+        If True a global scale on Hillas Intensity of each shower
         is applied from config["NsbCalibrator"]["intensity_correction"]
     Returns
     -------
@@ -786,7 +786,7 @@ def load_dl2_sst1m(
     """
     Reads DL2 table from the input HDF file. If config
     is provided then event selection (according to the
-    configuration) is applied. 
+    configuration) is applied.
 
     Parameters
     ----------
@@ -796,12 +796,12 @@ def load_dl2_sst1m(
         Either \'tel_00{1,2}\' (MC) or \'tel_02{1,2}\' (data)
     config: dict
     table: string
-        Type of the output table: \'astropy\' 
+        Type of the output table: \'astropy\'
         or \'pandas\'
     energy_min: float
         Cut on minimum reconstructed energy [TeV]
     scale_reco_energy: bool
-        If True a global scale on reconstructed energy of each shower 
+        If True a global scale on reconstructed energy of each shower
         is applied from config["analysis"]["reco_energy_scaling_factor"]
 
     Returns
@@ -850,7 +850,7 @@ def load_photon_list_sst1m(input_file, tel=None, config=None, table='astropy', e
     """
     Reads Photon list from the input HDF file. If config
     is provided then event selection (according to the
-    configuration) is applied. 
+    configuration) is applied.
 
     Parameters
     ----------
@@ -860,7 +860,7 @@ def load_photon_list_sst1m(input_file, tel=None, config=None, table='astropy', e
         Either \'tel_00{1,2}\' (MC) or \'tel_02{1,2}\' (data)
     config: dict
     table: string
-        Type of the output table: \'astropy\' 
+        Type of the output table: \'astropy\'
         or \'pandas\'
     energy_min: float
         Cut on minimum reconstructed energy [TeV]
@@ -921,15 +921,15 @@ def load_dl1_pedestals(input_file):
 def write_dl1_pedestals(input_file, pedestal_table=None):
 
     """
-    Write table of pedestal events from DL1 file into 
-    another DL1 file. Typical usecase is to propagate 
+    Write table of pedestal events from DL1 file into
+    another DL1 file. Typical usecase is to propagate
     pedestals from mono DL1 to stereo DL1.
 
     Parameters
     ----------
     input_file: string
         Path
-    
+
     pedestal_table: astropy.table.Table
 
     """
@@ -1011,7 +1011,7 @@ def write_pl_table(
         table_name=None, config=None, mode='a'):
     """
     Opens the HDF file and writes PL table
-    removing many keys from the DL2 table 
+    removing many keys from the DL2 table
     which are not needed at this point.
 
     Parameters
@@ -1143,7 +1143,7 @@ def load_drive_data(file):
 
 def write_dl2_info(dl2_file, rfs_used=None):
     """
-    Stores info tab with RF used and sst1mpipe 
+    Stores info tab with RF used and sst1mpipe
     version in the DL2 file. These are necesary
     for DL3 production.
 
@@ -1235,9 +1235,9 @@ def load_more_dl2_files(files, config=None,
         Gammaness cut to be applied when loading and merging
         DL2 files (optional). If float, global gammaness cut
         is applied. Alternatively, it can be a string with
-        path to the directory with gammaness cuts optimized 
+        path to the directory with gammaness cuts optimized
         on MC. A set of gammaness cut for given zenith angle
-        and NSB is found authomaticaly. The subdir structure 
+        and NSB is found authomaticaly. The subdir structure
         should follow the same logic as the RF model directories.
 
     Returns
@@ -1245,7 +1245,7 @@ def load_more_dl2_files(files, config=None,
     dl2_data: pandas.DataFrame
     times_all:
     GTI: numpy.ndarray
-        Good Time Intervals. The splitting criteria are defined 
+        Good Time Intervals. The splitting criteria are defined
         as follows ():
             - pointing difference from previous DL2 file > 0.2 deg
             - time difference from previous event > 2 sec
@@ -1387,8 +1387,8 @@ def isfloat(num):
 
 def load_distributions_sst1m(dist_path=None, dl3_path=None):
     """
-    Reads all HDF files with DL1 distributions created with 
-    sst1mpipe_extract_dl1_distributions per wobble and stack 
+    Reads all HDF files with DL1 distributions created with
+    sst1mpipe_extract_dl1_distributions per wobble and stack
     them in output arrays.
 
     Parameters
@@ -1476,7 +1476,7 @@ def get_used_qe_simtel(source):
     Reads the simtel cfg file used to run current MC production and extracts
     all Quntum efficiency (PDE) files listed there. There are also default (dummy)
     PDE files there as the proper fields in simtel must be first initialized with
-    something before running. This is not dangerous as long us one does not 
+    something before running. This is not dangerous as long us one does not
     use one of the real PDE files used for the real production as the dummy file..
 
     Parameters

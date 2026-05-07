@@ -46,14 +46,14 @@ def evaluate_performance(
         gammaness_cuts=None):
     """
     Random Forrest performance evaluation on DL2 MC testing
-    point-like gammas and diffuse protons. It provides 
-    energy and angular resolution and if proton file is 
+    point-like gammas and diffuse protons. It provides
+    energy and angular resolution and if proton file is
     provided (optional) ROC curve is also evaluated.
 
     Except for global gammaness cut option, resolutions
     are calculated for events after optimal energy dependend
     cut (the same that is used for sensitivity curve),
-    which corresponds to the real observation of 
+    which corresponds to the real observation of
     a point-like source.
 
     Parameters
@@ -163,8 +163,8 @@ def energy_resolution_per_energy(
         confidence_level=0.95, bias_correction=False,
         bins=None, x_axis_true_energy=True):
     """
-    Modified functions from ctaplot, which doesnt 
-    seem to work properly. Evaluates energy resolution 
+    Modified functions from ctaplot, which doesnt
+    seem to work properly. Evaluates energy resolution
     per bin in energy
 
     Parameters
@@ -310,7 +310,7 @@ def energy_resolution(
     Parameters
     ----------
     dl2_gamma: pandas.DataFrame
-        DL2 MC table for gammas (after some optional 
+        DL2 MC table for gammas (after some optional
         gammaness cutting). True and reconstructed energy
         is expected to be in TeV
     e_bins: astropy.units.quantity.Quantity
@@ -435,7 +435,7 @@ def angular_resolution(
     Parameters
     ----------
     dl2_gamma: pandas.DataFrame
-        DL2 MC table for gammas (after some optional 
+        DL2 MC table for gammas (after some optional
         gammaness cutting)
     e_bins: astropy.units.quantity.Quantity
         Energy bin edges
@@ -450,7 +450,7 @@ def angular_resolution(
         If True energy axis is binned in true
         energy. Reconstructed energy is used otherwise
     axes_sky: bool
-        Only affets plotting. If True, axes of 
+        Only affets plotting. If True, axes of
         the 2D histogram are in alt/az, or in
         x/y (camera frame) otherwise.
 

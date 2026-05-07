@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Created on Wed Mar 23 16:36:22 2022
-@author: TT 
+@author: TT
 
 
 
@@ -29,7 +29,7 @@ Created on Wed Mar 23 16:36:22 2022
     tel: int
         number of the telescope (1 or 2)
     nfile: int
-        number of file to use starting from first_file 
+        number of file to use starting from first_file
     save_dir: string
         Path to a directory to save h5 files
     save_plot: boolean
@@ -69,7 +69,7 @@ from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
 class mes_fitter:
     """
-    class desinged to produce h5 table containing calibration parameters. 
+    class desinged to produce h5 table containing calibration parameters.
     """
     def __init__(self,
                  day          = 5,
@@ -100,7 +100,7 @@ class mes_fitter:
         tel: int
             number of the telescope (1 or 2)
         nfile: int
-            number of file to use starting from first_file 
+            number of file to use starting from first_file
         plot_dir: string
             Path to a directory to save plots
         save_dir: string
@@ -256,7 +256,7 @@ class mes_fitter:
 
     def spe_spectrum_function__s(self,x, ll, xt, g, sigma_pe, sigma_el):
         """
-        single phot-electron spectrum fuction x -> MES(x) 
+        single phot-electron spectrum fuction x -> MES(x)
 
         Parameters
         ----------
@@ -312,7 +312,7 @@ class mes_fitter:
 
     def spe_spectrum_function_sss(self,x, ll, xt, g, sigma_pe, sigma_el,x_el):
         """
-        single phot-electron spectrum fuction x -> MES(x) 
+        single phot-electron spectrum fuction x -> MES(x)
 
         Parameters
         ----------
@@ -383,7 +383,7 @@ class mes_fitter:
 
     def spe_spectrum_function(self,x, ll, xt, g, sigma_pe, sigma_el,x_el):
         """
-        single phot-electron spectrum fuction x -> MES(x) 
+        single phot-electron spectrum fuction x -> MES(x)
 
         Parameters
         ----------

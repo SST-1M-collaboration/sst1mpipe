@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-A script to extract a photon list from DL2 applying a simple global 
+A script to extract a photon list from DL2 applying a simple global
 gammaness cut and event selection for fast theta2 analysis.
 - Input is a single DL2 file in HDF format
 - Output is hdf file, basicaly DL2 table with gammaness cut and

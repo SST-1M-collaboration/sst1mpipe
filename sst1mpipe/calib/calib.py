@@ -11,8 +11,8 @@ from sst1mpipe.utils import VAR_to_Idrop, get_tel_string
 
 def get_default_window(telescope=None):
     """
-    Provides default window transmissivity file, 
-    used in the case when it is not defined in the 
+    Provides default window transmissivity file,
+    used in the case when it is not defined in the
     configuration file.
 
     Parameters
@@ -81,12 +81,12 @@ def window_transmittance_correction(
         swapped_modules=[]
         ):
     """
-    Applies window transmittance correction 
+    Applies window transmittance correction
     on the integrated waveforms (images)
 
     Parameters
     ----------
-    event: 
+    event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
     window_corr_factors: numpy.ndarray
     telescope: int
@@ -124,12 +124,12 @@ def saturated_charge_correction(event, processing_info=None):
     Finds saturated waveforms and applies different peak integration on
     them, as the standard one does not perform well in such cases. This
     method integrates the peak above 20\% of the amplitude.
-    Peak time for saturated events is also corrected as the middle of 
+    Peak time for saturated events is also corrected as the middle of
     the integration window.
 
     Parameters
     ----------
-    event: 
+    event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
 
     Returns
@@ -212,7 +212,7 @@ def correct_MC_for_PDE_drop(event, simtel_config_qe=None, pde_corr_factors=None)
         Different PDEs (QEs) found in the simtel file header
 
     pde_corr_factors: dict
-        Correction factors for different MC productions (it is NSB dependent) 
+        Correction factors for different MC productions (it is NSB dependent)
         stored in ../data/mc_pde_correction_factors.json
 
     Returns
@@ -291,7 +291,7 @@ class Calibrator_R0_R1:
         event:
             sst1mpipe.io.containers.SST1MArrayEventContainer
         pedestal_info:
-            class handling the parameters of pedesta events 
+            class handling the parameters of pedesta events
             in a sliding window
 
         Returns
@@ -350,8 +350,8 @@ class Calibrator_R0_R1:
 
     def get_default_calibration(self):
         """
-        Provides default calibration file, used in 
-        the case when it is not defined in the 
+        Provides default calibration file, used in
+        the case when it is not defined in the
         configuration file.
 
         """
@@ -380,8 +380,8 @@ class Calibrator_R0_R1:
 
     def get_dc_to_pe(self):
         """
-        Gets ADC -> p.e. conversion factor from the 
-        calibration file. Gain drop is not taken 
+        Gets ADC -> p.e. conversion factor from the
+        calibration file. Gain drop is not taken
         int account!
 
         """
@@ -394,11 +394,11 @@ class Calibrator_R0_R1:
 
     def remove_bad_pixels_calib(self, event, pedestal_info=None):
         """
-        Fills bad pixel waveforms with zeros and 
-        flags them in proper containers. Charges in 
-        these pixels are then interpolated using method 
+        Fills bad pixel waveforms with zeros and
+        flags them in proper containers. Charges in
+        these pixels are then interpolated using method
         set in cfg: invalid_pixel_handler_type
-        Default is NeighborAverage, but can be turned 
+        Default is NeighborAverage, but can be turned
         off with 'null'
 
         Parameters

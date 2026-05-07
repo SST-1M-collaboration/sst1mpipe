@@ -4,9 +4,9 @@
 Script to calculate observability of any source from the catalog
 for a single particular night. If one wants to quickly see the
 observability of a single source, which does not need to be put
-in the catalog (some transient for example), the coordinates may 
+in the catalog (some transient for example), the coordinates may
 be specified independently. If no date is specified, the following
-night is the default. Any source in the catalog can be removed from 
+night is the default. Any source in the catalog can be removed from
 plotting/calculation if obsplan_show: false. The script plots source
 visibility and moon distance and stores the figure in the output dir.
 It also prints observability windows with moon distance and altitude

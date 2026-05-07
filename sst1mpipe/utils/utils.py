@@ -46,12 +46,12 @@ INVERTED_MODULE_LIST_PATH = BASE_DIR / "data" / "inverted_module_list.json"
 
 def get_target(file, force_pointing=False):
     """
-    Extracts the target information from the string 
-    stored in the TARGET field of the input file 
-    Fits header. The string is expected to have the 
+    Extracts the target information from the string
+    stored in the TARGET field of the input file
+    Fits header. The string is expected to have the
     following format \"Target,RA[in deg],DEC[in deg]\".
-    Target may contain wobble information. Files stored 
-    during the transition between wobbles must be flagged 
+    Target may contain wobble information. Files stored
+    during the transition between wobbles must be flagged
     with \'Transition\' string.
 
     Parameters
@@ -132,7 +132,7 @@ def get_nsb_levels_rates(config):
 
 def get_stereo_method(config):
     """
-    Reads method of coincidet event matching 
+    Reads method of coincidet event matching
     from the config file.
 
     Parameters
@@ -236,7 +236,7 @@ def get_location(config=None, tel=None):
 
 def simbad_query(ra=None, dec=None, max_mag=8):
     """
-    Query simbad for the brightest stars in the 
+    Query simbad for the brightest stars in the
     FoV.
 
     Parameters
@@ -276,9 +276,9 @@ def simbad_query(ra=None, dec=None, max_mag=8):
 
 def event_hillas_add_units(event):
     """
-    This returns units to Hillas parameters to 
-    event which resulted from 
-    ctapipe.io.HDF5EventSource 
+    This returns units to Hillas parameters to
+    event which resulted from
+    ctapipe.io.HDF5EventSource
 
     Parameters
     ----------
@@ -289,7 +289,7 @@ def event_hillas_add_units(event):
     -------
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
-        Event with units added to Hillas 
+        Event with units added to Hillas
         parameter
     """
 
@@ -313,7 +313,7 @@ def add_trigger_time(event, telescope=None):
     Stores local_camera_clock provided with event source
     in event.trigger with nanosecond precision, see
     https://github.com/cta-observatory/ctapipe_io_nectarcam/issues/24
-    Note: If we read the data using ctapipe.io.read_table, 
+    Note: If we read the data using ctapipe.io.read_table,
     the numerical precision is lost anyway. This is the reason
     storing WR timestamps in two columns directly in the DL1
     table.
@@ -395,9 +395,9 @@ def add_pointing_to_events(
     event, ra=None, dec=None,
     telescope=None, location=None):
     """
-    Fills array pointing and telescope pointing 
-    fields of the event container. Pointing 
-    altitude ant azimuth are also calculated 
+    Fills array pointing and telescope pointing
+    fields of the event container. Pointing
+    altitude ant azimuth are also calculated
     from poiting ra,dec and trigger time.
 
     Parameters
@@ -431,7 +431,7 @@ def add_pointing_to_events(
 def check_mc(file):
     """
     Checks the input DL1 HDF file and
-    returns True of False if it's 
+    returns True of False if it's
     MC or data file, respectively.
 
     Parameters
@@ -473,7 +473,7 @@ def get_closest_rf_model(
     """
     RF models are trained per bin in zenith angle,
     azimuth and NSB level. They are expected to be
-    stored in subdirectories with the following 
+    stored in subdirectories with the following
     naming format: \'zeXX_azXX_nsbXX\'. This provides
     the path to the closest RF models (in [NSB,ze,az]
     space).
@@ -482,9 +482,9 @@ def get_closest_rf_model(
     ----------
     dl1: pandas.DataFrame or astropy.table.Table
     models_dir: str
-        Path to stored trained RFs, or path to general 
-        production directory where subdirectories with 
-        models in the following naming format are 
+        Path to stored trained RFs, or path to general
+        production directory where subdirectories with
+        models in the following naming format are
         expected: \'zeXX_azXX_nsbXX\''
     nsb_level: float
         Average NSB level, usualy stored in meanQ
@@ -582,10 +582,10 @@ def check_same_shower_fraction(dl2, energy_bins):
 def mc_correct_shower_reuse(mc_table, histograms):
     """
     If we use CSCAT>20 in CORSIKA the number stored in mc['shower_reuse']
-    is still 20, even though the total number of shower stored in the simtel 
-    file is correct (Vladimir checked), and also the total number of thrown 
-    events stored in histograms seems to be fine (Jakub checked). Here we 
-    use the total number of events stored in histograms to correct for 
+    is still 20, even though the total number of shower stored in the simtel
+    file is correct (Vladimir checked), and also the total number of thrown
+    events stored in histograms seems to be fine (Jakub checked). Here we
+    use the total number of events stored in histograms to correct for
     shower_reuse.
 
     Parameters
@@ -598,7 +598,7 @@ def mc_correct_shower_reuse(mc_table, histograms):
         file: /simulation/service/shower_distribution
 
     Returns
-    ------- 
+    -------
     astropy.table.Table
 
     """
@@ -624,14 +624,14 @@ def correct_number_simulated_showers(
         simulated_event_info, mc_table=None,
         histogram_table=None, e_min_cut=None):
     """
-    Corrects the number of totaly simulated showers 
+    Corrects the number of totaly simulated showers
     after the cuts on true energy in DL1 and DL2.
 
-    One may combine different MC production with 
+    One may combine different MC production with
     different E mins and cut on the minimum energy
     when producing DL1 or DL2 files. But is such case
     the number of simulated events and simulated event
-    histograms, wchi are stored in DL1/DL2 MC are not 
+    histograms, wchi are stored in DL1/DL2 MC are not
     correct resulting in wrong spectral reweighting.
 
     This fucntion corrects the number of simulated events
@@ -643,11 +643,11 @@ def correct_number_simulated_showers(
     mc_table: astropy.table.Table
     histogram_table: astropy.table.Table
     e_min_cut: float
-        Cut on E nergy applied in DL1/DL2 files. 
+        Cut on E nergy applied in DL1/DL2 files.
         Expected to be in TeV.
 
     Returns
-    ------- 
+    -------
     astropy.table.QTable
 
     """
@@ -815,7 +815,7 @@ def correct_true_image(event):
     """
     For an unknown reason, event.simulation.tel[tel].true_image
     is sometimes None, which kills the rest of the script
-    and simulation histogram is not saved. Here we repace 
+    and simulation histogram is not saved. Here we repace
     it with an array of zeros.
 
     Parameters
@@ -923,11 +923,11 @@ def swap_modules_r0wf(event,mask1,mask2,tel=None):
 
 def remove_bad_pixels(event, config=None):
     """
-    Fills bad pixel waveforms with zeros and 
-    flags them in proper containers. Charges in 
-    these pixels are then interpolated using method 
+    Fills bad pixel waveforms with zeros and
+    flags them in proper containers. Charges in
+    these pixels are then interpolated using method
     set in cfg: invalid_pixel_handler_type
-    Default is NeighborAverage, but can be turned 
+    Default is NeighborAverage, but can be turned
     off with 'null'
 
     Parameters
@@ -988,7 +988,7 @@ def check_output_dl1(file):
 
 def add_features(data):
     """
-    Add some extra parameters in the DL1 table. 
+    Add some extra parameters in the DL1 table.
 
     Parameters
     ----------
@@ -996,7 +996,7 @@ def add_features(data):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1008,20 +1008,20 @@ def add_features(data):
 
 def add_timing_features(data, images):
     """
-    Add some extra parameters in the DL1 table. 
+    Add some extra parameters in the DL1 table.
 
     Parameters
     ----------
     data: astropy.table.Table
-        table with event parameters, 
+        table with event parameters,
         usualy stored in /dl1/event/telescope/parameters/{tel}
     images: astropy.table.Table
-        table with event image, pixel timing and cleaning mask, 
+        table with event image, pixel timing and cleaning mask,
         usualy stored in /dl1/event/telescope/images/{tel}
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
     cleaning_mask = images['image_mask']
@@ -1042,8 +1042,8 @@ def add_timing_features(data, images):
 
 def add_log_true_energy(data):
     """
-    Add log of the true energy in 
-    the DL1 MC table. 
+    Add log of the true energy in
+    the DL1 MC table.
 
     Parameters
     ----------
@@ -1051,7 +1051,7 @@ def add_log_true_energy(data):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1062,7 +1062,7 @@ def add_log_true_energy(data):
 def add_pointing_mc(
         data, input_file=None, tel=None):
     """
-    Add pointing altitude and azimuth in 
+    Add pointing altitude and azimuth in
     DL1 table
 
     Parameters
@@ -1073,7 +1073,7 @@ def add_pointing_mc(
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1090,7 +1090,7 @@ def add_pointing_mc(
 
 def add_disp(paramtable, config=None, telescope=None):
     """
-    Add DISP parameters in the DL1 MC table. 
+    Add DISP parameters in the DL1 MC table.
 
     Parameters
     ----------
@@ -1100,7 +1100,7 @@ def add_disp(paramtable, config=None, telescope=None):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1126,7 +1126,7 @@ def add_disp(paramtable, config=None, telescope=None):
 
 def add_miss(paramtable):
     """
-    Add miss parameter in the DL1 MC table. 
+    Add miss parameter in the DL1 MC table.
 
     Parameters
     ----------
@@ -1134,7 +1134,7 @@ def add_miss(paramtable):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1163,7 +1163,7 @@ def add_true_impact(
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1190,7 +1190,7 @@ def event_selection(data, config=None):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
         Table after quality cuts
 
     """
@@ -1221,10 +1221,10 @@ def event_selection(data, config=None):
 
 def stereo_var_cuts(data, config=None):
     """
-    Performs cut on minimum distance between the two reconstructed 
-    source positions and on variance of reco gammaness and energy 
-    from both telescopes. 
-    
+    Performs cut on minimum distance between the two reconstructed
+    source positions and on variance of reco gammaness and energy
+    from both telescopes.
+
     Input table must contain min_distance column
     (in radians), var_reco_energy and var_gammaness.
 
@@ -1312,7 +1312,7 @@ def get_finite(data, config=None, stereo=False):
 def get_telescopes(input_file, data_level="dl1"):
     """
     Returns list of telescopes which have parameters
-    table stored in the input DL1 or DL2 HDF file. 
+    table stored in the input DL1 or DL2 HDF file.
 
     Parameters
     ----------
@@ -1544,7 +1544,7 @@ def get_GTIs(times):
 
 def clip_alt(alt):
     """
-    Make sure altitude is not larger than 90 deg 
+    Make sure altitude is not larger than 90 deg
     (it happens in some MC files for zenith=0),
     to keep astropy happy.
 
@@ -1568,7 +1568,7 @@ def clip_alt(alt):
 
 def add_disp_to_parameters(data):
     """
-    We need to add DISP parameters to the dl1 table, 
+    We need to add DISP parameters to the dl1 table,
     these are not implemented in ctapipe! This is a
     modification of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
@@ -1598,7 +1598,7 @@ def disp(
         cog_x, cog_y, src_x,
         src_y, hillas_psi):
     """
-    Calculates true DISP parameters shower 
+    Calculates true DISP parameters shower
     CoG and source coordinates. This is a
     modification of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
@@ -1631,12 +1631,12 @@ def disp(
             Distance of the source from shower CoG
             along the y axis
         disp_norm: astropy.units.quantity.Quantity
-            Absolute value of a distance of the source 
+            Absolute value of a distance of the source
             from shower CoG
         disp_angle: astropy.units.quantity.Quantity
             Hillas Psi angle
         disp_sign: numpy.ndarray
-            Defines on which side of the main axis the 
+            Defines on which side of the main axis the
             source lies
 
     """
@@ -1667,7 +1667,7 @@ def disp(
 def disp_to_pos(disp_dx, disp_dy, cog_x, cog_y):
     """
     Calculates source coordinates from DISP params
-    and CoG of the shower. This is a modification 
+    and CoG of the shower. This is a modification
     of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
     Copyright (c) 2024 cta-lstchain developers
@@ -1704,7 +1704,7 @@ def disp_vector(disp_norm, disp_angle, disp_sign):
     """
     Calculates disp vector (source position relative
     to the position of the shower) from RF reconstructed
-    quantities. This is a modification 
+    quantities. This is a modification
     of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
     Copyright (c) 2024 cta-lstchain developers
@@ -1713,12 +1713,12 @@ def disp_vector(disp_norm, disp_angle, disp_sign):
     Parameters
     ----------
     disp_norm: numpy.ndarray
-        Absolute value of a distance of the source 
+        Absolute value of a distance of the source
         from shower CoG. Should be in metres
     disp_angle: pandas.core.series.Series
         Hillas Psi angle in rad
     disp_sign: numpy.ndarray
-        Defines on which side of the main axis the 
+        Defines on which side of the main axis the
         source lies
 
     Returns
@@ -1734,8 +1734,8 @@ def disp_vector(disp_norm, disp_angle, disp_sign):
 def polar_to_cartesian(norm, angle, sign):
     """
     Polar to cartesian transformation.
-    As a convention, angle should be in 
-    [-pi/2:pi/2]. This is a modification 
+    As a convention, angle should be in
+    [-pi/2:pi/2]. This is a modification
     of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
     Copyright (c) 2024 cta-lstchain developers
@@ -1826,7 +1826,7 @@ def get_sources_in_dir(base_path):
     base_path: string
         Directory with all data for given night. It
         should contain folders with names of observed
-        sources. 
+        sources.
 
     Returns
     -------
@@ -1849,9 +1849,9 @@ def get_moon_phase(times=None, loc=None):
 
     Parameters
     ----------
-    times: 
+    times:
         astropy.time.Time
-    loc: 
+    loc:
         astropy.coordinates.EarthLocation
 
     Returns
@@ -1884,7 +1884,7 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
         list of source to ignore
     Returns
     -------
-    pyplot figure, axis 
+    pyplot figure, axis
 
     """
     plt.rcParams['font.family'] = 'monospace'

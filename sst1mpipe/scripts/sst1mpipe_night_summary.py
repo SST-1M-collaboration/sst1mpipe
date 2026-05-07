@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 """
-A script to create night summary for each observed source, which is 
+A script to create night summary for each observed source, which is
 stored as a PDF in the base data analysis directory. For the full
-summary, the script needs all data analysis levels up to DL3 for 
-mono and stereo to be already produced. It also needs the DL1 
+summary, the script needs all data analysis levels up to DL3 for
+mono and stereo to be already produced. It also needs the DL1
 distributions to be already extracted.
-- Input is a base data analysis directory, within which the expected 
+- Input is a base data analysis directory, within which the expected
 structure is BASE_DIR/{date}/{source}/{telescope}/{data level}/{subdir}/
 - Outputs are night summary PDFs for all sources observed during the night
 

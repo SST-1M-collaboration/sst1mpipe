@@ -18,7 +18,7 @@ from sst1mpipe.utils import (
 
 def add_reco_ra_dec(data, horizon_frame=None):
     """
-    Calculate reconstructed RA, DEC from reconstructed ALT,AZ in DL2 table 
+    Calculate reconstructed RA, DEC from reconstructed ALT,AZ in DL2 table
     for timestamps specified in horizon_frame and add them as new columns
 
     Parameters
@@ -245,9 +245,9 @@ def add_wobble_flag(data, horizon_frame=None, wobbles=[]):
 def get_theta_off_stereo(data, n_off=1, on_region=None, wobbles=[]):
     """
     Calculates theta^2 for OFF regions regularly distributed around
-    the pointing RA,DEC at the same offset as the ON region (for each 
-    wobble). This is to be used for theta^2 in stereo, where the camera 
-    frame is different for each telescope. The derivation of the rotation 
+    the pointing RA,DEC at the same offset as the ON region (for each
+    wobble). This is to be used for theta^2 in stereo, where the camera
+    frame is different for each telescope. The derivation of the rotation
     angles is from:
     https://github.com/cta-observatory/magic-cta-pipe/blob/master/magicctapipe/utils/functions.py
 
@@ -263,7 +263,7 @@ def get_theta_off_stereo(data, n_off=1, on_region=None, wobbles=[]):
     theta2_off: numpy.ndarray
         One column per OFF region
     off_radec: list of astropy.coordinates.SkyCoord
-    
+
     """
 
     theta2_off = np.zeros([len(data), n_off])
@@ -339,7 +339,7 @@ def get_theta_off(
     theta2_off: numpy.ndarray
         One column per OFF region
     off_radec: list of astropy.coordinates.SkyCoord
-    
+
     """
 
     true_source_position = [data['source_x'], data['source_y']]

@@ -2,10 +2,10 @@
 
 """
 This script has two use cases:
-- It can be used to calculate the edges of event classes based 
-on percentile cut aplied on misdirection in DL2 MC filee, and 
+- It can be used to calculate the edges of event classes based
+on percentile cut aplied on misdirection in DL2 MC filee, and
 to store them in output HDF file.
-- Having the event classes already defined, it can be used to 
+- Having the event classes already defined, it can be used to
 clasify events in any DL2 files (MC/data).
 
 The script can automaticaly find the closest node in alt,az,nsb

@@ -523,10 +523,10 @@ def apply_models(
         dl1, models_dir=None, config=None,
         telescope=None, stereo=False, mc=True):
     """
-    Applies all RF models from models directory to reconstruct 
+    Applies all RF models from models directory to reconstruct
     all events from DL1 to DL2. Works on both MC/data, mono/stereo.
-    For stereo reconstruction, only DISP norm is reconstructed, 
-    and both possible signs are stored in the output DataFrame for 
+    For stereo reconstruction, only DISP norm is reconstructed,
+    and both possible signs are stored in the output DataFrame for
     each event (MARS-like stereo reconstruction). All quantities
     are reconstructed per-telescope even in stereo. Final averaging
     for stereo reconstruction is done in .reco.stereo_reconstruction()
@@ -696,12 +696,12 @@ def stereo_reconstruction(
         params, config=None,
         ismc=False, telescopes=None):
     """
-    Averages energy and gammaness stereoscopicly reconstructed for 
+    Averages energy and gammaness stereoscopicly reconstructed for
     each telescope to get final stereo quantities for each event.
-    For direction reconstruction, alt/az for both signs from each 
+    For direction reconstruction, alt/az for both signs from each
     telescope are calculated. Then the combination leading to
     reconstructed coordinates with the smallest distance is
-    selected and final direction is calculated as weighted average 
+    selected and final direction is calculated as weighted average
     of the two (MARS-like stereo reconstruction).
 
     Parameters
@@ -954,7 +954,7 @@ def get_data_tel(params, tel=1):
 
 def angular_distance(params, combination='pp', tels=None):
     """
-    Calculates angular distance for all four combination of 
+    Calculates angular distance for all four combination of
     reconstructed source positions for images of the two telescopes.
 
     Parameters
@@ -991,7 +991,7 @@ def get_average_param(params, param=None, weights=None):
 
     Returns
     -------
-    average:    
+    average:
         pandas.DataFrame
     variance:
         Note that variance is calculated always from unweighted quantities
@@ -1105,8 +1105,8 @@ def find_coincidence_offset(
         config=None, save_figures=False):
     """
     Finds time offset between both telescope timestamps
-    which results in the most coincident events (for 
-    given time window). This has to be used if the data does 
+    which results in the most coincident events (for
+    given time window). This has to be used if the data does
     not contain White Rabbit timestamps.
 
     Parameters
@@ -1201,15 +1201,15 @@ def make_dl1_stereo(
         config=None,
         time_offset=0):
     """
-    Finds coincidet events in all passed tel2 DL1 files for 
+    Finds coincidet events in all passed tel2 DL1 files for
     given tel1 DL1 file. Resulting DL1 file contains coincident
     events only in two tabs (
-    /dl1/event/telescope/parameters/{tel_021/tel_022}). 
-    Coincident events have the same event_id. There is also 
-    geometrical stereo reconstruction applied in this step 
-    providing extra columns to be used as features for 
-    stereo reconstruction (tel_impact_distance, h_max). 
-    This does not have to be run on MC, where the 
+    /dl1/event/telescope/parameters/{tel_021/tel_022}).
+    Coincident events have the same event_id. There is also
+    geometrical stereo reconstruction applied in this step
+    providing extra columns to be used as features for
+    stereo reconstruction (tel_impact_distance, h_max).
+    This does not have to be run on MC, where the
     coincident events are found on sim_telarray level.
 
     Parameters
