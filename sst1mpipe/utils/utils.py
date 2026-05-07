@@ -8,6 +8,7 @@ import os
 import re
 from datetime import datetime
 from os import path
+import json
 
 import astropy.constants as c
 import astropy.units as u
@@ -29,6 +30,7 @@ from astropy.coordinates import (
     get_sun,
 )
 from astropy.io import fits
+import astropy.io.ascii as aio
 from astropy.time import Time
 from astroquery.simbad import Simbad
 from ctapipe.coordinates import CameraFrame
