@@ -1,5 +1,11 @@
 name: ci
-on: [push]
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
 
 jobs:
  build:
@@ -18,6 +24,9 @@ jobs:
       - name: Test install
         shell: micromamba-shell {0}
         run : pip install .
+      - name: Run Ruff (pyflakes + pycodestyle)
+        shell: micromamba-shell {0}
+        run: ruff check .
       - name: Run tests
         shell: micromamba-shell {0}
         run : pytest sst1mpipe/tests/
