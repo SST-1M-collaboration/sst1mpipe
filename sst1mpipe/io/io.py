@@ -377,7 +377,7 @@ def write_extra_parameters(
 
 def add_wr_dl1_stereo(file, dl1_data_tabs=None):
     """
-    Opens the DL1 stereo file after conincident event matching and
+    Opens the DL1 stereo file after coincident event matching and
     adds two columns with high precision WR timestamps, which are
     stored in mono DL1 tables of both telescopes. This is neccessary
     because we use ctapipe DataWriter to store DL1 stereo file, but
