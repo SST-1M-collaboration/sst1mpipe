@@ -139,7 +139,7 @@ def add_source_xy(data, source=None, camera_frame=None):
 
 
 def get_sigma_time(
-        data, theta2_on, theta2_off, theta2_cut=0.04, 
+        data, theta2_on, theta2_off, theta2_cut=0.04,
         norm_range=None, step_events=1):
     """
     Calculates time development of significance and background normalization
@@ -233,8 +233,8 @@ def add_wobble_flag(data, horizon_frame=None, wobbles=None):
     if wobbles is None:
         wobbles = []
 
-    pointing_coords = SkyCoord(alt = data['true_alt_tel'] * u.deg, 
-                           az = data['true_az_tel'] * u.deg, 
+    pointing_coords = SkyCoord(alt = data['true_alt_tel'] * u.deg,
+                           az = data['true_az_tel'] * u.deg,
                            frame=horizon_frame
                            )
 

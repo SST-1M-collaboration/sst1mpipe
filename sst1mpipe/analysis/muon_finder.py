@@ -254,15 +254,15 @@ class muon_finder:
                         self.mbs   = self.mbs[-100:]
                         self.bsstd = self.bsstd[-100:]
                     continue
-                ## intergrate signal in a fixed window : 
+                ## intergrate signal in a fixed window :
                 VI = VAR_to_Idrop(pedestal_info.get_charge_std().mean()**2, 20+self.tel)
                 Q_sum_ADC    = (r0data.adc_samples.T[self.w_start:self.w_end] - r0data.digicam_baseline).sum(axis=0)
                 Q_sum_window = Q_sum_ADC /self.gain /VI /self.window_t
-                    
-                
-            mask_tailcuts = tailcuts_clean(self.geom, 
-                                           Q_sum_window, 
-                                           self.tailcuts_1, 
+
+
+            mask_tailcuts = tailcuts_clean(self.geom,
+                                           Q_sum_window,
+                                           self.tailcuts_1,
                                            self.tailcuts_2,
                                            min_number_picture_neighbors=2)
 

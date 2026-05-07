@@ -11,9 +11,9 @@ from gammapy.stats import WStatCountsStatistic
 
 
 def plot_count_maps(
-        data, bins_raw=20, bins_conv=100, 
-        conv_kernel_deg=0.2, range_deg=4, 
-        source=None, theta2_cut=None, 
+        data, bins_raw=20, bins_conv=100,
+        conv_kernel_deg=0.2, range_deg=4,
+        source=None, theta2_cut=None,
         wobbles=None, off_radec_w=None):
     """
     Plots count maps (not bkg subtracted). Raw 2D historam and
@@ -178,8 +178,8 @@ def plot_sigma_time(data, sigma, times, obsid, alphas, nights):
 
 
 def plot_theta2(
-        theta2_on, theta2_off, 
-        theta2_range=None, n_bins_before_th2_cut=1, 
+        theta2_on, theta2_off,
+        theta2_range=None, n_bins_before_th2_cut=1,
         theta2_cut=0.04, norm_range=None,
         t_elapsed=0 * u.h):
     """
@@ -663,7 +663,7 @@ def plot_roc(
 
 
 def plot_sensitivity(
-        sens_tables=None, labels=None, markers=None, 
+        sens_tables=None, labels=None, markers=None,
         ax=None, xlim=None, ylim=None,
         bands=False, yerrors=False, preliminary=False,
         legend_fontsize=10):
