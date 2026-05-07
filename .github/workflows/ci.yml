@@ -13,10 +13,11 @@ jobs:
           environment-file: environment.yml
           init-shell: bash
           cache-environment: true
+          generate-run-shell: true
           post-cleanup: 'all'
-      - name: Activate micromamba env
-        run: micromamba activate sst1m-dev
-      - name: Install sst1mpipe
-        run: pip install .
-      - name: Run pytest
-        run: pytest sst1mpipe/tests/
+      - name: Test install
+        shell: micromamba-shell {0}
+        run : pip install .
+      - name: Run tests
+        shell: micromamba-shell {0}
+        run : pytest sst1mpipe/tests/
