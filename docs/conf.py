@@ -22,7 +22,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
-    'sphinx.ext.githubpages', 
+    'sphinx.ext.githubpages',
     "numpydoc",
     "sphinx_rtd_theme",
     "sphinx_togglebutton"
