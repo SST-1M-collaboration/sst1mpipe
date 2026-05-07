@@ -107,7 +107,7 @@ class shape_maker:
             for sub_sample in range((len(samples)*n_rebin)-n_rebin):
                 rb_samples.append(samples[sub_sample//n_rebin]+(sub_sample%n_rebin)/n_rebin*(samples[(sub_sample//n_rebin)+1]-samples[(sub_sample//n_rebin)]))
                 #print(type((samples[sub_sample//n_rebin]-samples[(sub_sample//n_rebin)+1])))
-            for sub_sample in range(n_rebin):
+            for _sub_sample in range(n_rebin):
                 rb_samples.append(samples[len(samples)-1])
             return rb_samples
 
@@ -227,7 +227,7 @@ class shape_maker:
 
                         try:
                             P0=T0-btom
-                            res1  = minimize( lambda x: likelyhood_fct_spe(pixs_interp_norm,wf,x)   ,[P0] , method='BFGS', tol=1e-12)
+                            res1  = minimize( lambda x, wf=wf: likelyhood_fct_spe(pixs_interp_norm,wf,x)   ,[P0] , method='BFGS', tol=1e-12)
                             tom0  = T0-res1.x[0]
                             # LL = 2*(np.log(res1.fun) - np.log(likelyhood_fct_spe(pixs_interp_norm,wf,P0)))
                             # print(tom0,'diff :',res1.x[0]-P0)
@@ -379,9 +379,3 @@ if __name__ == "__main__":
 
     plt.show()
     # ax.plot(pt['col1'],pt['col3'])
-
-
-
-
-
-

@@ -265,7 +265,7 @@ def write_charge_images(ped_q_map, output_file=None):
     write_table_hdf5(q_maps_t, output_file, path='charge_images', overwrite=True, append=True, serialize_meta=True)
 
 
-def write_charge_fraction(file, survived_charge={}):
+def write_charge_fraction(file, survived_charge=None):
     """
     Writes fraction of survived charge after cleaning in
     the DL1 table of each telescope. Works on MC only
@@ -283,6 +283,9 @@ def write_charge_fraction(file, survived_charge={}):
     -------
 
     """
+
+    if survived_charge is None:
+        survived_charge = {}
 
     telescopes = get_telescopes(file)
 
@@ -372,7 +375,7 @@ def write_extra_parameters(
 
 
 
-def add_wr_dl1_stereo(file, dl1_data_tabs=[]):
+def add_wr_dl1_stereo(file, dl1_data_tabs=None):
     """
     Opens the DL1 stereo file after conincident event matching and
     adds two columns with high precision WR timestamps, which are
@@ -391,6 +394,9 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=[]):
     -------
 
     """
+
+    if dl1_data_tabs is None:
+        dl1_data_tabs = []
 
     logging.info('Adding WR timestamps back into the DL1 stereo file...')
     telescopes = get_telescopes(file)

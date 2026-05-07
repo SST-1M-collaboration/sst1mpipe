@@ -11,10 +11,10 @@ from gammapy.stats import WStatCountsStatistic
 
 
 def plot_count_maps(
-        data, bins_raw=20, bins_conv=100,
-        conv_kernel_deg=0.2, range_deg=4,
-        source=None, theta2_cut=None,
-        wobbles=[], off_radec_w=[]):
+        data, bins_raw=20, bins_conv=100, 
+        conv_kernel_deg=0.2, range_deg=4, 
+        source=None, theta2_cut=None, 
+        wobbles=None, off_radec_w=None):
     """
     Plots count maps (not bkg subtracted). Raw 2D historam and
     the same but convoluted with a gaussian kernel of given
@@ -39,6 +39,11 @@ def plot_count_maps(
     -------
 
     """
+
+    if wobbles is None:
+        wobbles = []
+    if off_radec_w is None:
+        off_radec_w = []
 
     range_d = [
                        [source.ra.value-range_deg/2/np.cos(np.deg2rad(source.dec.value)),
@@ -173,9 +178,9 @@ def plot_sigma_time(data, sigma, times, obsid, alphas, nights):
 
 
 def plot_theta2(
-        theta2_on, theta2_off,
-        theta2_range=[0, 1.0], n_bins_before_th2_cut=1,
-        theta2_cut=0.04, norm_range=[0.2, 0.5],
+        theta2_on, theta2_off, 
+        theta2_range=None, n_bins_before_th2_cut=1, 
+        theta2_cut=0.04, norm_range=None,
         t_elapsed=0 * u.h):
     """
     Plots theta2 distribution for on regions and all off
@@ -201,6 +206,11 @@ def plot_theta2(
     -------
 
     """
+
+    if theta2_range is None:
+        theta2_range = [0, 1.0]
+    if norm_range is None:
+        norm_range = [0.2, 0.5]
 
     nbins=round((theta2_range[1]/theta2_cut)*n_bins_before_th2_cut)
     hist_on, bin_edges_on=np.histogram(theta2_on, density=False, bins=nbins, range=theta2_range)
@@ -384,7 +394,7 @@ def plot_energy_resolution(
         markers=None, axes=None, plot=None,
         preliminary=False,
         skip_bins_first=0, skip_bins_last=0,
-        titles=['Energy resolution', 'Energy bias']):
+        titles=None):
     """
     Plots energy resolution and bias.
 
@@ -414,6 +424,9 @@ def plot_energy_resolution(
     -------
 
     """
+
+    if titles is None:
+        titles = ['Energy resolution', 'Energy bias']
 
     energy_center = ctaplot.ana.logbin_mean(e_bins['energy_bins'])
 
@@ -650,8 +663,8 @@ def plot_roc(
 
 
 def plot_sensitivity(
-        sens_tables=None, labels=None, markers=None,
-        ax=None, xlim=[10**-1, 10**3], ylim=[10**-12, 10**-10],
+        sens_tables=None, labels=None, markers=None, 
+        ax=None, xlim=None, ylim=None,
         bands=False, yerrors=False, preliminary=False,
         legend_fontsize=10):
     """
@@ -680,6 +693,11 @@ def plot_sensitivity(
     -------
 
     """
+
+    if xlim is None:
+        xlim = [10**-1, 10**3]
+    if ylim is None:
+        ylim = [10**-12, 10**-10]
 
     if preliminary:
         plot_preliminary(ax=ax)
