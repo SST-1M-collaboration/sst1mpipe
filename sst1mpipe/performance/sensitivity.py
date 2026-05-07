@@ -1107,7 +1107,7 @@ def source_time_to_detection(
         dl2_gamma, dl2_proton, mc_info_gamma=None,
         mc_info_proton=None, config=None, telescope=None,
         gammaness_cuts=None, theta2_cuts=None,
-	    source=None, energy_min=0.0):
+        source=None, energy_min=0.0):
     """
     Provides time needed to detection of given source above
     certain energy.
