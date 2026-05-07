@@ -1,26 +1,19 @@
-from astropy.coordinates import (
-    SkyCoord, 
-    EarthLocation, 
-    AltAz, 
-    Angle, 
-    SkyOffsetFrame
-)
-from astropy.time import Time
-from ctapipe.coordinates import CameraFrame
-import astropy.units as u
-import numpy as np
-import matplotlib.pyplot as plt
-from gammapy.stats import WStatCountsStatistic
+import logging
 import math
 
-from sst1mpipe.utils import (
-    clip_alt,
-    get_horizon_frame,
-)
+import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.coordinates import Angle, SkyCoord, SkyOffsetFrame
+from astropy.time import Time
+from ctapipe.coordinates import CameraFrame
+from gammapy.data import DataStore
+from gammapy.stats import WStatCountsStatistic
 
 from sst1mpipe.performance import get_theta
-import logging
-from gammapy.data import DataStore
+from sst1mpipe.utils import (
+    get_horizon_frame,
+)
 
 
 def add_reco_ra_dec(data, horizon_frame=None):
@@ -361,7 +354,7 @@ def get_theta_off(
     if plot:
         fig, ax = plt.subplots(1, len(angles)-1, figsize=(25,5))
 
-    for i, angle in zip(range(len(angles)), angles):
+    for i, angle in enumerate(angles):
 
         if angle > 0:
             x_off = np.cos(angle) * true_source_position[0] - np.sin(angle) * true_source_position[1]
@@ -396,8 +389,8 @@ def get_theta_off(
                     axx = ax[i-1]
                 else:
                     axx = ax
-                h = axx.hist(data['theta']**2, bins=12, range=[0, 0.5], alpha=0.5, color='blue', label='ON')
-                h2 = axx.hist(dl2_photon_list_off['theta']**2, bins=12, range=[0, 0.5], alpha=0.5, color='orange', label='OFF')
+                axx.hist(data['theta']**2, bins=12, range=[0, 0.5], alpha=0.5, color='blue', label='ON')
+                axx.hist(dl2_photon_list_off['theta']**2, bins=12, range=[0, 0.5], alpha=0.5, color='orange', label='OFF')
                 axx.set_xlabel("$\\theta^{2} [deg^{2}]$")
                 axx.legend()
 
@@ -440,8 +433,6 @@ def camera_to_altaz(
 def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_axis=None, n_off=5, norm_range=[0.5, 0.7]*u.deg, theta_cut=0.1*u.deg):
 
     data_store = DataStore.from_dir(dl3_path)
-    theta2_off = np.zeros([len(theta2_axis.edges)-1, n_off])
-    off_radec = []
     counts_all_on = []
     counts_all_all_off=[]
 
@@ -488,7 +479,7 @@ def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_a
         rotations_off = pos_angle + rotations_off
         
         counts_all_off = []
-        for i_off, rotation in enumerate(rotations_off, start=0):
+        for _, rotation in enumerate(rotations_off, start=0):
             position_off = observation.pointing_radec.directional_offset_by(rotation, sep_angle)
             separation_off = position_off.separation(observation.events.radec)
             N_off += sum(separation_off < theta_cut)

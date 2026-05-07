@@ -1,13 +1,13 @@
+import itertools
+
+import astropy.units as u
+import ctaplot
 import matplotlib.pyplot as plt
 import numpy as np
-from gammapy.stats import WStatCountsStatistic
-import astropy.units as u
-import itertools 
 from astropy.convolution import convolve
 from astropy.convolution.kernels import Gaussian2DKernel
 from astropy.visualization.wcsaxes import SphericalCircle
-import ctaplot
-from sst1mpipe.performance.spectra import *
+from gammapy.stats import WStatCountsStatistic
 
 
 def plot_count_maps(
@@ -49,7 +49,7 @@ def plot_count_maps(
     
     fig, ax = plt.subplots(1, 2, figsize=(17,7))
 
-    h = ax[0].hist2d(data.reco_ra, 
+    ax[0].hist2d(data.reco_ra, 
                    data.reco_dec, 
                    bins=bins_raw, 
                    range=range_d
@@ -81,9 +81,9 @@ def plot_count_maps(
     # Convoluted image
     edge = int(0.05*bins_conv) # We do not plot the borders affected by convolution artefacts
     if edge > 0:
-        img = ax[1].pcolor(xedges[edge:-edge], yedges[edge:-edge], image[edge:-edge, edge:-edge].T)
+        ax[1].pcolor(xedges[edge:-edge], yedges[edge:-edge], image[edge:-edge, edge:-edge].T)
     else:
-        img = ax[1].pcolor(xedges, yedges, image.T)
+        ax[1].pcolor(xedges, yedges, image.T)
 
     ax[1].set_xlabel('RA [deg]')
     ax[1].set_ylabel('DEC [deg]')
@@ -116,8 +116,7 @@ def plot_count_maps(
 
 
 def cycle(iterable):
-    for item in itertools.cycle(iterable):
-        yield item
+    yield from itertools.cycle(iterable)
 
 
 def plot_sigma_time(data, sigma, times, obsid, alphas, nights):
@@ -158,7 +157,7 @@ def plot_sigma_time(data, sigma, times, obsid, alphas, nights):
 
     colors = ['r', 'b', 'g', 'y', 'm']
 
-    for i, c in zip(range(len(nights)), cycle(colors)):
+    for i, c in enumerate(cycle(colors)):
         if i < len(nights)-1:
             mask = (obsid >= nights[i]) & (obsid <= nights[i+1])
         else:
@@ -227,22 +226,17 @@ def plot_theta2(
     stat = WStatCountsStatistic(n_on=N_on, n_off=N_off, alpha=alpha)
     significance_lima = stat.sqrt_ts
 
-    textstr = r'N$_{{\rm on}}$ = {:.0f} '\
-                f'\n'\
-                r'N$_{{\rm off}}$ = {:.0f} '\
-                f'\n'\
-                r'N$_{{\rm excess}}$ = {:.0f} '\
-                f'\n'\
-                r'n$_{{\rm off \, regions}}$ = {:.0f} '\
-                f'\n'\
-                r'Time = {:.1f}'\
-                f'\n'\
-                r'LiMa Significance = {:.1f} $\sigma$ '.format(N_on,
-                                                          N_off,
-                                                          N_excess,
-                                                          n_off,
-                                                          t_elapsed.to(u.h),
-                                                          significance_lima)
+    textstr = rf'N$_{{\rm on}}$ = {N_on:.0f} '\
+                '\n'\
+                rf'N$_{{\rm off}}$ = {N_off:.0f} '\
+                '\n'\
+                rf'N$_{{\rm excess}}$ = {N_excess:.0f} '\
+                '\n'\
+                rf'n$_{{\rm off \, regions}}$ = {n_off:.0f} '\
+                '\n'\
+                rf'Time = {t_elapsed.to(u.h):.1f}'\
+                '\n'\
+                rf'LiMa Significance = {significance_lima:.1f} $\sigma$ '
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.95)
     
@@ -256,7 +250,7 @@ def plot_theta2(
     ax.set_ylabel("Counts")
     ax.legend(bbox_to_anchor=(0.1, 0.95))
 
-    txt = ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=15,
+    ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=15,
             verticalalignment='top', bbox=props)
 
 
@@ -424,7 +418,7 @@ def plot_energy_resolution(
     energy_center = ctaplot.ana.logbin_mean(e_bins['energy_bins'])
     
     marker_size = 6
-    if markers == None:
+    if markers is None:
         markers = len(labels) * ['o']
         
     if len(axes) == 2:
@@ -433,7 +427,7 @@ def plot_energy_resolution(
             plot_preliminary(ax=axes[0])
             plot_preliminary(ax=axes[1])
 
-        for table, label, marker in zip(e_tables, labels, markers):
+        for table, label, marker in zip(e_tables, labels, markers, strict=False):
 
             energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
             table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
@@ -478,7 +472,7 @@ def plot_energy_resolution(
             if preliminary:
                 plot_preliminary(ax=axes[0])
             
-            for table, label, marker in zip(e_tables, labels, markers):
+            for table, label, marker in zip(e_tables, labels, markers, strict=False):
 
                 energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
                 table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
@@ -507,7 +501,7 @@ def plot_energy_resolution(
             if preliminary:
                 plot_preliminary(ax=axes[0])
 
-            for table, label, marker in zip(e_tables, labels, markers):
+            for table, label, marker in zip(e_tables, labels, markers, strict=False):
 
                 energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
                 table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
@@ -532,7 +526,8 @@ def plot_energy_resolution(
             axes[0].set_ylabel(r"bias (median($E_\mathrm{reco}/E_\mathrm{true}$ - 1)")
             axes[0].set_xlabel(r'$E_\mathrm{true}$' + ' [' + energy_center_unit + ']')
 
-        else: print('Set plot=resolution or plot=bias.')
+        else: 
+            print('Set plot=resolution or plot=bias.')
 
 
 def plot_angular_resolution(
@@ -569,13 +564,13 @@ def plot_angular_resolution(
     energy_center = ctaplot.ana.logbin_mean(e_bins['energy_bins'])
     
     marker_size = 6
-    if markers == None:
+    if markers is None:
         markers = len(labels) * ['o']
 
     if preliminary:
         plot_preliminary(ax=ax)
 
-    for table, label, marker in zip(a_tables, labels, markers):
+    for table, label, marker in zip(a_tables, labels, markers, strict=False):
         
         energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
         table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
@@ -630,10 +625,10 @@ def plot_roc(
     if preliminary:
         plot_preliminary(ax=ax)
 
-    if linestyles == None:
+    if linestyles is None:
         linestyles = len(labels) * ['-']
 
-    for table, label, linestyle in zip(roc_tables, labels, linestyles):
+    for table, label, linestyle in zip(roc_tables, labels, linestyles, strict=False):
         
         ax.plot(table['false_positive_rate'], 
                 table['true_positive_rate'], 
@@ -690,10 +685,10 @@ def plot_sensitivity(
         plot_preliminary(ax=ax)
 
     marker_size = 6
-    if markers == None:
+    if markers is None:
         markers = len(labels) * ['o']
     
-    for table, label, marker in zip(sens_tables, labels, markers):
+    for table, label, marker in zip(sens_tables, labels, markers, strict=False):
 
         if bands:
             ax.fill_between(table['energy'],
@@ -1016,24 +1011,19 @@ def plot_theta2_dl3(ax=None, theta2_axis=None, counts_on=None, counts_off=None, 
     ax.axvline(theta_cut.to_value()**2, color='black',ls='--',alpha=0.75)
     ax.set_xlim(theta2_axis.bounds[0].value, theta2_axis.bounds[1].value)
 
-    textstr = r'N$_{{\rm on}}$ = {:.0f} '\
-                f'\n'\
-                r'N$_{{\rm off}}$ = {:.0f} '\
-                f'\n'\
-                r'N$_{{\rm excess}}$ = {:.0f} '\
-                f'\n'\
-                r'n$_{{\rm off \, regions}}$ = {:.0f} '\
-                f'\n'\
-                r'Time = {:.1f}'\
-                f'\n'\
-                r'LiMa Significance = {:.1f} $\sigma$ '.format(event_counts.N_on,
-                                                        event_counts.N_off,
-                                                        event_counts.N_excess,
-                                                        event_counts.n_off_regions,
-                                                        event_counts.t_elapsed,
-                                                        event_counts.significance_lima)
+    textstr = rf'N$_{{\rm on}}$ = {event_counts.N_on:.0f} '\
+                '\n'\
+                rf'N$_{{\rm off}}$ = {event_counts.N_off:.0f} '\
+                '\n'\
+                rf'N$_{{\rm excess}}$ = {event_counts.N_excess:.0f} '\
+                '\n'\
+                rf'n$_{{\rm off \, regions}}$ = {event_counts.n_off_regions:.0f} '\
+                '\n'\
+                rf'Time = {event_counts.t_elapsed:.1f}'\
+                '\n'\
+                rf'LiMa Significance = {event_counts.significance_lima:.1f} $\sigma$ '
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.95)
-    txt = ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=13,
+    ax.text(0.50, 0.96, textstr, transform=ax.transAxes, fontsize=13,
                 verticalalignment='top', bbox=props)
     ax.legend(bbox_to_anchor=(0.1, 0.95), fontsize=10)

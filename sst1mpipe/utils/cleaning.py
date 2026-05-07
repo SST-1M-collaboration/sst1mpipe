@@ -1,26 +1,20 @@
-from ctapipe.image import (
-    ImageCleaner,
-    ImageProcessor,
-    tailcuts_clean, 
-    apply_time_delta_cleaning,
-    number_of_islands
-)
-
-from ctapipe.core.traits import (
-    BoolTelescopeParameter,
-    FloatTelescopeParameter,
-    IntTelescopeParameter,
-)
-
-from ctapipe.containers import (
-    CameraHillasParametersContainer,
-    CameraTimingParametersContainer,
-    ImageParametersContainer
-)
+import logging
 from copy import deepcopy
 
 import numpy as np
-import logging
+from ctapipe.containers import (
+    CameraHillasParametersContainer,
+    CameraTimingParametersContainer,
+    ImageParametersContainer,
+)
+from ctapipe.image import (
+    ImageCleaner,
+    ImageProcessor,
+    apply_time_delta_cleaning,
+    number_of_islands,
+    tailcuts_clean,
+)
+
 
 def get_only_main_island_mask(geom, cleaning_mask):
             
@@ -78,7 +72,7 @@ class ImageCleanerSST(ImageCleaner):
         try:
             self.frac_rised = sum(pic_thr > picture_threshold_pe)/float(len(pic_thr))
             self.raised += pic_thr > picture_threshold_pe
-        except:
+        except Exception:
             self.frac_rised = 0.0
 
         mask_tailcuts = tailcuts_clean(

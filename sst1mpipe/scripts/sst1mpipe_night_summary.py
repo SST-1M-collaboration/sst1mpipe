@@ -23,43 +23,34 @@ $> python sst1mpipe_night_summary.py
 """
 
 import argparse
-import sys
-import os
-import logging
-
-import sst1mpipe
-
-from sst1mpipe.io import (
-    load_dl1_sst1m,
-    load_dl2_sst1m,
-    load_dl1_pedestals,
-    load_config,
-    load_source_catalog,
-    check_outdir
-)
 import glob
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-from sst1mpipe.utils import (
-    get_moon_params,
-    get_wr_timestamp,
-    get_sources_in_dir
-)
-
-from sst1mpipe.io import load_distributions_sst1m
+import logging
+import os
+import sys
 
 import astropy.units as u
-from ctapipe.io import read_table
-from astropy.time import Time
-from sst1mpipe.utils.NSB_tools import plot_average_nsb_VS_time
-from astropy.table import vstack
-from PIL import Image
-from gammapy.maps import MapAxis
-
-from sst1mpipe.analysis import get_theta2_from_dl3, plot_theta2_dl3
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from astropy.coordinates import SkyCoord
+from astropy.table import vstack
+from astropy.time import Time
+from gammapy.maps import MapAxis
+from PIL import Image
+
+import sst1mpipe
+from sst1mpipe.analysis import get_theta2_from_dl3, plot_theta2_dl3
+from sst1mpipe.io import (
+    check_outdir,
+    load_config,
+    load_distributions_sst1m,
+    load_dl1_pedestals,
+    load_dl1_sst1m,
+    load_dl2_sst1m,
+    load_source_catalog,
+)
+from sst1mpipe.utils import get_moon_params, get_sources_in_dir, get_wr_timestamp
+from sst1mpipe.utils.NSB_tools import plot_average_nsb_VS_time
 
 
 def parse_args():
@@ -131,11 +122,11 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
                 if not stereo:
                     try:
                         pt = load_dl1_pedestals(input_file)
-                    except: 
+                    except Exception: 
                         pass
             elif level == 'dl2':
                 df = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
-        except:
+        except Exception:
             logging.warning("Broken file %s", input_file)
             continue
         if i == 0:
@@ -143,18 +134,18 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
             if (level == 'dl1') and not stereo:
                 try:
                     ped_table = pt
-                except:
+                except Exception:
                     pass
         else:
             try:
                 data = pd.concat([data, df])
-            except:
+            except Exception:
                 logging.warning("Broken file %s", input_file)
                 continue
             if (level == 'dl1') and not stereo:
                 try:
                     ped_table = vstack([ped_table, pt])
-                except:
+                except Exception:
                     logging.warning("No pedestal monitoring in file %s", input_file)
                     continue
         i += 1
@@ -198,7 +189,7 @@ def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
         try:
             df = load_dl1_sst1m(dl1_files[ind], tel=tel, config=config, table='pandas', stereo=stereo)
             first_loaded = True
-        except:
+        except Exception:
             logging.warning('Broken file')
             ind += 1
             if ind > 50: 
@@ -211,7 +202,7 @@ def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
         try:
             df = load_dl1_sst1m(dl1_files[len(dl1_files)-ind], tel=tel, config=config, table='pandas', stereo=stereo)
             last_loaded = True
-        except:
+        except Exception:
             logging.warning('Broken file')
             ind += 1
             if ind > 50: 
@@ -267,7 +258,7 @@ def main():
         try:
             source_catalog = load_source_catalog(source_catalog_file)
             is_catalog = True
-        except:
+        except Exception:
             logging.warning('Source catalog file not found!')
     else:
         logging.warning('Source catalog file not specified!')
@@ -489,7 +480,7 @@ def main():
                     ax10[1].pcolormesh(X, Y, h22_tot)
                     t_diff_all = np.concatenate(t_diff_all)
                     times_all = np.concatenate(times_all)
-                    h = ax12[0].hist(t_diff_all, bins=100, range=[-1000, 1000])
+                    ax12[0].hist(t_diff_all, bins=100, range=[-1000, 1000])
                     ax12[1].plot(times_all, t_diff_all, '.')
 
             if is_dl2:
@@ -591,7 +582,7 @@ def main():
                 try:
                     target_coords = SkyCoord.from_name(source)
                     plot_theta2 = True
-                except:
+                except Exception:
                     logging.info('%s coordinates cannot be guessed authomaticaly, using source catalog file %s.', source, source_catalog_file)
                     if is_catalog:
                         if len(source_catalog[source]):
@@ -683,38 +674,38 @@ def main():
             ax6[1].set_title('Livetime of each wobble')
 
             if is_dist and (tt==21):
-                p = ax4[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
+                ax4[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
                 ax4[0].set_xscale('log')
                 ax4[0].set_yscale('log')
                 ax4[0].axvline(50)
                 ax4[0].set_xlim([10, 10**5])
                 ax4[0].grid()
 
-                h = ax4[1].hist(livetimes, bins=20)
+                ax4[1].hist(livetimes, bins=20)
                 ax4[1].grid()
                 fig4.suptitle(tel, fontsize=16)
 
             if is_dist and (tt==22):
-                p = ax5[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
+                ax5[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
                 ax5[0].set_xscale('log')
                 ax5[0].set_yscale('log')
                 ax5[0].axvline(50)
                 ax5[0].set_xlim([10, 10**5])
                 ax5[0].grid()
 
-                h = ax5[1].hist(livetimes, bins=20)
+                ax5[1].hist(livetimes, bins=20)
                 ax5[1].grid()
                 fig5.suptitle(tel, fontsize=16)
 
             if is_dist and (tt==0):
-                p = ax6[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
+                ax6[0].plot(bins[:-1], histograms_diff.T, alpha=0.5)
                 ax6[0].set_xscale('log')
                 ax6[0].set_yscale('log')
                 ax6[0].axvline(50)
                 ax6[0].set_xlim([10, 10**5])
                 ax6[0].grid()
 
-                h = ax6[1].hist(livetimes, bins=20)
+                ax6[1].hist(livetimes, bins=20)
                 ax6[1].grid()
                 fig6.suptitle(tel, fontsize=16)
 
@@ -774,7 +765,7 @@ def main():
                     time_unix = ax11.get_xticklabels()[i].get_position()[0]
                     new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
                 ax11.set_xticks(ax11.get_xticks())
-                t = ax11.set_xticklabels(new_times) #, rotation='vertical')
+                ax11.set_xticklabels(new_times) #, rotation='vertical')
                 ax11.grid()
                 ax11.legend()
                 
@@ -788,7 +779,7 @@ def main():
                     time_unix = ax.get_xticklabels()[i].get_position()[0]
                     new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
                 ax.set_xticks(ax.get_xticks())
-                t = ax.set_xticklabels(new_times) #, rotation='vertical')
+                ax.set_xticklabels(new_times) #, rotation='vertical')
                 ax.grid()
                 ax.legend()
 
@@ -802,7 +793,7 @@ def main():
                     time_unix = ax1.get_xticklabels()[i].get_position()[0]
                     new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
                 ax1.set_xticks(ax1.get_xticks())
-                t = ax1.set_xticklabels(new_times) #, rotation='vertical')
+                ax1.set_xticklabels(new_times) #, rotation='vertical')
                 ax1.grid()
                 ax1.legend()
                 ax1.set_ylim([0, 2*max(median1)])
@@ -818,7 +809,7 @@ def main():
                     time_unix = ax2.get_xticklabels()[i].get_position()[0]
                     new_times.append(Time(time_unix, format='unix', scale='utc').isot.split('T')[1].split('.')[0])
                 ax2.set_xticks(ax2.get_xticks())
-                t = ax2.set_xticklabels(new_times) #, rotation='vertical')
+                ax2.set_xticklabels(new_times) #, rotation='vertical')
                 ax2.set_ylim([0, 2*max(median2)])
                 ax2.grid()
                 ax2.legend()

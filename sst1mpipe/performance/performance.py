@@ -1,64 +1,42 @@
-from ctapipe.io import read_table
-from astropy.io.misc.hdf5 import write_table_hdf5
-from astropy.table import Table, QTable
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import tables
-import ctaplot
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-from sklearn import metrics
 import logging
-
+import operator
 import shutil
 
-from pathlib import Path
-
-from astropy.io import fits
+import astropy.units as u
+import ctaplot
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from astropy.coordinates import AltAz
+from astropy.io import fits
+from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
+from astropy.table import QTable, Table
+from pyirf.cuts import evaluate_binned_cut
+from pyirf.io import (
+    create_aeff2d_hdu,
+    create_background_2d_hdu,
+    create_energy_dispersion_hdu,
+    create_psf_table_hdu,
+)
+from pyirf.irf import (
+    background_2d,
+    effective_area_per_energy,
+    effective_area_per_energy_and_fov,
+    energy_dispersion,
+    psf_table,
+)
+from pyirf.simulations import SimulatedEventsInfo
+from sklearn import metrics
 
 import sst1mpipe
-
-from sst1mpipe.io import(
-    load_dl2_sst1m,
-    check_outdir,
-    load_config
-)
+from sst1mpipe.io import check_outdir, load_config, load_dl2_sst1m
 from sst1mpipe.utils import (
-    check_same_shower_fraction,
     get_avg_pointing,
 )
 
-from .spectra import DAMPE_P_He_SPECTRUM, CRAB_HEGRA
-from .sensitivity import (
-    get_mc_info,
-    get_weights,
-    get_gammaness_cuts,
-    get_theta
-)
-
-from pyirf.simulations import SimulatedEventsInfo
-
-from pyirf.irf import (effective_area, 
-                       effective_area_per_energy,
-                       effective_area_per_energy_and_fov, 
-                       psf_table,
-                       background_2d,
-                       energy_dispersion
-                      )
-from pyirf.io import (
-    create_aeff2d_hdu,
-    create_psf_table_hdu,
-    create_energy_dispersion_hdu,
-    create_rad_max_hdu,
-    create_background_2d_hdu,
-)
-from astropy.io.misc.hdf5 import read_table_hdf5
-from pyirf.cuts import (
-    evaluate_binned_cut
-)
-import operator
+from .sensitivity import get_gammaness_cuts, get_mc_info, get_theta, get_weights
+from .spectra import CRAB_HEGRA, DAMPE_P_He_SPECTRUM
 
 
 def evaluate_performance(
@@ -304,7 +282,7 @@ def angular_resolution_per_energy(
 
     logging.info(f"Out of {len(reco_alt)}, in {sum(~(np.isfinite(reco_alt) & np.isfinite(reco_az)))} events the altitude or azimuth was not reconstructed")
 
-    for i, e in enumerate(bins[:-1]):
+    for i, _ in enumerate(bins[:-1]):
         mask = (energy > bins[i]) & (energy <= bins[i + 1]) & np.isfinite(reco_alt) & np.isfinite(reco_az)
         res.append(ctaplot.ana.angular_resolution(true_alt[mask], reco_alt[mask], true_az[mask], reco_az[mask],
                                             percentile=percentile,
@@ -638,7 +616,7 @@ def roc_curve(
 
         # ROC and gammaness in reco energy bins
         energy = gh_testing_dataset['reco_energy']
-        for i, e in enumerate(e_bins[:-1]):
+        for i, _ in enumerate(e_bins[:-1]):
 
             mask_e = (energy > e_bins[i]) & (energy <= e_bins[i + 1])
             if (sum(mask_e) > 10) & (sum(gh_testing_dataset[mask_e].true_shower_primary_id == 0) > 0) & (sum(gh_testing_dataset[mask_e].true_shower_primary_id == 101) > 0):
@@ -718,7 +696,8 @@ class irf_maker:
         if true_energy_scaling:
             self.scaling_factor = float(self.config["analysis"]["true_energy_scaling_factor"])
             logging.warning('True energies in IRFs scaled by a factor of %f.', self.scaling_factor)
-        else: self.scaling_factor = 1.
+        else: 
+            self.scaling_factor = 1.
 
         if gammaness_cuts is None:
             self.gammaness_cut = self.config['analysis']['global_gammaness_cut']
@@ -730,7 +709,7 @@ class irf_maker:
         self.point_like_offset = point_like_offset
         v1 = sst1mpipe.__version__.split('.')[0]
         v2 = sst1mpipe.__version__.split('.')[1]
-        self.pipeline_version = '{}_{}'.format(v1,v2)
+        self.pipeline_version = f'{v1}_{v2}'
 
         self.hdu_list = [fits.PrimaryHDU()]
 
@@ -742,7 +721,7 @@ class irf_maker:
             tel_setup=mc_tel_setup
         self.tel_setup = tel_setup
 
-        logging.info("Making IRFs for telescope {}".format(self.tel_setup))
+        logging.info(f"Making IRFs for telescope {self.tel_setup}")
 
     ##################################### "dl2 tables" #####################################
 
@@ -778,11 +757,11 @@ class irf_maker:
                                     target_spectrum = DAMPE_P_He_SPECTRUM)
         
         if event_class is not None:
-            logging.info("Making IRFs for event class {}".format(event_class))
+            logging.info(f"Making IRFs for event class {event_class}")
             dl2_mc_gamma_c = dl2_mc_gamma[dl2_mc_gamma['event_type'] == event_class]
             dl2_mc_proton_c = dl2_mc_proton[dl2_mc_proton['event_type'] == event_class]
-            logging.info("{} gammas of event class {}".format(len(dl2_mc_gamma_c), event_class))
-            logging.info("{} protons of event class {}".format(len(dl2_mc_proton_c), event_class))
+            logging.info(f"{len(dl2_mc_gamma_c)} gammas of event class {event_class}")
+            logging.info(f"{len(dl2_mc_proton_c)} protons of event class {event_class}")
         else:
             dl2_mc_gamma_c = dl2_mc_gamma
             dl2_mc_proton_c = dl2_mc_proton
@@ -806,24 +785,16 @@ class irf_maker:
         #                                                            self.azimuth,
         #                                                            self.gammaness_cut_tag)
         if event_class is not None:
-            ec_str = "_ec{}".format(event_class)
-        else: ec_str = ""
-        self.outdir = output_dir + '/data/sst1m_{}/{}/bcf/ze{}_az{}_gc{}{}/'.format(self.tel_setup,
-                                                                    self.pipeline_version,
-                                                                    self.zenith_angle,
-                                                                    self.azimuth,
-                                                                    self.gammaness_cut_tag,
-                                                                    ec_str)
+            ec_str = f"_ec{event_class}"
+        else: 
+            ec_str = ""
+        self.outdir = output_dir + f'/data/sst1m_{self.tel_setup}/{self.pipeline_version}/bcf/ze{self.zenith_angle}_az{self.azimuth}_gc{self.gammaness_cut_tag}{ec_str}/'
 
         if point_like_offset is not None :
-            ptlk_str = "_pointlike_{}deg".format(point_like_offset)
+            ptlk_str = f"_pointlike_{point_like_offset}deg"
         else:
             ptlk_str = ""
-        self.out_fits_filename = "SST1M_{}_Zen{}deg_gcut{}{}{}_irfs.fits".format(self.tel_setup,
-                                                                               self.zenith_angle,
-                                                                               self.gammaness_cut_tag,
-                                                                               ptlk_str,
-                                                                               ec_str)
+        self.out_fits_filename = f"SST1M_{self.tel_setup}_Zen{self.zenith_angle}deg_gcut{self.gammaness_cut_tag}{ptlk_str}{ec_str}_irfs.fits"
         
     ##################################################################################
     ##################################### "BINS" #####################################
@@ -853,7 +824,7 @@ class irf_maker:
         source_offset_max = self.config['analysis']["source_offset_max_deg"]
         nbins_fov = self.config['analysis']["nbins_fov_offset"]
         nbins_fov_bg = self.config['analysis']["nbins_fov_offset_bg"]
-        nbins_offset = self.config['analysis']["nbins_source_offset"]
+        #nbins_offset = self.config['analysis']["nbins_source_offset"]
 
         self.fov_offset_bins_bg    = np.linspace(0, fov_offset_bg_max, nbins_fov_bg) * u.deg
         self.source_offset_bins =    np.linspace(0, source_offset_max, nbins_fov_bg)* u.deg
@@ -870,7 +841,7 @@ class irf_maker:
     def table_to_selectedEvt_dict(self, dl2_data):
 
         if isfloat(self.gammaness_cut):
-            logging.info('Global gammaness cut {} applied.'.format(self.gammaness_cut))
+            logging.info(f'Global gammaness cut {self.gammaness_cut} applied.')
             mask_gg = dl2_data['gammaness'] > self.gammaness_cut
         else:
             logging.info('Energy dependent gammaness cut applied.')
@@ -897,10 +868,8 @@ class irf_maker:
         event_dict['reco_source_fov_offset'] = tel_altaz.separation(evt_reco_altaz).to(u.deg)
         event_dict['true_source_fov_offset'] = tel_altaz.separation(evt_true_altaz).to(u.deg)
         event_dict['theta'] = evt_reco_altaz.separation(evt_true_altaz).to(u.deg)
-        try:
+        if 'weight' in dl2_selected:
             event_dict['weight'] = dl2_selected['weight']
-        except:
-            pass
         return event_dict
 ###################################################
 ###################################################
@@ -1006,7 +975,7 @@ class irf_maker:
             # Config file cannot be placed in the directory with IRFs, because otherwise HDU indexer 
             # is not able to do the match
             shutil.copy(self.config_filename,self.output_dir)
-            logging.info("IRFs stored in: {}".format(self.outdir))
+            logging.info(f"IRFs stored in: {self.outdir}")
 
 def isfloat(num):
     try:

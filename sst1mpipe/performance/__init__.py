@@ -2,28 +2,27 @@
 
 
 from .performance import (
-    evaluate_performance,
-    energy_resolution_per_energy,
-    energy_bias,
-    angular_resolution_per_energy,
-    energy_resolution,
     angular_resolution,
+    angular_resolution_per_energy,
+    energy_bias,
+    energy_resolution,
+    energy_resolution_per_energy,
+    evaluate_performance,
+    irf_maker,
     roc_curve,
-    irf_maker
 )
-
 from .sensitivity import (
-    get_mc_info,
-    get_weights,
-    get_theta,
-    relative_sensitivity,
-    sensitivity_to_flux,
-    get_time_to_detection,
-    sensitivity,
-    source_time_to_detection,
-    check_spectrum,
-    get_gammaness_cuts,
-    get_edep_theta_cuts,
     calculate_gammaness_cuts_efficiency,
-    plot_gammaness_cuts
+    check_spectrum,
+    get_edep_theta_cuts,
+    get_gammaness_cuts,
+    get_mc_info,
+    get_theta,
+    get_time_to_detection,
+    get_weights,
+    plot_gammaness_cuts,
+    relative_sensitivity,
+    sensitivity,
+    sensitivity_to_flux,
+    source_time_to_detection,
 )

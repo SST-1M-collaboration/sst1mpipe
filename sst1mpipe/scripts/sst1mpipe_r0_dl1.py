@@ -20,73 +20,56 @@ $> python sst1mpipe_r0_dl1.py
 
 """
 
+import argparse
+import logging
+import os
+import sys
+
+import astropy.units as u
+import numpy as np
+from ctapipe.calib import CameraCalibrator
+from ctapipe.io import DataWriter, EventSource
+from ctapipe.reco import ShowerProcessor
+
 import sst1mpipe
+from sst1mpipe.calib import (
+    Calibrator_R0_R1,
+    correct_MC_for_PDE_drop,
+    get_window_corr_factors,
+    saturated_charge_correction,
+    window_transmittance_correction,
+)
+from sst1mpipe.io import (
+    check_outdir,
+    get_pde_correction_factors,
+    get_used_qe_simtel,
+    load_config,
+    read_charge_images,
+    write_assumed_pointing,
+    write_charge_fraction,
+    write_charge_images,
+    write_dl1_info,
+    write_extra_parameters,
+    write_pixel_charges_table,
+)
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import (
-    correct_true_image, 
-    energy_min_cut,
-    remove_bad_pixels,
-    add_pointing_to_events,
     add_event_id,
+    add_pointing_to_events,
     add_trigger_time,
-    get_tel_string,
+    correct_true_image,
+    energy_min_cut,
     get_location,
     get_subarray,
-    image_cleaner_setup,
     get_swaped_modules,
-    swap_modules_r0wf,    
-    VAR_to_Idrop,
+    get_tel_string,
+    image_cleaner_setup,
+    remove_bad_pixels,
+    swap_modules_r0wf,
 )
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
 from sst1mpipe.utils.monitoring_r0_dl1 import Monitoring_R0_DL1
 
-from sst1mpipe.io import (
-    write_extra_parameters,
-    load_config,
-    check_outdir,
-    write_r1_dl1_cfg,
-    write_assumed_pointing,
-    write_pixel_charges_table,
-    write_charge_images,
-    read_charge_images,
-    write_wr_timestamps,
-    write_charge_fraction,
-    write_dl1_info,
-    get_used_qe_simtel,
-    get_pde_correction_factors
-)
-
-from sst1mpipe.calib import (
-    window_transmittance_correction,
-    get_window_corr_factors,
-    saturated_charge_correction,
-    Calibrator_R0_R1,
-    correct_MC_for_PDE_drop
-)
-
-from ctapipe.io import EventSource
-from ctapipe.calib import CameraCalibrator
-from ctapipe.image import ImageProcessor
-from ctapipe.reco import ShowerProcessor
-from ctapipe.io import DataWriter
-from ctapipe.instrument import SubarrayDescription
-
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-
-import os
-import sys
-import argparse
-import numpy as np
-import logging
-
-from os import path
-
-from ctapipe.io import (
-    TableLoader, 
-    read_table
-)
-
-import astropy.units as u
-from astropy.time import Time
 
 def parse_args():
 
@@ -320,17 +303,17 @@ def main():
                             if image_processor.clean.nsb_level >= min_charge:
                                 break
                         logging.info('Average charge from the first batch of pedestal events is %f which corresponds to NSB level %s in %s', image_processor.clean.nsb_level, nsb_rate, tel_string)
-                        
+
                 ### REAL START OF THE LOOP
 
                 event.trigger.tels_with_trigger = [tel]
 
-                # Here we swap  wrongly connected modules 
+                # Here we swap  wrongly connected modules
                 #  swapped modules and corresponding dates
                 # are stored in /data/inverted_module_list.json
                 for mask_1, mask_2 in swaped_modules_list:
                     event = swap_modules_r0wf(event,mask_1, mask_2, tel=tel)
-                    
+
                 event = calibrator_r0_r1.calibrate(event, pedestal_info=pedestal_info)
                 # print(calibrator_r0_r1.pixels_removed) # can be monitored
 
@@ -531,12 +514,13 @@ def main():
                 fractional_seconds.append((localtime % S_TO_NS) / S_TO_NS)
 
 
-        if max_events == None and source.is_simulation:
+        if max_events is None and source.is_simulation:
             writer.write_simulation_histograms(source)
 
     if not source.is_simulation and precise_timestamps:
         wr_timestamps = np.column_stack((full_seconds, fractional_seconds))
-    else: wr_timestamps=None
+    else:
+        wr_timestamps=None
 
     # Write additional params in the DL1 file
     # - these are not defined in the ctapipe containers, but are necessary for (mono) reconstruction

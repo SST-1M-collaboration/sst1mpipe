@@ -1,58 +1,45 @@
-from ctapipe.io import read_table
-from astropy.table import Table, QTable
+import glob
+import json
+import logging
+import operator
+import os
+from datetime import datetime
+from os import path
+
+import astropy.units as u
 import numpy as np
 import pandas as pd
-import astropy.units as u
-from astropy.table import join
-import tables
-import json
-import os
-from os import path
-from traitlets.config import Config
-import logging
-from astropy.io.misc.hdf5 import (
-    write_table_hdf5,
-    read_table_hdf5
-    )
-from datetime import datetime
-
-from sst1mpipe.utils import (
-    add_pointing_mc,
-    add_features,
-    add_timing_features,
-    add_log_true_energy,
-    add_disp,
-    event_selection,
-    add_miss,
-    get_telescopes,
-    add_true_impact,
-    get_location,
-    add_event_id,
-    get_tel_string,
-    get_finite,
-    get_pointing_radec,
-    stereo_var_cuts
-)
-
-from astropy.io import fits
-
-import sst1mpipe 
-
-from sst1mpipe.io.containers import (
-    DL1_info,
-    DL2_info
-)
-from pyirf.cuts import (
-    evaluate_binned_cut
-)
-
-import operator
-
-from astropy.coordinates import SkyCoord, AltAz
-from astropy.time import Time
-import glob
-from gammapy.data import DataStore
 import pkg_resources
+import tables
+from astropy.coordinates import AltAz, SkyCoord
+from astropy.io import fits
+from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
+from astropy.table import QTable, Table, join
+from astropy.time import Time
+from ctapipe.io import read_table
+from gammapy.data import DataStore
+from pyirf.cuts import evaluate_binned_cut
+from traitlets.config import Config
+
+import sst1mpipe
+from sst1mpipe.io.containers import DL1_info, DL2_info
+from sst1mpipe.utils.utils import (
+    add_disp,
+    add_event_id,
+    add_features,
+    add_log_true_energy,
+    add_miss,
+    add_pointing_mc,
+    add_timing_features,
+    add_true_impact,
+    event_selection,
+    get_finite,
+    get_location,
+    get_pointing_radec,
+    get_tel_string,
+    get_telescopes,
+    stereo_var_cuts,
+)
 
 
 def read_charges_data(file):
@@ -419,15 +406,17 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=[]):
             merged['true_az_tel'] = np.zeros(len(merged)).astype(np.float64)
             merged['true_alt_tel'] = np.zeros(len(merged)).astype(np.float64)
 
-            if tel == 'tel_021': params_tel = dl1_data_tabs[0]
-            elif tel == 'tel_022': params_tel = dl1_data_tabs[1]
+            if tel == 'tel_021': 
+                params_tel = dl1_data_tabs[0]
+            elif tel == 'tel_022': 
+                params_tel = dl1_data_tabs[1]
 
             # we cannot merge based on obs_id/event_id, because tel1/tel2 data has the same ids in the output file, but not in the input ones!
             # We also cannot merge based on only one parameter, because it turned out that the probability od having e.g. two events with the
             # very same (float64) intensity in data from a signle night is quite high
             params_tel_small = params_tel[['camera_frame_hillas_intensity', 'camera_frame_hillas_r', 'camera_frame_hillas_skewness', 'time_wr_full_seconds', 'time_wr_frac_seconds', 'true_az_tel', 'true_alt_tel']]
 
-            for i, (intensity, r, skew) in enumerate(zip(np.array(params['camera_frame_hillas_intensity']), np.array(params['camera_frame_hillas_r']), np.array(params['camera_frame_hillas_skewness']))):
+            for i, (intensity, r, skew) in enumerate(zip(np.array(params['camera_frame_hillas_intensity']), np.array(params['camera_frame_hillas_r']), np.array(params['camera_frame_hillas_skewness']), strict=True)):
                 mask = (intensity == params_tel_small['camera_frame_hillas_intensity']) & (r == params_tel_small['camera_frame_hillas_r']) & (skew == params_tel_small['camera_frame_hillas_skewness'])
 
                 if sum(mask) == 1:
@@ -571,28 +560,28 @@ def write_r1_dl1_cfg(file, config=None):
 
         for tel in telescope_coords.keys():
 
-            t = f.create_table(
+            f.create_table(
                 '/configuration/r1_dl1/telescope_coords',
                 tel,
                 pd.DataFrame(config['telescope_coords'][tel], index=[0]).to_records(index=False),
                 createparents=True,
             )
 
-        t = f.create_table(
+        f.create_table(
             '/configuration/r1_dl1/CameraCalibrator',
             calibrator,
             pd.DataFrame(config['CameraCalibrator'][calibrator], index=[0]).to_records(index=False),
             createparents=True,
         )
 
-        t = f.create_table(
+        f.create_table(
             '/configuration/r1_dl1/ImageProcessor',
             image_processor,
             pd.DataFrame(config['ImageProcessor'][image_processor], index=[0]).to_records(index=False),
             createparents=True,
         )
 
-        t = f.create_table(
+        f.create_table(
             '/configuration/r1_dl1',
             'Emin_cuts',
             pd.DataFrame({'emin_cut_g_tev': emin_cut_g, 'emin_cut_p_tev': emin_cut_p}, index=[0]).to_records(index=False),
@@ -669,7 +658,7 @@ def load_more_dl1_tables_mono(
                             dl1_data = pd.concat([dl1_data, df])
                             good_files += 1
                             tel_file_list.append(dl1_file)
-                        except:
+                        except Exception:
                             logging.warning("Skipping broken file: " + dl1_file)
                             bad_files += 1
                 else:
@@ -738,13 +727,13 @@ def load_dl1_sst1m(
     if 'true_alt_tel' not in events.keys():
         try:
             pointing = read_table(input_file, "/dl1/monitoring/telescope/pointing/" + tel)
-        except:
+        except Exception:
             logging.error('Adding pointing information failed! Pointing information is probably not stored in DL1 file.')
             exit()
         try:
             events['true_az_tel'] = pointing['azimuth'].to(u.deg).value
             events['true_alt_tel'] = pointing['altitude'].to(u.deg).value
-        except:
+        except Exception:
             logging.error('Adding pointing information failed! Length of params and pointing tables probably dont match. Broken file.')
             exit()
 
@@ -950,7 +939,7 @@ def write_dl1_pedestals(input_file, pedestal_table=None):
             append=True, path='/dl1/monitoring/telescope/pedestal', 
             serialize_meta=False
             )
-    except:
+    except Exception:
         logging.warning('Writing pedestals into the file failed!')
 
 
@@ -986,7 +975,7 @@ def write_dl2_table(
 
     for key in dl2.keys():
 
-        if dl2[key].dtypes == object:
+        if dl2[key].dtypes is object:
             logging.info('Removing key: %s, with content: %s', key, str(dl2[key].iloc[0]))
             logging.info('Because object saving is not supported in table')
             del dl2[key]
@@ -1091,7 +1080,7 @@ def load_slow_data_bias_curve(file):
     merge_data = {'timestamp': [], 'date': [],'biasCurveTriggerRate': [], 'biasCurveReadoutRate': [],
                   'biasCurvePatch7Threshold': [], 'biasCurveDroppedRate': [], 'appStatus': []}
 
-    print("Loading file %s" % file)
+    print(f"Loading file {file}")
     hdul = fits.open(file)
     bc_thr = hdul[1].data['biasCurvePatch7Threshold']
     bc_t = hdul[1].data['biasCurveTriggerRate']
@@ -1266,13 +1255,14 @@ def load_more_dl2_files(files, config=None,
 
     dl2_data = None
     pointing0 = None
+    times0 = None
     GTI_start, GTI_stop = [], []
     for input_file in files:
 
         try:
             tel_setup=get_telescopes(input_file, data_level="dl2")[0]
-        except:
-            logging.warning("No DL2 data in file : {}".format(input_file) )
+        except Exception:
+            logging.warning(f"No DL2 data in file : {input_file}" )
             continue
 
         # Here we apply gammaness cut directly during the merge to save some memory.
@@ -1283,7 +1273,7 @@ def load_more_dl2_files(files, config=None,
 
             # If there is no event in the file after selection cuts we skip it completely.
             if len(df0) == 0:
-                logging.warning("No events in the file {} after selection cuts. SKIPPING (and not taking the time interval into account) ".format(input_file))
+                logging.warning(f"No events in the file {input_file} after selection cuts. SKIPPING (and not taking the time interval into account) ")
                 continue
 
             times = df0['local_time']
@@ -1295,7 +1285,7 @@ def load_more_dl2_files(files, config=None,
             p_ra = np.unique(pointing['array_ra'])
             p_dec = np.unique(pointing['array_dec'])
             if (p_ra.shape[0]>1) or (p_dec.shape[0]>1):
-                logging.warning('Multiple ra dec pointing in file {} -- we expect ony one!'.format(input_file))
+                logging.warning(f'Multiple ra dec pointing in file {input_file} -- we expect ony one!')
             df0['array_ra']  = (p_ra[0]  * pointing['array_ra' ].unit).to_value('deg')
             df0['array_dec'] = (p_dec[0] * pointing['array_dec'].unit).to_value('deg')
 
@@ -1323,10 +1313,10 @@ def load_more_dl2_files(files, config=None,
 
             if gammaness_cut is not None:
                 if isfloat(gammaness_cut):
-                    logging.info('Global gammaness cut {} applied.'.format(gammaness_cut))
+                    logging.info(f'Global gammaness cut {gammaness_cut} applied.')
                     mask = df0['gammaness'] > gammaness_cut
                     df = df0[mask].copy()
-                    logging.info('N of events after gammaness cut: {}'.format(len(df)))
+                    logging.info(f'N of events after gammaness cut: {len(df)}')
                 else:
                     logging.info('Energy dependent gammaness cut applied.')
 
@@ -1339,10 +1329,10 @@ def load_more_dl2_files(files, config=None,
                         tel_mc = tel_setup
                     try:
                         cut_file = glob.glob(gammaness_cut + '/' + RF_used + '/gammaness_cuts_*' + tel_mc + '*.h5')[0]
-                        logging.info('Energy dendent cut table used: {}'.format(cut_file))
+                        logging.info(f'Energy dendent cut table used: {cut_file}')
                         cut_table = read_table_hdf5(cut_file, path='gammaness_cuts')
-                    except:
-                        logging.warning("Cannot read gammaness cut file in the path: {}".format(cut_file))
+                    except Exception:
+                        logging.warning(f"Cannot read gammaness cut file in the path: {cut_file}")
                         cut_table = None
 
                     # This works only on pandas dataframe
@@ -1354,7 +1344,7 @@ def load_more_dl2_files(files, config=None,
                         operator.ge,
                     )
                     df = df0[mask_gg].copy()
-                    logging.info('N of events after gammaness cut: {}'.format(len(df)))
+                    logging.info(f'N of events after gammaness cut: {len(df)}')
             else:
                 df = df0
 
@@ -1362,10 +1352,10 @@ def load_more_dl2_files(files, config=None,
             df['RF_used'] = RF_used
             v1 = info['sst1mpipe_version'][0].split('.')[0]
             v2 = info['sst1mpipe_version'][0].split('.')[1]
-            df['sst1mpipe_version'] = '{}_{}'.format(v1,v2)
+            df['sst1mpipe_version'] = f'{v1}_{v2}'
             df['tel_setup'] = tel_setup
-        except:
-            logging.warning("Some problem with file {}".format(input_file))
+        except Exception:
+            logging.warning(f"Some problem with file {input_file}")
             continue
 
         if dl2_data is None:
@@ -1375,7 +1365,7 @@ def load_more_dl2_files(files, config=None,
             try:
                 dl2_data = pd.concat([dl2_data, df])
                 times_all = pd.concat([times_all, times])
-            except:
+            except Exception:
                 logging.warning("Broken file", input_file)
                 continue
 
@@ -1391,7 +1381,7 @@ def isfloat(num):
     try:
         float(num)
         return True
-    except:
+    except (TypeError, ValueError):
         return False
 
 
@@ -1443,10 +1433,10 @@ def load_distributions_sst1m(dist_path=None, dl3_path=None):
     for table in tables:
         obsid = table.split('/')[-1].split('.')[0].split('_')[-1]
         hist = read_table(table, 'intensity_hist')
-        t_elapsed = read_table(table, 't_elapsed')
+        #t_elapsed = read_table(table, 't_elapsed')
         try:
             zenith = read_table(table, 'zenith')
-        except:
+        except KeyError:
             zenith = read_table(table, 'z_elapsed')
 
         # so that the pedestal fraction cut does not remove data for which we do not have pedestals (in those distribution files there is pedestal_frac=100.)
@@ -1530,6 +1520,6 @@ def get_pde_correction_factors():
         with open(pde_corr_file) as json_file:
                 pde_corr = Config(json.load(json_file))
         return pde_corr
-    except:
-        logging.error('%s file not found! Either make sure it is there, or turn off the PDE correction in the cfg file!'.format(pde_corr_file))
+    except Exception:
+        logging.error('%s file not found! Either make sure it is there, or turn off the PDE correction in the cfg file!')
         exit()

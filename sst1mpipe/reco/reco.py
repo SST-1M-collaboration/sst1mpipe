@@ -1,50 +1,43 @@
-import numpy as np
-import astropy.units as u
-from astropy.time import Time
-from astropy.table import QTable
+import glob
+import logging
+import os
 
+import astropy.units as u
+import joblib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from astropy.table import QTable
+from astropy.time import Time
+from ctapipe.io import DataWriter, HDF5EventSource
+from ctapipe.reco import ShowerProcessor
+from ctaplot.ana import angular_separation_altaz, logbin_mean
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
-import joblib
-import glob
-import os
-import matplotlib.pyplot as plt
-import pandas as pd
-from sst1mpipe.utils import (
-    camera_to_altaz, 
-    disp_to_pos, 
-    disp_vector, 
-    mix_gamma_proton,
-    remove_stereo,
-    get_event_pos_in_camera,
-    get_event_sample,
-    get_telescopes,
-    event_hillas_add_units,
-    get_wr_timestamp,
-    get_stereo_method,
-    get_horizon_frame,
-    get_finite,
-    get_tel_string
-)
+
+from sst1mpipe.analysis import add_reco_ra_dec
 from sst1mpipe.io import (
-    load_more_dl1_tables_mono,
-    load_dl1_sst1m,
     check_outdir,
     get_dl1_info,
     load_dl1_pedestals,
-    write_dl1_pedestals
+    load_dl1_sst1m,
+    load_more_dl1_tables_mono,
+    write_dl1_pedestals,
 )
-from sst1mpipe.analysis import add_reco_ra_dec
-
-from ctaplot.ana import (
-    angular_separation_altaz, 
-    logbin_mean
+from sst1mpipe.utils import (
+    camera_to_altaz,
+    disp_to_pos,
+    disp_vector,
+    event_hillas_add_units,
+    get_event_sample,
+    get_finite,
+    get_horizon_frame,
+    get_stereo_method,
+    get_telescopes,
+    get_wr_timestamp,
+    mix_gamma_proton,
+    remove_stereo,
 )
-import logging
-
-from ctapipe.reco import ShowerProcessor
-from ctapipe.io import HDF5EventSource
-from ctapipe.io import DataWriter
 
 
 def plot_feature_importance(
@@ -341,7 +334,7 @@ def train_rf_misdirection(
     reg.fit(data[features], data['log_misdirection'])
     
     if plot:
-        plot_feature_importance(reg, features=features, outfile=outdir + '/reg_mis_features_' + str(telescope) + '.png', telescope=tel)
+        plot_feature_importance(reg, features=features, outfile=outdir + '/reg_mis_features_' + str(telescope) + '.png', telescope=telescope)
 
     joblib.dump(reg, outdir + '/reg_misdirection_' + str(telescope) + '.sav', compress=3)
     del reg
@@ -463,8 +456,8 @@ def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
     for key in features:
         try:
             mask &= np.isfinite(dl2[key])
-        except:
-            logging.warning('{} column not in data.'.format(key))
+        except KeyError:
+            logging.warning(f'{key} column not in data.')
     dl2_finite = dl2[mask].copy()
 
     mis_mono_re = joblib.load(models_dir + '/reg_misdirection_'+telescope+'.sav')
@@ -1282,7 +1275,7 @@ def make_dl1_stereo(
                     ) as writer:
 
         
-        for jj, evt in enumerate(source):
+        for _, evt in enumerate(source):
         
             logging.info('TEL1 event: ' + str(evt.index.event_id))
 
@@ -1307,7 +1300,8 @@ def make_dl1_stereo(
                 if diff[idx] < window:
                     mask_concidence = diff == diff[idx]
                     tel2_event = dl1_data_tel2[mask_concidence]
-                else: tel2_event = np.array([])
+                else: 
+                    tel2_event = np.array([])
 
             tel_1 = evt.trigger.tels_with_trigger[0]
             tel1_idx = telescope_list.index(tel_1)
@@ -1335,7 +1329,7 @@ def make_dl1_stereo(
                     datestr  = str(tel2_event['date'].iloc[0])
                     filestr  = str(tel2_event['obs_id'].iloc[0]).replace(datestr,'')
 
-                    dl1_t2_filename = glob.glob(input_dir_tel2+'/SST1M2*{}*{}*{}*.h5'.format(datestr, filestr, file_pattern))[0].split('/')[-1]
+                    dl1_t2_filename = glob.glob(input_dir_tel2+f'/SST1M2*{datestr}*{filestr}*{file_pattern}*.h5')[0].split('/')[-1]
                     logging.info('Coincident events from TEL ' + str(tel_2) + ' was found in file: ' + dl1_t2_filename)
                     dl1_t2_file = os.path.join(input_dir_tel2, dl1_t2_filename)
                     
@@ -1355,7 +1349,7 @@ def make_dl1_stereo(
                         try:
                             while evt_t2.index.event_id != t2_event_id :
                                 evt_t2 = next(source_t2)
-                        except:
+                        except StopIteration:
                             pass
                     else:
                         logging.warning('This event from TEL ' + str(tel_2) + 'was already used! Skipping')
@@ -1399,5 +1393,5 @@ def make_dl1_stereo(
     try:
         pedestals = load_dl1_pedestals(dl1_file_tel1)
         write_dl1_pedestals(output_path, pedestal_table=pedestals)
-    except:
+    except Exception:
         logging.warning('No pedestals found in tel1 DL1 file!')

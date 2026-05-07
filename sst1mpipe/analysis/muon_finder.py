@@ -1,41 +1,29 @@
 import argparse
-from pkg_resources import resource_filename
+import datetime
+import glob
+import multiprocessing as mp
 import os
 from os import path
-import glob
-import warnings
-import numpy as np
-import pandas as pd
-import multiprocessing as mp
-import pkg_resources
-
-from ctapipe.instrument import SubarrayDescription
-from ctapipe.visualization import CameraDisplay
-from ctapipe.instrument import CameraGeometry
-from ctapipe.image import hillas_parameters, tailcuts_clean
-from ctapipe.image.cleaning import dilate, number_of_islands, fact_image_cleaning
-
-
-from ctapipe.image.muon import kundu_chaudhuri_circle_fit, ring_completeness
-
-
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
-from sst1mpipe.utils.NSB_tools import VAR_to_Idrop,  VAR_to_NSB
-from sst1mpipe.io import load_config
-from sst1mpipe.calib.calib import get_default_window
-
-from scipy.optimize import curve_fit, minimize
-from scipy.special import factorial
-from scipy.stats import gaussian_kde
-from scipy.ndimage import convolve1d
-import astropy.units as u
-
 
 import matplotlib.pyplot as plt
-import datetime
-
+import numpy as np
+import pandas as pd
+import pkg_resources
+from ctapipe.image import tailcuts_clean
+from ctapipe.image.cleaning import number_of_islands
+from ctapipe.image.muon import ring_completeness
+from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import EventSource
+from ctapipe.visualization import CameraDisplay
+from scipy.ndimage import convolve1d
+from scipy.optimize import minimize
+
+from sst1mpipe.calib.calib import get_default_window
+from sst1mpipe.io import load_config
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
+from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
+
 DEFAULT_CONFIG_FILE = pkg_resources.resource_filename(
                             'sst1mpipe',
                             path.join(
@@ -205,7 +193,7 @@ class muon_finder:
 
         if self.ismc:
             data_stream = EventSource(self.filename,max_events=self.max_evt)
-            print("file {} opened".format(self.filename))
+            print(f"file {self.filename} opened")
         else :
             data_stream = SST1MEventSource(
                 filelist    = [self.filename],
@@ -217,11 +205,9 @@ class muon_finder:
             pedestal_info.load_firsts_pedestals()
             if pedestal_info.get_n_events() == 0:
                 print("No pedestal events found in firsts events. Skipping run")
-                pedestals_in_file = False
                 return
             else:
-                print("{} pedestals events loaded in buffer".format(pedestal_info.get_n_events()))
-                pedestals_in_file = True
+                print(f"{pedestal_info.get_n_events()} pedestals events loaded in buffer")
 
         #####################################
         ### Loop in all events to find muons:
@@ -248,10 +234,7 @@ class muon_finder:
                     #                                      start_date.year,
                     #                                      start_date.hour,
                     #                                      start_date.minute)
-                    night_datestr = "{}-{}/{}/{}".format(start_date.day,
-                                                   start_date.day+1,
-                                                   start_date.month,
-                                                   start_date.year)
+                    night_datestr = f"{start_date.day}-{start_date.day+1}/{start_date.month}/{start_date.year}"
                     
                     
                     print("night : "+night_datestr)
@@ -434,19 +417,17 @@ class muon_finder:
                     for key in self.mu_data.keys():
                         try:
                             print(key+str(self.mu_data[key][-1]))
-                        except:
+                        except (IndexError, TypeError):
                             pass
                     if (self.plot) and (np.random.randint(100)<110) and (np.median(self.bsstd)>11) and (rc>0.6):
                         f,axs = self.plot_event(Q_sum_window,final_mask,mu_mask)
-                        f.savefig(self.plot_dir+'d{}_f{}_ev_{}_ismuontest_rc{:.4}.png'.format(self.date_str,
-                                                                                      self.file_n,
-                                                                                      ii,rc) )
+                        f.savefig(self.plot_dir+f'd{self.date_str}_f{self.file_n}_ev_{ii}_ismuontest_rc{rc:.4}.png' )
                         plt.close(f)
                         
                     if  len(self.mu_data['event_id'])%500==0 and False: 
                         df = pd.DataFrame.from_dict(self.mu_data)
                         df.to_hdf(os.path.join('./',
-                                               'mudata_tel{}_t.h5'.format(self.tel)),
+                                               f'mudata_tel{self.tel}_t.h5'),
                                                "df")
                     
                                     
@@ -464,7 +445,7 @@ class muon_finder:
         image[mask]=Q_sum[mask]
         disp = CameraDisplay(self.geom,ax=axs[1])
         disp.image = image
-        axs[1].set_title("Qtot = {} \n Qmax = {} (b std ={:.3})".format(Q_sum.sum(), Q_sum.max(),np.median(self.bsstd) ))
+        axs[1].set_title(f"Qtot = {Q_sum.sum()} \n Qmax = {Q_sum.max()} (b std ={np.median(self.bsstd):.3})")
         disp.add_colorbar(ax=axs[1])
         
         
@@ -478,7 +459,7 @@ class muon_finder:
         
         ttt = ""
         for key in ['radius','5pe_ratio','Q_mu','Q_nmu']:
-            ttt = ttt+("{} : {:.4} \n".format(key,self.mu_data[key][-1]) )
+            ttt = ttt+(f"{key} : {self.mu_data[key][-1]:.4} \n" )
             
         tetas = np.linspace(0,2*np.pi,30)
         Cx,Cy,Cr = [self.mu_data[key][-1] for key in ['x','y','radius']]
@@ -527,9 +508,9 @@ if __name__ == "__main__":
                               gain         = gains)
 
         try:
-            bt =finder.get_muons()
-        except:
-            print("file {} FAILED".format(filename))
+            finder.get_muons()
+        except Exception:
+            print(f"file {filename} FAILED")
             
 
         return finder.mu_data
@@ -559,13 +540,13 @@ if __name__ == "__main__":
     # df = pd.DataFrame(dict(results)).sort_values(by=['time'])
     df = pd.DataFrame(dict(results)).sort_values(by=['toa'])
     if args.ismc:
-        df.to_hdf(os.path.join('{}'.format(args.table_dir),
+        df.to_hdf(os.path.join(f'{args.table_dir}',
                                'MC_{}_{}_mudataV30_tel{}.h5'.format(args.data_path.split("/")[-3],
                                                                   args.data_path.split("/")[-2],
                                                                   args.tel)),
                                "df")
     else:
-        df.to_hdf(os.path.join('{}'.format(args.table_dir),
+        df.to_hdf(os.path.join(f'{args.table_dir}',
                                '{}{}{}_mudataV30_tel{}.h5'.format(args.data_path.split("/")[7],
                                                                   args.data_path.split("/")[8],
                                                                   args.data_path.split("/")[9],

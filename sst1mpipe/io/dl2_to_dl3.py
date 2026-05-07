@@ -1,27 +1,21 @@
-from astropy.table import Table
-import numpy as np
-import pandas as pd
+import glob
 import logging
 import os
-import glob
-
-from sst1mpipe.utils import (
-    get_telescopes,
-    get_horizon_frame,
-    get_GTIs,
-)
-from sst1mpipe.analysis import add_reco_ra_dec
-from sst1mpipe.io import load_config, load_more_dl2_files, check_outdir
-
-from ctapipe.coordinates import TelescopeFrame
 
 import astropy.units as u
+import numpy as np
+from astropy.coordinates import AltAz, SkyCoord
 from astropy.io import fits
-from astropy.coordinates import SkyCoord, AltAz
+from astropy.table import Table
 from astropy.time import Time
-from astropy.io.misc.hdf5 import read_table_hdf5
-
+from ctapipe.coordinates import TelescopeFrame
 from gammapy.data import DataStore
+
+from sst1mpipe.analysis import add_reco_ra_dec
+from sst1mpipe.io import check_outdir, load_config, load_more_dl2_files
+from sst1mpipe.utils import (
+    get_horizon_frame,
+)
 
 
 def photon_df_to_fits(dl2_photons,
@@ -90,7 +84,7 @@ def photon_df_to_fits(dl2_photons,
     p_ra  = np.unique(dl2_photons['array_ra'])
     p_dec = np.unique(dl2_photons['array_dec'])
     if (p_ra.shape[0]>1) or (p_dec.shape[0]>1):
-        logging.error('Multiple ra dec pointing in DF -- we expect only one!!!! (obs_id {})'.format(obs_id))
+        logging.error(f'Multiple ra dec pointing in DF -- we expect only one!!!! (obs_id {obs_id})')
 
     radec_pointing = SkyCoord(ra  = p_ra[0] *u.deg,
                               dec = p_dec[0]*u.deg,
@@ -99,14 +93,14 @@ def photon_df_to_fits(dl2_photons,
     ## reco direction in FOV
     tel_pointing = AltAz(alt = np.array(dl2_photons['true_alt_tel']) * u.deg,
                          az  = np.array(dl2_photons['true_az_tel'])*u.deg)
-    mean_zen = 90 - dl2_photons['true_alt_tel'].mean()
+    #mean_zen = 90 - dl2_photons['true_alt_tel'].mean()
 
     telescopeframe = TelescopeFrame(telescope_pointing=tel_pointing)
     reco_altaz = AltAz(alt= np.array(dl2_photons['reco_alt'])*u.deg,
                        az = np.array(dl2_photons['reco_az'])*u.deg)
 
-    offset = tel_pointing.separation(AltAz(alt = np.array(dl2_photons['reco_alt'])*u.deg,
-                                           az =  np.array(dl2_photons['reco_az'])*u.deg))
+    #offset = tel_pointing.separation(AltAz(alt = np.array(dl2_photons['reco_alt'])*u.deg,
+    #                                       az =  np.array(dl2_photons['reco_az'])*u.deg))
 
     if ('reco_ra' not in dl2_photons.keys()) or ('reco_dec' not in dl2_photons.keys()):
         horizon_frame = get_horizon_frame(config=config, telescope='tel_021', times=Time(dl2_photons['local_time'], format='unix'))
@@ -123,17 +117,18 @@ def photon_df_to_fits(dl2_photons,
     # Removing NSB info from the RF_used string
     try:
         name = RF_used.split('_nsb')[0]
-    except:
+    except AttributeError:
         name = RF_used
     if event_class is not None:
-        ec_str = "_ec{}".format(event_class)
-    else: ec_str = ""
-    irf_name = "{}_gc{}{}".format(name, gammaness_cut, ec_str)
+        ec_str = f"_ec{event_class}"
+    else: 
+        ec_str = ""
+    irf_name = f"{name}_gc{gammaness_cut}{ec_str}"
     logging.info('Expected IRF name for given DL3 file: %s', irf_name)
     pipeline_version = dl2_photons["sst1mpipe_version"].iloc[0]
 
     ########### Build TABLE
-    dl3_columns =["EVENT_ID","TIME","RA","DEC","ENERGY","DETX","DETY"]
+    #dl3_columns =["EVENT_ID","TIME","RA","DEC","ENERGY","DETX","DETY"]
     T_event = Table()
     T_event.add_column(dl2_photons['event_id'],name="EVENT_ID")
     T_event.add_column(np.array(dl2_photons['local_time'])*u.s,name="TIME")
@@ -270,7 +265,7 @@ def create_hdu_index(file_list, out_dir=None, irf_dir=None):
 
     try:
         data_store = DataStore.from_events_files(file_list)
-    except:
+    except Exception:
         logging.error("Likely, No IRFs exists for those DL3 file... We cant create HDU-index")
         exit()
     ## Hack to load proper name of the irf in hdu tables (for now hard coded in gammapy)
@@ -365,14 +360,14 @@ def dl2_dir_to_dl3(target_name   = None,
             outdir = out_dir + '/event_class_' + str(evtclass)
             check_outdir(outdir)
 
-    logging.info("{} GTIs (i.e. wobbles) in total.".format(len(GTIs.T)-1))
+    logging.info(f"{len(GTIs.T)-1} GTIs (i.e. wobbles) in total.")
     
     for obs_ii, GTI in enumerate(GTIs.T):
 
         df_t = df_dl2[(df_dl2['local_time']>GTI[0]) &
                       (df_dl2['local_time']<GTI[1]) ]
         if np.array(df_t).shape[0]==0:
-            logging.warning("Skipping empty df {}".format(obs_ii)) ## MORE INFO ? 
+            logging.warning(f"Skipping empty df {obs_ii}") ## MORE INFO ? 
             continue
 
         for RF_used in np.unique(df_t['RF_used']):
@@ -399,9 +394,9 @@ def dl2_dir_to_dl3(target_name   = None,
                 for evtclass in event_classes:
                     out_dir_c = out_dir + '/event_class_' + str(evtclass)
 
-                    logging.info("Making DL3s for event class {}".format(evtclass))
+                    logging.info(f"Making DL3s for event class {evtclass}")
                     df_tt_c = df_tt[df_tt['event_type'] == evtclass]
-                    logging.info("{} events of class {}".format(len(df_tt_c), evtclass))
+                    logging.info(f"{len(df_tt_c)} events of class {evtclass}")
 
                     # If there are no photons, the DL3 file is not created. This may potentialy
                     # raise some issues with exposure not being properly calculated.
@@ -417,15 +412,15 @@ def dl2_dir_to_dl3(target_name   = None,
                                                     gammaness_cuts   = gammaness_cuts,
                                                     event_class      = evtclass,
                                                     )
-                        outname = os.path.join(out_dir_c,"SST1M_{}_obs_id_{}_dl3.fits".format(target_name,obs_id))
+                        outname = os.path.join(out_dir_c,f"SST1M_{target_name}_obs_id_{obs_id}_dl3.fits")
                         fits.HDUList(hdulist).writeto(outname, overwrite=True)
                         key = 'event_class_'+str(evtclass)
                         if key not in created_files:
                             created_files[key] = []
                         created_files[key].append(outname)
                     else:
-                        outname = os.path.join(out_dir_c,"SST1M_{}_obs_id_{}_dl3.fits".format(target_name,obs_id))
-                        logging.warning("No events of class {}, file {} not created!".format(evtclass,outname))
+                        outname = os.path.join(out_dir_c,f"SST1M_{target_name}_obs_id_{obs_id}_dl3.fits")
+                        logging.warning(f"No events of class {evtclass}, file {outname} not created!")
             else:
                 if len(df_tt):
                     hdulist = photon_df_to_fits(df_tt,
@@ -438,11 +433,11 @@ def dl2_dir_to_dl3(target_name   = None,
                                                     end_t            = end_t,
                                                     gammaness_cuts = gammaness_cuts
                                                     )
-                    outname = os.path.join(out_dir,"SST1M_{}_obs_id_{}_dl3.fits".format(target_name,obs_id))
+                    outname = os.path.join(out_dir,f"SST1M_{target_name}_obs_id_{obs_id}_dl3.fits")
                     fits.HDUList(hdulist).writeto(outname, overwrite=True)
                     created_files['all'].append(outname)
                 else:
-                    outname = os.path.join(out_dir,"SST1M_{}_obs_id_{}_dl3.fits".format(target_name,obs_id))
-                    logging.warning("No events for this wobble/RF, file {} not created!".format(outname))
+                    outname = os.path.join(out_dir,f"SST1M_{target_name}_obs_id_{obs_id}_dl3.fits")
+                    logging.warning(f"No events for this wobble/RF, file {outname} not created!")
 
     return created_files

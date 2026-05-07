@@ -1,14 +1,12 @@
-import numpy as np
-import pkg_resources
-import pandas as pd
-from os import path
 import logging
-from sst1mpipe.utils import (
-    get_tel_string, 
-    VAR_to_Idrop,
-    )
+from os import path
 
-import time
+import numpy as np
+import pandas as pd
+import pkg_resources
+
+from sst1mpipe.utils import VAR_to_Idrop, get_tel_string
+
 
 
 def get_default_window(telescope=None):
@@ -39,7 +37,7 @@ def get_default_window(telescope=None):
         logging.info('Window file used: ' + default_window_file_tel2)
         window_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_window_file_tel2)) 
     else:
-        logging.error('Telescope {} not known'.format(tel))
+        logging.error(f'Telescope {telescope} not known')
     window_corr = np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
     return window_corr, window_file
 
@@ -95,7 +93,7 @@ def window_transmittance_correction(
         Telescope number as in
         event.sst1m.r0.tels_with_data
     swapped_modules: list
-        list of masks 
+        list of masks
 
     Returns
     -------
@@ -113,7 +111,7 @@ def window_transmittance_correction(
         window_corr_2 = window_corr_factors[mask_2]
         
         window_corr_factors[mask_1] = window_corr_2
-        window_corr_factors[mask_2] = window_corr_1  
+        window_corr_factors[mask_2] = window_corr_1
 
     image_corrected = event.dl1.tel[telescope].image / window_corr_factors
     event.dl1.tel[telescope].image = image_corrected.astype(np.float32) 
@@ -231,7 +229,7 @@ def correct_MC_for_PDE_drop(event, simtel_config_qe=None, pde_corr_factors=None)
             mask = [i in simtel_config_qe for i in stored_qe]
             VI = pde_corr_factors['mc_correction_for_PDE'][get_tel_string(tel, mc=True)][np.array(list(stored_qe))[mask][0]]
             event.r1.tel[tel].waveform /= VI
-        except:
+        except (KeyError, IndexError, TypeError, ZeroDivisionError):
             logging.error('PDE correction factors in the calibration file were not found in the simtel file header. Are you sure that you have listed the correct PDE factor in the mc_pde_correction_factors.json file?')
             exit()
 
@@ -376,7 +374,7 @@ class Calibrator_R0_R1:
             logging.info('Calib file used: ' + default_calib_file_tel2)
             self.calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_calib_file_tel2)) 
         else:
-            logging.error('Telescope {} not known'.format(tel))
+            logging.error(f'Telescope {self.telescope} not known')
         self.calibration_parameters = pd.read_hdf(self.calibration_file)
 
 

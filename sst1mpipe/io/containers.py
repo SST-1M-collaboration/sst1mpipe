@@ -9,26 +9,30 @@ might change rapidly as there is no final data level definition.
 """
 # from aenum import IntFlag
 from enum import Flag
+
 #import pickle
 #from gzip import open as gzip_open
 #from os import remove
 #from os.path import isfile
-
 import numpy as np
 from astropy import units as u
-from ctapipe.core import Container, Map
-from ctapipe.core import Field
-from ctapipe.instrument import SubarrayDescription
 from ctapipe.containers import (
     ArrayEventContainer,
     TriggerContainer,
 )
+from ctapipe.core import Container, Field, Map
+from ctapipe.instrument import SubarrayDescription
+
 # from ctapipe.serializer import Serializer
 # from ctapipe.containers import MCEventContainer, ReconstructedContainer, \
-    # MCHeaderContainer, CentralTriggerContainer
-from matplotlib import pyplot as plt
-
-from tables import *
+# MCHeaderContainer, CentralTriggerContainer
+from tables import (
+    BoolCol,
+    Float64Col,
+    Int64Col,
+    IsDescription,
+    StringCol,
+)
 
 __all__ = ['CameraEventType',
            'InstrumentContainer',

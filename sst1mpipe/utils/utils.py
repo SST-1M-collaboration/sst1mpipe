@@ -3,36 +3,39 @@ Copyright (c) 2024 SST-1M collaboration
 Licensed under the 3-clause BSD style license.
 """
 
-from ctapipe.io import read_table
-from astropy.coordinates import AltAz, SkyCoord, EarthLocation, get_moon, get_sun, get_body
+import logging
+import os
+import re
+from datetime import datetime
+from os import path
+
+import astropy.constants as c
+import astropy.units as u
+import ctaplot
+import h5py
+import matplotlib.pyplot as plt
+import numpy as np
+from pathlib import Path
+import pandas as pd
+import pkg_resources
+import tables
+from astropy.coordinates import (
+    AltAz,
+    EarthLocation,
+    SkyCoord,
+    angular_separation,
+    get_body,
+    get_moon,
+    get_sun,
+)
+from astropy.io import fits
+from astropy.time import Time
+from astroquery.simbad import Simbad
 from ctapipe.coordinates import CameraFrame
 from ctapipe.image import camera_to_shower_coordinates
 from ctapipe.instrument import SubarrayDescription
-
-import ctaplot
-from astropy.time import Time
-from astropy.table import Table
-from astropy.io import fits
-import astropy.io.ascii as aio
-
-import astropy.constants as c
-import numpy as np
-import pandas as pd
-import astropy.units as u
-import h5py
-import logging
-import tables
-import os
-from datetime import datetime
-import matplotlib.pyplot as plt
+from ctapipe.io import read_table
 from gammapy.data import DataStore
-from astroquery.simbad import Simbad
-import pkg_resources
-from os import path
-import re
-from astropy.coordinates import angular_separation
-from pathlib import Path
-import json
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -441,7 +444,7 @@ def check_mc(file):
     """
 
     try:
-        mc = read_table(file, "/configuration/simulation/run")
+        read_table(file, "/configuration/simulation/run")
         logging.info('This is MC file.')
         return True
     except tables.exceptions.NoSuchNodeError:
@@ -506,7 +509,7 @@ def get_closest_rf_model(
                     model_coords[2].split('nsb')[1],
                     dir_ze_az
                     ])
-            except:
+            except Exception:
                 logging.warning('%s does not follow the naming convention for RF model subdirectories, skipping..', os.path.join(models_dir, dir_ze_az))
         models_tab = np.array(models_tab)
         logging.info('%d RF nodes found in %s.',len(models_tab), models_dir)
@@ -561,7 +564,10 @@ def check_same_shower_fraction(dl2, energy_bins):
         #n_same_events = dl2[mask].groupby('true_energy').size()
         if len(dl2[mask]) > 0:
             total_events = len(dl2[mask])
-            fractions = ["%.2E" % elem for elem in list(np.histogram(n_same_events, bins=n_reuse_bins)[0] / total_events)]
+            fractions = [
+                f"{elem:.2E}"
+                for elem in (np.histogram(n_same_events, bins=n_reuse_bins)[0] / total_events)
+            ]
             fraction_used_more = sum(np.histogram(n_same_events, bins=n_reuse_bins)[0][1:] / total_events)
             logging.info('E_R [%.2f, %.2f] TeV, total events: %d, frac used N>1: %.2E, fracs: %s', energy_bins[i].value, energy_bins[i + 1].value, total_events, fraction_used_more, fractions)
             result.append([energy_bins[i].value, energy_bins[i + 1].value, fraction_used_more])
@@ -833,11 +839,11 @@ def correct_true_image(event):
 
 def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingfilepath=MAPPING_FILE_PATH):
     """
-    
-    get module list for wrongly mapped pixels 
-    Pixel numbering is based on 
+
+    get module list for wrongly mapped pixels
+    Pixel numbering is based on
     data/inverted_module_list.json
-    
+
     Parameters
     ----------
     event:
@@ -850,7 +856,7 @@ def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingf
 
     """
     pix_maps = aio.read(mappingfilepath)
-    
+
     mask_list = []
     tel = event.sst1m.r0.tels_with_data[0]
     with open(inv_list_path, "r", encoding="utf-8") as f:
@@ -865,31 +871,31 @@ def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingf
             if (time > time_min) and (time < time_max):
                 module_1 = inv_list[key]['module_1']
                 module_2 = inv_list[key]['module_2']
-                
+
                 mask1 = np.zeros(1296, dtype=bool)
                 mask1[pix_maps[(pix_maps["module"]==module_1)]['pixel_sw_id']] = True
-                
+
                 mask2 = np.zeros(1296, dtype=bool)
                 mask2[pix_maps[(pix_maps["module"]==module_2)]['pixel_sw_id']] = True
-                
+
                 mask_list.append([mask1,mask2])
                 logging.info('Data on tel ' + str(tel) + ' SWAPPING wrongly connected modules {} and {}'.format(module_1,module_2))
 
     return mask_list
-    
+
 
 def swap_modules_r0wf(event,mask1,mask2,tel=None):
 
     """
-    Swaps pixel R0 waveforms between any two masks 
+    Swaps pixel R0 waveforms between any two masks
 
     Parameters
     ----------
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
 
-    mask1 : int  
-    mask1 : int 
+    mask1 : int
+    mask1 : int
     tel   : int
     Returns
     -------
@@ -897,8 +903,8 @@ def swap_modules_r0wf(event,mask1,mask2,tel=None):
         sst1mpipe.io.containers.SST1MArrayEventContainer
 
     """
-    
-    
+
+
     waveform_1 = event.sst1m.r0.tel[tel].adc_samples[mask1,:]
     bs_1 = event.sst1m.r0.tel[tel].digicam_baseline[mask1]
 
@@ -910,9 +916,9 @@ def swap_modules_r0wf(event,mask1,mask2,tel=None):
 
     event.sst1m.r0.tel[tel].digicam_baseline[mask1] = bs_2
     event.sst1m.r0.tel[tel].digicam_baseline[mask2] = bs_1
-        
+
     return event
-    
+
 def remove_bad_pixels(event, config=None):
     """
     Fills bad pixel waveforms with zeros and 
@@ -972,7 +978,7 @@ def check_output_dl1(file):
     """
 
     try:
-        hist = read_table(file, "/simulation/service/shower_distribution")
+        read_table(file, "/simulation/service/shower_distribution")
     except tables.exceptions.NoSuchNodeError:
         logging.error("EOFError reading simtel file. The file might be truncated and resulting DL1 file cannot be produced.")
         os.remove(file)
@@ -1161,8 +1167,10 @@ def add_true_impact(
 
     array_info = read_table(input_file, "/configuration/instrument/subarray/layout")
 
-    if tel == 'tel_001': index = 0
-    else:  index = 1
+    if tel == 'tel_001':
+        index = 0
+    else:
+        index = 1
     params['true_tel_impact_distance'] = np.sqrt((array_info['pos_x'][index] - params['true_core_x'])**2 + (array_info['pos_y'][index] - params['true_core_y'])**2) * u.m
     return params
 
@@ -1237,7 +1245,7 @@ def stereo_var_cuts(data, config=None):
         if config['analysis']['stereo_delta_disp_cut_deg'] is not None:
             mask_disp = data['min_distance']*180/np.pi < config['analysis']['stereo_delta_disp_cut_deg']
             logging.info('{} deg cut on min disp distance applied.'.format(config['analysis']['stereo_delta_disp_cut_deg']))
-            logging.info('N of events of stereo after delta disp cut: {} '.format(sum(mask_disp)))
+            logging.info(f'N of events of stereo after delta disp cut: {sum(mask_disp)} ')
     else:
         logging.info('No cut on min disp distance applied.')
 
@@ -1245,7 +1253,7 @@ def stereo_var_cuts(data, config=None):
         if config['analysis']['stereo_relative_std_reco_energy_cut'] is not None:
             mask_energy = np.sqrt(data['var_reco_energy'])/data['reco_energy'] < config['analysis']['stereo_relative_std_reco_energy_cut']
             logging.info('{} cut on max relative std of reco energy applied.'.format(config['analysis']['stereo_relative_std_reco_energy_cut']))
-            logging.info('N of events of stereo after relative std reco energy cut: {} '.format(sum(mask_energy)))
+            logging.info(f'N of events of stereo after relative std reco energy cut: {sum(mask_energy)} ')
     else:
         logging.info('No cut on max relative std reco energy applied.')
 
@@ -1253,7 +1261,7 @@ def stereo_var_cuts(data, config=None):
         if config['analysis']['stereo_std_gammaness_cut'] is not None:
             mask_gammaness = np.sqrt(data['var_gammaness']) < config['analysis']['stereo_std_gammaness_cut']
             logging.info('{} cut on max std of reco gammaness applied.'.format(config['analysis']['stereo_std_gammaness_cut']))
-            logging.info('N of events of stereo after std reco gammaness cut: {} '.format(sum(mask_gammaness)))
+            logging.info(f'N of events of stereo after std reco gammaness cut: {sum(mask_gammaness)} ')
     else:
         logging.info('No cut on max std reco gammaness applied.')
 
@@ -1285,8 +1293,8 @@ def get_finite(data, config=None, stereo=False):
     for key in features:
         try:
             mask &= np.isfinite(data[key])
-        except:
-            logging.warning('{} column not in data.'.format(key))
+        except Exception:
+            logging.warning(f'{key} column not in data.')
 
     N_finite = len(data[mask])
 
@@ -1418,7 +1426,7 @@ def get_survived_ped_fraction(dl1_files, logs=None, tel=None):
 
         # find fraction of pedestals in log
         word = 'Fraction of pedestal'
-        with open(log_file, 'r') as fp:
+        with open(log_file) as fp:
             # read all lines in a list
             lines = fp.readlines()
             for line in lines:
@@ -1498,7 +1506,7 @@ def get_target_pos(target_name=None, ra=None, dec=None):
         target_name = 'UNKNOWN'
     try:
         target_pos = SkyCoord.from_name(target_name)
-    except:
+    except Exception:
         logging.warning('Target not recognized. Manual coordinate input required.')
 
         if (ra is not None) and (dec is not None):
@@ -1900,7 +1908,7 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
         if obj not in ignore_sources:
             plt.plot([datetime.fromtimestamp(t) for t in d_obs[obj][0]],
                      [np.sum(d_obs[obj][1][:ii])/60/60 for ii in range(len(d_obs[obj][1]))],
-                     label=r'{} : {:} h'.format(obj.ljust(11),np.round(np.sum(d_obs[obj][1])/60/60,1)))
+                     label=rf'{obj.ljust(11)} : {np.round(np.sum(d_obs[obj][1])/60/60,1)} h')
     plt.legend()
     plt.grid()
     plt.ylabel('observation time [h]')

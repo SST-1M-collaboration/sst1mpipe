@@ -16,29 +16,25 @@ $> python sst1mpipe_extract_dl1_distributions.py
 
 """
 
-import astropy.units as u
-
-import pandas as pd
-import numpy as np
+import argparse
 import glob
 
-from sst1mpipe.io import load_config
+import astropy.units as u
+import numpy as np
+import pandas as pd
+from astropy.io.misc.hdf5 import write_table_hdf5
+from astropy.table import QTable
+from gammapy.data import DataStore
 
 from sst1mpipe.io import (
+    check_outdir,
+    load_dl1_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
-    check_outdir,
-    load_dl1_pedestals
 )
 from sst1mpipe.utils import get_telescopes
 from sst1mpipe.utils.NSB_tools import VAR_to_NSB
 
-from gammapy.data import DataStore
-
-from astropy.io.misc.hdf5 import write_table_hdf5
-from astropy.table import QTable
-
-import argparse
 
 def parse_args():
 
@@ -107,7 +103,8 @@ def main():
     # load all DL1 for given date
     files = glob.glob(data_path_dl1 + '/*_stereo.h5')
     stereo = False
-    if len(files) > 0: stereo = True
+    if len(files) > 0: 
+        stereo = True
 
     logs = glob.glob(data_path_dl1 + "/*.log")
 
@@ -163,7 +160,7 @@ def main():
             rate = data / t_elapsed
             differential_rate = rate / bins_width
 
-            print('Integration time for obsid {}: {}'.format(obsid, t_elapsed.to(u.hour)))
+            print(f'Integration time for obsid {obsid}: {t_elapsed.to(u.hour)}')
 
             t_table = QTable()
             t_table['t_elapsed'] = np.array([t_elapsed.to(u.hour).value])
@@ -225,7 +222,7 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
                 # find fraction of pedestals in log
                 ped = 'Fraction of pedestal'
                 reclean = 'raised picture threshold'
-                with open(log_file, 'r') as fp:
+                with open(log_file) as fp:
                     # read all lines in a list
                     lines = fp.readlines()
                     ped_fraction = 100
@@ -241,16 +238,18 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
 
             elif data_level == 'dl2':
                 df = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
-        except:
+        except Exception:
             print('Broken file: ' + input_file + ', skipping.')
             continue
         try:
             pt = load_dl1_pedestals(input_file)
-            if '1' in tel: cs=21
-            else: cs=22
+            if '1' in tel: 
+                cs=21
+            else: 
+                cs=22
             NSB = VAR_to_NSB(pt['pedestal_charge_std'].mean(axis=1)**2, cs)
             nsb.append(NSB.mean())
-        except:
+        except Exception:
             print('No pedestals in : ' + input_file + '.')
             nsb.append(np.nan)
 

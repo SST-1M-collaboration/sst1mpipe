@@ -19,41 +19,32 @@ $> python sst1mpipe_pointing_check.py
 
 """
 
+import argparse
+import logging
+import sys
+from os import path
+
+import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
 import pkg_resources
+from astropy.coordinates import AltAz, SkyCoord
+from astropy.time import Time
+from ctapipe.coordinates import CameraFrame
+from ctapipe.instrument import SubarrayDescription
+from ctapipe.visualization import CameraDisplay
 
 import sst1mpipe
 from sst1mpipe.io import (
     load_config,
 )
-
-from ctapipe.instrument import SubarrayDescription
-
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-
-from sst1mpipe.utils import get_target
-
 from sst1mpipe.utils import (
-    simbad_query,
     get_location,
+    get_target,
     get_tel_string,
+    simbad_query,
 )
-
-import os
-import sys
-import argparse
-import numpy as np
-import logging
-
-from os import path
-
-import astropy.units as u
-from astropy.coordinates import SkyCoord, AltAz
-from astropy.time import Time
-
-from ctapipe.coordinates import CameraFrame
-from ctapipe.visualization import CameraDisplay
-
-import matplotlib.pyplot as plt
 
 
 def parse_args():

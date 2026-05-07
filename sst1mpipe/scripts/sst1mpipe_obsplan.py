@@ -26,33 +26,20 @@ $> python sst1mpipe_obsplan.py
 """
 
 import argparse
+import logging
 import sys
-import os
-import numpy as np
-
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-
-import sst1mpipe
-from sst1mpipe.io import (
-    load_source_catalog,
-    load_config,
-    check_outdir
-)
-from sst1mpipe.utils import get_location, get_moon_phase
-
-from astropy.time import Time
-import astropy.units as u
-from astropy.coordinates import (
-    SkyCoord,
-    AltAz,
-    get_sun,
-    get_moon
-)
-
 from datetime import datetime
 
-import logging
+import astropy.units as u
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.coordinates import AltAz, SkyCoord, get_moon, get_sun
+from astropy.time import Time
+
+import sst1mpipe
+from sst1mpipe.io import check_outdir, load_config, load_source_catalog
+from sst1mpipe.utils import get_location, get_moon_phase
 
 
 def parse_args():
@@ -138,7 +125,7 @@ def main():
 
     try:
         source_catalog = load_source_catalog(source_catalog_file)
-    except:
+    except Exception:
         logging.warning('Source catalog file not found!')
         source_catalog = {}
     if (ra is not None) and (dec is not None):

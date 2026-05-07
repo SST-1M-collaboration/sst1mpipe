@@ -1,24 +1,20 @@
-import numpy as np
-import astropy.units as u
-
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-
-from sst1mpipe.calib import (
-    Calibrator_R0_R1,
-    window_transmittance_correction,
-    get_window_corr_factors,
-    saturated_charge_correction
-)
-from ctapipe.calib import CameraCalibrator
-from ctapipe.image import ImageProcessor
-from sst1mpipe.utils import (
-    get_subarray,
-    get_swaped_modules
-)
-
 import logging
 from collections import deque
 from statistics import mean
+
+import astropy.units as u
+import numpy as np
+from ctapipe.calib import CameraCalibrator
+from ctapipe.image import ImageProcessor
+
+from sst1mpipe.calib import (
+    Calibrator_R0_R1,
+    get_window_corr_factors,
+    saturated_charge_correction,
+    window_transmittance_correction,
+)
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.utils import get_subarray, get_swaped_modules
 
 MON_EVT_TYPE = 8
 class sliding_pedestals:
@@ -43,10 +39,10 @@ class sliding_pedestals:
         if self.get_n_events() == 0:
             logging.warning("No pedestal events found in firsts events. Cleaned shower/NSB events used instead.")
             self.load_firsts_fake_pedestals()
-            logging.info("{} fake pedestals events loaded in buffer".format(self.get_n_events()))
+            logging.info(f"{self.get_n_events()} fake pedestals events loaded in buffer")
             self.pedestals_in_file = False
         else:
-            logging.info("{} pedestals events loaded in buffer".format(self.get_n_events()))
+            logging.info(f"{self.get_n_events()} pedestals events loaded in buffer")
             self.pedestals_in_file = True
 
     def add_ped_evt(self, evt, cleaning_mask=None, store_image=True):
@@ -194,7 +190,7 @@ class sliding_pedestals:
                     break
 
         self.max_array_size = keep_size
-        for i in range(len(self.timestamps)-keep_size):
+        for _ in range(len(self.timestamps)-keep_size):
             self.ped_mean_array.pop()
             self.ped_std_array.pop()
             self.timestamps.pop()
@@ -244,7 +240,7 @@ class sliding_pedestals:
 
             # here we apply gain drop correction
             event = calibrator_r0_r1.calibrate(event, pedestal_info=self)
-            event.r1.tel[tel].selected_gain_channel = np.zeros(data_stream.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
+            event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
 
             r1_dl1_calibrator(event)
             image_processor(event)
@@ -270,11 +266,11 @@ class sliding_pedestals:
 
               self.add_ped_evt(event)
 
-              if len(self.ped_img_array) >= max_n_img:
+              if len(self.ped_img_array) >= self.max_images_array:
                   break
 
         self.max_array_size = keep_size
-        for i in range(len(self.timestamps)-keep_size):
+        for _ in range(len(self.timestamps)-keep_size):
             self.ped_mean_array.pop()
             self.ped_std_array.pop()
             self.timestamps.pop()

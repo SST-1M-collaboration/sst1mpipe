@@ -23,22 +23,16 @@ $> python sst1mpipe_data_dl2_dl3.py
 
 """
 
-import numpy as np
 import argparse
-import sys
-import os
 import logging
+import sys
+
+from gammapy.data import DataStore
 
 import sst1mpipe
 from sst1mpipe.io import check_outdir
+from sst1mpipe.io.dl2_to_dl3 import create_hdu_index, dl2_dir_to_dl3
 from sst1mpipe.utils import get_target_pos
-
-from sst1mpipe.io.dl2_to_dl3 import (
-    dl2_dir_to_dl3,
-    create_hdu_index
-    )
-
-from gammapy.data import DataStore
 
 
 def parse_args():

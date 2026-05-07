@@ -1,44 +1,28 @@
-from ctapipe.io import read_table
-from astropy.io.misc.hdf5 import write_table_hdf5
-from astropy.table import Table, QTable
+import logging
+import operator
+
+import astropy.units as u
+import ctaplot
+import matplotlib.pyplot as plt
+import numpy as np
 from astropy.coordinates import (
     angular_separation,
 )
-import numpy as np
-import astropy.units as u
-import tables
-import ctaplot
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import logging
-import operator
-from scipy import special
+from astropy.io.misc.hdf5 import write_table_hdf5
+from astropy.table import QTable, Table
+from ctapipe.io import read_table
+from gammapy.stats import WStatCountsStatistic
+from pyirf.cuts import calculate_percentile_cut, evaluate_binned_cut
+from pyirf.spectral import PowerLaw, calculate_event_weights
 from scipy.interpolate import make_smoothing_spline
 
-from pyirf.spectral import (
-    calculate_event_weights,
-    PowerLaw
-)
-
-from pyirf.cuts import (
-    calculate_percentile_cut,
-    evaluate_binned_cut
-)
-
-from gammapy.stats import WStatCountsStatistic
-
-from sst1mpipe.io import (
-    load_dl2_sst1m,
-    check_outdir
-)
+from sst1mpipe.io import check_outdir, load_dl2_sst1m
+from sst1mpipe.performance import spectra
 from sst1mpipe.utils import (
-    get_primary_type,
+    check_same_shower_fraction,
     correct_number_simulated_showers,
     mc_correct_shower_reuse,
-    check_same_shower_fraction,
 )
-
-from .spectra import *
 
 
 def plot_gammaness_cuts(gammaness_cuts, outfile=None):
@@ -92,16 +76,18 @@ def get_mc_info(input_file, config=None):
     # at the r1->dl1 level in the future!
     mc = mc_correct_shower_reuse(mc, histograms)
 
-    particle_type = get_primary_type(input_file)
+    #particle_type = get_primary_type(input_file)
     simulated_event_info = QTable()
 
     for tel in ["tel_001", "stereo"]:
         try:
             params = read_table(input_file, "/dl2/event/telescope/parameters/" + tel)
-        except Exception: pass
+        except Exception: 
+            pass
         try:
             params = read_table(input_file, "/dl1/event/telescope/parameters/" + tel)
-        except Exception: pass
+        except Exception: 
+            pass
             
 
     if 'min_true_energy_cut' in params.keys():
@@ -362,9 +348,7 @@ def check_spectrum(source):
 
     """
 
-    try:
-        target_spectrum = globals()[source]
-    except KeyError:
+    if source not in globals():
         logging.error('Desired spectrum is not implemented! \
         You can implement whatever you wish in \
         sst1mpipe.performance.spectra.')
@@ -533,7 +517,7 @@ def get_edep_theta_cuts(
         ax.set_ylim([0, 1.])
         fig.savefig(outdir + '/theta_edep_cuts_'+telescope+'.png', dpi=200)
 
-    theta2_cuts_bool = evaluate_binned_cut(
+    theta_cuts_bool = evaluate_binned_cut(
             dl2_gamma["theta"].to(u.deg),
             dl2_gamma["reco_energy"] * u.TeV,
             theta_cuts,
@@ -877,10 +861,10 @@ def sensitivity(
     # Traditionaly, the point gammas are weighted on Crab HEGRA Power-Law spectrum, not the MAGIC LogParabola,
     # but for the resulting flux sensitivity it doesn't matter.
     logging.info('CRAB_HEGRA spectrum is used for purposes of sensitivity estimation.')
-    target_gamma_spectrum = CRAB_HEGRA # CRAB_HEGRA, CRAB_MAGIC_JHEAP2015
+    target_gamma_spectrum = spectra.CRAB_HEGRA # CRAB_HEGRA, CRAB_MAGIC_JHEAP2015
     #target_gamma_spectrum = CRAB_MAGIC_JHEAP2015
     dl2_gamma = get_weights(dl2_gamma, mc_info=mc_info_gamma, obs_time=obs_time, target_spectrum=target_gamma_spectrum)
-    dl2_proton = get_weights(dl2_proton, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=DAMPE_P_He_SPECTRUM)
+    dl2_proton = get_weights(dl2_proton, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=spectra.DAMPE_P_He_SPECTRUM)
 
     # for point gammas, theta2 is calculated wrt the true simulated source position
     dl2_gamma = get_theta(dl2_gamma, zero_alt=dl2_gamma['true_alt'][0], zero_az=dl2_gamma['true_az'][0])
@@ -979,7 +963,7 @@ def sensitivity(
 
         maskp = (protons_off['reco_energy'] * u.TeV > energy_bins[i]) & (protons_off['reco_energy'] * u.TeV <= energy_bins[i+1])
 
-        if theta_cuts == 'global':
+        if theta2_cuts == 'global':
             N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio
         elif theta2_cuts == 'efficiency':
             N_observed_p = sum(protons_off[maskp]['weight']) * area_ratio[i]
@@ -1083,7 +1067,7 @@ def sensitivity(
                     )
         # Crab
         energy_smooth = np.logspace(-1, 3, 200) * u.TeV
-        crab_flux = CRAB_MAGIC_JHEAP2015(energy_smooth)
+        crab_flux = spectra.CRAB_MAGIC_JHEAP2015(energy_smooth)
         plt.plot(energy_smooth, (crab_flux * energy_smooth**2).to(u.TeV / (u.cm ** 2 * u.s)), color='grey', label="Crab (JHEAP2015)")
 
         plt.xlim([10**-1, 5*10**2])
@@ -1182,7 +1166,7 @@ def source_time_to_detection(
     # https://bobbyhadz.com/blog/python-call-function-by-string-name
     target_spectrum = globals()[source]
     dl2_gamma = get_weights(dl2_gamma, mc_info=mc_info_gamma, obs_time=obs_time, target_spectrum=target_spectrum)
-    dl2_proton = get_weights(dl2_proton, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=DAMPE_P_He_SPECTRUM)
+    dl2_proton = get_weights(dl2_proton, mc_info=mc_info_proton, obs_time=obs_time, target_spectrum=spectra.DAMPE_P_He_SPECTRUM)
 
     # for point gammas, theta2 is calculated wrt the true simulated source position
     dl2_gamma = get_theta(dl2_gamma, zero_alt=dl2_gamma['true_alt'][0], zero_az=dl2_gamma['true_az'][0])

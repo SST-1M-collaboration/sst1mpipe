@@ -20,14 +20,15 @@ $> python sst1mpipe_mc_make_irfs.py
 """
 
 import argparse
+import glob
+import logging
 import sys
 
-from sst1mpipe.utils import get_telescopes
-from sst1mpipe.io import check_outdir, load_dl2_sst1m, load_config
-from sst1mpipe.performance import irf_maker
 import sst1mpipe
-import logging
-import glob
+from sst1mpipe.io import check_outdir, load_config, load_dl2_sst1m
+from sst1mpipe.performance import irf_maker
+from sst1mpipe.utils import get_telescopes
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="IRF maker")
@@ -114,7 +115,7 @@ def main():
 
         if gammaness_cut_dir is not None:
             gammaness_cuts = glob.glob(gammaness_cut_dir + '/gammaness_cuts*' + tel + '*h5')[0]
-            logging.info('Gammaness cut file used: {}'.format(gammaness_cuts))
+            logging.info(f'Gammaness cut file used: {gammaness_cuts}')
         else:
             gammaness_cuts = None
 
@@ -126,7 +127,8 @@ def main():
                                        table='pandas')
             evttypes = dl2_mc_gamma['event_type'].unique()
 
-        else: evttypes = []
+        else: 
+            evttypes = []
 
         if len(evttypes):
             for event_class in evttypes:

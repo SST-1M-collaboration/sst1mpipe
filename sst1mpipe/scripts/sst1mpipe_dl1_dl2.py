@@ -19,32 +19,30 @@ $> python sst1mpipe_dl1_dl2.py
 
 """
 
-import sst1mpipe
-import os
-import sys
 import argparse
-import shutil
-import pandas as pd
 import logging
-import numpy as np
-from sst1mpipe.reco import (
-    apply_models,
-    stereo_reconstruction
-)
-from sst1mpipe.utils import (
-    get_telescopes,
-    energy_min_cut,
-    check_mc,
-    get_closest_rf_model
-)
+import os
+import shutil
+import sys
+
+import pandas as pd
+
+import sst1mpipe
 from sst1mpipe.io import (
-    load_dl1_sst1m, 
-    write_dl2,
-    write_dl2_table,
-    load_config,
     check_outdir,
-    write_dl2_info
+    load_config,
+    load_dl1_sst1m,
+    write_dl2,
+    write_dl2_info,
 )
+from sst1mpipe.reco import apply_models, stereo_reconstruction
+from sst1mpipe.utils import (
+    check_mc,
+    energy_min_cut,
+    get_closest_rf_model,
+    get_telescopes,
+)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="MC/Data DL1 to DL2")
@@ -156,7 +154,7 @@ def main():
             models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
                 dl2_0 = pd.concat([dl2_0, apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)])
-            except:
+            except Exception:
                 logging.error('RF application failed.')
                 os.remove(output_file)
                 exit()
@@ -175,7 +173,7 @@ def main():
         # This is probably not in accordance with the ctapipe datamodel and should be changed in the future
         try:
             write_dl2(dl2, output_file=output_file, telescope='stereo', config=config, mode='a')
-        except:
+        except Exception:
             logging.error('Writting DL2 file failed.')
             os.remove(output_file)
             exit()
@@ -195,21 +193,21 @@ def main():
             models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
                 dl2 = apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)
-            except:
+            except Exception:
                 logging.error('RF application failed.')
                 os.remove(output_file)
                 exit()
 
             try:
                 write_dl2(dl2, output_file=output_file, telescope=tel, config=config, mode='a')
-            except:
+            except Exception:
                 logging.error('Writting DL2 file failed.')
                 os.remove(output_file)
                 exit()
 
     try:
         write_dl2_info(output_file, rfs_used=models_dir_auto)
-    except:
+    except Exception:
         logging.error('Writting DL2 info failed.')
         os.remove(output_file)
         exit()

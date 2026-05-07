@@ -16,19 +16,16 @@ $> python rate_scans_extraction.py
 
 """
 
-import os
-import numpy as np
-from astropy.io import fits
-from astropy.time import Time
-import matplotlib.pyplot as plt
-import matplotlib as mpl
 import argparse
+import os
 
-from sst1mpipe.io import (
-    check_outdir,
-    load_slow_data_bias_curve,
-    load_drive_data
-)
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.time import Time
+
+from sst1mpipe.io import check_outdir, load_drive_data, load_slow_data_bias_curve
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Extraction of bias curves from slow control data")
@@ -163,14 +160,19 @@ def save_data(slow_data, drive_data=None, save_path=None, only_good=False):
             else:
                 outfile = save_path + '/bias_curve_' + str(slow_data['timestamp'][i] / 1e3) + '_no_drive.txt'
             f = open(outfile, 'w')
-            f.write('#timestamp [s]\t%s\n' % str(np.array(slow_data['timestamp'][i])/ 1e3))
-            f.write('#Average_azimuth\t%s\n' % str(avg_az))
-            f.write('#Average_zenith\t%s\n' % str(avg_ze))
+            f.write(f"#timestamp [s]\t{np.array(slow_data['timestamp'][i]) / 1e3}\n")
+            f.write(f"#Average_azimuth\t{avg_az}\n")
+            f.write(f"#Average_zenith\t{avg_ze}\n")
             f.write('#thr\ttrigger_rate\treadout_rate\tdropped_rate\n')
             for j, v in enumerate(val):
-                f.write('%i\t%i\t%i\t%i\n' % (v, slow_data['biasCurveTriggerRate'][i][j],
-                                            slow_data['biasCurveReadoutRate'][i][j], slow_data['biasCurveDroppedRate'][i][j]))
+                f.write(
+                    f"{v}\t"
+                    f"{slow_data['biasCurveTriggerRate'][i][j]}\t"
+                    f"{slow_data['biasCurveReadoutRate'][i][j]}\t"
+                    f"{slow_data['biasCurveDroppedRate'][i][j]}\n"
+                )
             f.close()
+
 
         plt.plot(val,  slow_data['biasCurveTriggerRate'][i], label=str(time.to_value('iso', subfmt='date_hm')))
 

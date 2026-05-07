@@ -19,7 +19,9 @@ $> python sst1mpipe_merge_hdf5.py
 """
 
 import argparse
+
 from ctapipe.tools.merge import MergeTool
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="MC/Data merge hdf5 tables")

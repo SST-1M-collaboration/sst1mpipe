@@ -1,35 +1,24 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created June 01 2024
 """
 
-import pandas as pd
-import numpy as np
-import scipy
-import matplotlib.pyplot as plt
 import glob
 
 import astropy.units as u
-import astropy.constants as c
-
 import matplotlib.dates as mdates
-from datetime import datetime
-
-from astropy.time import Time
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from astropy.io import fits
 from astropy.table import Table, vstack
-
+from astropy.time import Time
 from ctapipe.io import read_table
+from scipy.optimize import curve_fit
 
-
-
-
+from sst1mpipe.io import load_config, load_dl1_sst1m
 from sst1mpipe.performance import get_mc_info, get_weights
 from sst1mpipe.performance.spectra import DAMPE_P_He_SPECTRUM
-from sst1mpipe.io import load_dl1_sst1m,load_dl2_sst1m, load_config
-
-from scipy.optimize import curve_fit
 
 DEFAULT_CUTS = {}
 DEFAULT_CUTS["zenith"]             = [0,70]
@@ -50,21 +39,14 @@ def get_slow_data_table(dl3_file,file_radical='DIGICAM',root_dir='/net'):
     oday    = str(dl3[1].header["OBS_ID"])[6:8]
     try:
         itel = int(dl3[1].header['TELESCOP'][-2:])%20
-    except:
+    except (IndexError, KeyError, ValueError, TypeError):
         print("This dont work for setereo DL3")
+        itel = None
     
     tstart = Time(dl3[1].header['TSTART'],format='unix',scale='utc')
     tstop  = Time(dl3[1].header['TSTOP'],format='unix',scale='utc')
     
-    files = glob.glob('{}/cs{}/data/aux/{}/{}/{}/SST1M_TEL{}/{}{}_{}_*.fits'.format(root_dir,
-                                                                                    itel,
-                                                                                    oyear,
-                                                                                    omonth,
-                                                                                    oday,
-                                                                                    itel,
-                                                                                    file_radical,
-                                                                                    itel,
-                                                                                    datestr))
+    files = glob.glob(f'{root_dir}/cs{itel}/data/aux/{oyear}/{omonth}/{oday}/SST1M_TEL{itel}/{file_radical}{itel}_{datestr}_*.fits')
     table = vstack([ Table(fits.open(f)[1].data) for f in files])
     t_mask = (table['TIMESTAMP']>tstart.unix*1000) & (table['TIMESTAMP']<tstop.unix*1000)
     return table[t_mask]
@@ -76,7 +58,7 @@ def get_bad_intervals(table,gapmax=2000,tpas=60000):
     tt = t0  = table['TIMESTAMP'][~sat_mask][0]
     NGTI =[]
 
-    for ii,t in enumerate(table['TIMESTAMP'][~sat_mask]):
+    for _,t in enumerate(table['TIMESTAMP'][~sat_mask]):
         if np.abs(t-tt) > tpas:
             NGTI.append([t0,tt])
             t0=t
@@ -87,7 +69,7 @@ def get_bad_intervals(table,gapmax=2000,tpas=60000):
 
 
 def plot_rates_from_slow_data(dl3_files):
-    f,ax =plt.subplots(figsize=(15,6))
+    _,ax =plt.subplots(figsize=(15,6))
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M:%S'))
     ax.xaxis.set_major_locator(mdates.AutoDateLocator())
@@ -97,11 +79,11 @@ def plot_rates_from_slow_data(dl3_files):
         table = get_slow_data_table(dl3_file)
         table_dsc = get_slow_data_table(dl3_file,file_radical='DigicamSlowControl')
 
-        p = ax.plot([Time(tt/1000.,format='unix').to_datetime() for tt in table['TIMESTAMP'] ] ,
+        ax.plot([Time(tt/1000.,format='unix').to_datetime() for tt in table['TIMESTAMP'] ] ,
                      table['rate_swat_arrevent_nreads'],
                      '.',
                      alpha=.3,
-                     label='obs_id : {}'.format(obs_id),
+                     label=f'obs_id : {obs_id}',
                      #label='rate_swat_arrevent_nreads (rate of array events successfully read from SWAT)'
                      )
 
@@ -132,7 +114,6 @@ def get_MC_dist_mono(tel_setup,
                      zenith,
                      Q_bins):
     
-    Q_bins_c = (Q_bins[1:]+Q_bins[:-1])/2.
     mc_config = load_config(config_file)
     dl2_mc_proton = load_dl1_sst1m(MC_proton_file,
                                   tel=tel_setup,
@@ -180,7 +161,7 @@ def write_MC_dist(tel_setup,
         res_dict["diff_rate_zenCorected_"+tel] = diff_rates_mc
         
     res_df = pd.DataFrame(res_dict)
-    outfile = outdir+'/MC_{}_intensity_hist.h5'.format(tel_setup)
+    outfile = outdir+f'/MC_{tel_setup}_intensity_hist.h5'
     res_df.to_hdf(outfile,'intensity_hist')
 
 def getmask(key,sel_dict,DQ_table):
@@ -222,7 +203,7 @@ def make_DQ_table(tel_setup,
         res_dict["qual_flag"]          = []
 
         MC_hist  = pd.read_hdf(mc_hist_file)
-        rates_mc = MC_hist['diff_rate_zenCorected_tel_00{}'.format(tel[-1])]
+        rates_mc = MC_hist[f'diff_rate_zenCorected_tel_00{tel[-1]}']
         Q_bins_c = MC_hist['center']
 
         fitmask = (Q_bins_c>Q_min) & (Q_bins_c<Q_max)
@@ -235,11 +216,18 @@ def make_DQ_table(tel_setup,
             return lin(x-shift,*mc_fit)
 
 
-        for ii,filename in enumerate(file_list):
+        for _ ,filename in enumerate(file_list):
             if tel in filename:
                 int_hist = read_table(filename,'intensity_hist')
                 zenith   = read_table(filename,'zenith')[0][0]
                 obs_id   = filename.split('_')[-1].split('.')[0]
+                res_dict["obs_id"].append(int(obs_id))
+                res_dict["zenith"].append(zenith)
+                res_dict["livetime"].append(read_table(filename,'t_elapsed')[0][0])
+                res_dict["ped_fraction"].append(read_table(filename,'survived_pedestal_frac')[0][0])
+                res_dict["tc_raised_fraction"].append(read_table(filename,'recleaned_fraction')[0][0])
+                res_dict["NSB"].append(read_table(filename,'NSB')[0][0])
+                res_dict["qual_flag"].append(0)
                 try:
                     Q_bins = np.append(int_hist['low'],int_hist['high'][-1])
                     Q_bins_c = (Q_bins[1:]+Q_bins[:-1])/2.
@@ -248,34 +236,18 @@ def make_DQ_table(tel_setup,
                     popt,corr= curve_fit(shifted_lin,
                                          np.log10(int_hist['center'][no_z_mask]),
                                          np.log10(int_hist['diff_rate'][no_z_mask]),
-                                         )
-
-
-                    res_dict["obs_id"].append(int(obs_id))
-                    res_dict["zenith"].append(zenith)
-                    res_dict["livetime"].append(read_table(filename,'t_elapsed')[0][0])
-                    res_dict["ped_fraction"].append(read_table(filename,'survived_pedestal_frac')[0][0])
-                    res_dict["tc_raised_fraction"].append(read_table(filename,'recleaned_fraction')[0][0])
-                    res_dict["NSB"].append(read_table(filename,'NSB')[0][0])
+                                         )  
                     res_dict["MC_rate_ratio"].append(10**popt[0]/np.cos(zenith*u.deg).to_value())
                     res_dict["failed_fit"].append(0)
-                    res_dict["qual_flag"].append(0)
-                except:
-                    res_dict["obs_id"].append(int(obs_id))
-                    res_dict["zenith"].append(zenith)
-                    res_dict["livetime"].append(read_table(filename,'t_elapsed')[0][0])
-                    res_dict["ped_fraction"].append(read_table(filename,'survived_pedestal_frac')[0][0])
-                    res_dict["tc_raised_fraction"].append(read_table(filename,'recleaned_fraction')[0][0])
-                    res_dict["NSB"].append(read_table(filename,'NSB')[0][0])
+                except (RuntimeError, ValueError, TypeError):
                     res_dict["MC_rate_ratio"].append(0)
-                    res_dict["failed_fit"].append(1)
-                    res_dict["qual_flag"].append(0)
+                    res_dict["failed_fit"].append(1)       
                     print("fit failed",filename)
 
         res = pd.DataFrame(res_dict)
         res["qual_flag"] = make_selection(res,sel_dict=sel_dict)
-        outfile = outdir+'/DQ_table_{}.h5'.format(tel_setup)
-        res.to_hdf(outfile,'DQ_table_{}'.format(tel))
+        outfile = outdir+f'/DQ_table_{tel_setup}.h5'
+        res.to_hdf(outfile,f'DQ_table_{tel}')
     
     return
 

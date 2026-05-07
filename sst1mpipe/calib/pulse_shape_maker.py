@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Wed Mar 23 16:36:22 2022
 
@@ -8,49 +7,28 @@ Created on Wed Mar 23 16:36:22 2022
 
 
 import argparse
-from pkg_resources import resource_filename
+import datetime
 import os
-import glob
-import warnings
+
+import astropy.units as u
+import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+
+#from spe_mc_v6 import mes_fitter_mc
+from astropy.io import ascii as asc
 
 #from cts_core.camera import Camera
 #from digicampipe.instrument import geometry
 #from digicampipe.io.event_stream import event_stream, add_slow_data
-
-from ctapipe.visualization import CameraDisplay
-from ctapipe.instrument import CameraGeometry
-from ctapipe.image import hillas_parameters, tailcuts_clean
 from ctapipe.io import EventSource
-
-import matplotlib.pyplot as plt
-import datetime
-
-import scipy
-from scipy.optimize import curve_fit
-from scipy.special import factorial
-import astropy.units as u
-
-import seaborn as sns
-
-import iminuit
-from iminuit import Minuit
-from iminuit.cost import LeastSquares
-
-from scipy.interpolate import interp1d, UnivariateSpline
+from PulseTemplate import GetTemplate3
+from scipy.interpolate import UnivariateSpline
 from scipy.optimize import minimize
 
-
-#from spe_mc_v6 import mes_fitter_mc
-from astropy.io import ascii as asc
-import astropy.units as u
-
-from PulseTemplate import GetTemplate3
-
-from sst1mpipe.utils import get_cam_geom
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.calib import get_default_calibration
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.utils import get_cam_geom
+
 
 class shape_maker:
     def __init__(self,
@@ -75,18 +53,18 @@ class shape_maker:
         
         self.tel=tel
         self.pix = pix
-        date_str = '{:04d}{:02d}{:02d}'.format(year,month,day)
+        date_str = f'{year:04d}{month:02d}{day:02d}'
         self.sample_size = sample_size
         
         self.data_path = data_path
         self.files_path   = os.path.join(data_path,
-                                         'cs{}'.format(tel),
+                                         f'cs{tel}',
                                          'data',
                                          'raw',
-                                         '{:04d}'.format(year),
-                                         '{:02d}'.format(month),
-                                         '{:02d}'.format(day),
-                                         'SST1M{}'.format(tel))
+                                         f'{year:04d}',
+                                         f'{month:02d}',
+                                         f'{day:02d}',
+                                         f'SST1M{tel}')
         self.first_file_n = first_file_n
         self.n_files      = n_files
         self.plot_dir     = plot_dir
@@ -108,13 +86,11 @@ class shape_maker:
             self.file_list.append(MC_filename)
         else:
             for n in range(first_file_n, first_file_n+n_files):
-                filepath = os.path.join(self.files_path,'SST1M{}_{}_{:04d}.fits.fz'.format(self.tel,
-                                                                                           date_str,
-                                                                                           n))
+                filepath = os.path.join(self.files_path,f'SST1M{self.tel}_{date_str}_{n:04d}.fits.fz')
                 if os.path.isfile(filepath):
                     self.file_list.append(filepath)
                 else:
-                    print('file {} not found'.format(filepath))
+                    print(f'file {filepath} not found')
             if len(self.file_list) == 0:
                 print("Warning : no files")
             
@@ -262,7 +238,7 @@ class shape_maker:
 
                             
                             
-                        except:
+                        except Exception:
                             print("fit failed : skippyng")
                             continue
                         
@@ -298,7 +274,7 @@ class shape_maker:
                         #print(np.argmax(ttt))
         self.tot_evts = tot_evts
         t_0 = np.argmax(pulseshape)/float(n_rebin)
-        print('T_0 : {} ns'.format(t_0))
+        print(f'T_0 : {t_0} ns')
         rebins = np.linspace(0,50-(1/n_rebin),50*n_rebin)
         
         ##ManualShift is here to set the TOM at 30 nanosec (or any val)
