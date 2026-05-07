@@ -1,0 +1,19 @@
+name: ci
+on: [push]
+
+jobs:
+ build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Mamba env
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          init-shell: bash
+          cache-environment: true
+          post-cleanup: 'all'
+      - name: Install sst1mpipe
+        run: pip install .
+      - name: Run pytest
+        run: pytest sst1mpipe/tests/
