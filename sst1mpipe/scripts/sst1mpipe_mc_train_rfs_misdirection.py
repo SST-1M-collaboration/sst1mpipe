@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-A script to train random forests for reconstruction of misdirection 
+A script to train random forests for reconstruction of misdirection
 (goodness of direction reconstruction), which can be used to classify
 events into different classes.
 """
@@ -78,7 +78,7 @@ def main():
 
     tels = get_telescopes(input_file_gamma, data_level="dl2")
     for tel in tels:
-        
+
         dl2_gamma = load_dl2_sst1m(input_file_gamma, tel=tel, config=config, table='pandas')
 
         # First, we need to calculate misdirection in the DL2 file
@@ -91,6 +91,6 @@ def main():
 
         logging.info('Training misdirection Random Forests for Telescope %s', tel)
         train_rf_misdirection(dl2_gamma, config=config, outdir=outdir, telescope=tel, plot=plot)
-    
+
 if __name__ == '__main__':
     main()

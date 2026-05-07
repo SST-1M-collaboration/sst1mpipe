@@ -2,10 +2,10 @@
 
 """
 A script to calculate NSB tunning parameters for MC.
-- Inputs are charge distribution files calculated from pedestal events in real data 
+- Inputs are charge distribution files calculated from pedestal events in real data
 (usualy in the same dir as DL1 tables), and a directory with charge distributions
 from MC.
-- Outputs are tunning parameters for each data file, and images comparing MC/data 
+- Outputs are tunning parameters for each data file, and images comparing MC/data
 charge distributions.
 
 Usage:
@@ -74,7 +74,7 @@ def main():
     check_outdir(outdir)
 
     mc_hist_files = glob.glob(mc_hist_dir + '/' + pattern)
-    
+
     i = 0
     for mc_hist_file in mc_hist_files:
 
@@ -97,7 +97,7 @@ def main():
 
         # normalization of histograms
         charges_data_norm = charge / sum(charge)
-        
+
         # determination of the shift of the distribution (bias)
         mode_data = bin_centers[np.argmax(charges_data_norm)]
 
@@ -112,7 +112,7 @@ def main():
         # cutting out outliers in data and shower pixels in MC
         max_diff = 6
         # calculate widening of the noise bump:
-        added_noise = (np.sum(data_diff[abs(data_diff)<max_diff]**2)/len(data_diff[abs(data_diff)<max_diff]) 
+        added_noise = (np.sum(data_diff[abs(data_diff)<max_diff]**2)/len(data_diff[abs(data_diff)<max_diff])
                         - np.sum(mc_diff[abs(mc_diff)<max_diff]**2)/len(mc_diff[abs(mc_diff) < max_diff]))
         noise = max(0., added_noise)
         noises.append(noise)

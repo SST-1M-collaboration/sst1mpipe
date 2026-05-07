@@ -180,25 +180,25 @@ CRAB_LHAASO_2022 = LogParabola(
 )
 
 # Log-parabola parametrization of CRAB (MAGIC LZA, up to 100 TeV)
-# https://www.aanda.org/articles/aa/pdf/2020/03/aa36899-19.pdf 
+# https://www.aanda.org/articles/aa/pdf/2020/03/aa36899-19.pdf
 CRAB_MAGIC_2020 = LogParabola(
     normalization=2.95e-23 / (u.eV * u.cm ** 2 * u.s), a=-2.48, b=-0.23, e_ref = 1 * u.TeV
 )
 
 # Log-parabola parametrization of CRAB (HAWC, "ground parameter")
-# https://iopscience.iop.org/article/10.3847/1538-4357/ab2f7d/pdf 
+# https://iopscience.iop.org/article/10.3847/1538-4357/ab2f7d/pdf
 CRAB_HAWC_2019 = LogParabola(
     normalization=2.35e-13 / (u.TeV * u.cm ** 2 * u.s), a=-2.79, b=-0.10, e_ref = 7 * u.TeV
 )
 
 # Log-parabola parametrization of CRAB (HAWC, "neural network")
-# https://iopscience.iop.org/article/10.3847/1538-4357/ab2f7d/pdf 
+# https://iopscience.iop.org/article/10.3847/1538-4357/ab2f7d/pdf
 CRAB_HAWC_2019_NN = LogParabola(
     normalization=2.31e-13 / (u.TeV * u.cm ** 2 * u.s), a=-2.73, b=-0.06, e_ref = 7 * u.TeV
 )
 
 # Log-parabola parametrization of CRAB (VERITAS)
-# https://arxiv.org/pdf/1508.06442.pdf 
+# https://arxiv.org/pdf/1508.06442.pdf
 CRAB_VERITAS_2015 = LogParabola(
     normalization=3.75e-11 / (u.TeV * u.cm ** 2 * u.s), a=-2.467, b=-0.16, e_ref = 1 * u.TeV
 )
@@ -211,14 +211,14 @@ CRAB_HESS_2024 = LogParabola_natural(
 )
 
 # Log-parabola parametrization of CRAB (LST 2023)
-# https://arxiv.org/pdf/2306.12960 
+# https://arxiv.org/pdf/2306.12960
 CRAB_LST_2023 = LogParabola_natural(
     normalization=3.05e-10 / (u.TeV * u.cm ** 2 * u.s), a=-2.25, b=-0.114, e_ref = 400 * u.GeV
 )
 
 # HESS J1702−420A
 # https://arxiv.org/pdf/2402.03511.pdf
-# https://journals.aps.org/prl/pdf/10.1103/PhysRevLett.124.021102 
+# https://journals.aps.org/prl/pdf/10.1103/PhysRevLett.124.021102
 HESS_J1702 = PowerLaw(
     normalization=1.6e-13 / (u.TeV * u.cm ** 2 * u.s), index=-1.53, e_ref = 1 * u.TeV
 )

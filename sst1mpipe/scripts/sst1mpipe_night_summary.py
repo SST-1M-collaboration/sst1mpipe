@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 """
-A script to create night summary for each observed source, which is 
+A script to create night summary for each observed source, which is
 stored as a PDF in the base data analysis directory. For the full
-summary, the script needs all data analysis levels up to DL3 for 
-mono and stereo to be already produced. It also needs the DL1 
+summary, the script needs all data analysis levels up to DL3 for
+mono and stereo to be already produced. It also needs the DL1
 distributions to be already extracted.
-- Input is a base data analysis directory, within which the expected 
+- Input is a base data analysis directory, within which the expected
 structure is BASE_DIR/{date}/{source}/{telescope}/{data level}/{subdir}/
 - Outputs are night summary PDFs for all sources observed during the night
 
@@ -122,7 +122,7 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
                 if not stereo:
                     try:
                         pt = load_dl1_pedestals(input_file)
-                    except Exception: 
+                    except Exception:
                         pass
             elif level == 'dl2':
                 df = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
@@ -153,9 +153,9 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
 
 
 def make_file_list(path, stereo=False, level='dl1'):
-    
+
     files_selected = []
-    
+
     if stereo:
         if level == 'dl1':
             files = glob.glob(path + '/*dl1_stereo.h5')
@@ -165,7 +165,7 @@ def make_file_list(path, stereo=False, level='dl1'):
         files = glob.glob(path + '/*'+level+'.h5')
 
     files_selected = files_selected + files
-    
+
     files_selected = np.sort(files_selected)
     return files_selected
 
@@ -192,7 +192,7 @@ def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
         except Exception:
             logging.warning('Broken file')
             ind += 1
-            if ind > 50: 
+            if ind > 50:
                 first_loaded = True
                 logging.warning('Something is really wrong, too many broken files!')
     min_time = min(df['local_time'])
@@ -205,7 +205,7 @@ def get_min_max_times(dl1_files, tel=None, config=None, stereo=False):
         except Exception:
             logging.warning('Broken file')
             ind += 1
-            if ind > 50: 
+            if ind > 50:
                 last_loaded = True
                 logging.warning('Something is really wrong, too many broken files!')
     max_time = max(df['local_time'])
@@ -303,7 +303,7 @@ def main():
             if not is_dl1:
                 dl1_path = base_path_source + '/' + dl1_tab_data_level.lower() + '/' + version
                 is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
-                
+
             if telescope == 'cs1':
                 if is_dl1:
                     dl1_files = make_file_list(dl1_path, stereo=False, level=dl1_tab_data_level)
@@ -335,7 +335,7 @@ def main():
             dl2_path = base_path_source + '/DL2/' + version
             dl3_path = base_path_source + '/DL3/' + version
             dist_path = base_path_source + '/distributions/' + version
-            
+
             is_dl1 = len(glob.glob(dl1_path+'/'+'*.h5'))
             is_dl2 = len(glob.glob(dl2_path+'/'+'*.h5'))
             is_dl3 = len(glob.glob(dl3_path+'/'+'*.fits'))
@@ -360,17 +360,17 @@ def main():
                 logging.warning('DL3 data is missing, there will be some missing figures in the final PDF.')
             if not is_dist:
                 logging.warning('DL1 rate distributions are missing, there will be some missing figures in the final PDF.')
-            
+
             if telescope not in 'stereo':
                 stereo=False
             else:
                 stereo=True
-            
+
             if is_dl1:
                 dl1_files = make_file_list(dl1_path, stereo=stereo, level=dl1_tab_data_level)
             if is_dl2:
                 dl2_files = make_file_list(dl2_path, stereo=stereo, level='dl2')
-            
+
             if '1' in telescope:
                 tel = 'tel_021'
                 tt = 21
@@ -382,7 +382,7 @@ def main():
                 tt = 0
 
             if is_dl1:
-                # We load and plot DL1 rates in bunches of file, 
+                # We load and plot DL1 rates in bunches of file,
                 # because otherwise it needs too much memory and
                 # is realy slow.
                 N_bunches = int(len(dl1_files)/bunch_size)
@@ -589,16 +589,16 @@ def main():
                             logging.info('Source coordinates found in the catalog file: %s', source_catalog[source])
                             if source_catalog[source]['frame'] == 'icrs':
                                 target_coords = SkyCoord(
-                                    ra=source_catalog[source]['ra']*u.deg, 
-                                    dec=source_catalog[source]['dec']*u.deg, 
+                                    ra=source_catalog[source]['ra']*u.deg,
+                                    dec=source_catalog[source]['dec']*u.deg,
                                     frame='icrs'
                                     )
                                 logging.info('ra: %f, dec: %f', source_catalog[source]['ra'], source_catalog[source]['dec'])
                                 plot_theta2 = True
                             elif source_catalog[source]['frame'] == 'galactic':
                                 target_coords = SkyCoord(
-                                    l=source_catalog[source]['l']*u.deg, 
-                                    b=source_catalog[source]['b']*u.deg, 
+                                    l=source_catalog[source]['l']*u.deg,
+                                    b=source_catalog[source]['b']*u.deg,
                                     frame='galactic'
                                     )
                                 logging.info('l: %f, b: %f', source_catalog[source]['l'], source_catalog[source]['b'])
@@ -611,42 +611,42 @@ def main():
                     theta2_axis = MapAxis.from_bounds(0, 0.5, nbin=10, interp="lin", unit="deg2")
                     theta_cut = 0.2 * u.deg
                     counts_on, counts_off, alpha, event_counts = get_theta2_from_dl3(
-                        dl3_path, 
-                        target_coords=target_coords, 
-                        theta2_axis=theta2_axis, 
+                        dl3_path,
+                        target_coords=target_coords,
+                        theta2_axis=theta2_axis,
                         theta_cut=theta_cut
                         )
                     if tt == 21:
                         ax13[0].set_title('tel1')
                         plot_theta2_dl3(
-                            ax=ax13[0], 
-                            theta2_axis=theta2_axis, 
-                            counts_on=counts_on, 
-                            counts_off=counts_off, 
-                            alpha=alpha, 
-                            theta_cut=theta_cut, 
+                            ax=ax13[0],
+                            theta2_axis=theta2_axis,
+                            counts_on=counts_on,
+                            counts_off=counts_off,
+                            alpha=alpha,
+                            theta_cut=theta_cut,
                             event_counts=event_counts
                             )
                     elif tt == 22:
                         ax13[1].set_title('tel2')
                         plot_theta2_dl3(
-                            ax=ax13[1], 
-                            theta2_axis=theta2_axis, 
-                            counts_on=counts_on, 
-                            counts_off=counts_off, 
-                            alpha=alpha, 
-                            theta_cut=theta_cut, 
+                            ax=ax13[1],
+                            theta2_axis=theta2_axis,
+                            counts_on=counts_on,
+                            counts_off=counts_off,
+                            alpha=alpha,
+                            theta_cut=theta_cut,
                             event_counts=event_counts
-                            )                
+                            )
                     else:
                         ax13[2].set_title('stereo')
                         plot_theta2_dl3(
-                            ax=ax13[2], 
-                            theta2_axis=theta2_axis, 
-                            counts_on=counts_on, 
-                            counts_off=counts_off, 
-                            alpha=alpha, 
-                            theta_cut=theta_cut, 
+                            ax=ax13[2],
+                            theta2_axis=theta2_axis,
+                            counts_on=counts_on,
+                            counts_off=counts_off,
+                            alpha=alpha,
+                            theta_cut=theta_cut,
                             event_counts=event_counts
                             )
             if is_dist:
@@ -731,7 +731,7 @@ def main():
                 ax8[0].set_title('tel_021')
             if is_dl1 and (tt == 22):
                 ax8[1].set_title('tel_022')
-            
+
             # DL2 mono
             # Gammas
             fig9.suptitle("CoG of DL2 mono events, gammaness > 0.7", fontsize=16)
@@ -756,7 +756,7 @@ def main():
                 ax12[1].set_ylim([-1200, 1200])
 
             # Moon
-            ax11.set_title('Moon')  
+            ax11.set_title('Moon')
             ax11.set_ylabel('deg')
             ax11.set_xlabel('Time [UTC]')
             if is_dl2:
@@ -768,7 +768,7 @@ def main():
                 ax11.set_xticklabels(new_times) #, rotation='vertical')
                 ax11.grid()
                 ax11.legend()
-                
+
             # changing tick labels to UTC time
             ax.set_title('DL1 events (survived cleaning)', fontsize=16)
             ax.set_xlabel('Time [UTC]')
@@ -797,7 +797,7 @@ def main():
                 ax1.grid()
                 ax1.legend()
                 ax1.set_ylim([0, 2*max(median1)])
-                
+
 
             # changing tick labels to UTC time
             ax2.set_title('DL2 events', fontsize=16)
@@ -820,7 +820,7 @@ def main():
             if is_dl1:
                 ax3.grid()
                 ax3.legend()
-    
+
         logging.info('All done, saving figures in temporary png files.')
         fig.savefig(outpath+'/trigger_rates.png', dpi=250)
         fig1.savefig(outpath+'/trigger_rates_zoom.png', dpi=250)

@@ -18,7 +18,7 @@ from sst1mpipe.utils import (
 
 def add_reco_ra_dec(data, horizon_frame=None):
     """
-    Calculate reconstructed RA, DEC from reconstructed ALT,AZ in DL2 table 
+    Calculate reconstructed RA, DEC from reconstructed ALT,AZ in DL2 table
     for timestamps specified in horizon_frame and add them as new columns
 
     Parameters
@@ -34,8 +34,8 @@ def add_reco_ra_dec(data, horizon_frame=None):
 
     data = data.copy()
     reco_coord = SkyCoord(
-        alt=np.array(data['reco_alt'])*u.deg, 
-        az=np.array(data['reco_az'])*u.deg, 
+        alt=np.array(data['reco_alt'])*u.deg,
+        az=np.array(data['reco_az'])*u.deg,
         frame=horizon_frame
         )
     radec = reco_coord.transform_to('icrs')
@@ -93,21 +93,21 @@ def get_camera_frame(data, config=None, telescope=None):
     """
 
     horizon_frame = get_horizon_frame(
-        config=config, 
-        telescope=telescope, 
+        config=config,
+        telescope=telescope,
         times=Time(data.local_time, format='unix', scale='utc')
         )
     focal = np.array(data["equivalent_focal_length"])[0] * u.m
     logging.info('Focal length used: {}'.format(np.array(data["equivalent_focal_length"])[0]))
     ponting_coords = SkyCoord(
-        alt = np.array(data['true_alt_tel'])*u.deg, 
-        az = np.array(data['true_az_tel'])*u.deg, 
+        alt = np.array(data['true_alt_tel'])*u.deg,
+        az = np.array(data['true_az_tel'])*u.deg,
         frame=horizon_frame
         )
 
     camera_frame = CameraFrame(
-        focal_length=focal, 
-        telescope_pointing=ponting_coords, 
+        focal_length=focal,
+        telescope_pointing=ponting_coords,
         obstime=horizon_frame.obstime,
         location=horizon_frame.location)
 
@@ -139,7 +139,7 @@ def add_source_xy(data, source=None, camera_frame=None):
 
 
 def get_sigma_time(
-        data, theta2_on, theta2_off, theta2_cut=0.04, 
+        data, theta2_on, theta2_off, theta2_cut=0.04,
         norm_range=[0.2, 0.5], step_events=1):
     """
     Calculates time development of significance and background normalization
@@ -161,7 +161,7 @@ def get_sigma_time(
     list: alphas
 
     """
-    
+
     sigma = []
     alphas = []
     times = []
@@ -228,8 +228,8 @@ def add_wobble_flag(data, horizon_frame=None, wobbles=[]):
 
     """
 
-    pointing_coords = SkyCoord(alt = data['true_alt_tel'] * u.deg, 
-                          az = data['true_az_tel'] * u.deg, 
+    pointing_coords = SkyCoord(alt = data['true_alt_tel'] * u.deg,
+                          az = data['true_az_tel'] * u.deg,
                           frame=horizon_frame
                           )
 
@@ -245,9 +245,9 @@ def add_wobble_flag(data, horizon_frame=None, wobbles=[]):
 def get_theta_off_stereo(data, n_off=1, on_region=None, wobbles=[]):
     """
     Calculates theta^2 for OFF regions regularly distributed around
-    the pointing RA,DEC at the same offset as the ON region (for each 
-    wobble). This is to be used for theta^2 in stereo, where the camera 
-    frame is different for each telescope. The derivation of the rotation 
+    the pointing RA,DEC at the same offset as the ON region (for each
+    wobble). This is to be used for theta^2 in stereo, where the camera
+    frame is different for each telescope. The derivation of the rotation
     angles is from:
     https://github.com/cta-observatory/magic-cta-pipe/blob/master/magicctapipe/utils/functions.py
 
@@ -263,7 +263,7 @@ def get_theta_off_stereo(data, n_off=1, on_region=None, wobbles=[]):
     theta2_off: numpy.ndarray
         One column per OFF region
     off_radec: list of astropy.coordinates.SkyCoord
-    
+
     """
 
     theta2_off = np.zeros([len(data), n_off])
@@ -319,7 +319,7 @@ def get_theta_off_stereo(data, n_off=1, on_region=None, wobbles=[]):
 
 
 def get_theta_off(
-        data, n_off=1, horizon_frame=None, 
+        data, n_off=1, horizon_frame=None,
         camera_frame=None, plot=False):
     """
     Calculates theta^2 for OFF regions regularly distributed around
@@ -339,7 +339,7 @@ def get_theta_off(
     theta2_off: numpy.ndarray
         One column per OFF region
     off_radec: list of astropy.coordinates.SkyCoord
-    
+
     """
 
     true_source_position = [data['source_x'], data['source_y']]
@@ -350,7 +350,7 @@ def get_theta_off(
 
     # ra dec of the off regions
     off_radec = []
-    
+
     if plot:
         fig, ax = plt.subplots(1, len(angles)-1, figsize=(25,5))
 
@@ -365,12 +365,12 @@ def get_theta_off(
             off_source_position[1].name = 'source_y'
 
             off_altaz = camera_to_altaz(
-                np.array(off_source_position[0]) * u.m, 
-                np.array(off_source_position[1]) * u.m, 
+                np.array(off_source_position[0]) * u.m,
+                np.array(off_source_position[1]) * u.m,
                 horizon_frame=horizon_frame,
                 camera_frame=camera_frame
             )
-            
+
             wobbles = np.unique(np.array(data['wobble']))
             for w in wobbles:
                 w_mask = data['wobble'] == w
@@ -378,12 +378,12 @@ def get_theta_off(
 
             # theta for OFF coordinates, reflected background
             dl2_photon_list_off = get_theta(
-                data.copy(), 
-                zero_alt=off_altaz.alt.value, 
+                data.copy(),
+                zero_alt=off_altaz.alt.value,
                 zero_az=off_altaz.az.value
             )
             dl2_photon_list_off['theta'] = dl2_photon_list_off['theta'].to(u.deg)
-            
+
             if plot:
                 if len(angles) > 2:
                     axx = ax[i-1]
@@ -401,12 +401,12 @@ def get_theta_off(
                 th2 = np.array(dl2_photon_list_off['theta']**2)
                 theta2_off = np.concatenate((theta2_off, np.expand_dims(th2, axis=1)), axis=1)
             off_point += 1
-    
+
     return theta2_off, off_radec
 
 
 def camera_to_altaz(
-        pos_x, pos_y, horizon_frame=None, 
+        pos_x, pos_y, horizon_frame=None,
         camera_frame=None):
     """
     Transforms coordinates in camera frame to horizon frame
@@ -453,18 +453,18 @@ def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_a
         observations = data_store.get_observations()
 
     for observation in observations:
-        
+
         mask = data_store.obs_table['OBS_ID'] == observation.obs_id
         t_elapsed += data_store.obs_table[mask]['LIVETIME']
 
         # ON counts
         separation = target_coords.separation(observation.events.radec)
-        
+
         N_on += sum(separation < theta_cut)
-        
+
         counts_on, _ = np.histogram(separation ** 2, bins = theta2_axis.edges)
         counts_all_on.append(counts_on)
-        
+
         norm_on = (separation > norm_range[0]) & (separation < norm_range[1])
         sum_norm_on += sum(norm_on)
 
@@ -477,7 +477,7 @@ def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_a
         rotations_off = np.arange(0, 359, rotation_step) * u.deg
         rotations_off = rotations_off[rotations_off.to_value("deg") != 0]
         rotations_off = pos_angle + rotations_off
-        
+
         counts_all_off = []
         for _, rotation in enumerate(rotations_off, start=0):
             position_off = observation.pointing_radec.directional_offset_by(rotation, sep_angle)
@@ -489,7 +489,7 @@ def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_a
             counts_all_off.append(counts_off_wob)
 
         counts_all_all_off.append(np.sum(np.array(counts_all_off), axis=0))
-        
+
     alpha = sum_norm_on/sum_norm_off
 
     stat = WStatCountsStatistic(n_on=N_on, n_off=N_off, alpha=alpha)

@@ -60,7 +60,7 @@ def parse_args():
                         help='Path to store the IRFs. This should be just base directory, the rest is created authomaticaly.',
                         default='./IRFs/'
                         )
-    
+
     parser.add_argument(
                         '--gammaness-cut-dir', type=str,
                         dest='gammaness_cut_dir',
@@ -78,7 +78,7 @@ def parse_args():
                         action='store_true',
                         dest='event_classes',
                         help='If used, IRFs are created for each event class found in the input DL2 files.',
-                        )           
+                        )
     args = parser.parse_args()
     return args
 
@@ -96,7 +96,7 @@ def main():
 
     check_outdir(outdir)
 
-    # This is not very nice, but I am not yet sure how to put the log file in the final directory, 
+    # This is not very nice, but I am not yet sure how to put the log file in the final directory,
     # containing only outputs for given telescope, if we want to iterate over them below
     zenith = input_file_gamma.split('/')[-1].split('_')[3]
     logging.basicConfig(
@@ -127,7 +127,7 @@ def main():
                                        table='pandas')
             evttypes = dl2_mc_gamma['event_type'].unique()
 
-        else: 
+        else:
             evttypes = []
 
         if len(evttypes):
@@ -162,4 +162,4 @@ if __name__ == "__main__":
     main()
 
 
-       
+

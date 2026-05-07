@@ -2,7 +2,7 @@
 
 """
 A script to calibrate raw data (R0) or MC (R1) in DL1.
-- Inputs are a single raw .fits.fz data file (containing single telescope data) 
+- Inputs are a single raw .fits.fz data file (containing single telescope data)
 or .simtel.gz output file of sim_telarray (may contain more telescopes).
 - Output is hdf file with a table of DL1 parameters.
 
@@ -220,7 +220,7 @@ def main():
             logging.info('Using arrayEvtNum as event_id: input file contains SWAT array event IDs')
         else:
             logging.info('Using eventNumber as event_id: input file does not contain SWAT array event IDs')
-    
+
 
     if reclean:
         processing_info.output_file = os.path.join(outdir, processing_info.output_file.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
@@ -273,8 +273,8 @@ def main():
         fractional_seconds = []
 
     with DataWriter(
-        source, output_path=processing_info.output_file, 
-        overwrite        = True, 
+        source, output_path=processing_info.output_file,
+        overwrite        = True,
         write_showers    = True,
         write_parameters = True,
         write_images     = True,
@@ -329,10 +329,10 @@ def main():
                 # the output DL1 file, in /dl1/monitoring/subarray/pointing and /dl1/monitoring/telescope/pointing/TEL
                 # This takes absurdly long time - revisit in the future, checking if we can make it faster
                 event = add_pointing_to_events(
-                                                event, 
-                                                ra=processing_info.pointing_ra, 
-                                                dec=processing_info.pointing_dec, 
-                                                telescope=tel, 
+                                                event,
+                                                ra=processing_info.pointing_ra,
+                                                dec=processing_info.pointing_dec,
+                                                telescope=tel,
                                                 location=location
                                                 )
 
@@ -349,7 +349,7 @@ def main():
                 event = correct_true_image(event)
                 # Now include PDE correction based on the PDE drop set in MC
                 if config['NsbCalibrator']['mc_correction_for_PDE']:
-                    event = correct_MC_for_PDE_drop(event, 
+                    event = correct_MC_for_PDE_drop(event,
                         simtel_config_qe=used_qe,
                         pde_corr_factors=pde_corr_factors
                         )
@@ -358,14 +358,14 @@ def main():
             # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
             # Default is NeighborAverage, but can be turned off with 'null'
             event = remove_bad_pixels(event, config=config)
-            
+
             if (not source.is_simulation) and (not reclean) and pedestal_info.pedestals_in_file:
                 # ALWAYS use adaptive cleaning - take data from online pedestal_info
                 image_processor.clean.average_charge = pedestal_info.get_img_charge_mean()
                 image_processor.clean.stdev_charge = pedestal_info.get_img_charge_std()
                 # in the current setup this value is common for the whole file but keep it like this for the future
                 ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, image_processor.clean.nsb_level]], axis=0)
-            
+
             #set proper charge info according to time bins of pedestal events
             if reclean and (len(dl1_charges) > 0):
                 for [start_time, n, Qped, sig_Qped, meanQ] in reversed(dl1_charges):
@@ -377,7 +377,7 @@ def main():
                 image_processor.clean.config = config['ImageProcessor'][cleaner]
                 ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, meanQ]], axis=0)
 
-            r1_dl1_calibrator(event) # r1->dl1a (images, peak times)                
+            r1_dl1_calibrator(event) # r1->dl1a (images, peak times)
 
             if not source.is_simulation:
 
@@ -385,8 +385,8 @@ def main():
                 event = saturated_charge_correction(event, processing_info=processing_info)
 
                 event = window_transmittance_correction(
-                    event, 
-                    window_corr_factors=window_corr_factors, 
+                    event,
+                    window_corr_factors=window_corr_factors,
                     telescope=tel,
                     swapped_modules=swaped_modules_list
                     )
@@ -488,10 +488,10 @@ def main():
 
             # Calculation of fraction of true charge which survived cleaning
             processing_info.count_survived_charge(event, ismc=source.is_simulation)
-            
+
             ## Correct (or not) the Voltage drop effect : Global correction on the intensity
             ## apply (or not) some absolute correction on the intensity
-            
+
             if not source.is_simulation:
                 I0 = event.dl1.tel[tel].parameters.hillas.intensity
                 # VN: to be consistent during the cleaning I had to move all gain drop corrections into calibration
@@ -530,21 +530,21 @@ def main():
     # I didn't find a solution, this should definitely be revisited!
     if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file):
         write_extra_parameters(
-                processing_info.output_file, 
-                config=config, ismc=ismc, meanQ=ped_mean_charge, 
+                processing_info.output_file,
+                config=config, ismc=ismc, meanQ=ped_mean_charge,
                 wr_timestamps=wr_timestamps
                 )
     else:
         write_extra_parameters(
-                processing_info.output_file, config=config, 
+                processing_info.output_file, config=config,
                 ismc=ismc, wr_timestamps=wr_timestamps
                 )
 
     if source.is_simulation:
         write_charge_fraction(
-            processing_info.output_file, 
+            processing_info.output_file,
             survived_charge={
-                "tel_001": processing_info.survived_charge_fraction_1, 
+                "tel_001": processing_info.survived_charge_fraction_1,
                 "tel_002": processing_info.survived_charge_fraction_2
                 }
             )
@@ -554,8 +554,8 @@ def main():
     # not to extract WR timestamps in the main event loop, which makes the
     # it much faster
     #if not source.is_simulation and precise_timestamps:
-    #    write_wr_timestamps(processing_info.output_file, 
-    #                        event_source=SST1MEventSource([processing_info.input_file], 
+    #    write_wr_timestamps(processing_info.output_file,
+    #                        event_source=SST1MEventSource([processing_info.input_file],
     #                        max_events=max_events)
     #                        )
 
@@ -575,7 +575,7 @@ def main():
     if source.is_simulation:
         # Cut on minimum mc_energy in the output file, which is needed if we want to safely combine MC from different productions
         # NOTE: This doesn't change the mc and histogram tab in the output files and this must be taken care of in performance
-        # evaluation. We cannot recalculate N of simulated events at this point for each individual dl1 file, because it would 
+        # evaluation. We cannot recalculate N of simulated events at this point for each individual dl1 file, because it would
         # lead to an error of the order of 10%.
         energy_min_cut(processing_info.output_file, config=config)
 
@@ -607,7 +607,7 @@ def main():
             if ((N_events_tel1 > 0) and (N_events_tel2 > 0)):
                 data = np.column_stack((np.array(final_histogram_tel1), np.array(final_histogram_tel2)))
                 names = ['pixel_charge_tel1', 'pixel_charge_tel2']
-        
+
         if (N_events > 0) or ((N_events_tel1 > 0) and (N_events_tel2 > 0)):
             write_pixel_charges_table(data, bin_edges, names=names, output_file=processing_info.output_file_px_charges)
         else:

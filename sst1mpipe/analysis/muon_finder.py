@@ -42,7 +42,7 @@ def swap_r0_modules_59_88(event, tel=None):
     mask59[1064:1067+1] = True
     waveform_59 = event.sst1m.r0.tel[tel].adc_samples[mask59, :]
     bls59 = event.sst1m.r0.tel[tel].digicam_baseline[mask59]
-    
+
     # module 88
     mask88 = np.zeros(1296, dtype=bool)
     mask88[1103] = True
@@ -51,10 +51,10 @@ def swap_r0_modules_59_88(event, tel=None):
     mask88[1135:1138+1] = True
     waveform_88 = event.sst1m.r0.tel[tel].adc_samples[mask88, :]
     bls88 = event.sst1m.r0.tel[tel].digicam_baseline[mask88]
-    
+
     event.sst1m.r0.tel[tel].adc_samples[mask59] = waveform_88
     event.sst1m.r0.tel[tel].adc_samples[mask88] = waveform_59
-    
+
     event.sst1m.r0.tel[tel].digicam_baseline[mask59] = bls88
     event.sst1m.r0.tel[tel].digicam_baseline[mask88] = bls59
 
@@ -95,10 +95,10 @@ class muon_finder:
                  gain         = 1.,
                  plot         = False,
                  ismc         = False):
-        
-        
-        
-        
+
+
+
+
         self.tailcuts_1 = 5
         self.tailcuts_2 = 4
         self.min_pix = 13
@@ -118,17 +118,17 @@ class muon_finder:
             self.month           = int(self.date_str[4:6])
             self.year            = int(self.date_str[:-4])
             self.window_t,_      = get_default_window(tel)
-                 
+
         self.plot_dir        = plot_dir
         self.max_evt         = max_evt
         self.gain            = gain
         self.tel             = tel
-        
+
         self.plot=plot
         self.ismc = ismc
         if self.plot and (not os.path.exists(self.plot_dir)):
             os.makedirs(self.plot_dir)
-      
+
         if self.ismc :
             self.w_start = 16
             self.w_end   = 25
@@ -137,9 +137,9 @@ class muon_finder:
             self.w_end   = 15
 
         self.mu_data = get_res_dict(self.ismc)
-        
 
-        
+
+
 
         subarray_file = pkg_resources.resource_filename(
                             'sst1mpipe',
@@ -155,19 +155,19 @@ class muon_finder:
         self.pixels   = np.arange(self.n_pixels)
 
         self.file_list = []
-        
+
         self.mbs   = []
         self.bsstd = []
 
 
-        
-    
+
+
     def get_barytom(self,wf):
-        
+
         Q = np.array([ wf[ii:ii+3].sum() for ii in range(len(wf)-3)])
         im = Q.argmax()
         return (wf[im:im+3] * np.arange(im,im+3)/wf[im:im+3].max() ).mean()
-    
+
     def get_muons(self):
         def get_circle_dists(C,pixs):
             Cx,Cy,Cr = C
@@ -224,7 +224,7 @@ class muon_finder:
                 E_mu = event.simulation.shower.energy
             else:
 
-            
+
                 tel = event.sst1m.r0.tels_with_data[0]
                 if ii==0:
                     T0 = event.sst1m.r0.tel[tel].local_camera_clock/1e9
@@ -235,14 +235,14 @@ class muon_finder:
                     #                                      start_date.hour,
                     #                                      start_date.minute)
                     night_datestr = f"{start_date.day}-{start_date.day+1}/{start_date.month}/{start_date.year}"
-                    
-                    
+
+
                     print("night : "+night_datestr)
                 if (tel==22) and (start_date<datetime.datetime(2024,7,18)):
                     event = swap_r0_modules_59_88(event, tel=tel)
                     #pass
-                r0data = event.sst1m.r0.tel[tel]                    
-    
+                r0data = event.sst1m.r0.tel[tel]
+
                 if r0data._camera_event_type.value==8:
                     pedestal_info.add_ped_evt(event, store_image=False)
                     pedestal_info.fill_mon_container(event)
@@ -256,57 +256,57 @@ class muon_finder:
                         self.bsstd = self.bsstd[-100:]
                     continue
                 else:
-                    ## intergrate signal in a fixed window : 
+                    ## intergrate signal in a fixed window :
                     VI = VAR_to_Idrop(pedestal_info.get_charge_std().mean()**2, 20+self.tel)
                     Q_sum_ADC    = (r0data.adc_samples.T[self.w_start:self.w_end] - r0data.digicam_baseline).sum(axis=0)
                     Q_sum_window = Q_sum_ADC /self.gain /VI /self.window_t
-                    
-                
-            mask_tailcuts = tailcuts_clean(self.geom, 
-                                           Q_sum_window, 
-                                           self.tailcuts_1, 
+
+
+            mask_tailcuts = tailcuts_clean(self.geom,
+                                           Q_sum_window,
+                                           self.tailcuts_1,
                                            self.tailcuts_2,
                                            min_number_picture_neighbors=2)
-            
-            
+
+
             n_island,mask_island = number_of_islands(self.geom, mask_tailcuts)
-            
+
             #drop empty
             if n_island == 0:
                 continue
-            
+
             final_mask = mask_tailcuts
-            
-            
-            
+
+
+
             cleaned_image = Q_sum_window.copy()
             cleaned_image[~final_mask] = 0
-            
-            
+
+
 
             if final_mask.sum() > self.min_pix and final_mask.sum() < self.max_pix:
-                
+
 
                 x0 = [self.geom.pix_x[final_mask].value.mean(),
                       self.geom.pix_y[final_mask].value.mean(),
                       .1]
-                
+
                 res = minimize(get_circle_dists, x0,args=(self.pixels[final_mask]), method='BFGS', tol=1e-2)
                 #print(res.x)
-                
-                
-                # rc = ring_completeness( self.geom.pix_x.value, 
-                #                         self.geom.pix_x.value, 
-                #                         weights  = Q_sum_window, 
-                #                         radius   = res.x[2], 
-                #                         center_x = res.x[0], 
-                #                         center_y = res.x[1], 
-                #                         threshold=4, 
+
+
+                # rc = ring_completeness( self.geom.pix_x.value,
+                #                         self.geom.pix_x.value,
+                #                         weights  = Q_sum_window,
+                #                         radius   = res.x[2],
+                #                         center_x = res.x[0],
+                #                         center_y = res.x[1],
+                #                         threshold=4,
                 #                         bins=30
                 #                         )
                 # print(ii,rc)
-                
-                
+
+
                 # if res.success:
                 # if res.fun<0.2:
                 # if res.x[2]>0.1:
@@ -317,7 +317,7 @@ class muon_finder:
 
                 if ismu_test:
                     Cx,Cy,Cr = res.x
-                    
+
                     d_center = ( (self.geom.pix_x.value-Cx)**2 +
                                  (self.geom.pix_y.value-Cy)**2)**.5
 
@@ -325,32 +325,32 @@ class muon_finder:
                     wide_mask = (d_center > Cr-WM_dr) & (d_center < Cr+WM_dr)
 
                     ## refit the circle
-                    res = minimize(get_Weighted_circle_dists, 
+                    res = minimize(get_Weighted_circle_dists,
                                    res.x,
                                    args=(self.pixels[wide_mask],Q_sum_window[wide_mask]),
-                                   method='BFGS', 
+                                   method='BFGS',
                                    tol=1e-2)
                     Cx,Cy,Cr = res.x
-                    
-                    
+
+
 
                     d_center = ( (self.geom.pix_x.value-Cx)**2 +
                                  (self.geom.pix_y.value-Cy)**2)**.5
-                    
+
 
                     dr = 0.015
                     mu_mask = (d_center > Cr-dr) & (d_center < Cr+dr)
-                    
+
                     ## if there is signal outside the ring : skip the event
                     if Q_sum_window[~mu_mask & final_mask].sum() > 60 :
                         continue
-                    rc = ring_completeness(self.geom.pix_x.value[mu_mask], 
-                                           self.geom.pix_y.value[mu_mask], 
-                                           weights  = Q_sum_window[mu_mask], 
-                                           radius   = res.x[2], 
-                                           center_x = res.x[0], 
-                                           center_y = res.x[1], 
-                                           threshold=7, 
+                    rc = ring_completeness(self.geom.pix_x.value[mu_mask],
+                                           self.geom.pix_y.value[mu_mask],
+                                           weights  = Q_sum_window[mu_mask],
+                                           radius   = res.x[2],
+                                           center_x = res.x[0],
+                                           center_y = res.x[1],
+                                           threshold=7,
                                            bins=12
                                            )
                     ## if there is less than half a muon : skip the event
@@ -365,7 +365,7 @@ class muon_finder:
                             wfs, np.ones(peak_search_window_width), axis=1, mode="nearest"
                         )
                         peak_index = np.argmax(sums[:, 2:-2], axis=1) + 2
-                        bin_time = 4 
+                        bin_time = 4
                         rawtoms = np.array([
                             np.sum(
                                 wfs[ii, m - 1 : m + 2]
@@ -385,7 +385,7 @@ class muon_finder:
                     phi_pixs = [np.arctan2(self.geom.pix_y[p].to('m').value-Cy,
                                            self.geom.pix_x[p].to('m').value-Cx) for p in self.pixels[mu_mask]]
 
-                    
+
                     self.mu_data['x'].append(Cx)
                     self.mu_data['y'].append(Cy)
                     self.mu_data['n_fmask'].append(final_mask.sum())
@@ -410,10 +410,10 @@ class muon_finder:
                         self.mu_data['bsstd'].append(np.median(self.bsstd))
                         self.mu_data['event_id'].append(event.sst1m.r0.event_id)
                         self.mu_data['toa'].append(r0data.local_camera_clock/1e9)
-                    
+
                     #self.mbs   = []
                     #self.bsstd = []
-                    
+
                     for key in self.mu_data.keys():
                         try:
                             print(key+str(self.mu_data[key][-1]))
@@ -423,44 +423,44 @@ class muon_finder:
                         f,axs = self.plot_event(Q_sum_window,final_mask,mu_mask)
                         f.savefig(self.plot_dir+f'd{self.date_str}_f{self.file_n}_ev_{ii}_ismuontest_rc{rc:.4}.png' )
                         plt.close(f)
-                        
-                    if  len(self.mu_data['event_id'])%500==0 and False: 
+
+                    if  len(self.mu_data['event_id'])%500==0 and False:
                         df = pd.DataFrame.from_dict(self.mu_data)
                         df.to_hdf(os.path.join('./',
                                                f'mudata_tel{self.tel}_t.h5'),
                                                "df")
-                    
-                                    
-                            
-        return 
-                        
+
+
+
+        return
+
     def plot_event(self,Q_sum,mask,mu_mask):
         f,axs = plt.subplots(1,3,figsize=(15,4))
         # disp = CameraDisplay(digicam_geometry,ax=ax)
         disp = CameraDisplay(self.geom,ax=axs[0])
         disp.image = Q_sum
         disp.add_colorbar(ax=axs[0])
-        
+
         image = np.zeros(self.n_pixels)
         image[mask]=Q_sum[mask]
         disp = CameraDisplay(self.geom,ax=axs[1])
         disp.image = image
         axs[1].set_title(f"Qtot = {Q_sum.sum()} \n Qmax = {Q_sum.max()} (b std ={np.median(self.bsstd):.3})")
         disp.add_colorbar(ax=axs[1])
-        
-        
+
+
         image = np.zeros(self.n_pixels)
         image[mu_mask]=Q_sum[mu_mask]
         disp = CameraDisplay(self.geom,ax=axs[2])
-       
+
         disp.image =image
         disp.highlight_pixels(self.pixels[mu_mask],'red',.5)
         disp.add_colorbar(ax=axs[2])
-        
+
         ttt = ""
         for key in ['radius','5pe_ratio','Q_mu','Q_nmu']:
             ttt = ttt+(f"{key} : {self.mu_data[key][-1]:.4} \n" )
-            
+
         tetas = np.linspace(0,2*np.pi,30)
         Cx,Cy,Cr = [self.mu_data[key][-1] for key in ['x','y','radius']]
         # axs[0].plot(Cx+np.cos(tetas)*Cr,Cy+np.sin(tetas)*Cr,color='grey')
@@ -470,13 +470,13 @@ class muon_finder:
         axs[1].legend()
         return f,axs
 
-        
-                    
 
-    
 
-    
-    
+
+
+
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -488,10 +488,10 @@ if __name__ == "__main__":
         parser.add_argument('--max_evt',      type=int, default = 20000000)
         parser.add_argument('--ismc',         type=bool, default = False)
 
-        
+
     args = parser.parse_args()
 
- 
+
     if args.tel==2:
         calib_df = pd.read_hdf('/mnt/nfs19/tavernier/sst1m/calib/averaged_calib_param_v2_tel2.h5')
     else:
@@ -511,7 +511,7 @@ if __name__ == "__main__":
             finder.get_muons()
         except Exception:
             print(f"file {filename} FAILED")
-            
+
 
         return finder.mu_data
 
@@ -523,18 +523,18 @@ if __name__ == "__main__":
     file_list=glob.glob(args.data_path+'/*.?z')
 
     pool = mp.Pool(n_proc)
-    pool_results = pool.map(proces_one_file, 
+    pool_results = pool.map(proces_one_file,
                             file_list[:1500])
     pool.close()
-                            
-    
+
+
 
     for res in pool_results:
         for key in results.keys():
             results[key] = results[key]+res[key]
-    
-    
-    
+
+
+
     # hdf5_file_path = os.path.join(args.table_dir,"tmp_"+args.out_file)
     # df.to_hdf(hdf5_file_path, key='df', mode='w')
     # df = pd.DataFrame(dict(results)).sort_values(by=['time'])

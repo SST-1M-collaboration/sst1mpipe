@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-A script to merge MC DL1 files in order to prepare a single (per particle) file 
+A script to merge MC DL1 files in order to prepare a single (per particle) file
 for RF training/testing.
 - Input is a directory containing DL1 MC files.
 - Output is a merged DL1 file containing all events from the input files.

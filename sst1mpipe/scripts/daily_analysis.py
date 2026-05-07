@@ -20,7 +20,7 @@ USAGE :
 
 nohup python daily_analysis.py /path/to/some/ana_config.json 2>daily_ana.err 1>daily_ana.out &
 
-or 
+or
 
 for auto proccessing of the last night data :
 python daily_analysis.py 2>daily_ana.err 1>daily_ana.out
@@ -32,12 +32,12 @@ DEFAULT_CONFIG_FILE = '/data/work/analysis/Daily_analysis/default_daily_ana_conf
 
 class iargs:
     """
-    dummy object made to handle arguments to 
+    dummy object made to handle arguments to
     be passed to the multiprocessing pool.
     """
     def __init__(self):
         pass
-        
+
 
 def args_maker(arg,file_list):
     '''
@@ -49,19 +49,19 @@ def args_maker(arg,file_list):
             padded to sst1mpipe scripts
 
         file_list: list
-            list of file paths 
+            list of file paths
     '''
 
     args_list = []
-    
+
     for input_file in file_list:
         t_arg = copy.copy(arg)
         t_arg.input_file=input_file
         args_list.append(t_arg)
     return args_list
 
-    
-    
+
+
 
 def r0_dl1_1file(arg):
         """
@@ -163,7 +163,7 @@ def make_runlist_allfiles(itel,year,month,day,rootdir='/net/'):
 
         Returns
         -------
-        list of raw data file paths    
+        list of raw data file paths
         """
         basedir = rootdir+f'/cs{itel}/data/raw/'
         filerad = f'SST1M{itel}'
@@ -183,10 +183,10 @@ def refine_file_list(file_list):
         ----------
         file_list : list
             list of raw data file paths
-            
+
         Returns
         -------
-        dict of raw data file paths   
+        dict of raw data file paths
     """
 
     list_dict = dict()
@@ -207,12 +207,12 @@ def refine_file_list(file_list):
 
 def run_daily_ana(daily_config):
     """
-    run daily r0 to dl3 analysis 
+    run daily r0 to dl3 analysis
 
     Parameters
     ----------
     daily_config : json config object
-            
+
     Returns
     -------
     None
@@ -243,7 +243,7 @@ def run_daily_ana(daily_config):
         output_logfile = os.path.join(ana_dir, "logs", f'daily_ana_{year:04d}{month:02d}{day:02d}.log')
     except Exception:
         output_logfile = os.path.join(ana_dir, "logs", 'default_daily_ana.log')
-    
+
     Path(ana_dir + '/logs/').mkdir(exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
@@ -253,7 +253,7 @@ def run_daily_ana(daily_config):
             logging.StreamHandler(stream=sys.stdout)
             ]
     )
-    
+
     if (year is None) or (month is None) or (day is None):
         logging.info("Running daily analysis for last night !")
         year  = (datetime.datetime.now()-datetime.timedelta(days=1)).year
@@ -261,8 +261,8 @@ def run_daily_ana(daily_config):
         day   = (datetime.datetime.now()-datetime.timedelta(days=1)).day
     logging.info("---------------------------------------------")
     logging.info(f"Daily analysis ({year:04d}/{month:02d}/{day:02d}) START ")
-    
-    ## get raw file list 
+
+    ## get raw file list
     raw_file_list_t1 = make_runlist_allfiles(itel = 1,
                                              year=year,
                                              month=month,
@@ -274,8 +274,8 @@ def run_daily_ana(daily_config):
                                              month=month,
                                              day=day,
                                              rootdir=rootdir)
- 
-    
+
+
     if (len(raw_file_list_t1)==0) and (len(raw_file_list_t2)==0):
         logging.warning("NO DATA FOUND : daily analysis ended")
         return
@@ -288,8 +288,8 @@ def run_daily_ana(daily_config):
     ## refine file list by target in header
     dict_list_t1 = refine_file_list(raw_file_list_t1)
     dict_list_t2 = refine_file_list(raw_file_list_t2)
-    
-    
+
+
     target_list = np.unique(list(dict_list_t1.keys())+list(dict_list_t2.keys()))
     logging.info("Target found ::")
     for target in target_list:
@@ -303,7 +303,7 @@ def run_daily_ana(daily_config):
         except Exception:
            logging.warning('no CS2 data')
 
- 
+
 
     ## make direcotory
     datedir = os.path.join(ana_dir,
@@ -316,7 +316,7 @@ def run_daily_ana(daily_config):
 
     shutil.copy(config_file, datedir)
 
-     
+
     for target in target_list:
         if target in ['DARK','Transition','UNKNOWN','BIAS','WRtest',"TRANSITION","transition","dark"]:
             continue
@@ -325,7 +325,7 @@ def run_daily_ana(daily_config):
         Path(target_dir).mkdir(exist_ok=True)
 
         ## yes, this have a low probability to work!
-        ## TODO get target pos.. How ? 
+        ## TODO get target pos.. How ?
         ## is ok, we don't realy use this for now
         try:
             target_pos = SkyCoord.from_name(target)
@@ -404,11 +404,11 @@ def run_daily_ana(daily_config):
         ## R0 -> DL1
         # cs1
         aargs = iargs()
-        
+
         aargs.config_file = config_file
         if cs1 and (target in list(dict_list_t1.keys()) ) and run_dl1:
             aargs.out_dir     = cs1_dl1_dir
-            
+
 
             pool = mp.Pool(n_proc)
             pool.map(r0_dl1_1file,
@@ -513,7 +513,7 @@ def run_daily_ana(daily_config):
                 pool = mp.Pool(n_proc)
                 pool.map(dl1_dl1_1file, args_maker(aargs,
                                                    glob.glob(cs1_dl1_dir+'/*.h5')))
-                pool.close()       
+                pool.close()
             if run_dl2:
                 aargs.out_dir   = stereo_dl2_dir
                 aargs.models_dir = stereo_model_dir
@@ -524,7 +524,7 @@ def run_daily_ana(daily_config):
                 pool.close()
             ## DL3
             if run_dl3:
-                try : 
+                try :
                     aargs.input_dir   = stereo_dl2_dir
                     aargs.out_dir     = stereo_dl3_dir
                     aargs.target_name = target
@@ -538,7 +538,7 @@ def run_daily_ana(daily_config):
 
             ## efficiency cuts
             if run_dl3_eff:
-                try : 
+                try :
                     aargs.input_dir   = stereo_dl2_dir
                     aargs.out_dir     = stereo_dl3_dir_eff
                     aargs.target_name = target
@@ -567,7 +567,7 @@ def run_daily_ana(daily_config):
             aargs.dl1_dir = stereo_dl1_dir
             aargs.dl3_dir = stereo_dl3_dir
             aargs.out_dir = stereo_dqual_dir
-            extract_dl1_distributions(aargs)       
+            extract_dl1_distributions(aargs)
 
         ## EXTRACT RATE DISTRIBUTION EFF
         aargs.date_str = f"{year:04d}{month:02d}{day:02d}"
@@ -585,8 +585,8 @@ def run_daily_ana(daily_config):
             aargs.dl1_dir = stereo_dl1_dir
             aargs.dl3_dir = stereo_dl3_dir_eff
             aargs.out_dir = stereo_dqual_dir_eff
-            extract_dl1_distributions(aargs)  
-    
+            extract_dl1_distributions(aargs)
+
 
     logging.info(f"Daily analysis ({year:04d}/{month:02d}/{day:02d}) ended ")
 

@@ -2,10 +2,10 @@
 
 """
 This script has two use cases:
-- It can be used to calculate the edges of event classes based 
-on percentile cut aplied on misdirection in DL2 MC filee, and 
+- It can be used to calculate the edges of event classes based
+on percentile cut aplied on misdirection in DL2 MC filee, and
 to store them in output HDF file.
-- Having the event classes already defined, it can be used to 
+- Having the event classes already defined, it can be used to
 clasify events in any DL2 files (MC/data).
 
 The script can automaticaly find the closest node in alt,az,nsb
@@ -92,7 +92,7 @@ def main():
     ismc = check_mc(input_file)
 
     for tel in tels:
-        
+
         dl2 = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
 
         models_dir_auto = get_closest_rf_model(dl2, models_dir=misdirection_models_dir)
@@ -144,6 +144,6 @@ def main():
         else:
             logging.info('Invalid combination of MC/data input file and --get-edges parameter. See --help.')
 
-        
+
 if __name__ == '__main__':
     main()

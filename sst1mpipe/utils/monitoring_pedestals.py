@@ -223,7 +223,7 @@ class sliding_pedestals:
             image_processor(event)
 
             clenaning_mask = event.dl1.tel[tel].image_mask
-            # Arbitrary cut, just to prevent too big showers from being used 
+            # Arbitrary cut, just to prevent too big showers from being used
             if sum(clenaning_mask) < 20:
                 self.add_ped_evt(event, cleaning_mask=clenaning_mask, store_image=False)
 
@@ -246,7 +246,7 @@ class sliding_pedestals:
             image_processor(event)
 
             clenaning_mask = event.dl1.tel[tel].image_mask
-            # Arbitrary cut, just to prevent too big showers from being used 
+            # Arbitrary cut, just to prevent too big showers from being used
             if sum(clenaning_mask) < 20:
               # Integration correction of saturated pixels - done only here because the fake pedestals must match in both loops
               event = saturated_charge_correction(event)

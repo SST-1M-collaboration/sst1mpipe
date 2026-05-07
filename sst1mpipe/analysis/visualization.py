@@ -11,9 +11,9 @@ from gammapy.stats import WStatCountsStatistic
 
 
 def plot_count_maps(
-        data, bins_raw=20, bins_conv=100, 
-        conv_kernel_deg=0.2, range_deg=4, 
-        source=None, theta2_cut=None, 
+        data, bins_raw=20, bins_conv=100,
+        conv_kernel_deg=0.2, range_deg=4,
+        source=None, theta2_cut=None,
         wobbles=[], off_radec_w=[]):
     """
     Plots count maps (not bkg subtracted). Raw 2D historam and
@@ -41,17 +41,17 @@ def plot_count_maps(
     """
 
     range_d = [
-                       [source.ra.value-range_deg/2/np.cos(np.deg2rad(source.dec.value)), 
-                        source.ra.value+range_deg/2/np.cos(np.deg2rad(source.dec.value))], 
-                       [source.dec.value-range_deg/2, 
+                       [source.ra.value-range_deg/2/np.cos(np.deg2rad(source.dec.value)),
+                        source.ra.value+range_deg/2/np.cos(np.deg2rad(source.dec.value))],
+                       [source.dec.value-range_deg/2,
                         source.dec.value+range_deg/2]
                    ]
-    
+
     fig, ax = plt.subplots(1, 2, figsize=(17,7))
 
-    ax[0].hist2d(data.reco_ra, 
-                   data.reco_dec, 
-                   bins=bins_raw, 
+    ax[0].hist2d(data.reco_ra,
+                   data.reco_dec,
+                   bins=bins_raw,
                    range=range_d
                   )
 
@@ -71,9 +71,9 @@ def plot_count_maps(
 
     kernel = Gaussian2DKernel(sigma_px, mode='oversample', factor=100, x_size=kernel_x_size, y_size=kernel_y_size).array
     heatmap, xedges, yedges = np.histogram2d(
-                            data.reco_ra, 
-                            data.reco_dec, 
-                            bins=bins_conv, 
+                            data.reco_ra,
+                            data.reco_dec,
+                            bins=bins_conv,
                             range=image_range_deg
                             )
     image = convolve(heatmap, kernel)
@@ -88,7 +88,7 @@ def plot_count_maps(
     ax[1].set_xlabel('RA [deg]')
     ax[1].set_ylabel('DEC [deg]')
     ax[1].grid(alpha=0.7)
-    
+
     #fig.colorbar(h[3], ax=ax[0])
     #fig.colorbar(img, ax=ax[1])
 
@@ -144,13 +144,13 @@ def plot_sigma_time(data, sigma, times, obsid, alphas, nights):
     ax[0].plot([0, np.sqrt(times[-1])], [0, max(sigma)], 'y-')
     ax[0].grid()
     ax[0].set_xlabel(r'$\sqrt{t} \, [\sqrt{s}]$')
-    ax[0].set_ylabel('$\sigma$')
+    ax[0].set_ylabel(r'$\sigma$')
 
     ax[1].plot(times, alphas, 'b.')
     ax[1].grid()
     ax[1].set_xlabel(r'$t \, [s]$')
     ax[1].set_ylabel(r'$\alpha$')
-    
+
     times = np.array(times)
     sigma = np.array(sigma)
     obsid = np.array(obsid)
@@ -163,18 +163,18 @@ def plot_sigma_time(data, sigma, times, obsid, alphas, nights):
         else:
             mask = (obsid >= nights[i])
         ax[2].plot(times[mask]/3600, sigma[mask], '.', color=c)
-        
+
         ax[2].text(times[mask][0]/3600, sigma[mask][0]-1, str(nights[i])[4:8], fontsize=12, color=c, fontweight='bold')
 
     ax[2].plot(times/3600, (max(sigma) / np.sqrt(times[-1]/3600)) * np.sqrt(times/3600), 'y-')
     ax[2].grid()
     ax[2].set_xlabel('t [h]')
-    ax[2].set_ylabel('$\sigma$')
+    ax[2].set_ylabel(r'$\sigma$')
 
 
 def plot_theta2(
-        theta2_on, theta2_off, 
-        theta2_range=[0, 1.0], n_bins_before_th2_cut=1, 
+        theta2_on, theta2_off,
+        theta2_range=[0, 1.0], n_bins_before_th2_cut=1,
         theta2_cut=0.04, norm_range=[0.2, 0.5],
         t_elapsed=0 * u.h):
     """
@@ -239,7 +239,7 @@ def plot_theta2(
                 rf'LiMa Significance = {significance_lima:.1f} $\sigma$ '
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.95)
-    
+
     fig, ax = plt.subplots(figsize=(8, 7))
     ax.errorbar(bin_center, hist_on, yerr=np.sqrt(hist_on), fmt='o', label='ON data', ms=10, color='lightcoral')
     ax.errorbar(bin_center, alpha * hist_off, yerr=alpha * np.sqrt(hist_off),fmt='s',label='Background', ms=10, color='cornflowerblue')
@@ -380,8 +380,8 @@ def plot_preliminary(ax=None, fontsize=60):
 
 
 def plot_energy_resolution(
-        e_bins, e_tables=None, labels=None, 
-        markers=None, axes=None, plot=None, 
+        e_bins, e_tables=None, labels=None,
+        markers=None, axes=None, plot=None,
         preliminary=False,
         skip_bins_first=0, skip_bins_last=0,
         titles=['Energy resolution', 'Energy bias']):
@@ -394,9 +394,9 @@ def plot_energy_resolution(
     e_tables: list of astropy.table.table.Table
     labels: list of strings
     markers: list of strings
-        List of markers 
+        List of markers
     axes: numpy.ndarray of matplotlib.axes._axes.Axes
-        Axes to plot the figure in 
+        Axes to plot the figure in
     plot: str
         If not provided with two axes, user must
         select whether to plot \'resolution\'
@@ -416,13 +416,13 @@ def plot_energy_resolution(
     """
 
     energy_center = ctaplot.ana.logbin_mean(e_bins['energy_bins'])
-    
+
     marker_size = 6
     if markers is None:
         markers = len(labels) * ['o']
-        
+
     if len(axes) == 2:
-        
+
         if preliminary:
             plot_preliminary(ax=axes[0])
             plot_preliminary(ax=axes[1])
@@ -439,10 +439,10 @@ def plot_energy_resolution(
                     label=label,
                     markersize=marker_size
                     )
-            axes[1].errorbar(energy_center_plot, 
-                    table_plot['energy_bias'], 
+            axes[1].errorbar(energy_center_plot,
+                    table_plot['energy_bias'],
                     xerr=(energy_center_plot - e_bins['energy_bins'][skip_bins_first:len(e_bins)-1-skip_bins_last], e_bins['energy_bins'][skip_bins_first+1:len(e_bins)-skip_bins_last] - energy_center_plot),
-                    fmt=marker, 
+                    fmt=marker,
                     label=label
                     )
 
@@ -459,7 +459,7 @@ def plot_energy_resolution(
         axes[0].set_ylim([0, 0.7])
         axes[0].grid(True, which='both')
         axes[0].label_outer()
-        axes[1].set_xscale('log')            
+        axes[1].set_xscale('log')
         axes[1].grid(True, which='both')
         axes[1].set_ylabel("Energy bias")
         axes[1].set_xlim([min(e_bins['energy_bins'].value), max(e_bins['energy_bins'].value)])
@@ -468,10 +468,10 @@ def plot_energy_resolution(
         axes[1].set_xlabel(r'$E_\mathrm{true}$' + ' [' + energy_center_unit + ']')
     else:
         if plot == 'resolution':
-            
+
             if preliminary:
                 plot_preliminary(ax=axes[0])
-            
+
             for table, label, marker in zip(e_tables, labels, markers, strict=False):
 
                 energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
@@ -497,7 +497,7 @@ def plot_energy_resolution(
             axes[0].grid(True, which='both')
             axes[0].label_outer()
         elif plot == 'bias':
-            
+
             if preliminary:
                 plot_preliminary(ax=axes[0])
 
@@ -506,10 +506,10 @@ def plot_energy_resolution(
                 energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
                 table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
 
-                axes[0].errorbar(energy_center_plot, 
-                                 table_plot['energy_bias'], 
+                axes[0].errorbar(energy_center_plot,
+                                 table_plot['energy_bias'],
                                  xerr=(energy_center_plot - e_bins['energy_bins'][skip_bins_first:len(e_bins)-1-skip_bins_last], e_bins['energy_bins'][skip_bins_first+1:len(e_bins)-skip_bins_last] - energy_center_plot),
-                                 fmt=marker, 
+                                 fmt=marker,
                                  label=label,
                                   markersize=marker_size
                                 )
@@ -526,12 +526,12 @@ def plot_energy_resolution(
             axes[0].set_ylabel(r"bias (median($E_\mathrm{reco}/E_\mathrm{true}$ - 1)")
             axes[0].set_xlabel(r'$E_\mathrm{true}$' + ' [' + energy_center_unit + ']')
 
-        else: 
+        else:
             print('Set plot=resolution or plot=bias.')
 
 
 def plot_angular_resolution(
-        e_bins, a_tables=None, labels=None, 
+        e_bins, a_tables=None, labels=None,
         markers=None, ax=None, preliminary=False,
         skip_bins_first=0, skip_bins_last=0,
         title='Angular resolution'):
@@ -544,9 +544,9 @@ def plot_angular_resolution(
     a_tables: list of astropy.table.table.Table
     labels: list of strings
     markers: list of strings
-        List of markers 
+        List of markers
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
     preliminary: bool
         Add preliminary watermark
     skip_bins_first: float
@@ -562,7 +562,7 @@ def plot_angular_resolution(
     """
 
     energy_center = ctaplot.ana.logbin_mean(e_bins['energy_bins'])
-    
+
     marker_size = 6
     if markers is None:
         markers = len(labels) * ['o']
@@ -571,15 +571,15 @@ def plot_angular_resolution(
         plot_preliminary(ax=ax)
 
     for table, label, marker in zip(a_tables, labels, markers, strict=False):
-        
+
         energy_center_plot = energy_center[skip_bins_first:len(energy_center)-skip_bins_last]
         table_plot = table[skip_bins_first:len(energy_center)-skip_bins_last]
-        
-        ax.errorbar(energy_center_plot, 
-                    table_plot['angular_res'], 
+
+        ax.errorbar(energy_center_plot,
+                    table_plot['angular_res'],
                     xerr=(energy_center_plot - e_bins['energy_bins'][skip_bins_first:len(e_bins)-1-skip_bins_last], e_bins['energy_bins'][skip_bins_first+1:len(e_bins)-skip_bins_last] - energy_center_plot),
                     yerr=(table_plot['angular_res'] - table_plot['angular_res_err_lo'], table_plot['angular_res_err_hi'] - table_plot['angular_res']),
-                    fmt=marker, 
+                    fmt=marker,
                     markersize=marker_size,
                     label=label)
 
@@ -596,8 +596,8 @@ def plot_angular_resolution(
 
 
 def plot_roc(
-        roc_tables=None, labels=None, ax=None, 
-        gammaness_cut=None, preliminary=False, 
+        roc_tables=None, labels=None, ax=None,
+        gammaness_cut=None, preliminary=False,
         linestyles=None, title='ROC curve'):
     """
     Plots energy resolution and bias.
@@ -607,7 +607,7 @@ def plot_roc(
     roc_tables: list of astropy.table.table.Table
     labels: list of strings
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
     gammaness_cut: float
         Highlights one point on the ROC curve
     preliminary: bool
@@ -629,14 +629,14 @@ def plot_roc(
         linestyles = len(labels) * ['-']
 
     for table, label, linestyle in zip(roc_tables, labels, linestyles, strict=False):
-        
-        ax.plot(table['false_positive_rate'], 
-                table['true_positive_rate'], 
+
+        ax.plot(table['false_positive_rate'],
+                table['true_positive_rate'],
                 label=label + ', AUC=' + str(get_auc(table)),
                 linestyle=linestyle
                )
         if gammaness_cut is not None:
-            ax.plot(table['false_positive_rate'][np.argmin(abs(table['threshold'] - gammaness_cut))], 
+            ax.plot(table['false_positive_rate'][np.argmin(abs(table['threshold'] - gammaness_cut))],
                     table['true_positive_rate'][np.argmin(abs(table['threshold'] - gammaness_cut))],
                     'k.')
     ax.set_ylabel('True Positive Rate')
@@ -650,8 +650,8 @@ def plot_roc(
 
 
 def plot_sensitivity(
-        sens_tables=None, labels=None, markers=None, 
-        ax=None, xlim=[10**-1, 10**3], ylim=[10**-12, 10**-10], 
+        sens_tables=None, labels=None, markers=None,
+        ax=None, xlim=[10**-1, 10**3], ylim=[10**-12, 10**-10],
         bands=False, yerrors=False, preliminary=False,
         legend_fontsize=10):
     """
@@ -664,7 +664,7 @@ def plot_sensitivity(
     markers:
         List of markers
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
     xlim: list of floats
     ylim: list of floats
     bands: bool
@@ -687,14 +687,14 @@ def plot_sensitivity(
     marker_size = 6
     if markers is None:
         markers = len(labels) * ['o']
-    
+
     for table, label, marker in zip(sens_tables, labels, markers, strict=False):
 
         if bands:
             ax.fill_between(table['energy'],
                             table['flux_sensitivity']-table['flux_sensitivity_err_minus'],
                             table['flux_sensitivity']+table['flux_sensitivity_err_plus'],
-                            alpha=0.5, 
+                            alpha=0.5,
                             antialiased=True,
                             label=label
                            )
@@ -746,9 +746,9 @@ def get_auc(table):
 
 
 def plot_source_sed(
-        spectrum=None, ax=None, fraction=None, 
-        linestyle="-", color='grey', 
-        flux_units=u.TeV / (u.cm ** 2 * u.s), 
+        spectrum=None, ax=None, fraction=None,
+        linestyle="-", color='grey',
+        flux_units=u.TeV / (u.cm ** 2 * u.s),
         alpha=None):
     """
     Plot SED of given gamma-ray source.
@@ -759,7 +759,7 @@ def plot_source_sed(
         Designation of source spectra as defined in
         sst1mpipe.performance.spectra
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
     fraction: float
         Scaling of plotted SED
     linestyle: string
@@ -772,7 +772,7 @@ def plot_source_sed(
     h: list of matplotlib.lines.Line2D
 
     """
-    
+
     target_spectrum = globals()[spectrum]
     energy_smooth = np.logspace(-1, 3, 200) * u.TeV
     if fraction is not None:
@@ -792,13 +792,13 @@ def plot_lhaaso_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------
 
     """
-    
+
     sens = np.array(
         [
             [153.6634615886556, 3.754698473106022e-11],
@@ -819,7 +819,7 @@ def plot_lhaaso_sens(ax=None):
             [750173.7128410875, 2.2273960279095398e-13]
         ]
     )
-    
+
     energy = sens[:, 0] * u.GeV
     diff_sens = sens[:, 1] * u.erg / (u.cm ** 2 * u.s)
     ax.plot(energy.to(u.TeV), diff_sens.to(u.TeV / (u.cm ** 2 * u.s)), label='LHAASO (1yr)')
@@ -833,7 +833,7 @@ def plot_hawc_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------
@@ -870,7 +870,7 @@ def plot_hawc_sens(ax=None):
             [103236.73479173059, 1.1326629017510099e-11]
         ]
     )
-    
+
     energy = sens[:, 0] * u.GeV
     diff_sens = sens[:, 1] * u.erg / (u.cm ** 2 * u.s)
     ax.plot(energy.to(u.TeV), diff_sens.to(u.TeV / (u.cm ** 2 * u.s)), label='HAWC (1yr)')
@@ -884,7 +884,7 @@ def plot_veritas_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------
@@ -925,7 +925,7 @@ def plot_hess_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------
@@ -971,7 +971,7 @@ def plot_astri_sens(ax=None):
     Parameters
     ----------
     ax: matplotlib.axes._axes.Axes
-        Axis to plot the figure in 
+        Axis to plot the figure in
 
     Returns
     -------

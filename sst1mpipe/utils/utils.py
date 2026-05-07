@@ -46,12 +46,12 @@ INVERTED_MODULE_LIST_PATH = BASE_DIR / "data" / "inverted_module_list.json"
 
 def get_target(file, force_pointing=False):
     """
-    Extracts the target information from the string 
-    stored in the TARGET field of the input file 
-    Fits header. The string is expected to have the 
+    Extracts the target information from the string
+    stored in the TARGET field of the input file
+    Fits header. The string is expected to have the
     following format \"Target,RA[in deg],DEC[in deg]\".
-    Target may contain wobble information. Files stored 
-    during the transition between wobbles must be flagged 
+    Target may contain wobble information. Files stored
+    during the transition between wobbles must be flagged
     with \'Transition\' string.
 
     Parameters
@@ -78,7 +78,7 @@ def get_target(file, force_pointing=False):
         try:
             header = hdul["Events"].header
             # Delimiter should be hopefuly either ',' or '_'
-            # The string in the TARGET field is expected in the form: target[]wobble[]ra[]dec, 
+            # The string in the TARGET field is expected in the form: target[]wobble[]ra[]dec,
             # but targetwobble[]ra[]dec, and also target_wobble[]ra[]dec should work as well
             pointing_string = header['TARGET']
             logging.info('TARGET field: ' + pointing_string)
@@ -104,7 +104,7 @@ def get_target(file, force_pointing=False):
                 elif len(pointing_string.split(delimiter)) == 3:
                     ra = float(pointing_string.split(delimiter)[1])
                     dec = float(pointing_string.split(delimiter)[2])
-                else: 
+                else:
                     logging.warning('Wrong format of coordinates in the fits header. Field with either 3 or 4 entries is expected.')
                     ra, dec = None, None
             except ValueError:
@@ -132,7 +132,7 @@ def get_nsb_levels_rates(config):
 
 def get_stereo_method(config):
     """
-    Reads method of coincidet event matching 
+    Reads method of coincidet event matching
     from the config file.
 
     Parameters
@@ -236,7 +236,7 @@ def get_location(config=None, tel=None):
 
 def simbad_query(ra=None, dec=None, max_mag=8):
     """
-    Query simbad for the brightest stars in the 
+    Query simbad for the brightest stars in the
     FoV.
 
     Parameters
@@ -276,9 +276,9 @@ def simbad_query(ra=None, dec=None, max_mag=8):
 
 def event_hillas_add_units(event):
     """
-    This returns units to Hillas parameters to 
-    event which resulted from 
-    ctapipe.io.HDF5EventSource 
+    This returns units to Hillas parameters to
+    event which resulted from
+    ctapipe.io.HDF5EventSource
 
     Parameters
     ----------
@@ -289,7 +289,7 @@ def event_hillas_add_units(event):
     -------
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
-        Event with units added to Hillas 
+        Event with units added to Hillas
         parameter
     """
 
@@ -304,7 +304,7 @@ def event_hillas_add_units(event):
         event.dl1.tel[tel].parameters.hillas.x = event.dl1.tel[tel].parameters.hillas.x * u.m
         event.dl1.tel[tel].parameters.hillas.y = event.dl1.tel[tel].parameters.hillas.y * u.m
         event.dl1.tel[tel].parameters.timing.slope = event.dl1.tel[tel].parameters.timing.slope * 1/u.m
-    
+
     return event
 
 
@@ -313,7 +313,7 @@ def add_trigger_time(event, telescope=None):
     Stores local_camera_clock provided with event source
     in event.trigger with nanosecond precision, see
     https://github.com/cta-observatory/ctapipe_io_nectarcam/issues/24
-    Note: If we read the data using ctapipe.io.read_table, 
+    Note: If we read the data using ctapipe.io.read_table,
     the numerical precision is lost anyway. This is the reason
     storing WR timestamps in two columns directly in the DL1
     table.
@@ -392,12 +392,12 @@ def add_event_id(event, filename=None, event_number=0):
 
 
 def add_pointing_to_events(
-    event, ra=None, dec=None, 
+    event, ra=None, dec=None,
     telescope=None, location=None):
     """
-    Fills array pointing and telescope pointing 
-    fields of the event container. Pointing 
-    altitude ant azimuth are also calculated 
+    Fills array pointing and telescope pointing
+    fields of the event container. Pointing
+    altitude ant azimuth are also calculated
     from poiting ra,dec and trigger time.
 
     Parameters
@@ -431,7 +431,7 @@ def add_pointing_to_events(
 def check_mc(file):
     """
     Checks the input DL1 HDF file and
-    returns True of False if it's 
+    returns True of False if it's
     MC or data file, respectively.
 
     Parameters
@@ -468,12 +468,12 @@ def get_avg_pointing(dl1):
 
 
 def get_closest_rf_model(
-        dl1, models_dir=None, nsb_level=None, 
+        dl1, models_dir=None, nsb_level=None,
         tel=None, config=None):
     """
     RF models are trained per bin in zenith angle,
     azimuth and NSB level. They are expected to be
-    stored in subdirectories with the following 
+    stored in subdirectories with the following
     naming format: \'zeXX_azXX_nsbXX\'. This provides
     the path to the closest RF models (in [NSB,ze,az]
     space).
@@ -482,9 +482,9 @@ def get_closest_rf_model(
     ----------
     dl1: pandas.DataFrame or astropy.table.Table
     models_dir: str
-        Path to stored trained RFs, or path to general 
-        production directory where subdirectories with 
-        models in the following naming format are 
+        Path to stored trained RFs, or path to general
+        production directory where subdirectories with
+        models in the following naming format are
         expected: \'zeXX_azXX_nsbXX\''
     nsb_level: float
         Average NSB level, usualy stored in meanQ
@@ -506,7 +506,7 @@ def get_closest_rf_model(
             try:
                 model_coords = dir_ze_az.split('_')
                 models_tab.append(
-                    [model_coords[0].split('ze')[1], 
+                    [model_coords[0].split('ze')[1],
                     model_coords[1].split('az')[1],
                     model_coords[2].split('nsb')[1],
                     dir_ze_az
@@ -551,7 +551,7 @@ def check_same_shower_fraction(dl2, energy_bins):
 
     # Same simulated showers can be identified by true energy, which might be a bit dangerous, if the numeric precision is not high enough
     # to catch all showers which differ only by a tiny fraction of E_True. An alternative is to use obs_id together with event_id, because
-    # the events generated by the same shower have the same event_id BUT THE LAST TWO DIGITS. The numbering starts from 100 (first shower, 
+    # the events generated by the same shower have the same event_id BUT THE LAST TWO DIGITS. The numbering starts from 100 (first shower,
     # first reuse), i.e. it works up to number_reuse = 100. What happens above that is a big mystery.
     event_id = dl2['event_id']
     event_id -= event_id % +100
@@ -582,10 +582,10 @@ def check_same_shower_fraction(dl2, energy_bins):
 def mc_correct_shower_reuse(mc_table, histograms):
     """
     If we use CSCAT>20 in CORSIKA the number stored in mc['shower_reuse']
-    is still 20, even though the total number of shower stored in the simtel 
-    file is correct (Vladimir checked), and also the total number of thrown 
-    events stored in histograms seems to be fine (Jakub checked). Here we 
-    use the total number of events stored in histograms to correct for 
+    is still 20, even though the total number of shower stored in the simtel
+    file is correct (Vladimir checked), and also the total number of thrown
+    events stored in histograms seems to be fine (Jakub checked). Here we
+    use the total number of events stored in histograms to correct for
     shower_reuse.
 
     Parameters
@@ -598,7 +598,7 @@ def mc_correct_shower_reuse(mc_table, histograms):
         file: /simulation/service/shower_distribution
 
     Returns
-    ------- 
+    -------
     astropy.table.Table
 
     """
@@ -610,7 +610,7 @@ def mc_correct_shower_reuse(mc_table, histograms):
         # NOTE: just be careful if you decide to cut in histograms in the future
         n_true_simulated = histograms['n_entries'][mask].sum()
         n_simulated = (mc_table['n_showers'][mask] * mc_table['shower_reuse'][mask]).sum()
-    
+
         if n_true_simulated != n_simulated:
             logging.warning('Sum of histograms for production with e_min: %f doesn\'t match with n_showers*shower_reuse stored in the mc tab!!', simulated_e_min)
             n_reuse_new = histograms['n_entries'][mask][0]  / mc_table['n_showers'][mask]
@@ -621,17 +621,17 @@ def mc_correct_shower_reuse(mc_table, histograms):
 
 
 def correct_number_simulated_showers(
-        simulated_event_info, mc_table=None, 
+        simulated_event_info, mc_table=None,
         histogram_table=None, e_min_cut=None):
     """
-    Corrects the number of totaly simulated showers 
+    Corrects the number of totaly simulated showers
     after the cuts on true energy in DL1 and DL2.
 
-    One may combine different MC production with 
+    One may combine different MC production with
     different E mins and cut on the minimum energy
     when producing DL1 or DL2 files. But is such case
     the number of simulated events and simulated event
-    histograms, wchi are stored in DL1/DL2 MC are not 
+    histograms, wchi are stored in DL1/DL2 MC are not
     correct resulting in wrong spectral reweighting.
 
     This fucntion corrects the number of simulated events
@@ -643,11 +643,11 @@ def correct_number_simulated_showers(
     mc_table: astropy.table.Table
     histogram_table: astropy.table.Table
     e_min_cut: float
-        Cut on E nergy applied in DL1/DL2 files. 
+        Cut on E nergy applied in DL1/DL2 files.
         Expected to be in TeV.
 
     Returns
-    ------- 
+    -------
     astropy.table.QTable
 
     """
@@ -695,7 +695,7 @@ def energy_min_cut(file, config=None):
     particle_type = get_primary_type(file)
 
     if particle_type == 0:
-        min_energy = config["analysis"]["gamma_min_simulated_energy_tev"] 
+        min_energy = config["analysis"]["gamma_min_simulated_energy_tev"]
     elif particle_type == 101:
         min_energy = config["analysis"]["proton_min_simulated_energy_tev"]
     else:
@@ -729,7 +729,7 @@ def energy_min_cut(file, config=None):
             if images_tab:
                 masked_images = images.copy()
 
-        # Only combination of both overwrite and append works like expected, i.e. overwrite only telescope parameters and the rest 
+        # Only combination of both overwrite and append works like expected, i.e. overwrite only telescope parameters and the rest
         # of the DL1 file remains the same
         # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
         # then cannot merge the files and raise error...
@@ -785,7 +785,7 @@ def mix_gamma_proton(params_gammas, params_protons, max_events=None, gp_training
             logging.info("GH classifier training: Requested number of training gammas cannot be fulfilled, too few events in training DL1 files.")
             N_gammas = len(params_gammas)
             if len(params_protons) < N_gammas / gp_training_ratio:
-                logging.info("GH classifier training: Requested number of training protons cannot be fulfilled, too few events in training DL1 files.") 
+                logging.info("GH classifier training: Requested number of training protons cannot be fulfilled, too few events in training DL1 files.")
                 N_protons = len(params_protons)
             else:
                 N_protons = int(N_gammas / gp_training_ratio)
@@ -794,7 +794,7 @@ def mix_gamma_proton(params_gammas, params_protons, max_events=None, gp_training
             logging.info("GH classifier training: Requested number of training protons cannot be fulfilled, too few events in training DL1 files.")
             N_protons = len(params_protons)
             if len(params_gammas) < N_protons * gp_training_ratio:
-                logging.info("GH classifier training: Requested number of training gammas cannot be fulfilled, too few events in training DL1 files.") 
+                logging.info("GH classifier training: Requested number of training gammas cannot be fulfilled, too few events in training DL1 files.")
                 N_gammas = len(params_gammas)
             else:
                 N_gammas = int(N_protons * gp_training_ratio)
@@ -815,7 +815,7 @@ def correct_true_image(event):
     """
     For an unknown reason, event.simulation.tel[tel].true_image
     is sometimes None, which kills the rest of the script
-    and simulation histogram is not saved. Here we repace 
+    and simulation histogram is not saved. Here we repace
     it with an array of zeros.
 
     Parameters
@@ -923,11 +923,11 @@ def swap_modules_r0wf(event,mask1,mask2,tel=None):
 
 def remove_bad_pixels(event, config=None):
     """
-    Fills bad pixel waveforms with zeros and 
-    flags them in proper containers. Charges in 
-    these pixels are then interpolated using method 
+    Fills bad pixel waveforms with zeros and
+    flags them in proper containers. Charges in
+    these pixels are then interpolated using method
     set in cfg: invalid_pixel_handler_type
-    Default is NeighborAverage, but can be turned 
+    Default is NeighborAverage, but can be turned
     off with 'null'
 
     Parameters
@@ -988,7 +988,7 @@ def check_output_dl1(file):
 
 def add_features(data):
     """
-    Add some extra parameters in the DL1 table. 
+    Add some extra parameters in the DL1 table.
 
     Parameters
     ----------
@@ -996,7 +996,7 @@ def add_features(data):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1008,20 +1008,20 @@ def add_features(data):
 
 def add_timing_features(data, images):
     """
-    Add some extra parameters in the DL1 table. 
+    Add some extra parameters in the DL1 table.
 
     Parameters
     ----------
     data: astropy.table.Table
-        table with event parameters, 
+        table with event parameters,
         usualy stored in /dl1/event/telescope/parameters/{tel}
     images: astropy.table.Table
-        table with event image, pixel timing and cleaning mask, 
+        table with event image, pixel timing and cleaning mask,
         usualy stored in /dl1/event/telescope/images/{tel}
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
     cleaning_mask = images['image_mask']
@@ -1042,8 +1042,8 @@ def add_timing_features(data, images):
 
 def add_log_true_energy(data):
     """
-    Add log of the true energy in 
-    the DL1 MC table. 
+    Add log of the true energy in
+    the DL1 MC table.
 
     Parameters
     ----------
@@ -1051,7 +1051,7 @@ def add_log_true_energy(data):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1062,7 +1062,7 @@ def add_log_true_energy(data):
 def add_pointing_mc(
         data, input_file=None, tel=None):
     """
-    Add pointing altitude and azimuth in 
+    Add pointing altitude and azimuth in
     DL1 table
 
     Parameters
@@ -1073,7 +1073,7 @@ def add_pointing_mc(
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1081,16 +1081,16 @@ def add_pointing_mc(
     pointing = read_table(input_file, string)
 
     merged_table = data.copy()
-    
+
     merged_table['true_az_tel'] = np.ones(len(merged_table)) * (pointing['azimuth'][0] * pointing['azimuth'].unit).to(u.deg)
     merged_table['true_alt_tel'] = np.ones(len(merged_table)) * (pointing['altitude'][0] * pointing['altitude'].unit).to(u.deg)
-    
+
     return merged_table
 
 
 def add_disp(paramtable, config=None, telescope=None):
     """
-    Add DISP parameters in the DL1 MC table. 
+    Add DISP parameters in the DL1 MC table.
 
     Parameters
     ----------
@@ -1100,33 +1100,33 @@ def add_disp(paramtable, config=None, telescope=None):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
     merged_table = paramtable
-    
+
     horizon_frame = get_horizon_frame(config=config, telescope=telescope)
 
     true_coordinates = get_event_pos_in_camera(merged_table, horizon_frame, true_pos=True)
     merged_table['true_camera_x'] = true_coordinates[0]
     merged_table['true_camera_y'] = true_coordinates[1]
-    
+
     # add disp parameters
     disp_parameters = add_disp_to_parameters(merged_table)
-    
+
     merged_table['disp_dx'] = disp_parameters[0]
     merged_table['disp_dy'] = disp_parameters[1]
     merged_table['disp_norm'] = disp_parameters[2]
     merged_table['disp_angle'] = disp_parameters[3].value * u.rad
     merged_table['disp_sign'] = disp_parameters[4]
-    
+
     return merged_table
 
 
 def add_miss(paramtable):
     """
-    Add miss parameter in the DL1 MC table. 
+    Add miss parameter in the DL1 MC table.
 
     Parameters
     ----------
@@ -1134,16 +1134,16 @@ def add_miss(paramtable):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
     # NOTE: Be careful here, camera_frame_hillas_psi is in units of degrees
     disp, miss = camera_to_shower_coordinates(
-        paramtable['true_camera_x'], 
-        paramtable['true_camera_y'], 
-        paramtable['camera_frame_hillas_x'], 
-        paramtable['camera_frame_hillas_y'], 
+        paramtable['true_camera_x'],
+        paramtable['true_camera_y'],
+        paramtable['camera_frame_hillas_x'],
+        paramtable['camera_frame_hillas_y'],
         paramtable['camera_frame_hillas_psi'].value * u.deg
         )
     paramtable['miss'] = miss
@@ -1163,7 +1163,7 @@ def add_true_impact(
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
 
     """
 
@@ -1190,7 +1190,7 @@ def event_selection(data, config=None):
 
     Returns
     -------
-    astropy.table.Table 
+    astropy.table.Table
         Table after quality cuts
 
     """
@@ -1202,7 +1202,7 @@ def event_selection(data, config=None):
     logging.info('Application of selection cuts:')
     for key, (lower_limit, upper_limit) in events_selection.items():
         # This is because we use this very same function on event selection for DL2, and in stereo,
-        # we have in DL2 these features with names changes so that we know which telescope they 
+        # we have in DL2 these features with names changes so that we know which telescope they
         # belong to.
         if key + "_tel1" in data.keys():
             for tel in ["tel1", "tel2"]:
@@ -1221,10 +1221,10 @@ def event_selection(data, config=None):
 
 def stereo_var_cuts(data, config=None):
     """
-    Performs cut on minimum distance between the two reconstructed 
-    source positions and on variance of reco gammaness and energy 
-    from both telescopes. 
-    
+    Performs cut on minimum distance between the two reconstructed
+    source positions and on variance of reco gammaness and energy
+    from both telescopes.
+
     Input table must contain min_distance column
     (in radians), var_reco_energy and var_gammaness.
 
@@ -1268,7 +1268,7 @@ def stereo_var_cuts(data, config=None):
         logging.info('No cut on max std reco gammaness applied.')
 
     mask = mask_disp & mask_gammaness & mask_energy
-    
+
     # JJ: .copy() complains: ValueError: values whose keys begin with an uppercase char must be Config instances: 'MC_correction_for_PDE', True
     # I changed the config param to lower case, let's see what happens in the next versions
     data_selected = data[mask] #.copy()
@@ -1280,9 +1280,9 @@ def get_finite(data, config=None, stereo=False):
     mask = np.ones(len(data), dtype=bool)
 
     N_selected = len(data[mask])
-    features = set(config["energy_regression_features"] + 
-            config["particle_classification_features"] + 
-            config["disp_regression_features"] + 
+    features = set(config["energy_regression_features"] +
+            config["particle_classification_features"] +
+            config["disp_regression_features"] +
             config["disp_classification_features"]
             )
 
@@ -1312,7 +1312,7 @@ def get_finite(data, config=None, stereo=False):
 def get_telescopes(input_file, data_level="dl1"):
     """
     Returns list of telescopes which have parameters
-    table stored in the input DL1 or DL2 HDF file. 
+    table stored in the input DL1 or DL2 HDF file.
 
     Parameters
     ----------
@@ -1382,7 +1382,7 @@ def camera_to_altaz(pos_x, pos_y, focal, pointing_alt, pointing_az, config=None,
     )
     camera_coord = SkyCoord(pos_x, pos_y, frame=camera_frame)
     horizon = camera_coord.transform_to(horizon_frame)
-    
+
     return horizon
 
 
@@ -1420,7 +1420,7 @@ def get_survived_ped_fraction(dl1_files, logs=None, tel=None):
 
         time = read_table(file, "/dl1/event/telescope/parameters/"+tel)['local_time'][0]
 
-        # find log 
+        # find log
         date = file.split('/')[-1].split('.')[0].split('_')[1]
         run = file.split('/')[-1].split('.')[0].split('_')[2]
         res = [i for i in logs if date in i]
@@ -1451,7 +1451,7 @@ def get_survived_ped_fraction(dl1_files, logs=None, tel=None):
     ped_fractions = np.array(ped_fractions)
     wobble = np.array(wobble)
     runs = np.array(runs)
-    
+
     return zenith_angles, times, ped_fractions, wobble, runs, filenames
 
 
@@ -1465,21 +1465,21 @@ def moon_phase_angle(time):
 
 
 def get_moon_params(data, config=None, tel=None, thinning=100):
-    
+
     location = get_location(config=config, tel=tel)
 
     time = Time(data.iloc[::thinning, :]['local_time'], format='unix', scale='utc')
     moon = get_moon(time, location=location)
     horizon_frame = AltAz(obstime=time, location=location)
     moon_altaz = moon.transform_to(horizon_frame)
-    
+
     moon_separation = ctaplot.ana.angular_separation_altaz(
-    np.array(data.iloc[::thinning, :]['true_alt_tel']) * np.pi/180. * u.rad, 
-    np.array(data.iloc[::thinning, :]['true_az_tel']) * np.pi/180. * u.rad, 
-    moon_altaz.alt, 
+    np.array(data.iloc[::thinning, :]['true_alt_tel']) * np.pi/180. * u.rad,
+    np.array(data.iloc[::thinning, :]['true_az_tel']) * np.pi/180. * u.rad,
+    moon_altaz.alt,
     moon_altaz.az
     )
-    
+
     return time, moon_altaz, moon_separation, moon_phase_angle(time)
 
 def get_target_pos(target_name=None, ra=None, dec=None):
@@ -1544,7 +1544,7 @@ def get_GTIs(times):
 
 def clip_alt(alt):
     """
-    Make sure altitude is not larger than 90 deg 
+    Make sure altitude is not larger than 90 deg
     (it happens in some MC files for zenith=0),
     to keep astropy happy.
 
@@ -1568,7 +1568,7 @@ def clip_alt(alt):
 
 def add_disp_to_parameters(data):
     """
-    We need to add DISP parameters to the dl1 table, 
+    We need to add DISP parameters to the dl1 table,
     these are not implemented in ctapipe! This is a
     modification of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
@@ -1595,10 +1595,10 @@ def add_disp_to_parameters(data):
 
 
 def disp(
-        cog_x, cog_y, src_x, 
+        cog_x, cog_y, src_x,
         src_y, hillas_psi):
     """
-    Calculates true DISP parameters shower 
+    Calculates true DISP parameters shower
     CoG and source coordinates. This is a
     modification of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
@@ -1631,12 +1631,12 @@ def disp(
             Distance of the source from shower CoG
             along the y axis
         disp_norm: astropy.units.quantity.Quantity
-            Absolute value of a distance of the source 
+            Absolute value of a distance of the source
             from shower CoG
         disp_angle: astropy.units.quantity.Quantity
             Hillas Psi angle
         disp_sign: numpy.ndarray
-            Defines on which side of the main axis the 
+            Defines on which side of the main axis the
             source lies
 
     """
@@ -1667,7 +1667,7 @@ def disp(
 def disp_to_pos(disp_dx, disp_dy, cog_x, cog_y):
     """
     Calculates source coordinates from DISP params
-    and CoG of the shower. This is a modification 
+    and CoG of the shower. This is a modification
     of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
     Copyright (c) 2024 cta-lstchain developers
@@ -1697,14 +1697,14 @@ def disp_to_pos(disp_dx, disp_dy, cog_x, cog_y):
     source_pos_x = cog_x + disp_dx
     source_pos_y = cog_y + disp_dy
 
-    return source_pos_x, source_pos_y    
+    return source_pos_x, source_pos_y
 
 
 def disp_vector(disp_norm, disp_angle, disp_sign):
     """
     Calculates disp vector (source position relative
     to the position of the shower) from RF reconstructed
-    quantities. This is a modification 
+    quantities. This is a modification
     of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
     Copyright (c) 2024 cta-lstchain developers
@@ -1713,12 +1713,12 @@ def disp_vector(disp_norm, disp_angle, disp_sign):
     Parameters
     ----------
     disp_norm: numpy.ndarray
-        Absolute value of a distance of the source 
+        Absolute value of a distance of the source
         from shower CoG. Should be in metres
     disp_angle: pandas.core.series.Series
         Hillas Psi angle in rad
     disp_sign: numpy.ndarray
-        Defines on which side of the main axis the 
+        Defines on which side of the main axis the
         source lies
 
     Returns
@@ -1734,8 +1734,8 @@ def disp_vector(disp_norm, disp_angle, disp_sign):
 def polar_to_cartesian(norm, angle, sign):
     """
     Polar to cartesian transformation.
-    As a convention, angle should be in 
-    [-pi/2:pi/2]. This is a modification 
+    As a convention, angle should be in
+    [-pi/2:pi/2]. This is a modification
     of the same functions from lstchain
     https://github.com/cta-observatory/cta-lstchain
     Copyright (c) 2024 cta-lstchain developers
@@ -1805,7 +1805,7 @@ def get_dt_from_altaz(altaz_coord):
 
     subarray = get_subarray()
 
-    d_tels = ((subarray.positions[21][1] - subarray.positions[22][1])**2 + 
+    d_tels = ((subarray.positions[21][1] - subarray.positions[22][1])**2 +
               (subarray.positions[21][0] - subarray.positions[22][0])**2 +
               (subarray.positions[21][2] - subarray.positions[22][2])**2)**0.5
 
@@ -1826,7 +1826,7 @@ def get_sources_in_dir(base_path):
     base_path: string
         Directory with all data for given night. It
         should contain folders with names of observed
-        sources. 
+        sources.
 
     Returns
     -------
@@ -1849,9 +1849,9 @@ def get_moon_phase(times=None, loc=None):
 
     Parameters
     ----------
-    times: 
+    times:
         astropy.time.Time
-    loc: 
+    loc:
         astropy.coordinates.EarthLocation
 
     Returns
@@ -1884,7 +1884,7 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
         list of source to ignore
     Returns
     -------
-    pyplot figure, axis 
+    pyplot figure, axis
 
     """
     plt.rcParams['font.family'] = 'monospace'
@@ -1892,7 +1892,7 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
     ds.obs_table.sort('OBS_ID')
     if objects is None:
         objects = np.unique(ds.obs_table['OBJECT'])
-    
+
     d_obs=dict({})
 
     for obj in objects:
@@ -1918,14 +1918,14 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
     return f,ax
 
 def calculate_misdirection(dl2):
-    
+
     dl2['misdirection'] = angular_separation(
         dl2['true_az'].values * u.deg,
         dl2['true_alt'].values * u.deg,
         dl2["reco_az"].values * u.deg,
         dl2["reco_alt"].values * u.deg,
     ).to_value(u.deg)
-    
+
     dl2['log_misdirection'] = np.log10(dl2['misdirection'])
-    
+
     return dl2

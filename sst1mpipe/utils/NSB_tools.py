@@ -49,7 +49,7 @@ Vdrop_lin_aprox = dict({'gain_tel21': -0.00487,
                         'xt_tel21'  : -0.00768,
                         'xt_tel22'  : -0.00207 })
 #Sipm gain w/o Vdrop
-## total pulse intergal 
+## total pulse intergal
 Gain_0 = dict({'tel21': 21.0,
                'tel22': 23.5})
 
@@ -69,7 +69,7 @@ def NSB_to_BLS(NSB_MHz,ntel):
     return A/(1-Vdrop_lin_aprox[f'gain_tel{ntel}']*A)
 
 def make_drop_func(param_name,ntel):
-    
+
     def drop_func(B_shift):
         slope   = Vdrop_lin_aprox[param_name+f'_tel{ntel}']
         #return max(slope*B_shift+1, 0)
@@ -118,7 +118,7 @@ def gain_drop_th(nsb_rate, cell_capacitance=85. * u.fF, bias_resistance=2.4 * u.
     return 1 - 1 / (1 + (nsb_rate * cell_capacitance * bias_resistance).to_value(1))
 
 
-    
+
 def BLS_to_NSB(baseline_shift,ntel,gain=None):
     if gain is None:
         gain = Gain_0[f'tel{ntel}']
@@ -166,7 +166,7 @@ def find_dark_files(data_dir):
         #run_number = int(file_path.split("_")[-1].split('.')[0])
         try :
             f = astropy.io.fits.open(file_path)
-            target = f[2].header['TARGET'] 
+            target = f[2].header['TARGET']
         except Exception:
             print(f'failed reading {file_path}')
             continue
@@ -177,9 +177,9 @@ def find_dark_files(data_dir):
 
 
 def get_dark_baseline(filename,max_evt=500,event_type=8):
-        
+
         raw_baselines  = [ [] for ii in range(1296)]
-       
+
         data_stream = SST1MEventSource([filename],
                                        max_events=max_evt)
         for _,event in enumerate(data_stream):
@@ -190,7 +190,7 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
                         for pix in range(1296):
                             raw_baselines[pix].append(r0data.adc_samples[pix,:50])
         raw_baselines  = np.array(raw_baselines)
-        
+
         return raw_baselines.mean(axis=(1,2))
 
 ############
@@ -198,9 +198,9 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
 ############
 
 def get_ped_table(file_list):
-    
+
     bline_table = None
-    
+
     for dl1file in sorted(file_list):
         if bline_table is None :
             try:
@@ -218,9 +218,9 @@ def get_ped_table(file_list):
     return bline_table
 
 def get_ped_table_low_res(file_list):
-    
+
     bline_table = None
-    
+
     for dl1file in sorted(file_list):
         if bline_table is None :
             try:

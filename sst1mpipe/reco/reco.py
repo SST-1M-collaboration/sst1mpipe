@@ -139,7 +139,7 @@ def train_rf_energy(
 
 
 def train_disp_vector(
-        data, config=None, plot=False, 
+        data, config=None, plot=False,
         outdir=None, telescope=None, stereo=False):
     """
     Train RF Regressor for DISP reconstruction (vector of disp_dx, disp_dy)
@@ -185,7 +185,7 @@ def train_disp_vector(
     del reg
 
 def train_disp_norm(
-        data, config=None, plot=False, 
+        data, config=None, plot=False,
         outdir=None, telescope=None, stereo=False):
     """
     Train RF Regressor for DISP norm reconstruction
@@ -230,7 +230,7 @@ def train_disp_norm(
 
 
 def train_disp_sign(
-        data, config=None, plot=False, 
+        data, config=None, plot=False,
         outdir=None, telescope=None, stereo=False):
     """
     Train RF Classifier for DISP sign reconstruction
@@ -275,7 +275,7 @@ def train_disp_sign(
 
 
 def train_rf_separation(
-        data, config=None, plot=False, 
+        data, config=None, plot=False,
         outdir=None, telescope=None, stereo=False):
     """
     Train RF Classifier for gamma/hadron separation
@@ -332,7 +332,7 @@ def train_rf_misdirection(
 
     reg = RandomForestRegressor(**regression_args)
     reg.fit(data[features], data['log_misdirection'])
-    
+
     if plot:
         plot_feature_importance(reg, features=features, outfile=outdir + '/reg_mis_features_' + str(telescope) + '.png', telescope=telescope)
 
@@ -341,8 +341,8 @@ def train_rf_misdirection(
 
 
 def train_models(
-        params_gamma, params_protons, config=None, 
-        plot=None, outdir=None, telescope=None, 
+        params_gamma, params_protons, config=None,
+        plot=None, outdir=None, telescope=None,
         stereo=False):
     """
     Run training of all RF models on MC gammas and protons
@@ -383,7 +383,7 @@ def train_models(
 
     if params_protons is not None:
 
-        # We want to use reco energy and disp_norm as features for g/h classifier (we skip disp_sign as it 
+        # We want to use reco energy and disp_norm as features for g/h classifier (we skip disp_sign as it
         # would be quite painful to implement again for stereo). To do this, we need to split training gammas into two subsets,
         # train energy and disp reconstructors on one of them, reco these two parameters in second of them, and then use the
         # second one as training sample for g/h separator
@@ -450,7 +450,7 @@ def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
         features = config['misdirection_regression_features_stereo']
     else:
         features = config['misdirection_regression_features_mono']
-    
+
     # Check finite
     mask = np.ones(len(dl2), dtype=bool)
     for key in features:
@@ -467,7 +467,7 @@ def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
 
 
 def get_evttype_edges(dl2, config=None, percentiles=[25, 50, 75]):
-    
+
     ebins = np.logspace(config['analysis']["log_energy_min_tev"], config['analysis']["log_energy_max_tev"], config['analysis']["n_energy_bins"])
     energy_center = logbin_mean(ebins)
 
@@ -488,7 +488,7 @@ def get_evttype_edges(dl2, config=None, percentiles=[25, 50, 75]):
         edges.append(evttype_edges)
     edges = np.array(edges)
 
-    
+
     cut_table = QTable()
     cut_table["low"] = ebins[:-1]
     cut_table["high"] = ebins[1:]
@@ -502,7 +502,7 @@ def get_evttype_edges(dl2, config=None, percentiles=[25, 50, 75]):
 
 
 def classify_evt_types(dl2, edges=None):
-    
+
     dl2['event_type'] = 0
     ebins_low = edges["low"]
     ebins_high = edges["high"]
@@ -520,13 +520,13 @@ def classify_evt_types(dl2, edges=None):
 
 
 def apply_models(
-        dl1, models_dir=None, config=None, 
+        dl1, models_dir=None, config=None,
         telescope=None, stereo=False, mc=True):
     """
-    Applies all RF models from models directory to reconstruct 
+    Applies all RF models from models directory to reconstruct
     all events from DL1 to DL2. Works on both MC/data, mono/stereo.
-    For stereo reconstruction, only DISP norm is reconstructed, 
-    and both possible signs are stored in the output DataFrame for 
+    For stereo reconstruction, only DISP norm is reconstructed,
+    and both possible signs are stored in the output DataFrame for
     each event (MARS-like stereo reconstruction). All quantities
     are reconstructed per-telescope even in stereo. Final averaging
     for stereo reconstruction is done in .reco.stereo_reconstruction()
@@ -614,7 +614,7 @@ def apply_models(
             disp_angle = dl2['camera_frame_hillas_psi'] * np.pi / 180
 
             disp_vec = disp_vector(disp_norm, disp_angle, disp_sign)
-            
+
         except FileNotFoundError:
             logging.warning('DISP model was not found. DISP vector of all reconstructed events will be set to [0, 0].')
             disp_vec = np.zeros((len(dl2), 2))
@@ -645,7 +645,7 @@ def apply_models(
         dl2['gammaness'] = 0
 
     if not stereo:
-        
+
         dl2['reco_disp_dx'] = disp_vec[:, 0]
         dl2['reco_disp_dy'] = disp_vec[:, 1]
         dl2['reco_src_x'], dl2['reco_src_y'] = disp_to_pos(dl2.reco_disp_dx,
@@ -661,7 +661,7 @@ def apply_models(
         if mc:
             times=None
         else:
-            times = Time(dl2.local_time, format='unix', scale='utc') 
+            times = Time(dl2.local_time, format='unix', scale='utc')
 
         src_pos_reco = reco_source_position_sky(dl2.camera_frame_hillas_x.values * u.m,
                                                     dl2.camera_frame_hillas_y.values * u.m,
@@ -693,15 +693,15 @@ def apply_models(
 
 
 def stereo_reconstruction(
-        params, config=None, 
+        params, config=None,
         ismc=False, telescopes=None):
     """
-    Averages energy and gammaness stereoscopicly reconstructed for 
+    Averages energy and gammaness stereoscopicly reconstructed for
     each telescope to get final stereo quantities for each event.
-    For direction reconstruction, alt/az for both signs from each 
+    For direction reconstruction, alt/az for both signs from each
     telescope are calculated. Then the combination leading to
     reconstructed coordinates with the smallest distance is
-    selected and final direction is calculated as weighted average 
+    selected and final direction is calculated as weighted average
     of the two (MARS-like stereo reconstruction).
 
     Parameters
@@ -790,8 +790,8 @@ def stereo_reconstruction(
                 config=config,
                 telescope=telescope
                 )
-            
-            azimuth_transformed = (src_pos_reco.az.to_value(u.deg) + 180) % 360 - 180            
+
+            azimuth_transformed = (src_pos_reco.az.to_value(u.deg) + 180) % 360 - 180
             params.loc[mask, 'reco_alt'+sign.replace('reco_disp','')] = src_pos_reco.alt.deg
             if abs(params[mask].true_az_tel.values[0]) <= 90:
                 params.loc[mask, 'reco_az'+sign.replace('reco_disp','')] = azimuth_transformed
@@ -800,11 +800,11 @@ def stereo_reconstruction(
                 params.loc[mask, 'reco_az'+sign.replace('reco_disp','')] = src_pos_reco.az.deg
                 logging.info('Using non-transformed azimuth')
 
-    # Now we have in params two azimuths and altitudes for each telescope, generated 
-    # using either + or - sign togther with the reconstructd disp_norm. We now need 
+    # Now we have in params two azimuths and altitudes for each telescope, generated
+    # using either + or - sign togther with the reconstructd disp_norm. We now need
     # to calculate all four possible angular distances (+,+), (-,-), (+,-), (-,+)
     # select the closest one, and calculate weighted average direction
-    # NOTE: We can safely average directions in alt/az, no need to go for ra/dec, because the difference 
+    # NOTE: We can safely average directions in alt/az, no need to go for ra/dec, because the difference
     # between the two frames is minor (of the order of 10^-3 deg).
 
     averaged_direction = get_averaged_direction(params, weights=weights, telescopes=telescopes)
@@ -824,15 +824,15 @@ def stereo_reconstruction(
 
     dl2.drop([
         'reco_alt_sign_p_tel'+str(tel[0]),
-        'reco_alt_sign_m_tel'+str(tel[0]), 
-        'reco_az_sign_p_tel'+str(tel[0]), 
+        'reco_alt_sign_m_tel'+str(tel[0]),
+        'reco_az_sign_p_tel'+str(tel[0]),
         'reco_az_sign_m_tel'+str(tel[0]),
         'reco_alt_sign_p_tel'+str(tel[1]),
-        'reco_alt_sign_m_tel'+str(tel[1]), 
-        'reco_az_sign_p_tel'+str(tel[1]), 
+        'reco_alt_sign_m_tel'+str(tel[1]),
+        'reco_az_sign_p_tel'+str(tel[1]),
         'reco_az_sign_m_tel'+str(tel[1])
         ],
-        inplace=True, 
+        inplace=True,
         axis=1
         )
 
@@ -883,17 +883,17 @@ def get_averaged_direction(params, weights=None, telescopes=None):
         for coord in ['alt', 'az']:
             if weights is not None:
                 telescopes_averaged.loc[mask, 'reco_'+coord] = (
-                    params_reshaped.loc[mask]['reco_'+coord+'_sign_'+combo[0]+'_tel'+str(tel[0])] * 
-                    params_reshaped.loc[mask][weights + '_tel'+str(tel[0])] + 
-                    params_reshaped.loc[mask]['reco_'+coord+'_sign_'+combo[1]+'_tel'+str(tel[1])] * 
-                    params_reshaped.loc[mask][weights + '_tel'+str(tel[1])] 
+                    params_reshaped.loc[mask]['reco_'+coord+'_sign_'+combo[0]+'_tel'+str(tel[0])] *
+                    params_reshaped.loc[mask][weights + '_tel'+str(tel[0])] +
+                    params_reshaped.loc[mask]['reco_'+coord+'_sign_'+combo[1]+'_tel'+str(tel[1])] *
+                    params_reshaped.loc[mask][weights + '_tel'+str(tel[1])]
                     ) / (
-                        params_reshaped.loc[mask][weights + '_tel'+str(tel[0])] + 
+                        params_reshaped.loc[mask][weights + '_tel'+str(tel[0])] +
                         params_reshaped.loc[mask][weights + '_tel'+str(tel[1])]
                     )
             else:
                 telescopes_averaged.loc[mask, 'reco_'+coord] = (
-                    params_reshaped.loc[mask]['reco_'+coord+'_sign_'+combo[0]+'_tel'+str(tel[0])] + 
+                    params_reshaped.loc[mask]['reco_'+coord+'_sign_'+combo[0]+'_tel'+str(tel[0])] +
                     params_reshaped.loc[mask]['reco_'+coord+'_sign_'+combo[1]+'_tel'+str(tel[1])]
                     ) / 2
 
@@ -916,22 +916,22 @@ def get_data_tel(params, tel=1):
     # We need those telescope dependent parameters (e.g. length or width)
     # for later use for event selection in performance evaluation
     data_tel = params[mask_tel][[
-        "obs_id", 
-        "event_id", 
-        'reco_alt_sign_p', 
-        'reco_alt_sign_m', 
-        'reco_az_sign_p', 
-        'reco_az_sign_m', 
+        "obs_id",
+        "event_id",
+        'reco_alt_sign_p',
+        'reco_alt_sign_m',
+        'reco_az_sign_p',
+        'reco_az_sign_m',
         "camera_frame_hillas_intensity",
         "camera_frame_hillas_width",
         "camera_frame_hillas_length",
         "leakage_intensity_width_2",
-        "camera_frame_hillas_wl", 
-        "camera_frame_hillas_skewness", 
-        "camera_frame_hillas_kurtosis", 
+        "camera_frame_hillas_wl",
+        "camera_frame_hillas_skewness",
+        "camera_frame_hillas_kurtosis",
         "camera_frame_timing_slope"
         ]]
-        
+
     data_tel = data_tel.rename(
                     columns={
                             "reco_alt_sign_p": "reco_alt_sign_p_tel"+str(tel),
@@ -954,7 +954,7 @@ def get_data_tel(params, tel=1):
 
 def angular_distance(params, combination='pp', tels=None):
     """
-    Calculates angular distance for all four combination of 
+    Calculates angular distance for all four combination of
     reconstructed source positions for images of the two telescopes.
 
     Parameters
@@ -970,10 +970,10 @@ def angular_distance(params, combination='pp', tels=None):
     """
 
     distance = angular_separation_altaz(
-                    params['reco_alt_sign_'+combination[0]+'_tel'+str(tels[0])].values * np.pi/180. * u.rad, 
-                    params['reco_az_sign_'+combination[0]+'_tel'+str(tels[0])].values * np.pi/180. * u.rad, 
-                    params['reco_alt_sign_'+combination[1]+'_tel'+str(tels[1])].values * np.pi/180. * u.rad, 
-                    params['reco_az_sign_'+combination[1]+'_tel'+str(tels[1])].values * np.pi/180. * u.rad, 
+                    params['reco_alt_sign_'+combination[0]+'_tel'+str(tels[0])].values * np.pi/180. * u.rad,
+                    params['reco_az_sign_'+combination[0]+'_tel'+str(tels[0])].values * np.pi/180. * u.rad,
+                    params['reco_alt_sign_'+combination[1]+'_tel'+str(tels[1])].values * np.pi/180. * u.rad,
+                    params['reco_az_sign_'+combination[1]+'_tel'+str(tels[1])].values * np.pi/180. * u.rad,
                 )
     return distance
 
@@ -991,7 +991,7 @@ def get_average_param(params, param=None, weights=None):
 
     Returns
     -------
-    average:    
+    average:
         pandas.DataFrame
     variance:
         Note that variance is calculated always from unweighted quantities
@@ -1059,10 +1059,10 @@ def get_stereo_dl2(params, ismc=False):
     """
 
     features = [
-        "obs_id", 
+        "obs_id",
         "event_id",
-        "true_az_tel", 
-        "true_alt_tel", 
+        "true_az_tel",
+        "true_alt_tel",
         "HillasReconstructor_core_x",
         "HillasReconstructor_core_y",
         "HillasReconstructor_h_max"
@@ -1071,15 +1071,15 @@ def get_stereo_dl2(params, ismc=False):
     # For MC we store some extra true parameters in DL2 for performance evaluation
     if ismc:
         features = features + [
-            "true_az", 
+            "true_az",
             "true_alt",
             "true_energy",
             "log_true_energy",
-            "true_core_x", 
-            "true_core_y", 
-            "true_h_first_int", 
-            "true_x_max", 
-            "true_shower_primary_id", 
+            "true_core_x",
+            "true_core_y",
+            "true_h_first_int",
+            "true_x_max",
+            "true_shower_primary_id",
             "true_camera_x",
             "true_camera_y",
         ]
@@ -1101,12 +1101,12 @@ def get_stereo_dl2(params, ismc=False):
 
 
 def find_coincidence_offset(
-        tel1_file=None, tel2_files=None, outdir=None, 
+        tel1_file=None, tel2_files=None, outdir=None,
         config=None, save_figures=False):
     """
     Finds time offset between both telescope timestamps
-    which results in the most coincident events (for 
-    given time window). This has to be used if the data does 
+    which results in the most coincident events (for
+    given time window). This has to be used if the data does
     not contain White Rabbit timestamps.
 
     Parameters
@@ -1126,19 +1126,19 @@ def find_coincidence_offset(
     """
 
     dl1_data_t1 = load_dl1_sst1m(
-        tel1_file, 
-        tel=get_telescopes(tel1_file)[0], 
-        config=config, 
-        table='pandas', 
-        check_finite=True, 
+        tel1_file,
+        tel=get_telescopes(tel1_file)[0],
+        config=config,
+        table='pandas',
+        check_finite=True,
         quality_cuts=True
         )
     dl1_data_t2 = load_more_dl1_tables_mono(
-        tel2_files, 
-        config=config, 
-        check_finite=True, 
-        quality_cuts=True, 
-        time_min=min(dl1_data_t1['local_time']), 
+        tel2_files,
+        config=config,
+        check_finite=True,
+        quality_cuts=True,
+        time_min=min(dl1_data_t1['local_time']),
         time_max=max(dl1_data_t1['local_time'])
         )
 
@@ -1162,7 +1162,7 @@ def find_coincidence_offset(
 
     for offset in time_offsets:
 
-        lolim = timestamp_tel1 + offset - window_half_width 
+        lolim = timestamp_tel1 + offset - window_half_width
         uplim = timestamp_tel1 + offset + window_half_width
 
         cond_lolim = timestamp_tel2_masked >= lolim[:, np.newaxis]
@@ -1201,15 +1201,15 @@ def make_dl1_stereo(
         config=None,
         time_offset=0):
     """
-    Finds coincidet events in all passed tel2 DL1 files for 
+    Finds coincidet events in all passed tel2 DL1 files for
     given tel1 DL1 file. Resulting DL1 file contains coincident
     events only in two tabs (
-    /dl1/event/telescope/parameters/{tel_021/tel_022}). 
-    Coincident events have the same event_id. There is also 
-    geometrical stereo reconstruction applied in this step 
-    providing extra columns to be used as features for 
-    stereo reconstruction (tel_impact_distance, h_max). 
-    This does not have to be run on MC, where the 
+    /dl1/event/telescope/parameters/{tel_021/tel_022}).
+    Coincident events have the same event_id. There is also
+    geometrical stereo reconstruction applied in this step
+    providing extra columns to be used as features for
+    stereo reconstruction (tel_impact_distance, h_max).
+    This does not have to be run on MC, where the
     coincident events are found on sim_telarray level.
 
     Parameters
@@ -1240,7 +1240,7 @@ def make_dl1_stereo(
     mono_events = 0
 
     source = HDF5EventSource(dl1_file_tel1)
-    current_t2_file = "" 
+    current_t2_file = ""
     t2_event_id = 0
 
     stereo_method = get_stereo_method(config)
@@ -1250,7 +1250,7 @@ def make_dl1_stereo(
         stereo_method = 'WhiteRabbitClosest'
 
     shower_processor  = ShowerProcessor(subarray=source.subarray, config=config)
-    
+
     if stereo_method == "SlidingWindow":
         window = config["stereo"]["SlidingWindow"]["window_half_width"]
     elif stereo_method == "WhiteRabbitClosest":
@@ -1265,18 +1265,18 @@ def make_dl1_stereo(
         dl1_data_tel1 = load_dl1_sst1m(dl1_file_tel1, tel='tel_021', table='pandas')
         t_t1_all = get_wr_timestamp(dl1_data_tel1)
         t_t2 = get_wr_timestamp(dl1_data_tel2)
-    
-    with DataWriter(source, 
-                    output_path=output_path, 
-                    overwrite        = True, 
+
+    with DataWriter(source,
+                    output_path=output_path,
+                    overwrite        = True,
                     write_showers    = True,
                     write_parameters = True,
                     write_images     = True,
                     ) as writer:
 
-        
+
         for _, evt in enumerate(source):
-        
+
             logging.info('TEL1 event: ' + str(evt.index.event_id))
 
             if stereo_method == "SlidingWindow":
@@ -1300,7 +1300,7 @@ def make_dl1_stereo(
                 if diff[idx] < window:
                     mask_concidence = diff == diff[idx]
                     tel2_event = dl1_data_tel2[mask_concidence]
-                else: 
+                else:
                     tel2_event = np.array([])
 
             tel_1 = evt.trigger.tels_with_trigger[0]
@@ -1308,7 +1308,7 @@ def make_dl1_stereo(
             tel_2 = telescope_list[tel1_idx-1]
 
             if tel2_event.shape[0]==1:
-                
+
                 if stereo_method == "SlidingWindow":
                     logging.info('Coincident event found! Time difference [s]: ' + str(abs(tel2_event['local_time'].iloc[0] - t_t1 - time_offset)))
                 elif stereo_method == "WhiteRabbitClosest":
@@ -1332,7 +1332,7 @@ def make_dl1_stereo(
                     dl1_t2_filename = glob.glob(input_dir_tel2+f'/SST1M2*{datestr}*{filestr}*{file_pattern}*.h5')[0].split('/')[-1]
                     logging.info('Coincident events from TEL ' + str(tel_2) + ' was found in file: ' + dl1_t2_filename)
                     dl1_t2_file = os.path.join(input_dir_tel2, dl1_t2_filename)
-                    
+
                     evt.trigger.tels_with_trigger = np.append(evt.trigger.tels_with_trigger, tel_2)
 
                     # Handling a first event from the file
@@ -1345,7 +1345,7 @@ def make_dl1_stereo(
 
                     if tel2_event['event_id'].iloc[0] != t2_event_id:
                         t2_event_id = tel2_event['event_id'].iloc[0]
-                        
+
                         try:
                             while evt_t2.index.event_id != t2_event_id :
                                 evt_t2 = next(source_t2)

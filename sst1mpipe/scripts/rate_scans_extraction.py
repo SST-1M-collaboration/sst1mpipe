@@ -80,7 +80,7 @@ def main():
 
         if 'DriveSystem' in f:
             drive_files.append(f)
-    
+
     if len(slow_control_files) > 0:
 
         font = {'family' : 'DejaVu Sans',
@@ -102,7 +102,7 @@ def main():
             else:
                 print('Drive File not found!')
                 drive_data = None
-    
+
             save_data(slow_data, drive_data=drive_data, save_path=save_path, only_good=only_good)
 
         plt.yscale('log')
@@ -119,7 +119,7 @@ def main():
         if show_figure:
             plt.show()
         plt.close()
-    
+
     else:
         print('No slow control file found!')
 
