@@ -376,7 +376,7 @@ def main():
             
             #set proper charge info according to time bins of pedestal events
             if reclean and (len(dl1_charges) > 0):
-                selected_charge = dl1_charges[0]
+                selected_charge = dl1_charges[-1]
                 for charge_entry in reversed(dl1_charges):
                     start_time = charge_entry[0]
                     if event.trigger.time >= start_time:
