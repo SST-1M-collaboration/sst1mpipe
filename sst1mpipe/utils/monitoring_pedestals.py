@@ -14,7 +14,7 @@ from sst1mpipe.calib import (
     window_transmittance_correction,
 )
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.utils import get_subarray, get_swap_flag
+from sst1mpipe.utils import get_subarray, get_swaped_modules
 
 MON_EVT_TYPE = 8
 class sliding_pedestals:
@@ -157,7 +157,7 @@ class sliding_pedestals:
                 window_corr_factors, _ = get_window_corr_factors(
                             telescope=tel, config=self.config
                             )
-                swap_modules = get_swap_flag(event)
+                swapped_modules = get_swaped_modules(event)
 
             r0data = event.sst1m.r0.tel[tel]
             if r0data._camera_event_type.value == MON_EVT_TYPE:
@@ -175,7 +175,7 @@ class sliding_pedestals:
                     event,
                     window_corr_factors=window_corr_factors,
                     telescope=tel,
-                    swap_flag=swap_modules
+                    swapped_modules=swapped_modules
                     )
 
                 if jj <= ii:
@@ -236,7 +236,7 @@ class sliding_pedestals:
                 window_corr_factors, _ = get_window_corr_factors(
                             telescope=tel, config=self.config
                             )
-                swap_modules = get_swap_flag(event)
+                swapped_modules = get_swaped_modules(event)
 
             # here we apply gain drop correction
             event = calibrator_r0_r1.calibrate(event, pedestal_info=self)
@@ -255,7 +255,7 @@ class sliding_pedestals:
                   event,
                   window_corr_factors=window_corr_factors,
                   telescope=tel,
-                  swap_flag=swap_modules
+                  swapped_modules=swapped_modules
                   )
 
               if jj <= ii:

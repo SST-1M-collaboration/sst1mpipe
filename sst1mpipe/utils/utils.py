@@ -15,6 +15,7 @@ import ctaplot
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
 import pandas as pd
 import pkg_resources
 import tables
@@ -36,6 +37,10 @@ from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
 from gammapy.data import DataStore
 
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+MAPPING_FILE_PATH = BASE_DIR / "data" / "digicam_pixels_mapping_V5T.txt"
+INVERTED_MODULE_LIST_PATH = BASE_DIR / "data" / "inverted_module_list.json"
 
 def get_target(file, force_pointing=False):
     """
@@ -830,11 +835,14 @@ def correct_true_image(event):
     return event
 
 
-def get_swap_flag(event):
+
+
+def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingfilepath=MAPPING_FILE_PATH):
     """
-    Correct for wrongly mapped pixels of tel2 between
-    camera refurbishment in September 2023 and physical 
-    repair in July 2024. 
+
+    get module list for wrongly mapped pixels
+    Pixel numbering is based on
+    data/inverted_module_list.json
 
     Parameters
     ----------
@@ -843,45 +851,52 @@ def get_swap_flag(event):
 
     Returns
     -------
-    bool:
-        Swap (or not) R1 waveforms and window corrections
-        in wrongly connected pixels
+    mask_list:
+        list of mask used to swap waveforms
 
     """
+    pix_maps = aio.read(mappingfilepath)
 
+    mask_list = []
     tel = event.sst1m.r0.tels_with_data[0]
-    flag = False
+    with open(inv_list_path, "r", encoding="utf-8") as f:
+        inv_list = json.load(f)
+    for ii, key in enumerate(inv_list.keys()):
+        if inv_list[key]['ntel'] == tel:
+            localtime = event.sst1m.r0.tel[tel].local_camera_clock/1e9
+            time = Time(localtime, format='unix_tai')
+            time_min = Time(inv_list[key]['date_sart'], format='isot', scale='utc')
+            time_max = Time(inv_list[key]['date_stop'], format='isot', scale='utc')
 
-    if tel == 22:
-        localtime = event.sst1m.r0.tel[tel].local_camera_clock/1e9
-        time = Time(localtime, format='unix_tai')
-        time_min = Time('2023-09-01T00:00:00.000', format='isot', scale='utc')
-        time_max = Time('2024-07-18T00:00:00.000', format='isot', scale='utc')
+            if (time > time_min) and (time < time_max):
+                module_1 = inv_list[key]['module_1']
+                module_2 = inv_list[key]['module_2']
 
-        if (time > time_min) and (time < time_max):
-            flag = True
-            logging.info('Data on tel ' + str(tel) + ' taken between Sep 2023 and Jul 2024, swapping wrongly connected modules 59 and 88.')
+                mask1 = np.zeros(1296, dtype=bool)
+                mask1[pix_maps[(pix_maps["module"]==module_1)]['pixel_sw_id']] = True
 
-    return flag
+                mask2 = np.zeros(1296, dtype=bool)
+                mask2[pix_maps[(pix_maps["module"]==module_2)]['pixel_sw_id']] = True
+
+                mask_list.append([mask1,mask2])
+                logging.info('Data on tel ' + str(tel) + ' SWAPPING wrongly connected modules {} and {}'.format(module_1,module_2))
+
+    return mask_list
 
 
-def swap_modules_59_88(event,tel=None, swap_flag=False):
+def swap_modules_r0wf(event,mask1,mask2,tel=None):
+
     """
-    Swaps pixel R1 waveforms in two wrongly
-    connected modules of tel2 between camera refurbishment
-    in September 2023 and physical repair in July 2024. 
-    Pixel numbering is based on 
-    test/resources/camera_config.cfg
+    Swaps pixel R0 waveforms between any two masks
 
     Parameters
     ----------
     event:
         sst1mpipe.io.containers.SST1MArrayEventContainer
-    tel: int
-    swap_flag: bool
-        Swap (or not) R1 waveforms
-        in wrongly connected pixels
 
+    mask1 : int
+    mask1 : int
+    tel   : int
     Returns
     -------
     event:
@@ -889,29 +904,20 @@ def swap_modules_59_88(event,tel=None, swap_flag=False):
 
     """
 
-    if swap_flag:
 
-        # module 59
-        mask59 = np.zeros(1296, dtype=bool)
-        mask59[1029] = True
-        mask59[1098:1102+1] = True
-        mask59[1133:1134+1] = True
-        mask59[1064:1067+1] = True
-        waveform_59 = event.r1.tel[tel].waveform[mask59, :]
-        
-        # module 88
-        mask88 = np.zeros(1296, dtype=bool)
-        mask88[1103] = True
-        mask88[1165:1169+1] = True
-        mask88[1194:1195+1] = True
-        mask88[1135:1138+1] = True
-        waveform_88 = event.r1.tel[tel].waveform[mask88, :]
-        
-        event.r1.tel[tel].waveform[mask59] = waveform_88
-        event.r1.tel[tel].waveform[mask88] = waveform_59   
+    waveform_1 = event.sst1m.r0.tel[tel].adc_samples[mask1,:]
+    bs_1 = event.sst1m.r0.tel[tel].digicam_baseline[mask1]
+
+    waveform_2 = event.sst1m.r0.tel[tel].adc_samples[mask2,:]
+    bs_2 = event.sst1m.r0.tel[tel].digicam_baseline[mask2]
+
+    event.sst1m.r0.tel[tel].adc_samples[mask1] = waveform_2
+    event.sst1m.r0.tel[tel].adc_samples[mask2] = waveform_1
+
+    event.sst1m.r0.tel[tel].digicam_baseline[mask1] = bs_2
+    event.sst1m.r0.tel[tel].digicam_baseline[mask2] = bs_1
 
     return event
-
 
 def remove_bad_pixels(event, config=None):
     """
@@ -1161,9 +1167,9 @@ def add_true_impact(
 
     array_info = read_table(input_file, "/configuration/instrument/subarray/layout")
 
-    if tel == 'tel_001': 
+    if tel == 'tel_001':
         index = 0
-    else:  
+    else:
         index = 1
     params['true_tel_impact_distance'] = np.sqrt((array_info['pos_x'][index] - params['true_core_x'])**2 + (array_info['pos_y'][index] - params['true_core_y'])**2) * u.m
     return params

@@ -49,12 +49,12 @@ from .utils import (
     get_moon_params,
     get_moon_phase,
     get_pointing_radec,
-    get_primary_type,
+    get_swaped_modules,
+    swap_modules_r0wf,
     get_sources_in_dir,
     get_stereo_method,
     get_subarray,
     get_survived_ped_fraction,
-    get_swap_flag,
     get_target,
     get_target_pos,
     get_tel_string,
@@ -67,7 +67,6 @@ from .utils import (
     remove_stereo,
     simbad_query,
     stereo_var_cuts,
-    swap_modules_59_88,
 )
 
 #from .monitoring_pedestals import (
