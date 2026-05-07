@@ -20,7 +20,7 @@ jobs:
         run : pip install .
       - name: Run Ruff (pyflakes + pycodestyle)
         shell: micromamba-shell {0}
-        run: ruff check . 
+        run: ruff check .
       - name: Run tests
         shell: micromamba-shell {0}
         run : pytest sst1mpipe/tests/
