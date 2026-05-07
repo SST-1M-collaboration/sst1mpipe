@@ -78,7 +78,7 @@ def get_window_corr_factors(telescope=None, config=None):
 def window_transmittance_correction(
         event, window_corr_factors=None, 
         telescope=None,
-        swapped_modules=[]
+        swapped_modules=None
         ):
     """
     Applies window transmittance correction 
@@ -101,6 +101,9 @@ def window_transmittance_correction(
         sst1mpipe.io.containers.SST1MArrayEventContainer
 
     """
+
+    if swapped_modules is None:
+        swapped_modules = []
 
     for mask_1,mask_2 in swapped_modules:
 

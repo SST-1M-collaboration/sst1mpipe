@@ -140,7 +140,9 @@ def write_MC_dist(tel_setup,
                   config_file,
                   zenith,
                   outdir,
-                  Q_bins = np.geomspace(10,1e5,300)):
+                  Q_bins=None):
+    if Q_bins is None:
+        Q_bins = np.geomspace(10, 1e5, 300)
     
     res_dict = {}
     res_dict["low"] = Q_bins[:-1]
@@ -212,7 +214,7 @@ def make_DQ_table(tel_setup,
                                    np.log10(rates_mc[fitmask])
                                    )
 
-        def shifted_lin(x,shift):
+        def shifted_lin(x,shift, mc_fit=mc_fit):
             return lin(x-shift,*mc_fit)
 
 
@@ -250,4 +252,3 @@ def make_DQ_table(tel_setup,
         res.to_hdf(outfile,f'DQ_table_{tel}')
     
     return
-

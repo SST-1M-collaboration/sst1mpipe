@@ -291,16 +291,15 @@ def get_time_to_detection(
     if sum(mask) == 0:
         logging.warning(f'5 sigma detection cannot be reached in {max_time.value} hours.')
         return max_time, 0 * u.hour, 0 * u.hour
+    if sum(mask_p) == 0:
+        err_minus = 0 * u.hour
     else:
-        if sum(mask_p) == 0:
-            err_minus = 0 * u.hour
-        else:
-            err_minus = min(times[mask]) - min(times[mask_p])
-        if sum(mask_m) == 0:
-            err_plus = 0 * u.hour
-        else:
-            err_plus = min(times[mask_m]) - min(times[mask])
-        return min(times[mask]), err_minus, err_plus
+        err_minus = min(times[mask]) - min(times[mask_p])
+    if sum(mask_m) == 0:
+        err_plus = 0 * u.hour
+    else:
+        err_plus = min(times[mask_m]) - min(times[mask])
+    return min(times[mask]), err_minus, err_plus
 
 
 def get_significance(n_signal=None, n_off=None, alpha=None):

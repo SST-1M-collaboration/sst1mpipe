@@ -94,8 +94,7 @@ class ImageCleanerSST(ImageCleaner):
         
         if only_main_island:
             return get_only_main_island_mask(geom, time_delta_cleaning_mask)
-        else:
-            return time_delta_cleaning_mask
+        return time_delta_cleaning_mask
 
     # for testing, might disappear in the future
     def dump(self):
@@ -155,8 +154,7 @@ class ImageCleanerSST_MC(ImageCleaner):
 
         if only_main_island:
             return get_only_main_island_mask(geom, time_delta_cleaning_mask)
-        else:
-            return time_delta_cleaning_mask
+        return time_delta_cleaning_mask
 
 
 def image_cleaner_setup(subarray=None, config=None, ismc=False):

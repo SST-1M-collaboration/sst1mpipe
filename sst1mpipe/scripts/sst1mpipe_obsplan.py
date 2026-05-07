@@ -285,7 +285,7 @@ def get_time_formated(time, format="hhmm"):
     time_hhmm = time_hhmmss.split(":")[0] + ":" + time_hhmmss.split(":")[1]
     if format == "hhmm":
         return time_hhmm
-    elif format == "hhmmss":
+    if format == "hhmmss":
         return time_hhmmss
 
 if __name__ == "__main__":

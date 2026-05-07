@@ -536,9 +536,8 @@ def get_closest_rf_model(
         closest_model_dir = os.path.join(models_dir, models_tab[idx_closest, 3])
         logging.info('Closest RF node found: %s', closest_model_dir)
         return closest_model_dir
-    else:
-        logging.info('There are RFs found directly in the directory provided: %s These will be used for the reconstruction without any further selection.', models_dir)
-        return models_dir
+    logging.info('There are RFs found directly in the directory provided: %s These will be used for the reconstruction without any further selection.', models_dir)
+    return models_dir
 
 
 def check_same_shower_fraction(dl2, energy_bins):
@@ -861,9 +860,9 @@ def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingf
 
     mask_list = []
     tel = event.sst1m.r0.tels_with_data[0]
-    with open(inv_list_path, "r", encoding="utf-8") as f:
+    with open(inv_list_path, encoding="utf-8") as f:
         inv_list = json.load(f)
-    for ii, key in enumerate(inv_list.keys()):
+    for key in inv_list.keys():
         if inv_list[key]['ntel'] == tel:
             localtime = event.sst1m.r0.tel[tel].local_camera_clock/1e9
             time = Time(localtime, format='unix_tai')
@@ -881,7 +880,7 @@ def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingf
                 mask2[pix_maps[(pix_maps["module"]==module_2)]['pixel_sw_id']] = True
 
                 mask_list.append([mask1,mask2])
-                logging.info('Data on tel ' + str(tel) + ' SWAPPING wrongly connected modules {} and {}'.format(module_1,module_2))
+                logging.info('Data on tel ' + str(tel) + f' SWAPPING wrongly connected modules {module_1} and {module_2}')
 
     return mask_list
 
@@ -1870,7 +1869,7 @@ def get_moon_phase(times=None, loc=None):
 
     return phase_angle_moon
 
-def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
+def plot_livetime(hdu_dir,objects=None,ignore_sources=None):
     """
     Plot total livetime from hdu_dir gammapy Datastore
 
@@ -1887,6 +1886,9 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=[]):
     pyplot figure, axis 
 
     """
+    if ignore_sources is None:
+        ignore_sources = []
+
     plt.rcParams['font.family'] = 'monospace'
     ds = DataStore.from_dir(hdu_dir)
     ds.obs_table.sort('OBS_ID')

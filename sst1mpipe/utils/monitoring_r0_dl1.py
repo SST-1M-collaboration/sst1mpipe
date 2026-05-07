@@ -75,8 +75,7 @@ class Monitoring_R0_DL1:
     def guess_mc(self):
         if "simtel" in self.input_file:
             return True
-        else:
-            return False
+        return False
 
     def fill_target_info(self):
 

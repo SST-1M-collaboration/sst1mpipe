@@ -140,7 +140,7 @@ def add_source_xy(data, source=None, camera_frame=None):
 
 def get_sigma_time(
         data, theta2_on, theta2_off, theta2_cut=0.04, 
-        norm_range=[0.2, 0.5], step_events=1):
+        norm_range=None, step_events=1):
     """
     Calculates time development of significance and background normalization
 
@@ -162,6 +162,9 @@ def get_sigma_time(
 
     """
     
+    if norm_range is None:
+        norm_range = [0.2, 0.5]
+
     sigma = []
     alphas = []
     times = []
@@ -210,7 +213,7 @@ def get_sigma_time(
     return sigma, times, obsid, alphas
 
 
-def add_wobble_flag(data, horizon_frame=None, wobbles=[]):
+def add_wobble_flag(data, horizon_frame=None, wobbles=None):
     """
     Adds new column in the input table with wobble names based on the
     telescope pointing
@@ -228,6 +231,9 @@ def add_wobble_flag(data, horizon_frame=None, wobbles=[]):
 
     """
 
+    if wobbles is None:
+        wobbles = []
+
     pointing_coords = SkyCoord(alt = data['true_alt_tel'] * u.deg, 
                           az = data['true_az_tel'] * u.deg, 
                           frame=horizon_frame
@@ -242,7 +248,7 @@ def add_wobble_flag(data, horizon_frame=None, wobbles=[]):
     return data
 
 
-def get_theta_off_stereo(data, n_off=1, on_region=None, wobbles=[]):
+def get_theta_off_stereo(data, n_off=1, on_region=None, wobbles=None):
     """
     Calculates theta^2 for OFF regions regularly distributed around
     the pointing RA,DEC at the same offset as the ON region (for each 
@@ -265,6 +271,9 @@ def get_theta_off_stereo(data, n_off=1, on_region=None, wobbles=[]):
     off_radec: list of astropy.coordinates.SkyCoord
     
     """
+
+    if wobbles is None:
+        wobbles = []
 
     theta2_off = np.zeros([len(data), n_off])
     off_radec = []

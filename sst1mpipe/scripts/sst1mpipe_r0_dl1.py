@@ -157,15 +157,23 @@ def main():
     precise_timestamps = args.precise_timestamps
 
     ismc = processing_info.guess_mc()
+    input_basename = os.path.basename(processing_info.input_file)
+
+    def strip_suffix(value, suffix):
+        if value.endswith(suffix):
+            return value[:-len(suffix)]
+        return value
 
     if ismc:
-        processing_info.output_file = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_dl1.h5")
-        output_logfile = os.path.join(outdir, processing_info.input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_r1_dl1.log")
-        processing_info.output_file_px_charges = os.path.join(outdir, processing_info.input_file.split('/')[-1].rstrip(".corsika.gz.simtel.gz") + "_pedestal_hist.h5")
+        base_name = strip_suffix(input_basename, ".corsika.gz.simtel.gz")
+        processing_info.output_file = os.path.join(outdir, base_name + "_dl1.h5")
+        output_logfile = os.path.join(outdir, base_name + "_r1_dl1.log")
+        processing_info.output_file_px_charges = os.path.join(outdir, base_name + "_pedestal_hist.h5")
     else:
-        processing_info.output_file = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".fits.fz") + "_dl1.h5")
-        output_logfile = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".fits.fz") + "_r1_dl1.log")
-        processing_info.output_file_px_charges = os.path.join(outdir,  processing_info.input_file.split('/')[-1].rstrip(".fits.fz") + "_pedestal_hist.h5")
+        base_name = strip_suffix(input_basename, ".fits.fz")
+        processing_info.output_file = os.path.join(outdir, base_name + "_dl1.h5")
+        output_logfile = os.path.join(outdir, base_name + "_r1_dl1.log")
+        processing_info.output_file_px_charges = os.path.join(outdir, base_name + "_pedestal_hist.h5")
 
     check_outdir(outdir)
 
@@ -368,9 +376,13 @@ def main():
             
             #set proper charge info according to time bins of pedestal events
             if reclean and (len(dl1_charges) > 0):
-                for [start_time, n, Qped, sig_Qped, meanQ] in reversed(dl1_charges):
+                selected_charge = dl1_charges[0]
+                for charge_entry in reversed(dl1_charges):
+                    start_time = charge_entry[0]
                     if event.trigger.time >= start_time:
+                        selected_charge = charge_entry
                         break
+                _, _, Qped, sig_Qped, meanQ = selected_charge
                 image_processor.clean.average_charge = Qped
                 image_processor.clean.stdev_charge = sig_Qped
                 image_processor.clean.nsb_level = meanQ

@@ -20,10 +20,10 @@ MON_EVT_TYPE = 8
 class sliding_pedestals:
     def __init__(self, input_file=None, max_array_size = 100, max_images_array = 1000, config=None):
 
-        self.timestamps = deque([])
-        self.ped_mean_array   = deque([])
-        self.ped_std_array    = deque([])
-        self.ped_img_array    = deque([])
+        self.timestamps = deque()
+        self.ped_mean_array   = deque()
+        self.ped_std_array    = deque()
+        self.ped_img_array    = deque()
         self.max_array_size   = max_array_size
         self.max_images_array = max_images_array
         self.ped_img_sum      = None
