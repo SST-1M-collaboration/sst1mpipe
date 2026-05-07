@@ -111,7 +111,7 @@ class shape_maker:
                 rb_samples.append(samples[len(samples)-1])
             return rb_samples
         
-        def likelyhood_fct_spe(fct,wf,shift):
+        def likelihood_fct_spe(fct,wf,shift):
             like = 0
             xx = np.arange(50)
 
@@ -227,7 +227,7 @@ class shape_maker:
                         
                         try:
                             P0=T0-btom
-                            res1  = minimize( lambda x, wf=wf: likelyhood_fct_spe(pixs_interp_norm,wf,x)   ,[P0] , method='BFGS', tol=1e-12)
+                            res1  = minimize( lambda x, wf=wf: likelihood_fct_spe(pixs_interp_norm,wf,x)   ,[P0] , method='BFGS', tol=1e-12)
                             tom0  = T0-res1.x[0]
                             # LL = 2*(np.log(res1.fun) - np.log(likelyhood_fct_spe(pixs_interp_norm,wf,P0)))
                             # print(tom0,'diff :',res1.x[0]-P0)
