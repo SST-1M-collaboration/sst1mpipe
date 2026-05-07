@@ -263,7 +263,7 @@ class SST1MContainer(Container):
     # dl2 = Field(ReconstructedContainer(), "Reconstructed Shower Information")
     # mc = Field(MCEventContainer(), "Monte-Carlo data")
     # mcheader = Field(MCHeaderContainer(), "Monte-Carlo run header data")
-    
+
 class SST1MArrayEventContainer(ArrayEventContainer):
     """
     Data container including SST1M and monitoring information

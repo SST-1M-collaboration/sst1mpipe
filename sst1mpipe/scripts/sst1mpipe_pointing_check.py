@@ -149,7 +149,7 @@ def main():
     wobble_coords = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame='icrs')
 
     source = SST1MEventSource([input_file], max_events=None)
-    
+
     ### This sould probably be moved to sst1m_event_source
     subarray_file = pkg_resources.resource_filename(
                         'sst1mpipe',
@@ -173,7 +173,7 @@ def main():
 
         r0data = event.sst1m.r0.tel[tel]
         event_type = event.sst1m.r0.tel[tel]._camera_event_type.value
-        
+
         if event_type == 8:
             std_samples.append(np.std(r0data.adc_samples, axis=1))
             time = event.sst1m.r0.tel[tel].local_camera_clock/10**9
@@ -195,8 +195,8 @@ def main():
 
     focal = float(config['telescope_equivalent_focal_length'][tel_string]) * u.m
     camera_frame = CameraFrame(
-        focal_length=focal, 
-        telescope_pointing=tel_pointing, 
+        focal_length=focal,
+        telescope_pointing=tel_pointing,
         obstime=obstime[index_mid],
         location=location)
 
@@ -204,7 +204,7 @@ def main():
 
     shift_x = 0
     shift_y = 0
-    
+
     geometry = subarray.tel[tel].camera.geometry
 
     f,ax = plt.subplots(1, 1, figsize=(15,15))
@@ -218,7 +218,7 @@ def main():
     for star in result_table:
         star1 = SkyCoord(star['RA'] + ' ' + star['DEC'], frame='icrs', unit=(u.hourangle, u.deg))
         star1_altaz = SkyCoord(alt=star1.transform_to(horizon_frame).alt,
-                            az=star1.transform_to(horizon_frame).az, 
+                            az=star1.transform_to(horizon_frame).az,
                             frame=horizon_frame)
         star1_camera_frame = star1_altaz.transform_to(camera_frame)
         ax.plot(star1_camera_frame.x.to('m').value+shift_x, star1_camera_frame.y.to('m').value+shift_y,'*',color='black',markersize=9,label='star1')

@@ -87,13 +87,13 @@ def parse_args():
                         dest='ra',
                         type=float,
                         help='Right ascention (deg) for a quick check of a source of interest if one does not want to have it in catalog.',
-                        )                    
+                        )
     parser.add_argument(
                         '--dec',
                         dest='dec',
                         type=float,
                         help='Declination (deg) for a quick check of a source of interest if one does not want to have it in catalog.',
-                        )   
+                        )
     args = parser.parse_args()
     return args
 
@@ -210,14 +210,14 @@ def main():
         if source_catalog[source]['obsplan_show']:
             if source_catalog[source]['frame'] == 'icrs':
                 target_coords = SkyCoord(
-                    ra=source_catalog[source]['ra']*u.deg, 
-                    dec=source_catalog[source]['dec']*u.deg, 
+                    ra=source_catalog[source]['ra']*u.deg,
+                    dec=source_catalog[source]['dec']*u.deg,
                     frame='icrs'
                     )
             elif source_catalog[source]['frame'] == 'galactic':
                 target_coords = SkyCoord(
-                    l=source_catalog[source]['l']*u.deg, 
-                    b=source_catalog[source]['b']*u.deg, 
+                    l=source_catalog[source]['l']*u.deg,
+                    b=source_catalog[source]['b']*u.deg,
                     frame='galactic'
                     )
             source_altaz = target_coords.transform_to(frame_night)
@@ -232,9 +232,9 @@ def main():
                 if source_altaz_sparse.alt[i] > 0:
 
                     if ((time_span_sparse[i]+0.5*u.hour + utc_shift) < max(time_span_sparse)) & ((time_span_sparse[i]+0.5*u.hour + utc_shift) > min(time_span_sparse)):
-                        plt.text((time_span_sparse+0.5*u.hour + utc_shift).datetime[i], 
-                        source_altaz_sparse.alt.to_value(u.deg)[i], 
-                        str(int(moon_distance.to_value(u.deg)[i])), 
+                        plt.text((time_span_sparse+0.5*u.hour + utc_shift).datetime[i],
+                        source_altaz_sparse.alt.to_value(u.deg)[i],
+                        str(int(moon_distance.to_value(u.deg)[i])),
                         color=color
                         )
 
@@ -247,18 +247,18 @@ def main():
             mask_naut = mask_moon * mask_zenith * mask_nautical
 
             if sum(mask_astro):
-                print(  'ASTRO'.ljust(5), 
-                        scale.ljust(10), 
-                        get_time_formated(min(time_span[mask_astro] + utc_shift)), 
+                print(  'ASTRO'.ljust(5),
+                        scale.ljust(10),
+                        get_time_formated(min(time_span[mask_astro] + utc_shift)),
                         ' - ',
                         get_time_formated(max(time_span[mask_astro] + utc_shift))
                         )
             else:
                 print('ASTRO'.ljust(5), 'None')
             if sum(mask_naut):
-                print(  'NAUT'.ljust(5), 
-                        scale.ljust(10), 
-                        get_time_formated(min(time_span[mask_naut] + utc_shift)), 
+                print(  'NAUT'.ljust(5),
+                        scale.ljust(10),
+                        get_time_formated(min(time_span[mask_naut] + utc_shift)),
                         ' - ',
                         get_time_formated(max(time_span[mask_naut] + utc_shift))
                         )

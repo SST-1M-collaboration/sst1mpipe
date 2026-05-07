@@ -75,7 +75,7 @@ class SST1MEventSource(EventSource):
         help = (
             'Fill pointing information.'
         ),
-    ).tag(config = True) 
+    ).tag(config = True)
 
     def __init__(self,
                  filelist=None,
@@ -114,7 +114,7 @@ class SST1MEventSource(EventSource):
 
 
         # self.pointing_source = PointingSource(subarray=self.subarray, parent=self)
-        
+
         target_info = {}
         pointing_mode = PointingMode.UNKNOWN
         # if self.pointing_information:
@@ -265,7 +265,7 @@ class SST1MEventSource(EventSource):
                         array_event.sst1m.inst.num_pixels[tel_id] = samples.shape[0]
                         array_event.sst1m.inst.num_samples[tel_id] = samples.shape[1]
                         loaded_telescopes.append(tel_id)
-                    
+
                     cta_r0 = array_event.r0.tel[tel_id]
                     cta_r0.waveform = samples[_sort_ids].reshape(1, n_pixels, -1)
 

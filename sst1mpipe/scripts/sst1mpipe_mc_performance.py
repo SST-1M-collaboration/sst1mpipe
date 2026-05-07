@@ -145,7 +145,7 @@ def parse_args():
                         dest='edep_gammaness_only',
                         default=False
                         )
-                        
+
     args = parser.parse_args()
     return args
 
@@ -219,7 +219,7 @@ def main():
                                         dl2_gamma["reco_az"].values * u.deg,
                                         dl2_gamma["reco_alt"].values * u.deg,
                                     ).to_value(u.deg)
-                                    
+
                 dl2_gamma_table = Table.from_pandas(dl2_gamma)
                 mask = dl2_gamma_table['reco_offset'] < 4.0
                 cuts = calculate_gammaness_cuts_efficiency(dl2_gamma_table[mask], config=config)
@@ -229,7 +229,7 @@ def main():
                 plot_gammaness_cuts(cuts, outfile=outdir + '/gammaness_cuts_'+gammaness_cuts+'_'+tel+'.png')
             else:
                 logging.error('So far only efficiency-based gammaness cuts are implemented in combination with --edep-gammaness-only switch.')
-        
+
         if tel == "stereo":
             break
 

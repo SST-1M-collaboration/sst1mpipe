@@ -140,7 +140,7 @@ def main():
                 gammaness_cuts = gammaness_cuts_dir,
                 event_classes=event_classes
                 )
-    
+
     if len(event_classes):
         for evtclass in event_classes:
             outdir_c = outdir + '/event_class_' + str(evtclass)

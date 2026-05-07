@@ -91,9 +91,9 @@ def main():
     tel = telescopes[0]
 
     dl2_data = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas', energy_min=0.0)
-    
+
     gammaness_mask = dl2_data.gammaness > config['analysis']['global_gammaness_cut']
-    logging.info('Global gammaness cut > %f applied.', config['analysis']['global_gammaness_cut']) 
+    logging.info('Global gammaness cut > %f applied.', config['analysis']['global_gammaness_cut'])
 
     dl2_photon_list = dl2_data[gammaness_mask]
 
@@ -111,10 +111,10 @@ def main():
     dl2_photon_list = add_reco_ra_dec(dl2_photon_list, horizon_frame=horizon_frame)
 
     write_photon_list(
-        dl2_photon_list, 
-        output_file=output_file, 
-        telescope=tel, 
-        config=config, 
+        dl2_photon_list,
+        output_file=output_file,
+        telescope=tel,
+        config=config,
         )
 
 if __name__ == '__main__':

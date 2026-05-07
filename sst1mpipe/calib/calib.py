@@ -35,7 +35,7 @@ def get_default_window(telescope=None):
     elif (telescope == 22) or (telescope == 2):
         default_window_file_tel2 = 'corr_factor_2nd_wdw.txt'
         logging.info('Window file used: ' + default_window_file_tel2)
-        window_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_window_file_tel2)) 
+        window_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_window_file_tel2))
     else:
         logging.error(f'Telescope {telescope} not known')
     window_corr = np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
@@ -76,7 +76,7 @@ def get_window_corr_factors(telescope=None, config=None):
 
 
 def window_transmittance_correction(
-        event, window_corr_factors=None, 
+        event, window_corr_factors=None,
         telescope=None,
         swapped_modules=[]
         ):
@@ -106,21 +106,21 @@ def window_transmittance_correction(
 
         # module 1
         window_corr_1 = window_corr_factors[mask_1]
-        
+
         # module 2
         window_corr_2 = window_corr_factors[mask_2]
-        
+
         window_corr_factors[mask_1] = window_corr_2
         window_corr_factors[mask_2] = window_corr_1
 
     image_corrected = event.dl1.tel[telescope].image / window_corr_factors
-    event.dl1.tel[telescope].image = image_corrected.astype(np.float32) 
+    event.dl1.tel[telescope].image = image_corrected.astype(np.float32)
 
     return event
 
 
 def saturated_charge_correction(event, processing_info=None):
-    """
+    r"""
     Finds saturated waveforms and applies different peak integration on
     them, as the standard one does not perform well in such cases. This
     method integrates the peak above 20\% of the amplitude.
@@ -160,7 +160,7 @@ def saturated_charge_correction(event, processing_info=None):
         # iterate over baseline subtracted waveforms and correct integration of those peaking above
         # saturation threshold and with larger width
         for k, w in enumerate(adc_samples.T):
-            
+
             if mask_saturated[k]:
                 mask_width = w > width_level
 
@@ -317,7 +317,7 @@ class Calibrator_R0_R1:
 
         event.r1.tel[self.telescope].waveform = (baseline_subtracted / self.dc_to_pe / VI ).T
 
-        # This function removes bad pixels 
+        # This function removes bad pixels
         # - with not well determined dc_to_pe
         # - based on pedestal variation, i.e. dynamicaly
         # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
@@ -334,7 +334,7 @@ class Calibrator_R0_R1:
         Finds and reads the calibration file.
 
         """
-        
+
         if "telescope_calibration" in self.config:
             if self.config["telescope_calibration"]["tel_" + str(self.telescope).zfill(3)]:
                 self.calib_file = self.config["telescope_calibration"]["tel_" + str(self.telescope).zfill(3)]
@@ -356,11 +356,11 @@ class Calibrator_R0_R1:
 
         """
 
-        # Calibration parameters averaged from all darks taken between 
+        # Calibration parameters averaged from all darks taken between
         # March 2023 and June 2024 (TEL1) and Sep 2023 and June 2024 (TEL2).
         # Based on TT's study, there is a relative difference in the dc_to_pe
-        # factor between individual darks on the level of 5%, showing a 
-        # slowly decreasing trend. In the future, we may start producing 
+        # factor between individual darks on the level of 5%, showing a
+        # slowly decreasing trend. In the future, we may start producing
         # calibration files "per season" to mitigate the systematic uncertainty,
         # but per-night is not necessary. TT also confirms that dc_to_pe
         # does not depend on the level of DCR (the camera temperature).
@@ -372,7 +372,7 @@ class Calibrator_R0_R1:
             self.calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_calib_file_tel1))
         elif (self.telescope == 22) or (self.telescope == 2):
             logging.info('Calib file used: ' + default_calib_file_tel2)
-            self.calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_calib_file_tel2)) 
+            self.calibration_file = pkg_resources.resource_filename('sst1mpipe',path.join('data', default_calib_file_tel2))
         else:
             logging.error(f'Telescope {self.telescope} not known')
         self.calibration_parameters = pd.read_hdf(self.calibration_file)
@@ -386,7 +386,7 @@ class Calibrator_R0_R1:
 
         """
 
-        self.dc_to_pe = np.array(self.calibration_parameters['dc_to_pe']) 
+        self.dc_to_pe = np.array(self.calibration_parameters['dc_to_pe'])
         # masking pixels with bad calibration parameters
         self.mask_bad = self.calibration_parameters['calib_flag'] != 1
         self.dc_to_pe[self.mask_bad] = self.dc_to_pe[~self.mask_bad].mean()

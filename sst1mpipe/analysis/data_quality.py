@@ -32,7 +32,7 @@ DEFAULT_CUTS["failed_fit"]         = [0,0.5]
 
 def get_slow_data_table(dl3_file,file_radical='DIGICAM',root_dir='/net'):
     dl3 = fits.open(dl3_file)
-    
+
     datestr = str(dl3[1].header["OBS_ID"])[:8]
     oyear   = str(dl3[1].header["OBS_ID"])[:4]
     omonth  = str(dl3[1].header["OBS_ID"])[4:6]
@@ -42,10 +42,10 @@ def get_slow_data_table(dl3_file,file_radical='DIGICAM',root_dir='/net'):
     except (IndexError, KeyError, ValueError, TypeError):
         print("This dont work for setereo DL3")
         itel = None
-    
+
     tstart = Time(dl3[1].header['TSTART'],format='unix',scale='utc')
     tstop  = Time(dl3[1].header['TSTOP'],format='unix',scale='utc')
-    
+
     files = glob.glob(f'{root_dir}/cs{itel}/data/aux/{oyear}/{omonth}/{oday}/SST1M_TEL{itel}/{file_radical}{itel}_{datestr}_*.fits')
     table = vstack([ Table(fits.open(f)[1].data) for f in files])
     t_mask = (table['TIMESTAMP']>tstart.unix*1000) & (table['TIMESTAMP']<tstop.unix*1000)
@@ -113,7 +113,7 @@ def get_MC_dist_mono(tel_setup,
                      config_file,
                      zenith,
                      Q_bins):
-    
+
     mc_config = load_config(config_file)
     dl2_mc_proton = load_dl1_sst1m(MC_proton_file,
                                   tel=tel_setup,
@@ -122,11 +122,11 @@ def get_MC_dist_mono(tel_setup,
 
     mc_info_proton = get_mc_info(MC_proton_file, config=mc_config)
 
-    dl2_mc_proton  = get_weights(dl2_mc_proton, 
-                                 mc_info=mc_info_proton, 
-                                 obs_time=1*u.s, 
+    dl2_mc_proton  = get_weights(dl2_mc_proton,
+                                 mc_info=mc_info_proton,
+                                 obs_time=1*u.s,
                                  target_spectrum=DAMPE_P_He_SPECTRUM)
-    
+
     rates_mc,_ = np.histogram(dl2_mc_proton["camera_frame_hillas_intensity"],
                                        weights=dl2_mc_proton["weight"],
                                        bins=Q_bins)
@@ -141,12 +141,12 @@ def write_MC_dist(tel_setup,
                   zenith,
                   outdir,
                   Q_bins = np.geomspace(10,1e5,300)):
-    
+
     res_dict = {}
     res_dict["low"] = Q_bins[:-1]
     res_dict["high"] = Q_bins[1:]
     res_dict["center"] = (Q_bins[:-1] + Q_bins[1:]) / 2
-        
+
     if tel_setup=='stereo':
         tel_setups = ['tel_001','tel_002']
     else:
@@ -159,7 +159,7 @@ def write_MC_dist(tel_setup,
                                          Q_bins)
 
         res_dict["diff_rate_zenCorected_"+tel] = diff_rates_mc
-        
+
     res_df = pd.DataFrame(res_dict)
     outfile = outdir+f'/MC_{tel_setup}_intensity_hist.h5'
     res_df.to_hdf(outfile,'intensity_hist')
@@ -170,7 +170,7 @@ def getmask(key,sel_dict,DQ_table):
 
 def make_selection(DQ_table,
                    sel_dict=DEFAULT_CUTS):
-    
+
     flag_array = np.ones(DQ_table.shape[0],dtype=bool)
     for key in sel_dict.keys():
         flag_array = flag_array & getmask(key,sel_dict,DQ_table)
@@ -236,18 +236,18 @@ def make_DQ_table(tel_setup,
                     popt,corr= curve_fit(shifted_lin,
                                          np.log10(int_hist['center'][no_z_mask]),
                                          np.log10(int_hist['diff_rate'][no_z_mask]),
-                                         )  
+                                         )
                     res_dict["MC_rate_ratio"].append(10**popt[0]/np.cos(zenith*u.deg).to_value())
                     res_dict["failed_fit"].append(0)
                 except (RuntimeError, ValueError, TypeError):
                     res_dict["MC_rate_ratio"].append(0)
-                    res_dict["failed_fit"].append(1)       
+                    res_dict["failed_fit"].append(1)
                     print("fit failed",filename)
 
         res = pd.DataFrame(res_dict)
         res["qual_flag"] = make_selection(res,sel_dict=sel_dict)
         outfile = outdir+f'/DQ_table_{tel_setup}.h5'
         res.to_hdf(outfile,f'DQ_table_{tel}')
-    
+
     return
 

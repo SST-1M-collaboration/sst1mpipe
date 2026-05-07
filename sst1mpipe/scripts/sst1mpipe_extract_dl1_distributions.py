@@ -74,11 +74,11 @@ def parse_args():
                 help='Binninig of the distributions.',
                 default=500
                 )
-                
+
     args = parser.parse_args()
     return args
 
-    
+
 def main():
 
     args = parse_args()
@@ -103,7 +103,7 @@ def main():
     # load all DL1 for given date
     files = glob.glob(data_path_dl1 + '/*_stereo.h5')
     stereo = False
-    if len(files) > 0: 
+    if len(files) > 0:
         stereo = True
 
     logs = glob.glob(data_path_dl1 + "/*.log")
@@ -117,7 +117,7 @@ def main():
         files = glob.glob(data_path_dl1 + '/*dl2.h5')
 
     files.sort()
-    
+
     # Sometimes first few files are broken
     for file in files:
         tels = get_telescopes(file)
@@ -135,19 +135,19 @@ def main():
 
         # iterate over obsids for given date and split data
         for obsid in obsids_date:
-            
+
             row_mask = obsids == obsid
             tmin = data_store.obs_table[row_mask]['TSTART']
             tmax = data_store.obs_table[row_mask]['TSTOP']
-            
+
             time_mask = (dl1_data['local_time'] > tmin.value[0]) & (dl1_data['local_time'] <= tmax.value[0])
             time_mask_ped = (times > tmin.value[0]) & (times <= tmax.value[0])
-        
+
             # get intensity distribution per obsid (wobble)
-            
+
             data, bin_edges = np.histogram(dl1_data[time_mask].camera_frame_hillas_intensity, bins=bins)
             zenith = 90.-np.mean(dl1_data[time_mask].true_alt_tel)
-            
+
             # elapsed time: sum of the time differences, excluding large ones
             time_diff = dl1_data[time_mask].local_time.diff()
             t_elapsed = np.sum(time_diff[time_diff < 10.]) * u.s
@@ -156,7 +156,7 @@ def main():
             ped_fraction_mean = np.mean(ped_fractions[time_mask_ped])
             recleaned_fraction_mean = np.mean(recleaned_fractions[time_mask_ped])
             nsb_per_dl3 = np.mean(nsb[time_mask_ped])
-        
+
             rate = data / t_elapsed
             differential_rate = rate / bins_width
 
@@ -206,14 +206,14 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
     recleaned_fractions = []
     times = []
     nsb = []
-    
+
     for input_file in files:
         try:
             if data_level == 'dl1':
                 df = load_dl1_sst1m(input_file, tel=tel, config=config, table='pandas')
                 times.append(df['local_time'][0])
 
-                # find log 
+                # find log
                 date = input_file.split('/')[-1].split('.')[0].split('_')[1]
                 run = input_file.split('/')[-1].split('.')[0].split('_')[2]
                 res = [i for i in logs if date in i]
@@ -243,9 +243,9 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
             continue
         try:
             pt = load_dl1_pedestals(input_file)
-            if '1' in tel: 
+            if '1' in tel:
                 cs=21
-            else: 
+            else:
                 cs=22
             NSB = VAR_to_NSB(pt['pedestal_charge_std'].mean(axis=1)**2, cs)
             nsb.append(NSB.mean())

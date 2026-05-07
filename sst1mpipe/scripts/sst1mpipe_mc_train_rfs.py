@@ -121,10 +121,10 @@ def main():
     params_gamma = load_dl1_sst1m(input_file_gamma, tel=telescope, config=config, table='pandas', check_finite=True, stereo=stereo, quality_cuts=True)
     if input_file_proton is not None:
         params_protons = load_dl1_sst1m(input_file_proton, tel=telescope, config=config, table='pandas', check_finite=True, stereo=stereo, quality_cuts=True)
-    else: 
+    else:
         params_protons = None
 
     train_models(params_gamma, params_protons, config=config, plot=plot, outdir=outdir, telescope=telescope, stereo=stereo)
-    
+
 if __name__ == '__main__':
     main()

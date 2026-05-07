@@ -40,9 +40,9 @@ from .spectra import CRAB_HEGRA, DAMPE_P_He_SPECTRUM
 
 
 def evaluate_performance(
-        gamma_file=None, proton_file=None, 
-        outdir=None, config=None, telescope=None, 
-        save_fig=False, save_hdf=False, 
+        gamma_file=None, proton_file=None,
+        outdir=None, config=None, telescope=None,
+        save_fig=False, save_hdf=False,
         gammaness_cuts=None):
     """
     Random Forrest performance evaluation on DL2 MC testing
@@ -82,7 +82,7 @@ def evaluate_performance(
     logging.info('Evaluating performance for %s', telescope)
 
     energy_bins = np.logspace(
-    config["analysis"]["log_energy_min_tev"], 
+    config["analysis"]["log_energy_min_tev"],
     config["analysis"]["log_energy_max_tev"],
     config["analysis"]["n_energy_bins"]
     ) * u.TeV
@@ -104,7 +104,7 @@ def evaluate_performance(
             logging.info('Energy and angular resolution are calculated only for gammas which passed ENERGY DEPENDENT GAMMANESS CUT. Optimized on %s', gammaness_cuts)
 
             dl2_gamma_table = Table.from_pandas(dl2_gamma)
-            dl2_proton_table = Table.from_pandas(dl2_proton) 
+            dl2_proton_table = Table.from_pandas(dl2_proton)
 
             if gammaness_cuts == 'significance':
 
@@ -112,7 +112,7 @@ def evaluate_performance(
                 dl2_gamma_table = get_theta(dl2_gamma_table, zero_alt=dl2_gamma_table['true_alt'][0], zero_az=dl2_gamma_table['true_az'][0])
                 # for diffuse protons theta2 is calculated wrt simulated point like gamma source position
                 dl2_proton_table = get_theta(dl2_proton_table, zero_alt=dl2_proton_table['true_alt'][0], zero_az=dl2_proton_table['true_az'][0])
-                
+
                 mc_info_gamma = get_mc_info(gamma_file, config=config)
                 mc_info_proton = get_mc_info(proton_file, config=config)
 
@@ -127,8 +127,8 @@ def evaluate_performance(
             mask = dl2_gamma["gammaness"] > config["analysis"]["global_gammaness_cut"]
             dl2_gamma = dl2_gamma[mask].copy()
 
-    # NOTE: I am not sure if these should be binned in true (as we do in the lst performance paper) 
-    # of reconstructed energy (as ctaplot seems to be suggesting in some functions). For now there is 
+    # NOTE: I am not sure if these should be binned in true (as we do in the lst performance paper)
+    # of reconstructed energy (as ctaplot seems to be suggesting in some functions). For now there is
     # a switch. Default is true energy binning.
     energy_resolution(dl2_gamma, e_bins=energy_bins, outdir=outdir, telescope=telescope, save_fig=save_fig, save_hdf=save_hdf, x_axis_true_energy=True)
 
@@ -139,19 +139,19 @@ def evaluate_performance(
     if telescope == 'stereo':
         logging.info('Telescope ' + telescope + '. Cut on disp sign is NOT APPLIED for evaluation of angular resolution.')
         angular_resolution(
-            dl2_gamma, e_bins=energy_bins, outdir=outdir, 
-            telescope=telescope, save_fig=save_fig, save_hdf=save_hdf, 
+            dl2_gamma, e_bins=energy_bins, outdir=outdir,
+            telescope=telescope, save_fig=save_fig, save_hdf=save_hdf,
             x_axis_true_energy=True, axes_sky=True
             )
     else:
         logging.info('Telescope ' + telescope + '. Cut on disp sign IS APPLIED for evaluation of angular resolution.')
         mask_disp_sign = dl2_gamma['reco_disp_sign'] == dl2_gamma['disp_sign']
         angular_resolution(
-            dl2_gamma[mask_disp_sign], e_bins=energy_bins, outdir=outdir, 
-            telescope=telescope, save_fig=save_fig, save_hdf=save_hdf, 
+            dl2_gamma[mask_disp_sign], e_bins=energy_bins, outdir=outdir,
+            telescope=telescope, save_fig=save_fig, save_hdf=save_hdf,
             x_axis_true_energy=True, axes_sky=True
             )
-    
+
     if proton_file is not None:
         roc_curve(gh_testing_dataset, e_bins=energy_bins, outdir=outdir, telescope=telescope, save_fig=save_fig, save_hdf=save_hdf)
     else:
@@ -159,8 +159,8 @@ def evaluate_performance(
 
 
 def energy_resolution_per_energy(
-        true_energy, reco_energy, percentile=68.27, 
-        confidence_level=0.95, bias_correction=False, 
+        true_energy, reco_energy, percentile=68.27,
+        confidence_level=0.95, bias_correction=False,
         bins=None, x_axis_true_energy=True):
     """
     Modified functions from ctaplot, which doesnt 
@@ -209,7 +209,7 @@ def energy_resolution_per_energy(
 
 
 def energy_bias(
-        true_energy, reco_energy, bins=None, 
+        true_energy, reco_energy, bins=None,
         x_axis_true_energy=True):
     """
     Evaluates energy bias per bin in energy
@@ -250,7 +250,7 @@ def energy_bias(
 
 def angular_resolution_per_energy(
         true_alt, reco_alt, true_az, reco_az, energy,
-        percentile=68.27, confidence_level=0.95, 
+        percentile=68.27, confidence_level=0.95,
         bias_correction=False, bins=None):
     """
     Evaluates angular resolution per bin in energy
@@ -301,8 +301,8 @@ def angular_resolution_per_energy(
 
 
 def energy_resolution(
-        dl2_gamma, e_bins=None, outdir=None, 
-        telescope=None, save_fig=False, save_hdf=False, 
+        dl2_gamma, e_bins=None, outdir=None,
+        telescope=None, save_fig=False, save_hdf=False,
         x_axis_true_energy=True):
     """
     Evaluates energy resolution and bias.
@@ -332,20 +332,20 @@ def energy_resolution(
     """
 
     # energy resolution
-    # We cannot use ctaplot.plot_energy_resolution(), because in this function I am not able to 
+    # We cannot use ctaplot.plot_energy_resolution(), because in this function I am not able to
     # set custom energy bins, it's somehow messed up
     # NOTE: Be carefull with the units! - must be revisited for proper unit conversion!
     e_bin, e_res = energy_resolution_per_energy(
-        dl2_gamma.true_energy.values * u.TeV, 
-        dl2_gamma.reco_energy.values * u.TeV, 
-        bins=e_bins, 
+        dl2_gamma.true_energy.values * u.TeV,
+        dl2_gamma.reco_energy.values * u.TeV,
+        bins=e_bins,
         x_axis_true_energy=True
         )
 
     # Energy bias = np.median((reco - true) / np.abs(true)
     e_bin, e_bias = energy_bias(
-        dl2_gamma.true_energy.values * u.TeV, 
-        dl2_gamma.reco_energy.values * u.TeV, 
+        dl2_gamma.true_energy.values * u.TeV,
+        dl2_gamma.reco_energy.values * u.TeV,
         bins=e_bins,
         x_axis_true_energy=True
         )
@@ -426,8 +426,8 @@ def energy_resolution(
 
 
 def angular_resolution(
-        dl2_gamma, e_bins=None, outdir=None, 
-        telescope=None, save_fig=False, save_hdf=False, 
+        dl2_gamma, e_bins=None, outdir=None,
+        telescope=None, save_fig=False, save_hdf=False,
         x_axis_true_energy=True, axes_sky=True):
     """
     Evaluates angular resolution.
@@ -529,8 +529,8 @@ def angular_resolution(
         axes[1, 0].set_xscale('log')
         axes[1, 0].set_title('Angular resolution')
         axes[1, 0].grid(True, which='both')
-        axes[1, 0].errorbar(energy_center, 
-                        ang_res[:, 0], 
+        axes[1, 0].errorbar(energy_center,
+                        ang_res[:, 0],
                         xerr=(energy_center - e_bin[:-1], e_bin[1:] - energy_center),
                         yerr=(ang_res[:, 0] - ang_res[:, 1], ang_res[:, 2] - ang_res[:, 0]),
                         fmt='o')
@@ -558,8 +558,8 @@ def angular_resolution(
 
 
 def roc_curve(
-        gh_testing_dataset, e_bins=None, 
-        outdir=None, telescope=None, save_fig=False, 
+        gh_testing_dataset, e_bins=None,
+        outdir=None, telescope=None, save_fig=False,
         save_hdf=False):
     """
     Evaluates ROC for gamma/hadron separation
@@ -599,7 +599,7 @@ def roc_curve(
         ax[0].grid(True, which='both')
         ax[0].set_xlim([0, 1])
         ax[0].set_ylim([0, 1])
-    
+
         # gammaness distribution of protons and gammas
         mask_gamma = gh_testing_dataset.true_shower_primary_id == 0
         mask_proton = gh_testing_dataset.true_shower_primary_id == 101
@@ -696,7 +696,7 @@ class irf_maker:
         if true_energy_scaling:
             self.scaling_factor = float(self.config["analysis"]["true_energy_scaling_factor"])
             logging.warning('True energies in IRFs scaled by a factor of %f.', self.scaling_factor)
-        else: 
+        else:
             self.scaling_factor = 1.
 
         if gammaness_cuts is None:
@@ -727,11 +727,11 @@ class irf_maker:
 
         sim_info = get_mc_info(mc_gamma_filename)
         self.sim_info = SimulatedEventsInfo(
-                               n_showers      = sim_info.n_showers, 
-                               energy_min     = sim_info.energy_min, 
-                               energy_max     = sim_info.energy_max, 
-                               max_impact     = sim_info.max_impact, 
-                               spectral_index = sim_info.spectral_index, 
+                               n_showers      = sim_info.n_showers,
+                               energy_min     = sim_info.energy_min,
+                               energy_max     = sim_info.energy_max,
+                               max_impact     = sim_info.max_impact,
+                               spectral_index = sim_info.spectral_index,
                                viewcone       = sim_info.viewcone) ## min & max in latter version
 
         dl2_mc_gamma  = load_dl2_sst1m(mc_gamma_filename,
@@ -751,11 +751,11 @@ class irf_maker:
             sim_info_proton.energy_min *= self.scaling_factor
             sim_info_proton.energy_max *= self.scaling_factor
 
-        dl2_mc_proton = get_weights(dl2_mc_proton, 
-                                    mc_info  = sim_info_proton, 
-                                    obs_time = self.bg_obstime, 
+        dl2_mc_proton = get_weights(dl2_mc_proton,
+                                    mc_info  = sim_info_proton,
+                                    obs_time = self.bg_obstime,
                                     target_spectrum = DAMPE_P_He_SPECTRUM)
-        
+
         if event_class is not None:
             logging.info(f"Making IRFs for event class {event_class}")
             dl2_mc_gamma_c = dl2_mc_gamma[dl2_mc_gamma['event_type'] == event_class]
@@ -786,7 +786,7 @@ class irf_maker:
         #                                                            self.gammaness_cut_tag)
         if event_class is not None:
             ec_str = f"_ec{event_class}"
-        else: 
+        else:
             ec_str = ""
         self.outdir = output_dir + f'/data/sst1m_{self.tel_setup}/{self.pipeline_version}/bcf/ze{self.zenith_angle}_az{self.azimuth}_gc{self.gammaness_cut_tag}{ec_str}/'
 
@@ -795,24 +795,24 @@ class irf_maker:
         else:
             ptlk_str = ""
         self.out_fits_filename = f"SST1M_{self.tel_setup}_Zen{self.zenith_angle}deg_gcut{self.gammaness_cut_tag}{ptlk_str}{ec_str}_irfs.fits"
-        
+
     ##################################################################################
     ##################################### "BINS" #####################################
-        
+
         emin = self.config['analysis']["log_energy_min_tev"]
         emax = self.config['analysis']["log_energy_max_tev"]
         nbinse = self.config['analysis']["n_energy_bins"]
         self.reco_energy_bins = np.logspace(emin, emax, nbinse) * u.TeV
         self.true_energy_bins = np.geomspace(
-            sim_info.energy_min.to_value(u.TeV), 
-            sim_info.energy_max.to_value(u.TeV), 
+            sim_info.energy_min.to_value(u.TeV),
+            sim_info.energy_max.to_value(u.TeV),
             nbinse
             ) * u.TeV
-        
+
         nbins_migration = self.config['analysis']["n_bins_migration"]
         self.e_bins_edisp = np.geomspace(
-            sim_info.energy_min.to_value(u.TeV), 
-            sim_info.energy_max.to_value(u.TeV), 
+            sim_info.energy_min.to_value(u.TeV),
+            sim_info.energy_max.to_value(u.TeV),
             nbins_migration
             ) * u.TeV
 
@@ -876,17 +876,17 @@ class irf_maker:
 
     def check_irf_exist(self):
         pass
-    
+
     ############## AEFF ##############
     def make_aeff_irf(self):
-                
+
         if self.point_like :
-            
+
             logging.info("Making Effective area (point-like).")
             aeff = effective_area_per_energy(selected_events  = Table(self.gamma_event_dict),
                                              simulation_info  = self.sim_info,
                                              true_energy_bins = self.true_energy_bins)
-            hdu_aeff=create_aeff2d_hdu(effective_area   = aeff[:, np.newaxis], 
+            hdu_aeff=create_aeff2d_hdu(effective_area   = aeff[:, np.newaxis],
                                        true_energy_bins = self.true_energy_bins,
                                        fov_offset_bins  = self.fov_offset_bins,
                                        point_like       = self.point_like)
@@ -898,7 +898,7 @@ class irf_maker:
                                                      true_energy_bins = self.true_energy_bins,
                                                      fov_offset_bins  = self.fov_offset_bins)
 
-            hdu_aeff=create_aeff2d_hdu(effective_area   = aeff, 
+            hdu_aeff=create_aeff2d_hdu(effective_area   = aeff,
                                        true_energy_bins = self.true_energy_bins,
                                        fov_offset_bins  = self.fov_offset_bins,
                                        extname          = "EFFECTIVE AREA",
@@ -907,11 +907,11 @@ class irf_maker:
 
     ############## EDISP ##############
     def make_edisp_irf(self):
-        
+
         logging.info("Making Energy dispersion matrix.")
-        edisp = energy_dispersion(selected_events  =self.gamma_event_dict, 
-                                  true_energy_bins =self.e_bins_edisp, 
-                                  fov_offset_bins  =self.fov_offset_bins, 
+        edisp = energy_dispersion(selected_events  =self.gamma_event_dict,
+                                  true_energy_bins =self.e_bins_edisp,
+                                  fov_offset_bins  =self.fov_offset_bins,
                                   migration_bins   =self.energy_migration_bins)
 
         hdu_edisp = create_energy_dispersion_hdu(energy_dispersion = edisp,
@@ -927,9 +927,9 @@ class irf_maker:
     def make_psf_irf(self):
 
         logging.info("Making Point Spread Function.")
-        psf = psf_table(events             = self.gamma_event_dict, 
-                        true_energy_bins   = self.true_energy_bins, 
-                        source_offset_bins = self.source_offset_bins, 
+        psf = psf_table(events             = self.gamma_event_dict,
+                        true_energy_bins   = self.true_energy_bins,
+                        source_offset_bins = self.source_offset_bins,
                         fov_offset_bins    = self.fov_offset_bins
                         )
         hdu_psf=create_psf_table_hdu(psf                = psf,
@@ -943,7 +943,7 @@ class irf_maker:
 
     ############## BKG ##############
     def make_bkg_irf(self):
-        
+
         logging.info("Making Background model.")
         bg_2d = background_2d(events           = self.proton_event_dict,
                               reco_energy_bins = self.reco_energy_bins,
@@ -972,7 +972,7 @@ class irf_maker:
             check_outdir(self.outdir)
             fits.HDUList(self.hdu_list).writeto(self.outdir+self.out_fits_filename,
                                                  overwrite=True)
-            # Config file cannot be placed in the directory with IRFs, because otherwise HDU indexer 
+            # Config file cannot be placed in the directory with IRFs, because otherwise HDU indexer
             # is not able to do the match
             shutil.copy(self.config_filename,self.output_dir)
             logging.info(f"IRFs stored in: {self.outdir}")

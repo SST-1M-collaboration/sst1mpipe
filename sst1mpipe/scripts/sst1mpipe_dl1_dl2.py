@@ -124,11 +124,11 @@ def main():
 
     logging.info('Input file: %s', input_file)
 
-    # DL2 file is just a copy of DL1 file with DL2 table added. We could consider removal of DL1 table to save some disk space, 
+    # DL2 file is just a copy of DL1 file with DL2 table added. We could consider removal of DL1 table to save some disk space,
     # but in that case, we would loose the information about all triggered events
     # because we cannot keep NaNs in the DL2 table as RFs are not able to reconstruct these and the reconstruction fails
     shutil.copyfile(input_file, output_file)
-    
+
     ismc = check_mc(input_file)
 
     # Cut on minimum mc_energy in the output file, which is needed if we want to safely combine MC from different productions

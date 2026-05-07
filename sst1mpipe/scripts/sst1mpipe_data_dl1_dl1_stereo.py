@@ -113,18 +113,18 @@ def main():
     if len(files_selected_t2) == 0:
         logging.error('No TEL2 file following pattern %s found in %s. Exiting..', pattern, input_dir_tel2)
         exit()
-    
+
     stereo_method = get_stereo_method(config)
-    
+
     if stereo_method == 'SlidingWindow':
 
-        time_offset = find_coincidence_offset(tel1_file=input_file_tel1, 
-                                                tel2_files=files_selected_t2, 
-                                                outdir=outdir, 
-                                                config=config, 
+        time_offset = find_coincidence_offset(tel1_file=input_file_tel1,
+                                                tel2_files=files_selected_t2,
+                                                outdir=outdir,
+                                                config=config,
                                                 save_figures=True
                                                 )
-    else: 
+    else:
         time_offset = 0
 
     dl1_data_t1 = load_dl1_sst1m(input_file_tel1, tel='tel_021')
@@ -132,11 +132,11 @@ def main():
 
     logging.info('Looking for overlapping tel2 files to the current tel1 file...')
     dl1_data_t2 = load_more_dl1_tables_mono(
-        files_selected_t2, 
-        config=None, 
+        files_selected_t2,
+        config=None,
         check_finite=False,
         quality_cuts=False,
-        time_min=min(dl1_data_t1['local_time']), 
+        time_min=min(dl1_data_t1['local_time']),
         time_max=max(dl1_data_t1['local_time']),
         pointing_sel=pointing_tel1
         )

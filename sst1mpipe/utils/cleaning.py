@@ -17,7 +17,7 @@ from ctapipe.image import (
 
 
 def get_only_main_island_mask(geom, cleaning_mask):
-            
+
     num_islands, island_labels = number_of_islands(geom, cleaning_mask)
     n_pixels_on_island = np.bincount(island_labels)
     # First bin is N pixels in no island, i.e. background
@@ -36,7 +36,7 @@ class ImageCleanerSST(ImageCleaner):
     Reclean images using the LST-like cleaning, i.e. dynamic picture/boundary technique + time delta. See
     `ctapipe.image.tailcuts_clean`
     `ctapipe.image.apply_time_delta_cleaning`
-    """ 
+    """
 
     average_charge = 0
     stdev_charge = 0
@@ -83,7 +83,7 @@ class ImageCleanerSST(ImageCleaner):
             min_number_picture_neighbors = min_picture_neighbors,
             keep_isolated_pixels = keep_isolated,
         )
-        
+
         time_delta_cleaning_mask = apply_time_delta_cleaning(
             geom,
             mask = mask_tailcuts,
@@ -91,7 +91,7 @@ class ImageCleanerSST(ImageCleaner):
             min_number_neighbors = min_time_neighbors,
             time_limit = time_limit_ns
         )
-        
+
         if only_main_island:
             return get_only_main_island_mask(geom, time_delta_cleaning_mask)
         else:
@@ -108,7 +108,7 @@ class ImageCleanerSST_MC(ImageCleaner):
     Reclean images using the LST-like cleaning, i.e. dynamic picture/boundary technique + time delta. See
     `ctapipe.image.tailcuts_clean`
     `ctapipe.image.apply_time_delta_cleaning`
-    """ 
+    """
 
     nsb_level = 0
     config = 0
@@ -163,7 +163,7 @@ def image_cleaner_setup(subarray=None, config=None, ismc=False):
 
     cleaner = config['ImageProcessor']['image_cleaner_type']
 
-    # If we use other than a standard cleaner recognized by ctapipe 
+    # If we use other than a standard cleaner recognized by ctapipe
     # (['TailcutsImageCleaner', 'MARSImageCleaner', 'FACTImageCleaner', 'TimeConstrainedImageCleaner'])
     # we have to setup its configuration manualy. Is there a better way to tackle this?
     if cleaner == 'ImageCleanerSST':
@@ -190,7 +190,7 @@ def image_cleaner_setup(subarray=None, config=None, ismc=False):
             image_cleaner_sst.nsb_level = 0
 
         image_cleaner_sst.config = config['ImageProcessor'][cleaner]
-        
+
     else:
         image_processor   = ImageProcessor(subarray=subarray, config=config)
 

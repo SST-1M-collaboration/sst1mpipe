@@ -92,7 +92,7 @@ def main():
     ismc = check_mc(input_file)
 
     for tel in tels:
-        
+
         dl2 = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
 
         models_dir_auto = get_closest_rf_model(dl2, models_dir=misdirection_models_dir)
@@ -144,6 +144,6 @@ def main():
         else:
             logging.info('Invalid combination of MC/data input file and --get-edges parameter. See --help.')
 
-        
+
 if __name__ == '__main__':
     main()

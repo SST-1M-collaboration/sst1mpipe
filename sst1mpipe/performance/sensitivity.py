@@ -28,8 +28,8 @@ from sst1mpipe.utils import (
 def plot_gammaness_cuts(gammaness_cuts, outfile=None):
 
     fig, ax = plt.subplots(1, 1, figsize=(8, 7))
-    ax.errorbar(gammaness_cuts['center'], 
-                gammaness_cuts['cut'], 
+    ax.errorbar(gammaness_cuts['center'],
+                gammaness_cuts['cut'],
                 xerr=(gammaness_cuts['center'] - gammaness_cuts['low'], gammaness_cuts['high'] - gammaness_cuts['center']),
                 fmt='o')
 
@@ -40,7 +40,7 @@ def plot_gammaness_cuts(gammaness_cuts, outfile=None):
     ax.grid(True, which='both')
     ax.set_xlim([min(gammaness_cuts['low'].value), max(gammaness_cuts['high'].value)])
     ax.set_ylim([0, 1.])
-    
+
     if outfile is not None:
         fig.savefig(outfile, dpi=200)
 
@@ -69,10 +69,10 @@ def get_mc_info(input_file, config=None):
     mc = read_table(input_file, "/configuration/simulation/run")
     histograms = read_table(input_file, "/simulation/service/shower_distribution")
 
-    # Interestingly, if we use CSCAT>20 the number stored in mc['shower_reuse'] is still 20, even though the 
-    # total number of shower stored in the simtel file is correct (Vladimir checked), and also the total 
+    # Interestingly, if we use CSCAT>20 the number stored in mc['shower_reuse'] is still 20, even though the
+    # total number of shower stored in the simtel file is correct (Vladimir checked), and also the total
     # number of thrown events stored in histograms seems to be fine (Jakub checked). Here we use the total
-    # number of events stored in histograms to correct for shower_reuse. NOTE: should be implemented 
+    # number of events stored in histograms to correct for shower_reuse. NOTE: should be implemented
     # at the r1->dl1 level in the future!
     mc = mc_correct_shower_reuse(mc, histograms)
 
@@ -82,13 +82,13 @@ def get_mc_info(input_file, config=None):
     for tel in ["tel_001", "stereo"]:
         try:
             params = read_table(input_file, "/dl2/event/telescope/parameters/" + tel)
-        except Exception: 
+        except Exception:
             pass
         try:
             params = read_table(input_file, "/dl1/event/telescope/parameters/" + tel)
-        except Exception: 
+        except Exception:
             pass
-            
+
 
     if 'min_true_energy_cut' in params.keys():
 
@@ -117,7 +117,7 @@ def get_mc_info(input_file, config=None):
 
 
 def get_weights(
-        data, mc_info=None, obs_time=None, 
+        data, mc_info=None, obs_time=None,
         target_spectrum=None):
     """
     Calculate event weights to MC event distribution for 
@@ -148,8 +148,8 @@ def get_weights(
         raise Exception('ERROR: DL2 table has apparently stored units now! Remove unit addition for true_energy in get_weights()')
 
     data["weight"] = calculate_event_weights(
-            data["true_energy"] * u.TeV, 
-            target_spectrum, 
+            data["true_energy"] * u.TeV,
+            target_spectrum,
             simulated_spectrum
             )
 
@@ -201,7 +201,7 @@ def relative_sensitivity(n_signal, n_background, alpha):
 
 
 def sensitivity_to_flux(
-        sensitivity, energy, 
+        sensitivity, energy,
         target_spectrum=None):
     """
     Converts sensitivity in percent of give source 
@@ -228,8 +228,8 @@ def sensitivity_to_flux(
 
 
 def get_time_to_detection(
-        rate_signal=None, err_rate_signal=None, 
-        rate_background=None, err_rate_background=None, 
+        rate_signal=None, err_rate_signal=None,
+        rate_background=None, err_rate_background=None,
         alpha=None, max_time=50 * u.hour):
     """
     Provides time needed to detection of given source 
@@ -356,9 +356,9 @@ def check_spectrum(source):
 
 
 def get_gammaness_cuts(
-        dl2_gamma, dl2_proton, config=None, 
-        method='global', save_hdf=False, save_fig=False, 
-        outdir=None, telescope=None, 
+        dl2_gamma, dl2_proton, config=None,
+        method='global', save_hdf=False, save_fig=False,
+        outdir=None, telescope=None,
         gamma_off=False):
     """
     Provide gammaness cuts (masks) on input gamma and 
@@ -417,7 +417,7 @@ def get_gammaness_cuts(
     else:
         logging.error('Desired method of gammaness cut not implemented! Type \'sst1mpipe_mc_performance.py --help\' to see what is available.')
         exit()
-       
+
     if save_hdf and (method != 'global'):
         logging.info(f'Differential sensitivity: saving energy dependent gammaness cut table for {telescope}..')
 
@@ -447,7 +447,7 @@ def get_gammaness_cuts(
 
 
 def get_edep_theta_cuts(
-        dl2_gamma, config=None, save_hdf=False, save_fig=False, 
+        dl2_gamma, config=None, save_hdf=False, save_fig=False,
         outdir=None, energy_bins=None, telescope=None, efficiency=0.68):
     """
     Calculates energy dependent theta2 cuts.
@@ -503,8 +503,8 @@ def get_edep_theta_cuts(
     if save_fig:
 
         fig, ax = plt.subplots(1, 1, figsize=(8, 7))
-        ax.errorbar(theta_cuts['center'], 
-                    theta_cuts['cut'], 
+        ax.errorbar(theta_cuts['center'],
+                    theta_cuts['cut'],
                     xerr=(theta_cuts['center'] - theta_cuts['low'], theta_cuts['high'] - theta_cuts['center']),
                     fmt='o')
 
@@ -553,9 +553,9 @@ def get_theta(dl2, zero_alt=None, zero_az=None):
         raise Exception("ERROR: reco_alt, reco_az are probably not in degrees! Check your DL2 file.")
 
     dl2['theta'] = ctaplot.ana.angular_separation_altaz(
-        dl2['reco_alt'] * np.pi/180. * u.rad, 
-        dl2['reco_az'] * np.pi/180. * u.rad, 
-        zero_alt * np.pi/180. * u.rad, 
+        dl2['reco_alt'] * np.pi/180. * u.rad,
+        dl2['reco_az'] * np.pi/180. * u.rad,
+        zero_alt * np.pi/180. * u.rad,
         zero_az * np.pi/180. * u.rad
         )
 
@@ -565,7 +565,7 @@ def calculate_gammaness_cuts_efficiency(
     dl2_gamma, config=None):
 
     energy_bins = np.logspace(
-    config["analysis"]["log_energy_min_tev"], 
+    config["analysis"]["log_energy_min_tev"],
     config["analysis"]["log_energy_max_tev"],
     config["analysis"]["n_energy_bins"]
     ) * u.TeV
@@ -591,8 +591,8 @@ def calculate_gammaness_cuts_efficiency(
 
 
 def calculate_gammaness_cuts_significance(
-        dl2_gamma, dl2_proton, config=None, 
-        save_fig=False, outdir=None, energy_bins=None, 
+        dl2_gamma, dl2_proton, config=None,
+        save_fig=False, outdir=None, energy_bins=None,
         telescope=None, gamma_off=False):
     """
     Calculates energy dependent gammaness cut
@@ -630,7 +630,7 @@ def calculate_gammaness_cuts_significance(
     """
 
     energy_bins = np.logspace(
-    config["analysis"]["log_energy_min_tev"], 
+    config["analysis"]["log_energy_min_tev"],
     config["analysis"]["log_energy_max_tev"],
     config["analysis"]["n_energy_bins"]
     ) * u.TeV
@@ -682,7 +682,7 @@ def calculate_gammaness_cuts_significance(
                 n_off_all.append(sum(protons_off['weight']) * area_ratio.to_value(u.one) * N_off_regions)
         n_signal_all = np.array(n_signal_all)
         n_off_all = np.array(n_off_all)
-    
+
         significance = get_significance(n_signal=n_signal_all, n_off=n_off_all, alpha=1/N_off_regions)
         if significance_fit:
             spl = make_smoothing_spline(gammaness_cuts, significance)
@@ -692,7 +692,7 @@ def calculate_gammaness_cuts_significance(
         else:
             best_gcut = gammaness_cuts[np.argmax(significance)]
             logging.info('Getting energy dependent gammaness cut. Significance fit NOT applied')
-            
+
 
         if save_fig and any(significance > 0):
 
@@ -712,7 +712,7 @@ def calculate_gammaness_cuts_significance(
             ax.legend()
             fig.savefig(outdir_sens + '/significance_'+telescope+'_'+str(emin)+'_'+str(emax) + '.png', dpi=200)
             plt.close()
-                
+
         cut_table["n_gamma_events"][i] = n_signal_all[np.argmax(significance)]
         cut_table["n_proton_events"][i] = n_off_all[np.argmax(significance)]
         if (n_signal_all[np.argmax(significance)] > 0) and (n_off_all[np.argmax(significance)] > 0):
@@ -746,12 +746,12 @@ def get_n_gammas_off(dl2_gamma, n_off=None, theta_cut=None):
     """
 
     # this finds reflected regions wrt center of the FoV in camera coordinates
-    # For stereo, it should be done based on reconstructed alt az or ra dec, and 
+    # For stereo, it should be done based on reconstructed alt az or ra dec, and
     # telescope pointing would be the average pointing of the two telescopes
     offset = angular_separation(
-        dl2_gamma['true_az_tel'][0] * u.deg, 
-        dl2_gamma['true_alt_tel'][0] * u.deg, 
-        dl2_gamma['true_az'][0] * u.deg, 
+        dl2_gamma['true_az_tel'][0] * u.deg,
+        dl2_gamma['true_alt_tel'][0] * u.deg,
+        dl2_gamma['true_az'][0] * u.deg,
         dl2_gamma['true_alt'][0] * u.deg
         ).to(u.deg)
     on_x = dl2_gamma['true_camera_x'][0]
@@ -778,9 +778,9 @@ def get_n_gammas_off(dl2_gamma, n_off=None, theta_cut=None):
 
 
 def sensitivity(
-        input_file_gamma, input_file_proton, outdir=None, 
-        config=None, telescope=None, save_fig=False, 
-        save_hdf=False, gammaness_cuts=False, theta2_cuts=False, source_detection='', 
+        input_file_gamma, input_file_proton, outdir=None,
+        config=None, telescope=None, save_fig=False,
+        save_hdf=False, gammaness_cuts=False, theta2_cuts=False, source_detection='',
         energy_min=0.0, gamma_off=False):
     """
     Evaluates differential flux sensitivity on a point-like
@@ -797,7 +797,7 @@ def sensitivity(
     in respective regions after the cuts. Otherwise the CTA 
     criteria on flux sensitivity in each energy bin are applied: 
         - significance >=5 sigma
-        - excess > 5\% of background
+        - excess > 5\\% of background
         - N excess >= 10
 
     Parameters
@@ -847,7 +847,7 @@ def sensitivity(
     logging.info('Assumed obstime %f h.', obs_time.value)
 
     energy_bins = np.logspace(
-        config["analysis"]["log_energy_min_tev"], 
+        config["analysis"]["log_energy_min_tev"],
         config["analysis"]["log_energy_max_tev"],
         config["analysis"]["n_energy_bins"]
         ) * u.TeV
@@ -893,12 +893,12 @@ def sensitivity(
     gammas_on = dl2_gamma[mask]
     logging.info('N of simulated gamma-like point gammas in ON region: %d', len(gammas_on))
     N_observed_g = sum(gammas_on['weight'])
-    logging.info(f'Rate of observed gamma-like point gammas in ON region: {(N_observed_g/obs_time).to(1/u.s)}, Crab Spectrum')    
+    logging.info(f'Rate of observed gamma-like point gammas in ON region: {(N_observed_g/obs_time).to(1/u.s)}, Crab Spectrum')
 
     # Number of protons in OFF region after gammaness cut
-    # Here we take protons from a region centered at the same position as the ON region, 
+    # Here we take protons from a region centered at the same position as the ON region,
     # but with larger radius to get better statistics of the background
-    # Then to calculate the rate of remaining protons in ON region, we just use the ratio 
+    # Then to calculate the rate of remaining protons in ON region, we just use the ratio
     # of areas of the two
     theta_cut_p = 1.2 * u.deg
     mask = (dl2_proton['theta'] < theta_cut_p) & mask_gp
@@ -909,7 +909,7 @@ def sensitivity(
     if offset > 0.01 * u.deg and gamma_off:
         if telescope == 'tel_001' or telescope == 'tel_002':
             n_gammas_off_observed = get_n_gammas_off(dl2_gamma[mask_gg], n_off=N_off_regions, theta_cut=theta_cut)
-            logging.info(f'Rate of observed gamma-like point gammas in all OFF regions: {(n_gammas_off_observed/obs_time).to(1/u.s)}, Crab Spectrum')   
+            logging.info(f'Rate of observed gamma-like point gammas in all OFF regions: {(n_gammas_off_observed/obs_time).to(1/u.s)}, Crab Spectrum')
         else:
             logging.info('Estimation of gammas in the OFF region is not yet supported.')
 
@@ -937,9 +937,9 @@ def sensitivity(
         n_off = N_observed_p *  N_off_regions
 
     time_5sig = get_time_to_detection(
-        rate_signal=(N_observed_g/obs_time).to(1/u.s), 
-        err_rate_signal=(np.sqrt(N_observed_g)/obs_time).to(1/u.s), 
-        rate_background=(n_off/obs_time).to(1/u.s), 
+        rate_signal=(N_observed_g/obs_time).to(1/u.s),
+        err_rate_signal=(np.sqrt(N_observed_g)/obs_time).to(1/u.s),
+        rate_background=(n_off/obs_time).to(1/u.s),
         err_rate_background=(np.sqrt(n_off)/obs_time).to(1/u.s),
         alpha=1/N_off_regions
         )
@@ -955,7 +955,7 @@ def sensitivity(
     sens_flux_err_plus = np.zeros(len(energy_bins)-1)
     energy = np.sqrt(energy_bins[:-1] * energy_bins[1:])
 
-    logging.info("SENSITIVITY: [e min, e max] TeV, N sim gammas, N sim protons, N excess, N bkg, sensitivity [5sigma only] [\% Crab], sensitivity [\% Crab], sensitivity [TeV / (cm2 s)], sens err - [flux], sens err + [flux], fraction of G used N>1, fraction of P used N>1")
+    logging.info(r"SENSITIVITY: [e min, e max] TeV, N sim gammas, N sim protons, N excess, N bkg, sensitivity [5sigma only] [\% Crab], sensitivity [\% Crab], sensitivity [TeV / (cm2 s)], sens err - [flux], sens err + [flux], fraction of G used N>1, fraction of P used N>1")
     for i in range(len(energy_bins)-1):
         maskg = (gammas_on['reco_energy'] * u.TeV > energy_bins[i]) & (gammas_on['reco_energy'] * u.TeV <= energy_bins[i+1])
         N_observed_g = sum(gammas_on[maskg]['weight'])
@@ -1028,12 +1028,12 @@ def sensitivity(
         if sens_flux_err_plus[i] < 0:
             sens_flux_err_plus[i] = 10*sensitivity_flux.value
             logging.warning(f'[{energy_bins[i]:.2f}, {energy_bins[i+1]:.2f}], flux_sensitivity_err_plus cannot be estimated!')
-        # We print also simulated (not weighted) number of protons and gammas after all cuts to see how good is the statistics 
+        # We print also simulated (not weighted) number of protons and gammas after all cuts to see how good is the statistics
         # on which the sensitivity is based
         logging.info(f'[{energy_bins[i].to_value(u.TeV):6.1f}, {energy_bins[i+1].to_value(u.TeV):6.1f}], {N_simulated_g:4d}, {N_simulated_p:4d}, {n_signal:5.1f}, {n_off:5.1f}, {sensitivity_5sigma_only:5.1f}, {sensitivity:5.1f}, {sensitivity_flux.value:3.1E}, {sens_flux_err_minus[i]:3.1E}, {sens_flux_err_plus[i]:3.1E}, {fraction_g[i, 2]:3.1E}, {fraction_p[i, 2]:3.1E}')
-    
+
     # NOTE: This is uggly. We get rid of the units in order to merge everything in an array, and later adding the units after conversion
-    # in the Astropy Table. 
+    # in the Astropy Table.
     data = np.array(np.column_stack((energy.value, energy_bins[:-1].value, energy_bins[1:].value, sensitivity_all, sensitivity_flux_all, sens_flux_err_minus, sens_flux_err_plus)))
 
     names = ['energy', 'energy_min', 'energy_max', 'relative_sensitivity', 'flux_sensitivity', 'flux_sensitivity_err_minus', 'flux_sensitivity_err_plus']
@@ -1047,7 +1047,7 @@ def sensitivity(
 
         logging.info(f'Differential sensitivity: saving images for {telescope}..')
         fig = plt.figure(figsize=(6, 5))
-        
+
         plt.ylabel(rf'Flux sensitivity [{sensitivity_flux.unit.to_string("latex")}]')
         plt.xlabel(rf'$E_R$ [{energy.unit.to_string("latex")}]')
         plt.xscale('log')
@@ -1086,27 +1086,27 @@ def sensitivity(
 
     # estimation of time needed for detection of a given source
     if len(source_detection) > 0:
-        
+
         dl2_gamma.remove_column('weight')
         dl2_proton.remove_column('weight')
         check_spectrum(source_detection)
         source_time_to_detection(
-            dl2_gamma, 
-            dl2_proton, 
-            mc_info_gamma=mc_info_gamma, 
-            mc_info_proton=mc_info_proton, 
-            config=config, 
-            telescope=telescope, 
-            gammaness_cuts=gammaness_cuts, 
-            theta2_cuts=theta2_cuts, 
-            source=source_detection, 
+            dl2_gamma,
+            dl2_proton,
+            mc_info_gamma=mc_info_gamma,
+            mc_info_proton=mc_info_proton,
+            config=config,
+            telescope=telescope,
+            gammaness_cuts=gammaness_cuts,
+            theta2_cuts=theta2_cuts,
+            source=source_detection,
             energy_min=energy_min)
 
 
 def source_time_to_detection(
-        dl2_gamma, dl2_proton, mc_info_gamma=None, 
-        mc_info_proton=None, config=None, telescope=None, 
-        gammaness_cuts=None, theta2_cuts=None, 
+        dl2_gamma, dl2_proton, mc_info_gamma=None,
+        mc_info_proton=None, config=None, telescope=None,
+        gammaness_cuts=None, theta2_cuts=None,
 	source=None, energy_min=0.0):
     """
     Provides time needed to detection of given source above
@@ -1153,7 +1153,7 @@ def source_time_to_detection(
     logging.info('N off regions %d', N_off_regions)
 
     energy_bins = np.logspace(
-        config["analysis"]["log_energy_min_tev"], 
+        config["analysis"]["log_energy_min_tev"],
         config["analysis"]["log_energy_max_tev"],
         config["analysis"]["n_energy_bins"]
         ) * u.TeV
@@ -1192,12 +1192,12 @@ def source_time_to_detection(
     gammas_on = dl2_gamma[mask]
     logging.info('N of simulated gamma-like point gammas in ON region: %d', len(gammas_on))
     N_observed_g = sum(gammas_on['weight'])
-    logging.info(f'Rate of observed gamma-like point gammas in ON region: {(N_observed_g/obs_time).to(1/u.s)}, {source} Spectrum')    
+    logging.info(f'Rate of observed gamma-like point gammas in ON region: {(N_observed_g/obs_time).to(1/u.s)}, {source} Spectrum')
 
     # Number of protons in OFF region after gammaness cut
-    # Here we take protons from a region centered at the same position as the ON region, 
+    # Here we take protons from a region centered at the same position as the ON region,
     # but with larger radius to get better statistics of the background
-    # Then to calculate the rate of remaining protons in ON region, we just use the ratio 
+    # Then to calculate the rate of remaining protons in ON region, we just use the ratio
     # of areas of the two
     theta_cut_p = 1.2 * u.deg
     mask = (dl2_proton['theta'] < theta_cut_p) & mask_gp
@@ -1219,9 +1219,9 @@ def source_time_to_detection(
 
     # Time to reach 5 sigma for all energies integrated
     time_5sig = get_time_to_detection(
-        rate_signal=(N_observed_g/obs_time).to(1/u.s), 
-        err_rate_signal=(np.sqrt(N_observed_g)/obs_time).to(1/u.s), 
-        rate_background=(N_observed_p/obs_time).to(1/u.s) *  N_off_regions, 
+        rate_signal=(N_observed_g/obs_time).to(1/u.s),
+        err_rate_signal=(np.sqrt(N_observed_g)/obs_time).to(1/u.s),
+        rate_background=(N_observed_p/obs_time).to(1/u.s) *  N_off_regions,
         err_rate_background=(np.sqrt(N_observed_p * N_off_regions)/obs_time).to(1/u.s),
         alpha=1/N_off_regions,
         max_time=500 * u.hour
