@@ -11,25 +11,10 @@ from ctapipe.image import (
     ImageCleaner,
     ImageProcessor,
     apply_time_delta_cleaning,
+    largest_island,
     number_of_islands,
     tailcuts_clean,
 )
-
-
-def get_only_main_island_mask(geom, cleaning_mask):
-
-    num_islands, island_labels = number_of_islands(geom, cleaning_mask)
-    n_pixels_on_island = np.bincount(island_labels)
-    # First bin is N pixels in no island, i.e. background
-    n_pixels_on_island[0] = 0
-    # biggest island
-    max_island_label = np.argmax(n_pixels_on_island)
-    if max_island_label > 0:
-        new_image_mask = island_labels == max_island_label
-    else:
-        new_image_mask = cleaning_mask
-    return new_image_mask
-
 
 class ImageCleanerSST(ImageCleaner):
     """
@@ -93,7 +78,8 @@ class ImageCleanerSST(ImageCleaner):
         )
 
         if only_main_island:
-            return get_only_main_island_mask(geom, time_delta_cleaning_mask)
+            _, island_labels = number_of_islands(geom, time_delta_cleaning_mask)
+            return largest_island(island_labels)
         else:
             return time_delta_cleaning_mask
 
@@ -154,7 +140,8 @@ class ImageCleanerSST_MC(ImageCleaner):
         )
 
         if only_main_island:
-            return get_only_main_island_mask(geom, time_delta_cleaning_mask)
+            _, island_labels = number_of_islands(geom, time_delta_cleaning_mask)
+            return largest_island(island_labels)
         else:
             return time_delta_cleaning_mask
 
