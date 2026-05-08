@@ -3,14 +3,13 @@ channels:
   - conda-forge
   - default
 dependencies:
-  - python=3.8
+  - python=3.11
   - pip
-  - ctapipe=0.17
-  - gammapy=1.0
+  - ctapipe=0.30
+  - gammapy=2.1
   - jupyter
-  - protozfits=2.0
-  - astroquery=0.4.6
-  - pydantic<2.0
+  - protozfits=2.11
+  - astroquery=0.4.11
   - pytest
   - ruff
   - sphinx
@@ -19,6 +18,6 @@ dependencies:
   - sphinx_rtd_theme
   - numpydoc
   - pip:
-      - ctaplot~=0.6.2
-      - pyirf~=0.8.0
+      - ctaplot~=0.6.5
+      - pyirf~=0.13.0
       - git+https://github.com/SST-1M-collaboration/CTS.git

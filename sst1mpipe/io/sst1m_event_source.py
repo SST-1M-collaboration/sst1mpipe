@@ -206,9 +206,9 @@ class SST1MEventSource(EventSource):
 
         subarray = SubarrayDescription(
             name=f"SST1M-{tel_id} subarray",
-            # tel_descriptions=tel_descriptions,
-            # tel_positions=tel_positions,
-            # reference_location=LST1_LOCATION,
+            tel_positions={},
+            tel_descriptions={},
+            reference_location=reference_location,
         )
 
         return subarray

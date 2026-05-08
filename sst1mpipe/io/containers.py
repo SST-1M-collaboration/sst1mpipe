@@ -73,7 +73,7 @@ class InstrumentContainer(Container):
     functions.
     """
 
-    subarray = Field(SubarrayDescription("MonteCarloArray"),
+    subarray = Field(None,
                      "SubarrayDescription from the instrument module")
     optical_foclen = Field(Map(np.ndarray), "map of tel_id to focal length")
     tel_pos = Field(Map(np.ndarray), "map of tel_id to telescope position")
