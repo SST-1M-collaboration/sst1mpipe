@@ -1269,9 +1269,9 @@ def make_dl1_stereo(
     with DataWriter(source,
                     output_path=output_path,
                     overwrite        = True,
-                    write_showers    = True,
-                    write_parameters = True,
-                    write_images     = True,
+                    write_dl2        = True,
+                    write_dl1_parameters = True,
+                    write_dl1_images = True,
                     ) as writer:
 
 

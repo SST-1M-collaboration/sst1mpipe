@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pkg_resources
+import astropy.units as u
+from ctapipe.containers import MuonRingContainer
 from ctapipe.image import tailcuts_clean
 from ctapipe.image.cleaning import number_of_islands
 from ctapipe.image.muon import ring_completeness
@@ -344,15 +346,24 @@ class muon_finder:
                     ## if there is signal outside the ring : skip the event
                     if Q_sum_window[~mu_mask & final_mask].sum() > 60 :
                         continue
-                    rc = ring_completeness(self.geom.pix_x.value[mu_mask],
-                                           self.geom.pix_y.value[mu_mask],
-                                           weights  = Q_sum_window[mu_mask],
-                                           radius   = res.x[2],
-                                           center_x = res.x[0],
-                                           center_y = res.x[1],
-                                           threshold=7,
-                                           bins=12
-                                           )
+                    # ring_completeness API changed in ctapipe 0.21+: it now takes
+                    # Quantity angular coords and a MuonRingContainer instead of
+                    # separate radius/center_x/center_y keyword arguments.
+                    # The camera-frame coordinates (in m) are treated as tangent-plane
+                    # angles (numerically equivalent for arctan2 binning purposes).
+                    _ring = MuonRingContainer(
+                        center_fov_lon=res.x[0] * u.rad,
+                        center_fov_lat=res.x[1] * u.rad,
+                        radius=res.x[2] * u.rad,
+                    )
+                    rc = ring_completeness(
+                        self.geom.pix_x.value[mu_mask] * u.rad,
+                        self.geom.pix_y.value[mu_mask] * u.rad,
+                        weights=Q_sum_window[mu_mask],
+                        ring=_ring,
+                        threshold=7,
+                        bins=12,
+                    )
                     ## if there is less than half a muon : skip the event
                     if rc < 0.5:
                         continue
