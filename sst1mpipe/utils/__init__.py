@@ -46,6 +46,7 @@ from .utils import (
     get_GTIs,
     get_horizon_frame,
     get_location,
+    get_moon,
     get_moon_params,
     get_moon_phase,
     get_pointing_radec,

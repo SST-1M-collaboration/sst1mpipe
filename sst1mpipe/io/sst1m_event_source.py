@@ -198,7 +198,10 @@ class SST1MEventSource(EventSource):
     @staticmethod
     def create_subarray(tel_id=1, reference_location=None):
         """
-        Obtain the subarray from the EventSource
+        Obtain the subarray from the EventSource.
+
+        For SST-1M raw input we read one telescope stream at a time, so we create
+        an empty subarray shell and fill telescope-specific information per event.
         Returns
         -------
         ctapipe.instrument.SubarrayDescription

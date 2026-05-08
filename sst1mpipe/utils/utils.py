@@ -45,6 +45,7 @@ INVERTED_MODULE_LIST_PATH = BASE_DIR / "data" / "inverted_module_list.json"
 
 
 def get_moon(time, location=None):
+    """Compatibility helper for astropy versions where `get_moon` is removed."""
     return get_body("moon", time, location=location)
 
 def get_target(file, force_pointing=False):
