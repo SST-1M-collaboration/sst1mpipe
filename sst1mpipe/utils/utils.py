@@ -26,7 +26,6 @@ from astropy.coordinates import (
     SkyCoord,
     angular_separation,
     get_body,
-    get_moon,
     get_sun,
 )
 from astropy.io import fits
@@ -43,6 +42,10 @@ from gammapy.data import DataStore
 BASE_DIR = Path(__file__).resolve().parent.parent
 MAPPING_FILE_PATH = BASE_DIR / "data" / "digicam_pixels_mapping_V5T.txt"
 INVERTED_MODULE_LIST_PATH = BASE_DIR / "data" / "inverted_module_list.json"
+
+
+def get_moon(time, location=None):
+    return get_body("moon", time, location=location)
 
 def get_target(file, force_pointing=False):
     """

@@ -34,12 +34,16 @@ import astropy.units as u
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.coordinates import AltAz, SkyCoord, get_moon, get_sun
+from astropy.coordinates import AltAz, SkyCoord, get_body, get_sun
 from astropy.time import Time
 
 import sst1mpipe
 from sst1mpipe.io import check_outdir, load_config, load_source_catalog
 from sst1mpipe.utils import get_location, get_moon_phase
+
+
+def get_moon(time, location=None):
+    return get_body("moon", time, location=location)
 
 
 def parse_args():

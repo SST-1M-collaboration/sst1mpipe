@@ -21,7 +21,6 @@ from ctapipe.containers import (
     TriggerContainer,
 )
 from ctapipe.core import Container, Field, Map
-from ctapipe.instrument import SubarrayDescription
 
 # from ctapipe.serializer import Serializer
 # from ctapipe.containers import MCEventContainer, ReconstructedContainer, \
