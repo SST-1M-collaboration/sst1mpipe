@@ -225,6 +225,7 @@ class SST1MEventSource(EventSource):
         array_event = SST1MArrayEventContainer()
         with MultiZFitsFiles(input_path) as events:
             array_event.r0.meta = dict(is_simulation=False)
+            skip_event = False
             for event_counter, event in enumerate(events):
                 # print(f" **** event: {event}")
                 if self.max_events is not None and event_counter > self.max_events:
