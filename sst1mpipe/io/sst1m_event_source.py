@@ -236,6 +236,7 @@ class SST1MEventSource(EventSource):
                     array_event.sst1m.r0.event_id = event.eventNumber
                 array_event.sst1m.r0.tels_with_data = [event.telescopeID, ]
                 _sort_ids = None
+                skip_event = False
                 for tel_id in array_event.sst1m.r0.tels_with_data:
                     pixel_ids = event.hiGain.waveforms.pixelsIndices
                     n_pixels = len(pixel_ids)
@@ -252,7 +253,8 @@ class SST1MEventSource(EventSource):
                             f"of file:{self.input_url}\n",
                             stacklevel=2,
                         )
-                        return np.ones(n_pixels) * np.nan
+                        skip_event = True
+                        break
 
                     if tel_id not in loaded_telescopes:
                         array_event.sst1m.inst.num_channels[tel_id] = event.num_gains
@@ -319,6 +321,8 @@ class SST1MEventSource(EventSource):
                             (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
 
                     r0.digicam_baseline = unsorted_baseline[_sort_ids] / 16
+                if skip_event:
+                    continue
                 yield array_event
 
     def _prepare_trigger_input(self, _a):
