@@ -245,10 +245,10 @@ class SST1MEventSource(EventSource):
 
                     try:
                         unsorted_baseline = event.hiGain.waveforms.baselines
-                    except AttributeError:
+                    except AttributeError as err:
                         raise AttributeError("Could not read `hiGain.waveforms.baselines`"
                             f"for event:{event_counter} (eventNumber {event.eventNumber})\n"
-                            f"of file:{self.input_url}\n")
+                            f"of file:{self.input_url}\n") from err
 
                     if tel_id not in loaded_telescopes:
                         array_event.sst1m.inst.num_channels[tel_id] = event.num_gains
