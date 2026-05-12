@@ -8,3 +8,5 @@ ignore = ["E501"]
 
 per-file-ignores = { "**/__init__.py" = ["F401"] }
 
+[tool.pytest.ini_options]
+pythonpath = ["sst1mpipe"]
