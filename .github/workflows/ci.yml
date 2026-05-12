@@ -21,6 +21,7 @@ jobs:
           cache-environment: true
           generate-run-shell: true
           post-cleanup: 'all'
+          lfs: true
       - name: Test install
         shell: micromamba-shell {0}
         run : pip install .
