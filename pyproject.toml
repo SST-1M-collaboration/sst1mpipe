@@ -4,6 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.ruff.lint]
 select = ["F", "E", "W"]
+extend-select = ["B", "RET505", "RET507", "PIE808", "UP015", "UP032", "RUF037", "SIM910"]
 ignore = ["E501"]
 
 per-file-ignores = { "**/__init__.py" = ["F401"] }
