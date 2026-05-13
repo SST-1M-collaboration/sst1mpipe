@@ -290,7 +290,7 @@ class mes_fitter:
         def spe_spectrum_function_(x, ll, xt, g, x0, sigma_pe, sigma_el):
 
             S = np.zeros_like(x)
-            for n in range(0, 6):
+            for n in range(6):
                 if n==0:
                     S+= single_gauss(x, x0, sigma_el) * G_poisson(0,ll,xt)
                 else:
@@ -354,7 +354,7 @@ class mes_fitter:
         def spe_spectrum_function_(x, ll, xt, g, x_el, sigma_pe, sigma_el):
 
             S = np.zeros_like(x)
-            for n in range(0, 8):
+            for n in range(8):
                 if n==0:
                     S+= single_gauss(x, x_el, sigma_el) * scst.poisson(ll).pmf(0)
                 else:
@@ -427,7 +427,7 @@ class mes_fitter:
         def spe_spectrum_function_(x, ll, xt, g, x_el, sigma_pe, sigma_el):
             poissonratio= (1-np.exp(-ll))/(1-np.exp(-ll/self.n_sample * self.peak_search_window_width))
             S = np.zeros_like(x)
-            for n in range(0, 8):
+            for n in range(8):
                 if n==0:
                     S+= single_gauss(x, x_el, sigma_el) * scst.poisson(ll).pmf(0)
                 else:

@@ -192,8 +192,7 @@ class SST1MEventSource(EventSource):
         # Otherwise, we can expect 0 at most once, if SWAT was just restarted
         if id0 == id1 == 0:
             return False
-        else:
-            return True
+        return True
 
     @staticmethod
     def create_subarray(tel_id=1, reference_location=None):
@@ -246,13 +245,10 @@ class SST1MEventSource(EventSource):
 
                     try:
                         unsorted_baseline = event.hiGain.waveforms.baselines
-                    except AttributeError:
-                        warnings.warn(
-                            "Could not read `hiGain.waveforms.baselines`"
+                    except AttributeError as err:
+                        raise AttributeError("Could not read `hiGain.waveforms.baselines`"
                             f"for event:{event_counter} (eventNumber {event.eventNumber})\n"
-                            f"of file:{self.input_url}\n"
-                        )
-                        return np.ones(n_pixels) * np.nan
+                            f"of file:{self.input_url}\n") from err
 
                     if tel_id not in loaded_telescopes:
                         array_event.sst1m.inst.num_channels[tel_id] = event.num_gains
@@ -290,7 +286,9 @@ class SST1MEventSource(EventSource):
                         )
                     else:
                         warnings.warn(
-                            'trigger_input_traces does not exist: --> nan')
+                            'trigger_input_traces does not exist: --> nan',
+                            stacklevel=2,
+                        )
                         r0.trigger_input_traces = np.zeros(
                             (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
 
@@ -299,7 +297,9 @@ class SST1MEventSource(EventSource):
                             event.trigger_output_patch7)
                     else:
                         warnings.warn(
-                            'trigger_output_patch7 does not exist: --> nan')
+                            'trigger_output_patch7 does not exist: --> nan',
+                            stacklevel=2,
+                        )
                         r0.trigger_output_patch7 = np.zeros(
                             (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
 
@@ -308,7 +308,9 @@ class SST1MEventSource(EventSource):
                             event.trigger_output_patch19)
                     else:
                         warnings.warn(
-                            'trigger_output_patch19 does not exist: --> nan')
+                            'trigger_output_patch19 does not exist: --> nan',
+                            stacklevel=2,
+                        )
                         r0.trigger_output_patch19 = np.zeros(
                             (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
 

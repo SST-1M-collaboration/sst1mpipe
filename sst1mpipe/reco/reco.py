@@ -438,7 +438,7 @@ def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
     if telescope == 'stereo':
 
         # In data, we need to rename columns _tel21 -> tel1, tel22 -> tel2
-        for tt,ttn in zip(['_tel21', '_tel22'], ['_tel1', '_tel2']):
+        for tt,ttn in zip(['_tel21', '_tel22'], ['_tel1', '_tel2'], strict=False):
             cols_to_rename = dl2.columns[dl2.columns.str.contains(tt)]
             rename_dict = {col: col.replace(tt, ttn) for col in cols_to_rename}
             dl2 = dl2.rename(columns=rename_dict)
@@ -466,7 +466,9 @@ def reco_misdirection(dl2, models_dir=None, config=None, telescope=None):
     return dl2_finite
 
 
-def get_evttype_edges(dl2, config=None, percentiles=[25, 50, 75]):
+def get_evttype_edges(dl2, config=None, percentiles=None):
+    if percentiles is None:
+        percentiles = [25, 50, 75]
 
     ebins = np.logspace(config['analysis']["log_energy_min_tev"], config['analysis']["log_energy_max_tev"], config['analysis']["n_energy_bins"])
     energy_center = logbin_mean(ebins)

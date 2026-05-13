@@ -24,7 +24,7 @@ class Camera(camera.Camera):
     '''
 
     def __init__(self, *args, **kwargs):
-        if not args and kwargs.get('_config_file', None) is None:
+        if not args and kwargs.get('_config_file') is None:
             kwargs['_config_file'] = pkg_resources.resource_filename(
                 'sst1mpipe',
                 path.join(
