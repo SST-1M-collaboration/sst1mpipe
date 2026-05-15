@@ -47,37 +47,60 @@ def evaluate_performance(
         save_fig=False, save_hdf=False,
         gammaness_cuts=None):
     """
-    Random Forrest performance evaluation on DL2 MC testing
-    point-like gammas and diffuse protons. It provides
-    energy and angular resolution and if proton file is
-    provided (optional) ROC curve is also evaluated.
+    Evaluate reconstruction quality on testing DL2 Monte Carlo samples.
 
-    Except for global gammaness cut option, resolutions
-    are calculated for events after optimal energy dependend
-    cut (the same that is used for sensitivity curve),
-    which corresponds to the real observation of
-    a point-like source.
+    The routine computes energy and angular resolution for a point-like gamma
+    sample and, when a proton sample is also provided, evaluates the
+    gamma/hadron-separation ROC curve. The same performance products are later
+    reused when validating a trained model set or preparing IRF inputs.
+
+    Except for the global gammaness-cut option, resolutions are calculated after
+    applying energy-dependent cuts optimized in the same way as the sensitivity
+    workflow.
 
     Parameters
     ----------
-    gamma_file: string
+    gamma_file : str
         Path to DL2 MC point-like gammas
-    proton_file: string
+    proton_file : str, optional
         Path to DL2 MC diffuse protons
-    outdir: string
-    config: dict
-    telescope: string
-    save_fig: bool
+    outdir : str
+        Directory in which figures and tables are stored.
+    config : dict
+        Pipeline configuration with energy binning and selection settings.
+    telescope : str
+        Telescope identifier such as ``"tel_001"`` or ``"stereo"``.
+    save_fig : bool, optional
         If True some figures are stored
-    save_hdf: bool
+    save_hdf : bool, optional
         If True hdf files with performance
         tables are stored
-    gammaness_cuts: string
+    gammaness_cuts : str, optional
         Gammaness cut method to be applied \'global\',
         \'efficiency\', \'significance\'
 
     Returns
     -------
+    None
+
+    Notes
+    -----
+    The function reads DL2 files from disk on every call, applies the requested
+    cuts, and then runs several plotting and table-generation steps. It is
+    therefore most efficient when used in batch production rather than being
+    called repeatedly inside tight interactive loops.
+
+    Examples
+    --------
+    >>> evaluate_performance(
+    ...     gamma_file="gamma_test_dl2.h5",
+    ...     proton_file="proton_test_dl2.h5",
+    ...     outdir="performance",
+    ...     config=config,
+    ...     telescope="tel_001",
+    ...     save_fig=True,
+    ...     gammaness_cuts="significance",
+    ... )
 
     """
 

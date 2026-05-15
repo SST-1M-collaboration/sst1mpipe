@@ -347,21 +347,60 @@ def train_models(
         plot=None, outdir=None, telescope=None,
         stereo=False):
     """
-    Run training of all RF models on MC gammas and protons
+    Train the full reconstruction model suite for a telescope configuration.
+
+    Depending on the configured DISP strategy, this routine trains the DISP
+    regressors/classifiers, the energy regressor, and optionally the
+    gamma/hadron classifier. For classifier training, it can create temporary
+    models to derive reconstructed features that are then reused as classifier
+    inputs.
 
     Parameters
     ----------
-    params_gamma: pandas.DataFrame
-    params_protons: pandas.DataFrame
-    config: dict
-    plot: bool
-    outdir: str
+    params_gamma : pandas.DataFrame
+        Gamma Monte Carlo training sample with all required feature columns.
+    params_protons : pandas.DataFrame or None
+        Proton Monte Carlo training sample used for gamma/hadron separation.
+        If ``None``, only the regression models are trained.
+    config : dict
+        Pipeline configuration controlling feature lists, sample sizes, and the
+        DISP method.
+    plot : bool, optional
+        When ``True``, save feature-importance plots for the trained models.
+    outdir : str
         output file path
-    telescope: str (tel_001/tel_002)
-    stereo: bool
+    telescope : str
+        Telescope identifier such as ``"tel_001"`` or ``"tel_002"``.
+    stereo : bool, optional
+        Train the stereo-specific variant of the models.
 
     Returns
     -------
+    None
+
+    Raises
+    ------
+    Exception
+        If the configured DISP method is not supported.
+
+    Notes
+    -----
+    The function writes trained model files to ``outdir`` and may also create a
+    temporary ``tmp`` subdirectory for intermediate models. It mutates the
+    supplied proton table when reconstructed temporary features are added during
+    classifier training, so callers should pass a copy when they need to keep
+    the original table unchanged.
+
+    Examples
+    --------
+    >>> train_models(
+    ...     params_gamma=gamma_training_sample,
+    ...     params_protons=proton_training_sample,
+    ...     config=config,
+    ...     outdir="models",
+    ...     telescope="tel_001",
+    ...     plot=True,
+    ... )
 
     """
 
@@ -700,24 +739,51 @@ def stereo_reconstruction(
         params, config=None,
         ismc=False, telescopes=None):
     """
-    Averages energy and gammaness stereoscopicly reconstructed for
-    each telescope to get final stereo quantities for each event.
-    For direction reconstruction, alt/az for both signs from each
-    telescope are calculated. Then the combination leading to
-    reconstructed coordinates with the smallest distance is
-    selected and final direction is calculated as weighted average
-    of the two (MARS-like stereo reconstruction).
+    Combine telescope-level predictions into a stereo DL2 event table.
+
+    The function averages per-telescope energy and gammaness predictions and
+    reconstructs the source direction by evaluating all DISP-sign combinations
+    for the participating telescopes. The closest pair is then combined through
+    a weighted average, following the MARS-like stereo strategy used by the
+    project.
 
     Parameters
     ----------
-    params: pandas.DataFrame
-    config: dict
-    ismc: bool
-    telescopes: list of strings
+    params : pandas.DataFrame
+        Telescope-level event table containing reconstructed mono quantities and
+        the Hillas and pointing information required for stereo combination.
+    config : dict
+        Pipeline configuration with stereo weighting choices and coordinate
+        conversion settings.
+    ismc : bool, optional
+        If ``True``, interpret telescope identifiers as Monte Carlo telescope
+        IDs. Otherwise expect real-data telescope IDs.
+    telescopes : list of str
+        Telescope names included in the stereo event, for example
+        ``["tel_021", "tel_022"]``.
 
     Returns
     -------
     pandas.DataFrame
+        Event-level DL2 table with averaged energy, gammaness, direction, and
+        supporting variance columns.
+
+    Notes
+    -----
+    The input table is expanded with intermediate reconstructed direction
+    columns before those temporary columns are removed again. The routine also
+    computes ICRS coordinates through :func:`sst1mpipe.analysis.add_reco_ra_dec`,
+    making it a natural boundary between telescope-level reconstruction and
+    downstream science analysis.
+
+    Examples
+    --------
+    >>> stereo_dl2 = stereo_reconstruction(
+    ...     params=stereo_params,
+    ...     config=config,
+    ...     ismc=False,
+    ...     telescopes=["tel_021", "tel_022"],
+    ... )
 
     """
 

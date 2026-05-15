@@ -108,18 +108,46 @@ def read_charge_images(file):
 
 def load_config(cfg_file, ismc=False):
     """
-    Reads sst1mpipe config file which must
-    be stored as json file.
+    Load an SST-1M pipeline configuration from JSON.
+
+    If ``cfg_file`` is not provided, the function falls back to the packaged
+    default configuration for either data or Monte Carlo processing.
 
     Parameters
     ----------
-    cfg_file: string
-        Path to the config file
-    ismc: bool
+    cfg_file : str or None
+        Path to the JSON configuration file. If ``None``, a built-in default
+        file is resolved from :mod:`sst1mpipe.data`.
+    ismc : bool, optional
+        When ``True`` and ``cfg_file`` is ``None``, load the Monte Carlo
+        default configuration. Otherwise load the default data configuration.
 
     Returns
     -------
-    config: dict
+    traitlets.config.loader.Config
+        Parsed configuration wrapped in a ``traitlets`` ``Config`` object.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the requested configuration file cannot be found.
+    json.JSONDecodeError
+        If the configuration file is not valid JSON.
+
+    Notes
+    -----
+    The returned object is used throughout the repository, including the
+    command-line scripts, reconstruction code, and performance evaluation.
+    Loading the packaged defaults keeps those workflows reproducible when a
+    custom configuration is not supplied.
+
+    Examples
+    --------
+    Load the packaged Monte Carlo defaults:
+
+    >>> config = load_config(None, ismc=True)
+    >>> "analysis" in config
+    True
 
     """
     if cfg_file is None:
@@ -186,18 +214,31 @@ def write_dl2(
         dl2_table, output_file=None, telescope=None,
         config=None, mode='w'):
     """
-    Helper function to write DL2 file
+    Write a DL2 event table to the standard SST-1M HDF5 location.
 
     Parameters
     ----------
-    dl2_table: pandas.DataFrame
-    output_file: string
-    telescope: string
-    config: dict
-    mode: string
+    dl2_table : pandas.DataFrame
+        Reconstructed DL2 event table to serialize.
+    output_file : str
+        Destination HDF5 file.
+    telescope : str
+        Telescope or subarray identifier used as the table name.
+    config : dict, optional
+        Pipeline configuration. Passed through to the underlying writer so
+        metadata and consistency checks can be handled centrally.
+    mode : str, optional
+        HDF5 open mode forwarded to :func:`write_dl2_table`.
 
     Returns
     -------
+    None
+
+    Notes
+    -----
+    This helper is intentionally thin: it keeps the canonical DL2 table path in
+    one place and delegates the actual serialization work to
+    :func:`write_dl2_table`.
 
     """
 
@@ -694,33 +735,66 @@ def load_dl1_sst1m(
         table='astropy', check_finite=False,
         stereo=False, quality_cuts=False, scale_intensities=False):
     """
-    Reads DL1 table from the input HDF file.
+    Load a DL1 parameter table from an SST-1M HDF5 product.
+
+    The loader can optionally enrich the table with pointing information,
+    stereo-geometry columns, finite-feature filtering, and event-quality cuts.
+    Callers can choose either an Astropy table or a pandas ``DataFrame``
+    depending on the downstream workflow.
 
     Parameters
     ----------
-    input_file: string
-        Path
-    tel: string
+    input_file : str
+        Path to the DL1 HDF5 file.
+    tel : str
         Either \'tel_00{1,2}\' (MC) or \'tel_02{1,2}\' (data)
-    config: dict
-    table: string
+    config : dict, optional
+        Pipeline configuration used when applying event selection, finite checks,
+        or intensity scaling.
+    table : {"astropy", "pandas"}, optional
         Type of the output table: \'astropy\'
         or \'pandas\'
-    check_finite: bool
+    check_finite : bool, optional
         If True finite check of RF features is
         performed.
-    stereo: bool
+    stereo : bool, optional
         If True, extra columns with geometricaly reconstructed
         stereo quantities are added to the output table
-    quality_cuts: bool
+    quality_cuts : bool, optional
         If True event selection from the config
         file is applied.
-    scale_intensities: bool
+    scale_intensities : bool, optional
         If True a global scale on Hillas Intensity of each shower
         is applied from config["NsbCalibrator"]["intensity_correction"]
+
     Returns
     -------
-    data: pandas.DataFrame or astropy.table.Table
+    pandas.DataFrame or astropy.table.Table
+        The loaded event parameters in the requested table representation.
+
+    Raises
+    ------
+    SystemExit
+        If pointing information is required but missing or inconsistent in the
+        input file.
+
+    Notes
+    -----
+    Converting to pandas removes multidimensional columns such as
+    ``tels_with_trigger`` because they are not represented cleanly in a
+    ``DataFrame``. Use the Astropy representation when exact table fidelity is
+    more important than scikit-learn interoperability.
+
+    Examples
+    --------
+    >>> config = load_config(None, ismc=True)
+    >>> dl1 = load_dl1_sst1m(
+    ...     "gamma_dl1.h5",
+    ...     tel="tel_001",
+    ...     config=config,
+    ...     table="pandas",
+    ...     quality_cuts=True,
+    ... )
 
     """
 

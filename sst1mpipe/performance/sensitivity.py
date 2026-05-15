@@ -784,51 +784,53 @@ def sensitivity(
         save_hdf=False, gammaness_cuts=False, theta2_cuts=False, source_detection='',
         energy_min=0.0, gamma_off=False):
     """
-    Evaluates differential flux sensitivity on a point-like
-    source. It also calculates optimal gammaness cuts
-    and stores them in hdf table to be further used
-    in IRF production and in DL2->DL3 on data. If spectrum
-    of any point-like source is specified it provides
-    also estimated time to detection. Number of simulated
-    events and re-used event fraction in each energy bin is
-    listed to monitor sanity of pruduced results.
+    Estimate differential flux sensitivity for a point-like source.
 
-    Sensitivity in given energy bin is only computed if
-    N_simulated_gammas > 10 & N_simulated_protons > 10
-    in respective regions after the cuts. Otherwise the CTA
-    criteria on flux sensitivity in each energy bin are applied:
-        - significance >=5 sigma
-        - excess > 5\\% of background
-        - N excess >= 10
+    In addition to the final sensitivity curve, this routine derives the
+    gammaness and theta cuts that are later reused in IRF production and in the
+    DL2-to-DL3 data path. When a supported source spectrum is requested, it also
+    estimates the time to detection for that source.
+
+    Sensitivity in a given energy bin is only computed if enough simulated gamma
+    and proton events survive the cuts. Otherwise the standard CTA-style
+    criteria are applied in each bin:
+
+    * significance >= 5 sigma;
+    * excess > 5\\% of background;
+    * excess counts >= 10.
 
     Parameters
     ----------
-    input_file_gamma: string
+    input_file_gamma : str
         Path to DL2 testing MC point-like gammas
-    input_file_proton: string
+    input_file_proton : str
         Path to DL2 testing MC diffuse protons
-    outdir: string
-    config: dict
-    telescope: string
-    save_fig: bool
+    outdir : str
+        Directory for stored figures and HDF5 tables.
+    config : dict
+        Pipeline configuration with observation time, energy binning, and cut
+        settings.
+    telescope : str
+        Telescope identifier such as ``"tel_001"`` or ``"stereo"``.
+    save_fig : bool, optional
         If True some figures are stored
-    save_hdf: bool
+    save_hdf : bool, optional
         If True hdf file with sensitivity
         table is stored
-    gammaness_cuts: string
+    gammaness_cuts : str
         Gammaness cut method to be applied \'global\',
         \'efficiency\', \'significance\'
-    theta2_cuts: string
+    theta2_cuts : str
         Theta2 cut method to be applied \'global\', \'efficiency\'
-    source_detection: string
+    source_detection : str, optional
         If not empty time to the source detection is
         calculated. Spectrum must be specified in
         performance.spectra
-    energy_min: float
+    energy_min : float, optional
         Additional cut on minimum reconstructed energy
         in TeV. Only applied on estimated time to
         detect a source.
-    gamma_off: bool
+    gamma_off : bool, optional
         If True it takes into account badly reconstructed
         gammas which fall into the OFF region and
         contribute to the background. It only works for
@@ -837,6 +839,26 @@ def sensitivity(
 
     Returns
     -------
+    None
+
+    Notes
+    -----
+    This workflow loads full DL2 test samples, weights them to the configured
+    observation time, and scans multiple energy-dependent cuts. The calculation
+    can therefore be noticeably slower than simple table-level summary
+    functions, especially when plots and HDF output are both enabled.
+
+    Examples
+    --------
+    >>> sensitivity(
+    ...     "gamma_test_dl2.h5",
+    ...     "proton_test_dl2.h5",
+    ...     outdir="performance",
+    ...     config=config,
+    ...     telescope="tel_001",
+    ...     gammaness_cuts="significance",
+    ...     theta2_cuts="efficiency",
+    ... )
 
     """
 

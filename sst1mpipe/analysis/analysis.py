@@ -20,17 +20,35 @@ from sst1mpipe.utils import (
 
 def add_reco_ra_dec(data, horizon_frame=None):
     """
-    Calculate reconstructed RA, DEC from reconstructed ALT,AZ in DL2 table
-    for timestamps specified in horizon_frame and add them as new columns
+    Add reconstructed right ascension and declination to a DL2 table.
+
+    The function transforms reconstructed altitude and azimuth columns into the
+    ICRS frame using the supplied horizon frame and stores the results in the
+    ``reco_ra`` and ``reco_dec`` columns.
 
     Parameters
     ----------
-    data: pandas.DataFrame with DL2 table
-    horizon_frame: astropy.coordinates.AltAz
+    data : pandas.DataFrame
+        DL2 event table containing ``reco_alt`` and ``reco_az`` columns in
+        degrees.
+    horizon_frame : astropy.coordinates.AltAz
+        Horizon frame describing the observation time and location for the
+        events in ``data``.
 
     Returns
     -------
     pandas.DataFrame
+        Copy of the input table with ``reco_ra`` and ``reco_dec`` columns.
+
+    Notes
+    -----
+    Existing reconstructed sky-coordinate columns are replaced. The function
+    copies the input table before modifying it, which is convenient for
+    notebooks but can increase memory usage on large DL2 samples.
+
+    Examples
+    --------
+    >>> dl2_with_radec = add_reco_ra_dec(dl2_data, horizon_frame=horizon_frame)
 
     """
 
@@ -81,16 +99,32 @@ def add_source_altaz(data, source=None, horizon_frame=None):
 
 def get_camera_frame(data, config=None, telescope=None):
     """
+    Build a camera frame for the events stored in a DL1 or DL2 table.
 
     Parameters
     ----------
-    data: pandas.DataFrame with DL1 or DL2 table
-    config: dict
-    telescope: str (tel_021/tel_022)
+    data : pandas.DataFrame
+        DL1 or DL2 table containing telescope pointing and focal-length columns.
+    config : dict
+        Pipeline configuration used to build the horizon frame.
+    telescope : str
+        Telescope identifier such as ``"tel_021"`` or ``"tel_022"``.
 
     Returns
     -------
     ctapipe.coordinates.CameraFrame
+        Camera frame aligned with the event timestamps and telescope pointing.
+
+    Notes
+    -----
+    The function assumes that the table contains a single effective focal length
+    for the selected telescope and uses the first row to obtain it. The returned
+    frame is commonly reused when converting source positions into camera-frame
+    coordinates for further analysis.
+
+    Examples
+    --------
+    >>> camera_frame = get_camera_frame(dl2_data, config=config, telescope="tel_021")
 
     """
 
