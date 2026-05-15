@@ -1,3 +1,5 @@
+"""Compute sensitivity metrics and event-selection cuts from DL2 products."""
+
 import logging
 import operator
 

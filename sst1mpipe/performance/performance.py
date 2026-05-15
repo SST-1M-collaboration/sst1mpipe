@@ -1,3 +1,5 @@
+"""Evaluate reconstruction quality and generate instrument response products."""
+
 import logging
 import operator
 import shutil

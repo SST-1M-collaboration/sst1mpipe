@@ -1,3 +1,5 @@
+"""Camera wrapper classes that expose SST-1M-specific geometry helpers."""
+
 from os import path
 
 import pkg_resources

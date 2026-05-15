@@ -1,5 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
+"""Performance and sensitivity utilities for evaluating reconstructed events."""
+
 
 from .performance import (
     angular_resolution,

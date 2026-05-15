@@ -1,3 +1,5 @@
+"""Shared constants that describe the simulated SST-1M instrument layout."""
+
 import numpy as np
 from astropy import units as u
 from ctapipe.instrument.subarray import EarthLocation

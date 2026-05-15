@@ -16,6 +16,7 @@ dependencies:
   - sphinx
   - sphinx-automodapi
   - sphinx-design
+  - sphinx-togglebutton
   - sphinx_rtd_theme
   - numpydoc
   - pip:

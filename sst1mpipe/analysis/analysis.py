@@ -1,3 +1,5 @@
+"""Coordinate transforms and source-position helpers for DL2 and DL3 analysis."""
+
 import logging
 import math
 

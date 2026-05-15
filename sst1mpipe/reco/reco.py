@@ -1,3 +1,5 @@
+"""Train and apply reconstruction models for mono and stereo SST-1M events."""
+
 import glob
 import logging
 import os

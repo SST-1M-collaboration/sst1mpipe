@@ -1,3 +1,5 @@
+"""Geometry builders and neighborhood matrices for the SST-1M camera layout."""
+
 import numpy as np
 from astropy import units as u
 from ctapipe.instrument.camera import CameraGeometry

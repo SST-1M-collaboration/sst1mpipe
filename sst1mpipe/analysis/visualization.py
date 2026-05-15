@@ -1,3 +1,5 @@
+"""Plotting utilities for reconstructed event distributions and performance curves."""
+
 import itertools
 
 import astropy.units as u

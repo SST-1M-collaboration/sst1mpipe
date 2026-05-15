@@ -1,3 +1,5 @@
+"""Read, merge, and write SST-1M data products used throughout the pipeline."""
+
 import glob
 import json
 import logging

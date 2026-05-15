@@ -1,5 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
+"""Calibration tools used to correct SST-1M camera and waveform data."""
+
 
 from .calib import (
     Calibrator_R0_R1,

@@ -1,3 +1,5 @@
+"""Calibration utilities for waveform corrections and R0-to-R1 processing."""
+
 import logging
 from os import path
 
