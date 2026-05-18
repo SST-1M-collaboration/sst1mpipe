@@ -1,4 +1,5 @@
-# SST-1M pipeline
+[![documentation](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/documentation.yml/badge.svg)](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/documentation.yml) [![ci](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml/badge.svg)](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml)
+# SST-1M pipeline 
 
 The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository is used for processing and analyzing data from the <b>SST-1M</b> prototype. Currently, two SST-1M telescopes are installed in Ondrejov, Czech Republic, operation in both mono and stereo observation modes. The <b>SST-1M</b> pipeline is based on [ctapipe](https://github.com/cta-observatory/ctapipe) and draws inspiration from [cta-lstchain](https://github.com/cta-observatory/cta-lstchain). Some funcionalities for stereoscopic reconstruction are inspired by [magic-cta-pipe](https://github.com/cta-observatory/magic-cta-pipe).
 
@@ -60,3 +61,23 @@ conda activate sst1m-dev
 pip install -e sst1mpipe
 ```
 
+## Building the documentation
+
+The documentation is built using sphynx. All necessary dependencies to build the documentation come with the [environement.yml](environment.yml) file.
+
+```
+mamba activate sst1m-dev
+cd docs/
+sphinx-build . _build/
+xdg-open _build/index.html  
+```
+
+## Running ruff checks
+
+The code is tested against a set of syntax rules defined in the [project.toml](pyproject.toml) file.
+To run these test yourself :
+
+```
+mamba activate sst1m-dev
+ruff check .
+```

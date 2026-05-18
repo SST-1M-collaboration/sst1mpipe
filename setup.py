@@ -22,7 +22,7 @@ setup(
     package_data={
         'sst1mpipe': [
             'data/*',
-            'tests/resources/camera_config.cfg',
+            'resources/camera_config.cfg',
         ],
     },
     extras_require={

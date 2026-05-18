@@ -13,6 +13,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Cache Git LFS files
+        uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: ${{ runner.os }}-lfs-${{ hashFiles('.gitattributes') }}
+          restore-keys: |
+             ${{ runner.os }}-lfs-
+
+      - name: Pull LFS files
+        run: git lfs pull
+
       - name: Set up Micromamba env
         uses: mamba-org/setup-micromamba@v2
         with:
@@ -21,12 +33,15 @@ jobs:
           cache-environment: true
           generate-run-shell: true
           post-cleanup: 'all'
+
       - name: Test install
         shell: micromamba-shell {0}
         run : pip install .
+
       - name: Run Ruff (pyflakes + pycodestyle)
         shell: micromamba-shell {0}
         run: ruff check .
+
       - name: Run tests
         shell: micromamba-shell {0}
-        run : pytest sst1mpipe/tests/
+        run : pytest tests/

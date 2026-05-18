@@ -18,6 +18,7 @@ dependencies:
   - sphinx-design
   - sphinx-togglebutton
   - sphinx_rtd_theme
+  - sphinx-togglebutton
   - numpydoc
   - pip:
       - ctaplot~=0.6.2
