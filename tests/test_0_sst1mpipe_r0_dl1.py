@@ -1,3 +1,4 @@
+from importlib.resources import files
 from pathlib import Path
 from subprocess import CompletedProcess
 
@@ -12,6 +13,14 @@ from conftest import (
     skip_if_missing,
 )
 
+FILE_TEL_1 = files("sst1mpipe.resources.zfits").joinpath(
+    "SST1M1_20260121_0001.fits.fz"
+)
+
+FILE_TEL_2 = files("sst1mpipe.resources.zfits").joinpath(
+    "SST1M2_20260121_0001.fits.fz"
+)
+
 LOG_REQUIRED_PATTERNS = {
     "tel1": r"Total number of TEL1 triggered events in the file:\s*([0-9]+)",
     "tel2": r"Total number of TEL2 triggered events in the file:\s*([0-9]+)",
@@ -23,11 +32,14 @@ LOG_REQUIRED_PATTERNS = {
 @pytest.fixture(scope="module")
 def r0_dl1_cfg(tmp_path_factory: pytest.TempPathFactory):
     fixtures: Path = fixtures_dir()
+    config_file = files("sst1mpipe.data").joinpath(
+        "sst1mpipe_data_config.json"
+    )
     return RunCfg(
         exe="sst1mpipe_r0_dl1",
         opts={
-            "--input-file": fixtures / "r0/SST1M2_20251218_0350.fits.fz",
-            "--config": fixtures / "default_sst1mpipe_data_config_analysis.json",
+            "--input-file": str(FILE_TEL_1),
+            "--config": str(config_file),
             "--output-dir": tmp_path_factory.mktemp("sst1mpipe_dl1_out"),
         },
         template_file=fixtures / "dl1/SST1M2_20251218_0350_W1_dl1.h5",
