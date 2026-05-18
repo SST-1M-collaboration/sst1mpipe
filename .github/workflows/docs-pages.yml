@@ -40,7 +40,9 @@ jobs:
 
       - name: Install package in docs env
         shell: micromamba-shell {0}
-        run: pip install -e . --no-deps
+        run: |
+          pip install sphinx-togglebutton
+          pip install -e . --no-deps
 
       - name: Build Sphinx docs (warnings are errors)
         shell: micromamba-shell {0}
