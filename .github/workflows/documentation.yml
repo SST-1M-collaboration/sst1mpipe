@@ -34,3 +34,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: _build/
           force_orphan: true
+      - name: Deploy on readthedocs
+        uses: readthedocs/actions/preview@v1
+        with:
+          project-slug: "readthedocs-preview"
