@@ -1,4 +1,4 @@
-from importlib.resources import files
+from importlib_resources import files
 from pathlib import Path
 from subprocess import CompletedProcess
 
@@ -56,7 +56,7 @@ def produced_DL1_outputs(r0_dl1_cfg: RunCfg):
     )
 
     if proc.returncode != 0:
-        pytest.skip(
+        pytest.fail(
             "Skipping pipeline-dependent tests because the pipeline failed.\n\n"
             f"STDOUT:\n{proc.stdout}\n\nSTDERR:\n{proc.stderr}"
         )
