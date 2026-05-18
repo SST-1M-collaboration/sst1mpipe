@@ -28,7 +28,6 @@ class Camera(camera.Camera):
             kwargs['_config_file'] = pkg_resources.resource_filename(
                 'sst1mpipe',
                 path.join(
-                    'tests',
                     'resources',
                     'camera_config.cfg'
                 )
