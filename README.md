@@ -61,3 +61,23 @@ conda activate sst1m-dev
 pip install -e sst1mpipe
 ```
 
+## Building the documentation
+
+The documentation is built using sphynx. All necessary dependencies to build the documentation come with the [environement.yml](environment.yml) file.
+
+```
+mamba activate sst1m-dev
+cd docs/
+sphinx-build . _build/
+xdg-open _build/index.html  
+```
+
+## Running ruff checks
+
+The code is tested against a set of syntax rules defined in the [project.toml](pyproject.toml) file.
+To run these test yourself :
+
+```
+mamba activate sst1m-dev
+ruff check .
+```
