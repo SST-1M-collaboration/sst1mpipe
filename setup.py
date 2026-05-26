@@ -59,7 +59,8 @@ setup(
             'sst1mpipe_night_summary = sst1mpipe.scripts.sst1mpipe_night_summary:main',
             'sst1mpipe_obsplan = sst1mpipe.scripts.sst1mpipe_obsplan:main',
             'sst1mpipe_mc_train_rfs_misdirection = sst1mpipe.scripts.sst1mpipe_mc_train_rfs_misdirection:main',
-            'sst1mpipe_event_classes = sst1mpipe.scripts.sst1mpipe_event_classes:main'
+            'sst1mpipe_event_classes = sst1mpipe.scripts.sst1mpipe_event_classes:main',
+            'sst1mpipe_read_camera_server_logs = sst1mpipe.scripts.read_camera_server_logs:main',
         ]
     }
 )
