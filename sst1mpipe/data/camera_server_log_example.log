@@ -1,0 +1,81 @@
+INFO  2026-05-26T11:26:08 csp 0.9.5: [330623:70559000] init_allocations: allocating buffers, please wait ...
+INFO  2026-05-26T11:26:08 csp 0.9.5: [330623:70559000] |  queue name  | total size | qdepth | parameters
+INFO  2026-05-26T11:26:08 csp 0.9.5: [330623:70559000] | ------------ | G--M--K--- | ------ | ------------------------------------------------
+INFO  2026-05-26T11:26:09 csp 0.9.5: [330623:70559000] |  udpktarena  | 4620000000 | 500000 | itsize=9240, areasize=9240, structsize=40
+INFO  2026-05-26T11:26:09 csp 0.9.5: [330623:70559000] |  udpktque    |    1600000 | 200000 |
+INFO  2026-05-26T11:26:09 csp 0.9.5: [330623:70559000] |  bunchque    |  102400000 | 100000 | itsize=1024, areasize=1024, structsize=40
+INFO  2026-05-26T11:26:09 csp 0.9.5: [330623:70559000] |  mergeque    |     115200 |   3600 | timebin=1 radii: future=3000 past=600 [millisec]
+INFO  2026-05-26T11:26:09 csp 0.9.5: [330623:70559000] |  sortque     |     800000 | 100000 |
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] |  prearena    | 5759424000 |  12000 | itsize=479952, areasize=479952, structsize=40
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] |  trgque      |      96000 |  12000 |
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] |  arrque      |      96000 |  12000 |
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] | ------------ | G--M--K--- | ------ | ------------------------------------------------
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] init_allocations: done (all big buffers allocated) ...
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] merge que: CSP will wait 0.6s before processing packets from the camera
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] Digicam localclock: max jitter: +/- 1 seconds, rate: 1
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] pixel mapping: using linear mapping (pixel offsets x/y set to zero - no muon detection possible)
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] Will create 1 RXRING threads
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] CLOCK: kernel's CLOCK_TAI is OK (leaps=37).
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] CLOCK: calibrated: clktype=CLOCK_TAI (11), leaps=0
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] CLOCK: calibrated: accy=135 [nsec], offset=1777884849646377794 [nsec]
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] Created new thread:  thr_ID=F93BA700  name: Status thread
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] Created new thread:  thr_ID=F8BB9700  name: SWAT RECV thread
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] Created new thread:  thr_ID=F83B8700  name: Processor thread
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F8BB9700] Native SWAT interface DISABLED
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F8BB9700] Will mark each 1-th camera trgr as array trgr
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F93BA700] Will report status every 1 seconds
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] Created new thread:  thr_ID=F7BB7700  name: Merge thread
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] Created new thread:  thr_ID=F73B6700  name: Ingest thread
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:70559000] Created new thread:  thr_ID=F6BB5700  name: DIGICAM UDP:0 thread
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F6BB5700] RXRING #0 init: selected version: TPACKET_V3
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F6BB5700] RXRING #0 init: enabled promisc mode on iface: ens3f0
+2026-05-26T11:26:10 - Warning: ZMQStreamerConfig.ini could not be found. Using default values.
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F8BB9700] DAQ/ZMQ interface initialized at TCP port 13581
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F8BB9700] DAQ/ZMQ interface will push type 0 protobuf messages (0: L0, 1: R1, 2: DL0)
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F93BA700] RXRING | PACKET ERRS | UDP INGEST | CLOCK |   TRIGGER RATES             |     MERGE OFFSET    |    BUFFERS/QUEUES   | DAQ RATES
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F93BA700]   drop | gaps+ gaps- | pckts MB/s | drift | part camera array muon hill | L min  max E mean P | ARRQ BUNQ UARN PARN | objs MB/s
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F93BA700]      0       0     0       0    0   0.000      0      0     0    0    0      -1   -1     -1        0    0   0%   0%      0    0
+INFO  2026-05-26T11:26:10 csp 0.9.5: [330623:F93BA700] Trimming messages since no activity detected. Press  Ctrl-\  to terminate ....
+INFO  2026-05-26T11:26:12 csp 0.9.5: [330623:F6BB5700] Dropping kernel caches (arg=3) - successful
+INFO  2026-05-26T11:26:12 csp 0.9.5: [330623:F6BB5700] RXRING #0 init: allocated and mmaped 1048576000 bytes (4000 x 262144)
+INFO  2026-05-26T11:26:12 csp 0.9.5: [330623:F6BB5700] RXRING #0 init: successful bind to iface: ens3f0
+INFO  2026-05-26T11:26:12 csp 0.9.5: [330623:F6BB5700] RXRING #0 init: enabled kernel filter: inbound && udp && udp[8:2] = 0x4447 && udp[12:2] = 0x434d
+INFO  2026-05-26T11:26:44 csp 0.9.5: [330623:F93BA700] RXRING | PACKET ERRS | UDP INGEST | CLOCK |   TRIGGER RATES             |     MERGE OFFSET    |    BUFFERS/QUEUES   | DAQ RATES
+INFO  2026-05-26T11:26:44 csp 0.9.5: [330623:F93BA700]   drop | gaps+ gaps- | pckts MB/s | drift | part camera array muon hill | L min  max E mean P | ARRQ BUNQ UARN PARN | objs MB/s
+INFO  2026-05-26T11:26:44 csp 0.9.5: [330623:F93BA700]      0     250   249   39628  180   0.000      1    248   248    0    0     527 1376    750        0  233   4%   0%    248   32
+INFO  2026-05-26T11:26:45 csp 0.9.5: [330623:F93BA700]      0    1666  1666   41015  187   0.113      0   1666  1666    0    0     149  979    468        0  101   1%   0%   1666  219
+INFO  2026-05-26T11:26:46 csp 0.9.5: [330623:F93BA700]      0    1394  1394   49715  226   0.210      0   1393  1215    0    0     100  929    408      189   55   1%   3%   1026  135
+INFO  2026-05-26T11:26:47 csp 0.9.5: [330623:F93BA700]      0    1189  1189   53319  243   0.269      0   1189  1236    0    0      62  786    415       17  140   3%   1%   1408  185
+INFO  2026-05-26T11:26:48 csp 0.9.5: [330623:F93BA700]      0     835   835   36591  167   0.299      0    835   880    0    0       2  836    439       30  215   4%   0%    866  114
+INFO  2026-05-26T11:26:49 csp 0.9.5: [330623:F93BA700]      0     975   974   39972  182   0.337      0    974  1060    0    0   L  12  805    398        0  264   4%   0%   1091  143
+INFO  2026-05-26T11:26:50 csp 0.9.5: [330623:F93BA700]      0    1253  1249   52324  238   0.398      2   1248  1248    0    0   L   0  724    369        0  228   4%   0%   1248  164
+INFO  2026-05-26T11:26:51 csp 0.9.5: [330623:F93BA700]      0    1446  1444   49804  227   0.468      1   1443  1443    0    0   L   7  621    242        0   93   1%   0%   1443  190
+INFO  2026-05-26T11:26:52 csp 0.9.5: [330623:F93BA700]      0     861   860   38311  174   0.516      1    859   859    0    0   L   7  608    267        0   40   0%   0%    859  113
+INFO  2026-05-26T11:26:53 csp 0.9.5: [330623:F93BA700]      0    1117  1113   50528  230   0.572      2   1111  1111    0    0   L   0  463    236        0    0   0%   0%   1111  146
+INFO  2026-05-26T11:26:54 csp 0.9.5: [330623:F93BA700]      0     666   663   34840  159   0.608      1    662   662    0    0   L   0  498    244        0    0   0%   0%    662   87
+INFO  2026-05-26T11:26:55 csp 0.9.5: [330623:F93BA700]      0     609   607   38069  173   0.651      1    606   606    0    0   L   8  502    242        0    0   0%   0%    606   79
+INFO  2026-05-26T11:26:56 csp 0.9.5: [330623:F93BA700]      0     568   568   40602  185   0.694      1    567   521    0    0   L   6  464    232       34    0   0%   0%    486   64
+INFO  2026-05-26T11:26:57 csp 0.9.5: [330623:F93BA700]      0      26    26   48346  220   0.760      0     27    53    0    0   L  81  392    244        2  170   3%   0%     86   11
+INFO  2026-05-26T11:26:58 csp 0.9.5: [330623:F93BA700]      0     742   741   43096  196   0.854      0    740   760    0    0   L   8  367    206        0   88   1%   0%    762  100
+INFO  2026-05-26T11:26:59 csp 0.9.5: [330623:F93BA700]      0     582   579   52577  240   0.960      2    577   577    0    0   L   0  366    136        0   16   0%   0%    577   75
+INFO  2026-05-26T11:27:00 csp 0.9.5: [330623:F93BA700]      0     587   586   40413  184   1.049      1    585   585    0    0   L   8  325    162        0    0   0%   0%    585   77
+INFO  2026-05-26T11:27:01 csp 0.9.5: [330623:F93BA700]      0     468   468   32944  150   1.112      1    468   468    0    0   L   1  378    212        0    0   0%   0%    468   61
+INFO  2026-05-26T11:27:02 csp 0.9.5: [330623:F93BA700]      0     611   610   42645  194   1.196      0    609   609    0    0   L  14  366    190        0    0   0%   0%    609   80
+INFO  2026-05-26T11:27:03 csp 0.9.5: [330623:F93BA700]      0     378   378   48694  222   1.294      1    377   359    0    0   L  34  407    191        0   26   2%   0%    357   47
+INFO  2026-05-26T11:27:04 csp 0.9.5: [330623:F93BA700]      0     395   395   40557  185   1.382      0    395   413    0    0   L  11  421    233        0  130   2%   0%    415   54
+INFO  2026-05-26T11:27:05 csp 0.9.5: [330623:F93BA700]      0     611   610   49930  227   1.480      1    610   610    0    0   L   4  399    203        0   83   1%   0%    610   80
+INFO  2026-05-26T11:27:06 csp 0.9.5: [330623:F93BA700]      0     896   896   45338  206   1.570      1    896   896    0    0   L   1  253    140        0    0   0%   0%    896  117
+INFO  2026-05-26T11:27:07 csp 0.9.5: [330623:F93BA700]      0     613   612   39664  181   1.653      0    611   611    0    0   L  12  379    185        0    0   0%   0%    611   80
+INFO  2026-05-26T11:27:08 csp 0.9.5: [330623:F93BA700]      0     501   499   37838  172   1.715      2    497   497    0    0   L   0  361    194        0    0   0%   0%    497   65
+INFO  2026-05-26T11:27:09 csp 0.9.5: [330623:F93BA700]      0     537   534   36694  167   1.775      2    533   533    0    0   L  10  342    175        0    0   0%   0%    533   70
+INFO  2026-05-26T11:27:10 csp 0.9.5: [330623:F93BA700]      0     300   300   39283  179   1.854      0    299   289    0    0   L   7  343    168      122    0   0%   1%    166   21
+INFO  2026-05-26T11:27:11 csp 0.9.5: [330623:F93BA700]      0     112   110   38279  174   1.922      0    110   120    0    0   L 112  336    209        0  137   2%   0%    243   32
+INFO  2026-05-26T11:27:12 csp 0.9.5: [330623:F93BA700]      0     597   597   41626  190   2.002      1    597   597    0    0   L  12  327    168        0   44   0%   0%    597   78
+INFO  2026-05-26T11:27:13 csp 0.9.5: [330623:F93BA700]      0     458   457   39400  179   2.082      0    456   456    0    0   L   0  223    118        0    0   0%   0%    456   60
+INFO  2026-05-26T11:27:14 csp 0.9.5: [330623:F93BA700] RXRING | PACKET ERRS | UDP INGEST | CLOCK |   TRIGGER RATES             |     MERGE OFFSET    |    BUFFERS/QUEUES   | DAQ RATES
+INFO  2026-05-26T11:27:14 csp 0.9.5: [330623:F93BA700]   drop | gaps+ gaps- | pckts MB/s | drift | part camera array muon hill | L min  max E mean P | ARRQ BUNQ UARN PARN | objs MB/s
+INFO  2026-05-26T11:27:14 csp 0.9.5: [330623:F93BA700]      0     505   501   40445  184   2.169      2    499   499    0    0   L   0  355    182        0    0   0%   0%    499   65
+INFO  2026-05-26T11:27:15 csp 0.9.5: [330623:F93BA700]      0     425   423   36656  167   2.232      2    422   422    0    0   L   0  334    166        0    0   0%   0%    422   55
+INFO  2026-05-26T11:27:16 csp 0.9.5: [330623:F93BA700]      0     643   642   45700  208   2.305      2    641   641    0    0   L  11  323    177        0    0   0%   0%    641   84
+INFO  2026-05-26T11:27:17 csp 0.9.5: [330623:F93BA700]      0       0     0   15778   72   2.350      0      0     0    0    0   L  -1   -1     -1        0    0   0%   0%      0    0
+INFO  2026-05-26T11:27:18 csp 0.9.5: [330623:F93BA700]      0       0     0       0    0   2.350      0      0     0    0    0      -1   -1     -1        0    0   0%   0%      0    0
