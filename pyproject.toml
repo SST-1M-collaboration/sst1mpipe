@@ -58,6 +58,12 @@ include-package-data = true
 [tool.setuptools.packages.find]
 where = ["."]
 
+[tool.setuptools.package-data]
+sst1mpipe = [
+  "data/*",
+  "resources/camera_config.cfg"
+]
+
 
 
 [project.scripts]
