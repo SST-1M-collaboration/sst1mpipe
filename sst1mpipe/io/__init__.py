@@ -1,5 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
+"""Input and output helpers for SST-1M data products across pipeline stages."""
+
 
 from .io import (
     add_wr_dl1_stereo,

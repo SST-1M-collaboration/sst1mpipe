@@ -18,9 +18,12 @@ Products of automatic processing (all data levels up to DL3) can be found in:
 
 ``/data/work/analysis/Daily_analysis/daily_data/``
 
-Those are sorted by date, source observed, and the telescope used (``cs1``, ``cs2`` and ``stereo`` for coincident events).
-All data level directories also contain configuration file and log file for each processed run, so 
-user can easily check if the processing went OK and which version of ``sst1mpipe``wasused. Random Forest models used in authomatic analysis 
+Those products are sorted by date, observed source, and telescope selection
+(``cs1``, ``cs2``, or ``stereo`` for coincident events).
+All data-level directories also contain a configuration file and log file for
+each processed run, so users can verify that processing finished correctly and
+see which version of ``sst1mpipe`` was used. Random Forest models used in
+automatic analysis
 can be found in
 
 ``/data/work/analysis/MC/prod_january_2023/``

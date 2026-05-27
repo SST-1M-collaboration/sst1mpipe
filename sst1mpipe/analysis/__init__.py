@@ -1,5 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
+"""High-level analysis helpers and plotting utilities for SST-1M data."""
+
 
 from .analysis import (
     add_reco_ra_dec,

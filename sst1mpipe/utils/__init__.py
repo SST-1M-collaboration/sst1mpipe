@@ -1,5 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
+"""Shared helper functions used across calibration, reconstruction, and analysis."""
+
 
 from .cleaning import ImageCleanerSST, image_cleaner_setup
 from .NSB_tools import (

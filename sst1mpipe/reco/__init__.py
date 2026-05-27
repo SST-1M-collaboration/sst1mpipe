@@ -1,5 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
+"""Event reconstruction models and stereo combination utilities."""
+
 
 from .reco import (
     angular_distance,
