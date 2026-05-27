@@ -7,10 +7,11 @@ build-backend = "setuptools.build_meta"
 name = "sst1mpipe"
 version = "0.9.0-dev"
 description = "Analysis chain for the SST-1M prototype"
-author = "SST-1M collaboration"
-license = "BSD 3-Clause"
-url = "https://github.com/SST-1M-collaboration/sst1mpipe"
-readme = "README.md"
+authors = [
+  { name = "SST-1M collaboration" }
+  ]
+license = { file = "LICENSE" }
+readme = { file = "README.md", content-type = "text/markdown" }
 dependencies = [
   "h5py",
   "ctapipe~=0.17.0",
@@ -24,6 +25,11 @@ dependencies = [
   "tables~=3.8.0",
   "pydantic>=1.4,<2.0"
 ]
+
+[project.urls]
+Homepage = "https://sst-1m.space/"
+Repository = "https://github.com/SST-1M-collaboration/sst1mpipe"
+Documentation = "https://sst1mpipe.readthedocs.io/"
 
 [metadata]
 
