@@ -1,0 +1,234 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Introduction &mdash; sst1mpipe 0.9.0.dev0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=13237357" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=53b0aaa1"></script>
+      <script src="_static/doctools.js?v=888ff710"></script>
+      <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="_static/togglebutton.js?v=4a39c7ea"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="SST-1M analysis workflow" href="sst1m_analysis_workflow.html" />
+    <link rel="prev" title="Welcome to sst1mpipe’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            sst1mpipe
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#for-users">For users</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#for-developers">For developers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pre-installed-conda-environment-on-calculus">Pre-installed conda environment on <strong>Calculus</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#analysis-basics">Analysis basics</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sst1m_analysis_workflow.html">SST-1M analysis workflow</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">sst1mpipe</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Introduction</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/introduction.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="introduction">
+<span id="id1"></span><h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this heading"></a></h1>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this heading"></a></h2>
+<p>The advanced package and environment management system, <a class="reference external" href="https://www.anaconda.com/distribution/#download-section">Anaconda</a>, <a class="reference external" href="https://docs.conda.io/en/latest/miniconda.html">Miniconda</a> or <a class="reference external" href="https://anaconda.org/conda-forge/mamba">Mamba</a>, is needed to be installed first.</p>
+<p>The Mamba is recomended due to some (quite often occured) stucks at solving environment on Anaconda. Up to now Mamba works well.</p>
+<p>Set up environment based on Mamba</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For more details see <a class="reference external" href="https://github.com/conda-forge/miniforge#mambaforge">https://github.com/conda-forge/miniforge#mambaforge</a></p>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">curl -L -O &quot;https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh&quot;</span>
+<span class="go">bash Mambaforge-$(uname)-$(uname -m).sh</span>
+</pre></div>
+</div>
+<p>or</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">wget &quot;https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh&quot;</span>
+<span class="go">bash Mambaforge-$(uname)-$(uname -m).sh</span>
+</pre></div>
+</div>
+<section id="for-users">
+<h3>For users<a class="headerlink" href="#for-users" title="Permalink to this heading"></a></h3>
+<ul class="simple">
+<li><p>download stable version of <strong>sst1mpipe</strong> (latest version = 0.9.0)</p></li>
+<li><p>create and activate <strong>conda</strong> environment</p></li>
+<li><p>install <strong>sst1mpipe</strong></p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">SST1MPIPE_VER=0.9.0</span>
+
+<span class="go">wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz</span>
+<span class="go">tar -xvf v$SST1MPIPE_VER.tar.gz</span>
+<span class="go">cd sst1mpipe-$SST1MPIPE_VER</span>
+<span class="go">conda env create -n sst1m-$SST1MPIPE_VER -f environment.yml</span>
+<span class="go">conda activate sst1m-$SST1MPIPE_VER</span>
+<span class="go">pip install -e .</span>
+
+<span class="go">rm environment.yml</span>
+</pre></div>
+</div>
+</section>
+<section id="for-developers">
+<h3>For developers<a class="headerlink" href="#for-developers" title="Permalink to this heading"></a></h3>
+<ul class="simple">
+<li><p>download latest development version from git repository</p></li>
+<li><p>create and activate <strong>conda</strong> environment</p></li>
+<li><p>install <strong>sst1mpipe</strong></p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone git@github.com:SST-1M-collaboration/sst1mpipe.git</span>
+<span class="go">conda env create -f sst1mpipe/environment.yml</span>
+<span class="go">conda activate sst1m-dev</span>
+<span class="go">pip install -e sst1mpipe</span>
+</pre></div>
+</div>
+</section>
+<section id="pre-installed-conda-environment-on-calculus">
+<h3>Pre-installed conda environment on <strong>Calculus</strong><a class="headerlink" href="#pre-installed-conda-environment-on-calculus" title="Permalink to this heading"></a></h3>
+<p>If one prefers to work on <strong>Calculus</strong>, he/she may skip the pipeline installation completely and
+only activate preinstalled environment:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">source /data/work/analysis/software/mambaforge/etc/profile.d/conda.sh</span>
+<span class="go">conda activate /data/work/analysis/software/mambaforge/envs/sst1m-$SST1MPIPE_VER</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="analysis-basics">
+<span id="id2"></span><h2>Analysis basics<a class="headerlink" href="#analysis-basics" title="Permalink to this heading"></a></h2>
+<p><strong>sst1mpipe</strong> takes the raw waveforms in each camera pixel, calibrates them into the number of photoelectrons,
+and reconstructs the physical parameters of primary gamma-ray photons such as their energy
+and arrival direction. It also classifies events to suppress hadronic background. Standard reconstruction is
+performed using Random Forest regressors and classifiers, which are pre-trained on precise Monte Carlo simulations.
+<strong>sst1mpipe</strong> handles Monte Carlo and Random Forest training as well, and can be also used to estimate SST-1M
+performance. The data analysis is performed in several subsequent steps, where each data level is stored, and so
+any possible future reprocessing can start from any point in the chain. The data levels used in <strong>sst1mpipe</strong> follow
+the <strong>ctapipe</strong> data model:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Data Level</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>File Format</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>R0</p></td>
+<td><p>Raw waveforms in each pixel (uncalibrated),</p></td>
+<td><p>ZFITS</p></td>
+</tr>
+<tr class="row-odd"><td><p>R1</p></td>
+<td><p>Calibrated waveforms (in photoelectrons, pedestal subtracted)</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>DL1</p></td>
+<td><p>Integrated charge and peak position of the waveform in each pixel
++ Hillas parameters.</p></td>
+<td><p>HDF5</p></td>
+</tr>
+<tr class="row-odd"><td><p>DL2</p></td>
+<td><p>Reconstructed event parameters (energy, direction, primary type)</p></td>
+<td><p>HDF5</p></td>
+</tr>
+<tr class="row-even"><td><p>DL3</p></td>
+<td><p>Photon lists (after selection and gammaness cut)
++ Instrument Response Functions</p></td>
+<td><p>FITS</p></td>
+</tr>
+</tbody>
+</table>
+<p>Scheme of data/MC processing the pipeline:</p>
+<a class="reference internal image-reference" href="_images/sst1mpipe_scheme_mono.png"><img alt="_images/sst1mpipe_scheme_mono.png" class="align-center" src="_images/sst1mpipe_scheme_mono.png" style="width: 700px;" /></a>
+<a class="reference internal image-reference" href="_images/sst1mpipe_scheme_stereo.png"><img alt="_images/sst1mpipe_scheme_stereo.png" class="align-center" src="_images/sst1mpipe_scheme_stereo.png" style="width: 700px;" /></a>
+<p>For a detailed description of all analysis steps, see: <a class="reference internal" href="sst1m_analysis_workflow.html#sst1m-analysis-workflow"><span class="std std-ref">SST-1M analysis workflow</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to sst1mpipe’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sst1m_analysis_workflow.html" class="btn btn-neutral float-right" title="SST-1M analysis workflow" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SST-1M collaboration.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

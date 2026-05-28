@@ -1,0 +1,944 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SST-1M analysis workflow &mdash; sst1mpipe 0.9.0.dev0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=13237357" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js?v=53b0aaa1"></script>
+      <script src="_static/doctools.js?v=888ff710"></script>
+      <script src="_static/sphinx_highlight.js?v=4825356b"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="_static/togglebutton.js?v=4a39c7ea"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Introduction" href="introduction.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            sst1mpipe
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">SST-1M analysis workflow</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#automatic-data-processing">Automatic data processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#detailed-data-processing">Detailed data processing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#configuration-files">Configuration files</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#r0-to-dl1">R0 to DL1</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#random-forest-training">Random Forest training</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dl1-to-dl1-stereo">DL1 to DL1 stereo</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dl1-to-dl2">DL1 to DL2</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dl2-mc-to-irfs">DL2 MC to IRFs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#dl2-to-dl3">DL2 to DL3</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#high-level-analysis">High level analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#rf-performance-and-sensitivity">RF performance and sensitivity</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">sst1mpipe</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">SST-1M analysis workflow</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/sst1m_analysis_workflow.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sst-1m-analysis-workflow">
+<span id="sst1m-analysis-workflow"></span><h1>SST-1M analysis workflow<a class="headerlink" href="#sst-1m-analysis-workflow" title="Permalink to this heading"></a></h1>
+<section id="automatic-data-processing">
+<span id="automatic-processing"></span><h2>Automatic data processing<a class="headerlink" href="#automatic-data-processing" title="Permalink to this heading"></a></h2>
+<p>Raw data from both telescopes are processed automaticaly up to DL3 level
+every morning after an observing night on <strong>Calculus</strong> with <code class="docutils literal notranslate"><span class="pre">Daily</span> <span class="pre">analysis</span></code>
+pipeline:</p>
+<p><code class="docutils literal notranslate"><span class="pre">/mnt/nfs22_auger/jurysek/sst1mpipe/sst1mpipe/scripts/daily_analysis.py</span></code></p>
+<p>Products of automatic processing (all data levels up to DL3) can be found in:</p>
+<p><code class="docutils literal notranslate"><span class="pre">/data/work/analysis/Daily_analysis/daily_data/</span></code></p>
+<p>Those are sorted by date, source observed, and the telescope used (<code class="docutils literal notranslate"><span class="pre">cs1</span></code>, <code class="docutils literal notranslate"><span class="pre">cs2</span></code> and <code class="docutils literal notranslate"><span class="pre">stereo</span></code> for coincident events).
+All data level directories also contain configuration file and log file for each processed run, so
+user can easily check if the processing went OK and which version of <a href="#id1"><span class="problematic" id="id2">``</span></a>sst1mpipe``wasused. Random Forest models used in authomatic analysis
+can be found in</p>
+<p><code class="docutils literal notranslate"><span class="pre">/data/work/analysis/MC/prod_january_2023/</span></code></p>
+<p>for both mono and stereo regimes of observation, together with expected performances and sensitivity curves. IRFs used for DL3
+production can be found in</p>
+<p><code class="docutils literal notranslate"><span class="pre">/data/work/analysis/IRFs/</span></code></p>
+<p>DL3 products of the automatic processing can be further analyzed using standard tools
+such as <a class="reference external" href="https://github.com/gammapy">gammapy</a>, see <a class="reference internal" href="#higher-level"><span class="std std-ref">High level analysis</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>As the software development is progressing very fast, automatic processing is usually
+done with a slightly obsolete version of <code class="docutils literal notranslate"><span class="pre">sst1mpipe</span></code> and with a configuration not fully
+tunned for atmospheric conditions during particular nights. To obtain <em>paper level</em>
+analysis, one should proceed with the steps described in <a class="reference internal" href="#detailed-processing"><span class="std std-ref">Detailed data processing</span></a>.</p>
+</div>
+</section>
+<section id="detailed-data-processing">
+<span id="detailed-processing"></span><h2>Detailed data processing<a class="headerlink" href="#detailed-data-processing" title="Permalink to this heading"></a></h2>
+<p>All data files are stored on telescope servers cs1/cs2. They are also mirrored on Calculus
+(<code class="docutils literal notranslate"><span class="pre">/net/cs1/data/raw/</span></code>, <code class="docutils literal notranslate"><span class="pre">/net/cs2/data/raw/</span></code>) and <a class="reference external" href="https://www.farm.particle.cz/">FZU farm</a> (<code class="docutils literal notranslate"><span class="pre">/mnt/sst1m/sst1m_backups/</span></code>),
+where can be processed and analyzed.</p>
+<p>To get some feeling of how the event reconstruction and data analysis works, one can take
+a look at materials from the last SST-1M hands-on analysis session in Prague, December 2023:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://indico.cern.ch/event/1337334/contributions/5692346/attachments/2775295/4836434/data_analysis_basics.pdf">Introductory talk</a></p></li>
+<li><p>Jupyter notebooks on Calculus: <code class="docutils literal notranslate"><span class="pre">/data/work/analysis/sst1m_analysis_handson_2023/</span></code></p></li>
+</ul>
+<p>To understand general logic of the data processing, see scheme of the pipeline for mono and stereo
+data analysis: <a class="reference internal" href="introduction.html#analysis-basics"><span class="std std-ref">Analysis basics</span></a>.</p>
+<section id="configuration-files">
+<h3>Configuration files<a class="headerlink" href="#configuration-files" title="Permalink to this heading"></a></h3>
+<p>There are two slightly different configuration files. One is to be used for MC processing
+(needed only if one wants to get custom RF models / IRFs / performance curves), and one
+for real data processing. These contain configuration for all reconstruction/analysis steps
+from R0 to DL3 (or performance evaluation in case of MC).</p>
+<p>Default config file for MC:</p>
+<div class="toggle docutils container">
+<div class="code json highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+    <span class="s2">&quot;telescope_coords&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="s2">&quot;tel_001&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;long_deg&quot;</span><span class="p">:</span> <span class="mf">14.782924</span><span class="p">,</span>
+        <span class="s2">&quot;lat_deg&quot;</span><span class="p">:</span> <span class="mf">49.911800</span><span class="p">,</span>
+        <span class="s2">&quot;height_m&quot;</span><span class="p">:</span> <span class="mi">510</span>
+      <span class="p">},</span>
+      <span class="s2">&quot;tel_002&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;long_deg&quot;</span><span class="p">:</span> <span class="mf">14.782078</span><span class="p">,</span>
+        <span class="s2">&quot;lat_deg&quot;</span><span class="p">:</span> <span class="mf">49.913084</span><span class="p">,</span>
+        <span class="s2">&quot;height_m&quot;</span><span class="p">:</span> <span class="mi">510</span>
+      <span class="p">}</span>
+    <span class="p">},</span>
+    <span class="s2">&quot;allowed_tels&quot;</span><span class="p">:</span> <span class="n">null</span><span class="p">,</span>
+
+    <span class="s2">&quot;analysis&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="s2">&quot;global_theta_cut&quot;</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+      <span class="s2">&quot;global_gammaness_cut&quot;</span><span class="p">:</span> <span class="mf">0.6</span><span class="p">,</span>
+      <span class="s2">&quot;gamma_efficiency&quot;</span><span class="p">:</span> <span class="mf">0.6</span><span class="p">,</span>
+      <span class="s2">&quot;theta2_efficiency&quot;</span><span class="p">:</span> <span class="mf">0.68</span><span class="p">,</span>
+      <span class="s2">&quot;stereo_delta_disp_cut_deg&quot;</span><span class="p">:</span> <span class="n">null</span><span class="p">,</span>
+      <span class="s2">&quot;stereo_relative_std_reco_energy_cut&quot;</span><span class="p">:</span> <span class="n">null</span><span class="p">,</span>
+      <span class="s2">&quot;stereo_std_gammaness_cut&quot;</span><span class="p">:</span> <span class="n">null</span><span class="p">,</span>
+      <span class="s2">&quot;significance_fit&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+      <span class="s2">&quot;log_energy_min_tev&quot;</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+      <span class="s2">&quot;log_energy_max_tev&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+      <span class="s2">&quot;n_energy_bins&quot;</span><span class="p">:</span> <span class="mi">21</span><span class="p">,</span>
+      <span class="s2">&quot;n_bins_migration&quot;</span><span class="p">:</span> <span class="mi">51</span><span class="p">,</span>
+      <span class="s2">&quot;fov_offset_max_deg&quot;</span><span class="p">:</span> <span class="mi">6</span><span class="p">,</span>
+      <span class="s2">&quot;nbins_fov_offset&quot;</span><span class="p">:</span> <span class="mi">9</span><span class="p">,</span>
+      <span class="s2">&quot;fov_offset_bg_max_deg&quot;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+      <span class="s2">&quot;nbins_fov_offset_bg&quot;</span><span class="p">:</span> <span class="mi">17</span><span class="p">,</span>
+      <span class="s2">&quot;source_offset_max_deg&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+      <span class="s2">&quot;nbins_source_offset&quot;</span><span class="p">:</span> <span class="mi">501</span><span class="p">,</span>
+      <span class="s2">&quot;gamma_min_simulated_energy_tev&quot;</span><span class="p">:</span> <span class="mf">0.2</span><span class="p">,</span>
+      <span class="s2">&quot;proton_min_simulated_energy_tev&quot;</span><span class="p">:</span> <span class="mf">0.4</span><span class="p">,</span>
+      <span class="s2">&quot;true_energy_scaling_factor&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+      <span class="s2">&quot;n_training_events&quot;</span><span class="p">:</span> <span class="mf">7E5</span><span class="p">,</span>
+      <span class="s2">&quot;gamma_to_proton_training_ratio&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+      <span class="s2">&quot;stereo_reco_weights&quot;</span><span class="p">:</span> <span class="s2">&quot;camera_frame_hillas_intensity&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;observation_time_h&quot;</span><span class="p">:</span> <span class="mi">50</span><span class="p">,</span>
+      <span class="s2">&quot;off_regions&quot;</span><span class="p">:</span> <span class="mi">5</span><span class="p">,</span>
+      <span class="s2">&quot;bad_pixels&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;tel_001&quot;</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">&quot;tel_002&quot;</span><span class="p">:</span> <span class="p">[]</span>
+      <span class="p">}</span>
+    <span class="p">},</span>
+
+    <span class="s2">&quot;event_selection&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;camera_frame_hillas_intensity&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1000000</span><span class="p">],</span>
+        <span class="s2">&quot;camera_frame_hillas_width&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">],</span>
+        <span class="s2">&quot;camera_frame_hillas_length&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">],</span>
+        <span class="s2">&quot;leakage_intensity_width_2&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="p">},</span>
+
+    <span class="s2">&quot;CameraCalibrator&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;image_extractor_type&quot;</span> <span class="p">:</span> <span class="s2">&quot;LocalPeakWindowSum&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;LocalPeakWindowSum&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;apply_integration_correction&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+            <span class="s2">&quot;window_shift&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+            <span class="s2">&quot;window_width&quot;</span><span class="p">:</span> <span class="mi">7</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;invalid_pixel_handler_type&quot;</span><span class="p">:</span> <span class="s2">&quot;NeighborAverage&quot;</span>
+    <span class="p">},</span>
+
+    <span class="s2">&quot;NsbCalibrator&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="s2">&quot;intensity_correction&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;tel_001&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="s2">&quot;tel_002&quot;</span><span class="p">:</span> <span class="mf">1.0</span>
+      <span class="p">},</span>
+      <span class="s2">&quot;mc_correction_for_PDE&quot;</span><span class="p">:</span> <span class="n">true</span>
+  <span class="p">},</span>
+
+    <span class="s2">&quot;ImageProcessor&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="s2">&quot;image_cleaner_type&quot;</span><span class="p">:</span> <span class="s2">&quot;ImageCleanerSST&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;use_telescope_frame&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+      <span class="s2">&quot;TailcutsImageCleaner&quot;</span><span class="p">:</span> <span class="p">{</span>
+          <span class="s2">&quot;picture_threshold_pe&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">8</span><span class="p">],</span>
+            <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">9</span><span class="p">]</span>
+          <span class="p">],</span>
+          <span class="s2">&quot;boundary_threshold_pe&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
+            <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">]</span>
+          <span class="p">],</span>
+          <span class="s2">&quot;min_picture_neighbors&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
+            <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span>
+          <span class="p">]</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;ImageCleanerSST&quot;</span><span class="p">:</span> <span class="p">{</span>
+          <span class="s2">&quot;telescope_defaults&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;tel_001&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;min_nsb_level&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;stdev_scaling&quot;</span><span class="p">:</span> <span class="mf">2.5</span><span class="p">,</span>
+                <span class="s2">&quot;picture_threshold_pe&quot;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+                <span class="s2">&quot;boundary_threshold_pe&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+                <span class="s2">&quot;min_picture_neighbors&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="s2">&quot;keep_isolated&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+                <span class="s2">&quot;min_time_neighbors&quot;</span> <span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;time_limit_ns&quot;</span> <span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+                <span class="s2">&quot;only_main_island&quot;</span> <span class="p">:</span> <span class="n">false</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s2">&quot;min_nsb_level&quot;</span><span class="p">:</span> <span class="mf">2.3554</span><span class="p">,</span>
+                <span class="s2">&quot;stdev_scaling&quot;</span><span class="p">:</span> <span class="mf">2.5</span><span class="p">,</span>
+                <span class="s2">&quot;picture_threshold_pe&quot;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+                <span class="s2">&quot;boundary_threshold_pe&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+                <span class="s2">&quot;min_picture_neighbors&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="s2">&quot;keep_isolated&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+                <span class="s2">&quot;min_time_neighbors&quot;</span> <span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;time_limit_ns&quot;</span> <span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+                <span class="s2">&quot;only_main_island&quot;</span> <span class="p">:</span> <span class="n">false</span>
+            <span class="p">}],</span>
+            <span class="s2">&quot;tel_002&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;min_nsb_level&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;stdev_scaling&quot;</span><span class="p">:</span> <span class="mf">2.5</span><span class="p">,</span>
+                <span class="s2">&quot;picture_threshold_pe&quot;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+                <span class="s2">&quot;boundary_threshold_pe&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+                <span class="s2">&quot;min_picture_neighbors&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="s2">&quot;keep_isolated&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+                <span class="s2">&quot;min_time_neighbors&quot;</span> <span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;time_limit_ns&quot;</span> <span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+                <span class="s2">&quot;only_main_island&quot;</span> <span class="p">:</span> <span class="n">false</span>
+            <span class="p">},</span> <span class="p">{</span>
+                <span class="s2">&quot;min_nsb_level&quot;</span><span class="p">:</span> <span class="mf">2.4287</span><span class="p">,</span>
+                <span class="s2">&quot;stdev_scaling&quot;</span><span class="p">:</span> <span class="mf">2.5</span><span class="p">,</span>
+                <span class="s2">&quot;picture_threshold_pe&quot;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+                <span class="s2">&quot;boundary_threshold_pe&quot;</span><span class="p">:</span> <span class="mi">4</span><span class="p">,</span>
+                <span class="s2">&quot;min_picture_neighbors&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="s2">&quot;keep_isolated&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+                <span class="s2">&quot;min_time_neighbors&quot;</span> <span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;time_limit_ns&quot;</span> <span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+                <span class="s2">&quot;only_main_island&quot;</span> <span class="p">:</span> <span class="n">false</span>
+            <span class="p">}]</span>
+          <span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">},</span>
+
+    <span class="s2">&quot;ShowerProcessor&quot;</span><span class="p">:</span> <span class="p">{</span>
+      <span class="s2">&quot;reconstructor_types&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;HillasReconstructor&quot;</span><span class="p">],</span>
+      <span class="s2">&quot;HillasReconstructor&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;StereoQualityQuery&quot;</span><span class="p">:</span>   <span class="p">{</span>
+          <span class="s2">&quot;quality_criteria&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">[</span><span class="s2">&quot;enough intensity&quot;</span><span class="p">,</span> <span class="s2">&quot;parameters.hillas.intensity &gt; 0&quot;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s2">&quot;Positive width&quot;</span><span class="p">,</span> <span class="s2">&quot;parameters.hillas.width.value &gt; 0&quot;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s2">&quot;enough pixels&quot;</span><span class="p">,</span> <span class="s2">&quot;parameters.morphology.n_pixels &gt; 0&quot;</span><span class="p">],</span>
+            <span class="p">[</span><span class="s2">&quot;not clipped&quot;</span><span class="p">,</span> <span class="s2">&quot;parameters.leakage.intensity_width_2 &lt; 1.0&quot;</span><span class="p">]</span>
+          <span class="p">]</span>
+        <span class="p">}</span>
+      <span class="p">}</span>
+    <span class="p">},</span>
+
+    <span class="s2">&quot;random_forest_regressor_args&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;max_depth&quot;</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span>
+        <span class="s2">&quot;min_samples_leaf&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="s2">&quot;n_jobs&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="s2">&quot;n_estimators&quot;</span><span class="p">:</span> <span class="mi">150</span><span class="p">,</span>
+        <span class="s2">&quot;bootstrap&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+        <span class="s2">&quot;criterion&quot;</span><span class="p">:</span> <span class="s2">&quot;squared_error&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;max_leaf_nodes&quot;</span><span class="p">:</span> <span class="n">null</span><span class="p">,</span>
+        <span class="s2">&quot;min_impurity_decrease&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">&quot;min_samples_split&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="s2">&quot;min_weight_fraction_leaf&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">&quot;oob_score&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+        <span class="s2">&quot;random_state&quot;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+        <span class="s2">&quot;verbose&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">&quot;warm_start&quot;</span><span class="p">:</span> <span class="n">false</span>
+      <span class="p">},</span>
+
+      <span class="s2">&quot;random_forest_classifier_args&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;max_depth&quot;</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span>
+        <span class="s2">&quot;min_samples_leaf&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="s2">&quot;n_jobs&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="s2">&quot;n_estimators&quot;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
+        <span class="s2">&quot;criterion&quot;</span><span class="p">:</span> <span class="s2">&quot;gini&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;min_samples_split&quot;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+        <span class="s2">&quot;min_weight_fraction_leaf&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">&quot;max_leaf_nodes&quot;</span><span class="p">:</span> <span class="n">null</span><span class="p">,</span>
+        <span class="s2">&quot;min_impurity_decrease&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="s2">&quot;bootstrap&quot;</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span>
+        <span class="s2">&quot;oob_score&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+        <span class="s2">&quot;random_state&quot;</span><span class="p">:</span> <span class="mi">42</span><span class="p">,</span>
+        <span class="s2">&quot;verbose&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">&quot;warm_start&quot;</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span>
+        <span class="s2">&quot;class_weight&quot;</span><span class="p">:</span> <span class="n">null</span>
+      <span class="p">},</span>
+
+    <span class="s2">&quot;energy_regression_features&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s2">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_width&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_wl&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_skewness&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_timing_slope&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;leakage_intensity_width_2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_x&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_y&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;HillasReconstructor_tel_impact_distance&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;HillasReconstructor_h_max&quot;</span>
+     <span class="p">],</span>
+
+    <span class="s2">&quot;particle_classification_features&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s2">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_width&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_wl&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_skewness&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_timing_slope&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;leakage_intensity_width_2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_x&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_y&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;HillasReconstructor_tel_impact_distance&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;HillasReconstructor_h_max&quot;</span>
+      <span class="p">],</span>
+
+    <span class="s2">&quot;disp_method&quot;</span><span class="p">:</span> <span class="s2">&quot;disp_norm_sign&quot;</span><span class="p">,</span>
+
+    <span class="s2">&quot;disp_regression_features&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s2">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_width&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_wl&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_skewness&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_timing_slope&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;leakage_intensity_width_2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;HillasReconstructor_tel_impact_distance&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;HillasReconstructor_h_max&quot;</span>
+      <span class="p">],</span>
+
+      <span class="s2">&quot;disp_classification_features&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s2">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_width&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_wl&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_skewness&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_timing_slope&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;leakage_intensity_width_2&quot;</span>
+      <span class="p">],</span>
+
+      <span class="s2">&quot;misdirection_regression_features_mono&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s2">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_width&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_length&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_wl&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_skewness&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_timing_slope&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;leakage_intensity_width_2&quot;</span>
+      <span class="p">],</span>
+
+      <span class="s2">&quot;misdirection_regression_features_stereo&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s2">&quot;log_camera_frame_hillas_intensity_tel1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_width_tel1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_length_tel1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_wl_tel1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_skewness_tel1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_kurtosis_tel1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_timing_slope_tel1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;leakage_intensity_width_2_tel1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;HillasReconstructor_tel_impact_distance_tel1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;log_camera_frame_hillas_intensity_tel2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_width_tel2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_length_tel2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_wl_tel2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_skewness_tel2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_hillas_kurtosis_tel2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;camera_frame_timing_slope_tel2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;leakage_intensity_width_2_tel2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;HillasReconstructor_tel_impact_distance_tel2&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;HillasReconstructor_h_max&quot;</span>
+<span class="p">]</span>
+
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<p>Default config file for data:</p>
+<div class="toggle docutils container">
+<pre class="code json literal-block"><code><span class="punctuation">{</span><span class="whitespace">   </span><span class="name tag">&quot;array_center_coords&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+      </span><span class="name tag">&quot;long_deg&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">14.7825010</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;lat_deg&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">49.9124420</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;height_m&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">511.195000</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+    </span><span class="name tag">&quot;telescope_coords&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+      </span><span class="name tag">&quot;tel_021&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;long_deg&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">14.782924</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;lat_deg&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">49.911800</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;height_m&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">510</span><span class="whitespace">
+      </span><span class="punctuation">},</span><span class="whitespace">
+      </span><span class="name tag">&quot;tel_022&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;long_deg&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">14.782078</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;lat_deg&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">49.913084</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;height_m&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">510</span><span class="whitespace">
+      </span><span class="punctuation">}</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;telescope_calibration&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+      </span><span class="name tag">&quot;tel_021&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;tel_022&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;bad_calib_px_interpolation&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">true</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;dynamic_dead_px_interpolation&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">true</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;window_transmittance&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+      </span><span class="name tag">&quot;tel_021&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;tel_022&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;telescope_equivalent_focal_length&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+      </span><span class="name tag">&quot;tel_021&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">5.6</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;tel_022&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">5.6</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;stereo&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+      </span><span class="name tag">&quot;event_matching_method&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;WhiteRabbitClosest&quot;</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;SlidingWindow&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;window_half_width&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">1E-3</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;offset_search&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+          </span><span class="name tag">&quot;time_start&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">-1E-2</span><span class="punctuation">,</span><span class="whitespace">
+          </span><span class="name tag">&quot;time_stop&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">1E-2</span><span class="punctuation">,</span><span class="whitespace">
+          </span><span class="name tag">&quot;time_step&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">2E-5</span><span class="whitespace">
+        </span><span class="punctuation">}</span><span class="whitespace">
+      </span><span class="punctuation">},</span><span class="whitespace">
+      </span><span class="name tag">&quot;WhiteRabbitClosest&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;max_time_diff_ns&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">1E4</span><span class="whitespace">
+      </span><span class="punctuation">},</span><span class="whitespace">
+      </span><span class="name tag">&quot;SWATEventIDs&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{}</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;analysis&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+      </span><span class="name tag">&quot;global_theta_cut&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">0.2</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;global_gammaness_cut&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">0.75</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;stereo_delta_disp_cut_deg&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;stereo_relative_std_reco_energy_cut&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;stereo_std_gammaness_cut&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;gamma_efficiency&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">0.7</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;log_energy_min_tev&quot;</span><span class="punctuation">:</span><span class="literal number integer">-1</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;log_energy_max_tev&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">3</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;n_energy_bins&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">21</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;gamma_min_simulated_energy_tev&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">0.2</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;proton_min_simulated_energy_tev&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">0.4</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;n_training_events&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">5E5</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;gamma_to_proton_training_ratio&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">1.0</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;reco_energy_scaling_factor&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">1.0</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;stereo_reco_weights&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;camera_frame_hillas_intensity&quot;</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;observation_time_h&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">50</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;off_regions&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">5</span><span class="punctuation">,</span><span class="whitespace">
+      </span><span class="name tag">&quot;bad_pixels&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;tel_021&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[],</span><span class="whitespace">
+        </span><span class="name tag">&quot;tel_022&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[]</span><span class="whitespace">
+      </span><span class="punctuation">},</span><span class="whitespace">
+      </span><span class="name tag">&quot;ped_time_window&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">10</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;event_selection&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;camera_frame_hillas_intensity&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="literal number integer">50</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">1000000</span><span class="punctuation">],</span><span class="whitespace">
+        </span><span class="name tag">&quot;camera_frame_hillas_width&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="literal number integer">0</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">100</span><span class="punctuation">],</span><span class="whitespace">
+        </span><span class="name tag">&quot;camera_frame_hillas_length&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="literal number integer">0</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">100</span><span class="punctuation">],</span><span class="whitespace">
+        </span><span class="name tag">&quot;leakage_intensity_width_2&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="literal number integer">0</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number float">0.7</span><span class="punctuation">]</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;CameraCalibrator&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;image_extractor_type&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;LocalPeakWindowSum&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;LocalPeakWindowSum&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+            </span><span class="name tag">&quot;apply_integration_correction&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">true</span><span class="punctuation">,</span><span class="whitespace">
+            </span><span class="name tag">&quot;window_shift&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">3</span><span class="punctuation">,</span><span class="whitespace">
+            </span><span class="name tag">&quot;window_width&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">7</span><span class="whitespace">
+        </span><span class="punctuation">},</span><span class="whitespace">
+        </span><span class="name tag">&quot;invalid_pixel_handler_type&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;NeighborAverage&quot;</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;NsbCalibrator&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;apply_pixelwise_Vdrop_correction&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;apply_global_Vdrop_correction&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">true</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;intensity_correction&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+          </span><span class="name tag">&quot;tel_021&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">1.0</span><span class="punctuation">,</span><span class="whitespace">
+          </span><span class="name tag">&quot;tel_022&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">1.0</span><span class="whitespace">
+        </span><span class="punctuation">}</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;ImageProcessor&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;image_cleaner_type&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;ImageCleanerSST&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;use_telescope_frame&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;TailcutsImageCleaner&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+            </span><span class="name tag">&quot;picture_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+              </span><span class="punctuation">[</span><span class="literal string double">&quot;id&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">21</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">8</span><span class="punctuation">],</span><span class="whitespace">
+              </span><span class="punctuation">[</span><span class="literal string double">&quot;id&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">22</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">9</span><span class="punctuation">]</span><span class="whitespace">
+            </span><span class="punctuation">],</span><span class="whitespace">
+            </span><span class="name tag">&quot;boundary_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+              </span><span class="punctuation">[</span><span class="literal string double">&quot;id&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">21</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">4</span><span class="punctuation">],</span><span class="whitespace">
+              </span><span class="punctuation">[</span><span class="literal string double">&quot;id&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">22</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">4</span><span class="punctuation">]</span><span class="whitespace">
+            </span><span class="punctuation">],</span><span class="whitespace">
+            </span><span class="name tag">&quot;min_picture_neighbors&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+              </span><span class="punctuation">[</span><span class="literal string double">&quot;id&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">21</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">2</span><span class="punctuation">],</span><span class="whitespace">
+              </span><span class="punctuation">[</span><span class="literal string double">&quot;id&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">22</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal number integer">2</span><span class="punctuation">]</span><span class="whitespace">
+            </span><span class="punctuation">]</span><span class="whitespace">
+          </span><span class="punctuation">},</span><span class="whitespace">
+        </span><span class="name tag">&quot;ImageCleanerSST&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+            </span><span class="name tag">&quot;min_number_pedestals&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">100</span><span class="punctuation">,</span><span class="whitespace">
+            </span><span class="name tag">&quot;telescope_defaults&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+                </span><span class="name tag">&quot;tel_021&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+                </span><span class="punctuation">{</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_nsb_level&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">0</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;stdev_scaling&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">2.5</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;picture_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">8</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;boundary_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">4</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_picture_neighbors&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">2</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;keep_isolated&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_time_neighbors&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">1</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;time_limit_ns&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">8</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;only_main_island&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="whitespace">
+                </span><span class="punctuation">},</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_nsb_level&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">2.3554</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;stdev_scaling&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">2.5</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;picture_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">8</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;boundary_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">4</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_picture_neighbors&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">2</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;keep_isolated&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_time_neighbors&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">1</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;time_limit_ns&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">8</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;only_main_island&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="whitespace">
+                </span><span class="punctuation">}],</span><span class="whitespace">
+                </span><span class="name tag">&quot;tel_022&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+                </span><span class="punctuation">{</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_nsb_level&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">0</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;stdev_scaling&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">2.5</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;picture_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">8</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;boundary_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">4</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_picture_neighbors&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">2</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;keep_isolated&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_time_neighbors&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">1</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;time_limit_ns&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">8</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;only_main_island&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="whitespace">
+                </span><span class="punctuation">},</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_nsb_level&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">2.4287</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;stdev_scaling&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">2.5</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;picture_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">8</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;boundary_threshold_pe&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">4</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_picture_neighbors&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">2</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;keep_isolated&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;min_time_neighbors&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">1</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;time_limit_ns&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">8</span><span class="punctuation">,</span><span class="whitespace">
+                    </span><span class="name tag">&quot;only_main_island&quot;</span><span class="whitespace"> </span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="whitespace">
+                </span><span class="punctuation">}]</span><span class="whitespace">
+            </span><span class="punctuation">}</span><span class="whitespace">
+        </span><span class="punctuation">}</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;ShowerProcessor&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+      </span><span class="name tag">&quot;reconstructor_types&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="literal string double">&quot;HillasReconstructor&quot;</span><span class="punctuation">],</span><span class="whitespace">
+      </span><span class="name tag">&quot;HillasReconstructor&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;StereoQualityQuery&quot;</span><span class="punctuation">:</span><span class="whitespace">   </span><span class="punctuation">{</span><span class="whitespace">
+          </span><span class="name tag">&quot;quality_criteria&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+            </span><span class="punctuation">[</span><span class="literal string double">&quot;enough intensity&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal string double">&quot;parameters.hillas.intensity &gt; 0&quot;</span><span class="punctuation">],</span><span class="whitespace">
+            </span><span class="punctuation">[</span><span class="literal string double">&quot;Positive width&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal string double">&quot;parameters.hillas.width.value &gt; 0&quot;</span><span class="punctuation">],</span><span class="whitespace">
+            </span><span class="punctuation">[</span><span class="literal string double">&quot;enough pixels&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal string double">&quot;parameters.morphology.n_pixels &gt; 0&quot;</span><span class="punctuation">],</span><span class="whitespace">
+            </span><span class="punctuation">[</span><span class="literal string double">&quot;not clipped&quot;</span><span class="punctuation">,</span><span class="whitespace"> </span><span class="literal string double">&quot;parameters.leakage.intensity_width_2 &lt; 1.0&quot;</span><span class="punctuation">]</span><span class="whitespace">
+          </span><span class="punctuation">]</span><span class="whitespace">
+        </span><span class="punctuation">}</span><span class="whitespace">
+      </span><span class="punctuation">}</span><span class="whitespace">
+    </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;random_forest_regressor_args&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;max_depth&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">30</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;min_samples_leaf&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">10</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;n_jobs&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">-1</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;n_estimators&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">150</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;bootstrap&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">true</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;criterion&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;squared_error&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;max_leaf_nodes&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;min_impurity_decrease&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">0.0</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;min_samples_split&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">10</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;min_weight_fraction_leaf&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">0.0</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;oob_score&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;random_state&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">42</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;verbose&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">0</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;warm_start&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="whitespace">
+      </span><span class="punctuation">},</span><span class="whitespace">
+
+      </span><span class="name tag">&quot;random_forest_classifier_args&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;max_depth&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">30</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;min_samples_leaf&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">10</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;n_jobs&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">-1</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;n_estimators&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">100</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;criterion&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;gini&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;min_samples_split&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">10</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;min_weight_fraction_leaf&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">0.0</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;max_leaf_nodes&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;min_impurity_decrease&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">0.0</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;bootstrap&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">true</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;oob_score&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;random_state&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">42</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;verbose&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">0</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;warm_start&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">false</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="name tag">&quot;class_weight&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="keyword constant">null</span><span class="whitespace">
+      </span><span class="punctuation">},</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;energy_regression_features&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+        </span><span class="literal string double">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_width&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_length&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_wl&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_skewness&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_timing_slope&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;leakage_intensity_width_2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_x&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_y&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;HillasReconstructor_tel_impact_distance&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;HillasReconstructor_h_max&quot;</span><span class="whitespace">
+     </span><span class="punctuation">],</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;particle_classification_features&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+        </span><span class="literal string double">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_width&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_length&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_wl&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_skewness&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_timing_slope&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;leakage_intensity_width_2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_x&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_y&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;HillasReconstructor_tel_impact_distance&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;HillasReconstructor_h_max&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;log_reco_energy&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;reco_disp_norm&quot;</span><span class="whitespace">
+      </span><span class="punctuation">],</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;disp_method&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;disp_norm_sign&quot;</span><span class="punctuation">,</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;disp_regression_features&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+        </span><span class="literal string double">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_width&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_length&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_wl&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_skewness&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_timing_slope&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;leakage_intensity_width_2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;HillasReconstructor_tel_impact_distance&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;HillasReconstructor_h_max&quot;</span><span class="whitespace">
+      </span><span class="punctuation">],</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;disp_classification_features&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+        </span><span class="literal string double">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_width&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_length&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_wl&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_skewness&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_timing_slope&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;leakage_intensity_width_2&quot;</span><span class="whitespace">
+      </span><span class="punctuation">],</span><span class="whitespace">
+
+      </span><span class="name tag">&quot;misdirection_regression_features_mono&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+        </span><span class="literal string double">&quot;log_camera_frame_hillas_intensity&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_width&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_length&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_wl&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_skewness&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_kurtosis&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_timing_slope&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;leakage_intensity_width_2&quot;</span><span class="whitespace">
+      </span><span class="punctuation">],</span><span class="whitespace">
+
+      </span><span class="name tag">&quot;misdirection_regression_features_stereo&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+        </span><span class="literal string double">&quot;log_camera_frame_hillas_intensity_tel1&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_width_tel1&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_length_tel1&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_wl_tel1&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_skewness_tel1&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_kurtosis_tel1&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_timing_slope_tel1&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;leakage_intensity_width_2_tel1&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;HillasReconstructor_tel_impact_distance_tel1&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;log_camera_frame_hillas_intensity_tel2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_width_tel2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_length_tel2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_wl_tel2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_skewness_tel2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_hillas_kurtosis_tel2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;camera_frame_timing_slope_tel2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;leakage_intensity_width_2_tel2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;HillasReconstructor_tel_impact_distance_tel2&quot;</span><span class="punctuation">,</span><span class="whitespace">
+        </span><span class="literal string double">&quot;HillasReconstructor_h_max&quot;</span><span class="whitespace">
+      </span><span class="punctuation">],</span><span class="whitespace">
+
+    </span><span class="name tag">&quot;mean_charge_to_nsb_rate&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+        </span><span class="name tag">&quot;tel_021&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+          </span><span class="punctuation">{</span><span class="whitespace">
+            </span><span class="name tag">&quot;mean_charge_bin_low&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">0</span><span class="punctuation">,</span><span class="whitespace">
+            </span><span class="name tag">&quot;nsb_rate&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;low&quot;</span><span class="whitespace">
+          </span><span class="punctuation">},</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+            </span><span class="name tag">&quot;mean_charge_bin_low&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">2.3554</span><span class="punctuation">,</span><span class="whitespace">
+            </span><span class="name tag">&quot;nsb_rate&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;med&quot;</span><span class="whitespace">
+          </span><span class="punctuation">}</span><span class="whitespace">
+        </span><span class="punctuation">],</span><span class="whitespace">
+        </span><span class="name tag">&quot;tel_022&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation">[</span><span class="whitespace">
+          </span><span class="punctuation">{</span><span class="whitespace">
+            </span><span class="name tag">&quot;mean_charge_bin_low&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number integer">0</span><span class="punctuation">,</span><span class="whitespace">
+            </span><span class="name tag">&quot;nsb_rate&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;low&quot;</span><span class="whitespace">
+          </span><span class="punctuation">},</span><span class="whitespace"> </span><span class="punctuation">{</span><span class="whitespace">
+            </span><span class="name tag">&quot;mean_charge_bin_low&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal number float">2.4287</span><span class="punctuation">,</span><span class="whitespace">
+            </span><span class="name tag">&quot;nsb_rate&quot;</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string double">&quot;med&quot;</span><span class="whitespace">
+          </span><span class="punctuation">}</span><span class="whitespace">
+        </span><span class="punctuation">]</span><span class="whitespace">
+      </span><span class="punctuation">}</span><span class="whitespace">
+
+</span><span class="punctuation">}</span></code></pre>
+</div>
+</section>
+<section id="r0-to-dl1">
+<h3>R0 to DL1<a class="headerlink" href="#r0-to-dl1" title="Permalink to this heading"></a></h3>
+<p>To calibrate raw data (R0) or MC (R1) and process them to DL1, one may run <code class="docutils literal notranslate"><span class="pre">sst1mpipe_r0_dl1</span></code> script. Inputs are a single raw
+<code class="docutils literal notranslate"><span class="pre">.fits.fz</span></code> data file (containing single telescope data) or <code class="docutils literal notranslate"><span class="pre">.simtel.gz</span></code> output file of sim_telarray (may contain mono and coincident events
+triggering more telescopes).
+Output is <code class="docutils literal notranslate"><span class="pre">HDF5</span></code> file with a table of DL1 parameters, one output file per run (about 40 seconds of data) and per telescope (DL1 files from individual
+telescopes searched for coincidences and merged for stereoscopic reconstruction in the next step <a class="reference internal" href="#dl1-dl1-stereo"><span class="std std-ref">DL1 to DL1 stereo</span></a>).</p>
+<p>It applies dc to p.e. calibration on raw R0 waveforms, integrates them, cleans the images (gets rid of the noisy pixels which likely do not
+contain any Cherenkov photons), and parametrizes the shower images with Hillas ellipses.
+See <code class="docutils literal notranslate"><span class="pre">--help</span></code> for possible inputs. Some of them, which might not be obvious:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--px-charges</span></code> - the script stores also distribution of all integrated charges in individual pixels for all events merged. This is useful for further MC/data tunning and to get some impression on the level of NSB in the data.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--precise-timestamps</span></code> - stores also White Rabbit timestamps in the DL1 output with the precision needed for coincident events matching. Keep it on for all data taken after 25th September 2023, when WR was deployed.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--pointing-ra/dec</span></code> and <code class="docutils literal notranslate"><span class="pre">--force-pointing</span></code> - allows to specify the telescope pointing direction. To process data taken after begining of September 2023 it can be ignored (i.e. do not use it for any new data), because the pointing coordinates are being written automaticaly in the fits file header during the datataking and the script understands where to look for it.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">—-reclean</span></code> - experimental method of data re-cleaning based on pixel charge variation. For now it needs distribution of pixel charges stored in the first pass of the script (<code class="docutils literal notranslate"><span class="pre">--px-charges</span></code>). I.e. to apply re-cleaning, one has to run the script for the second time with the <code class="docutils literal notranslate"><span class="pre">—-reclean</span></code> switch.</p></li>
+</ul>
+<p><strong>Relevant parts of the config file</strong> applied in this analysis step:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">telescope_calibration</span></code> - calibration files based on analysis of dark runs. Should be taken relatively close to the date of observation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">window_transmittance</span></code> - files with for camera window transmittance correction (measured in the lab and can be kept default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CameraCalibrator</span></code> - Pulse integration settings</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ImageProcessor</span></code> - Settings of image cleaning method and tailcuts. Tailcuts can be set different for different levels of NSB</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ShowerProcessor</span></code> - Method of shower geometry reconstruction. Only applied if event source contains data from more telescopes, i.e. it’s only relevant for MC in this analysis step.</p></li>
+</ul>
+</section>
+<section id="random-forest-training">
+<h3>Random Forest training<a class="headerlink" href="#random-forest-training" title="Permalink to this heading"></a></h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In most cases, <strong>analyser does not need to train dedicated Random Forest models and this step can be safely skipped</strong> using pre-trained RFs
+referenced in <a class="reference internal" href="#dl1-dl2"><span class="std std-ref">DL1 to DL2</span></a>. Training of dedicated RFs is, however, necessary in some performance studies if one wants to use different
+configuration for <code class="docutils literal notranslate"><span class="pre">sst1mpipe_r0_dl1</span></code> than MC was processed with (e.g. cleaning, peak integration, ..).</p>
+</div>
+<p>Random Forests can be trained on <strong>DL1 MC diffuse gammas and diffuse proton</strong> files using <code class="docutils literal notranslate"><span class="pre">sst1mpipe_mc_train_rfs</span></code> script (see
+<code class="docutils literal notranslate"><span class="pre">--help</span></code> for possible inputs). Before running <code class="docutils literal notranslate"><span class="pre">sst1mpipe_mc_train_rfs</span></code> it is useful to merge many small DL1 files in given MC production (which resulted
+from paralelized MC simulations) into a single file per particle with <code class="docutils literal notranslate"><span class="pre">sst1mpipe_merge_hdf5</span></code> script to reach satisfactory
+statistics for RF training. Outputs are trained models in the <code class="docutils literal notranslate"><span class="pre">scikit.learn</span></code> format (.sav). There is RF classifier for gamma/hadron
+separation, RF regressor for energy reconstruction, and either RF regressor (<code class="docutils literal notranslate"><span class="pre">disp_vector</span></code>) or RF regressor+classifier (<code class="docutils literal notranslate"><span class="pre">disp_norm_sign</span></code>)
+for arrival direction reconstruction depenting on the method selected (<code class="docutils literal notranslate"><span class="pre">disp_method</span></code> field in the cfg file).</p>
+<p>RF are trained for each telescope, even in case of stereo reconstruction. In stereo, we only use extra stereo features,
+which are reconstructed geometricaly, such as <code class="docutils literal notranslate"><span class="pre">HillasReconstructor_h_max</span></code> and <code class="docutils literal notranslate"><span class="pre">HillasReconstructor_tel_impact_distance</span></code>.
+Then, in <a class="reference internal" href="#dl1-dl2"><span class="std std-ref">DL1 to DL2</span></a>, reconstruction is performed for each telescope independently, and final reconstructed quantities are
+obtained as weighted average of the values for each telescope (except for direction recontruction where MARS-like approach is adopted).</p>
+<p><strong>Relevant parts of the config file</strong> applied in this analysis step:</p>
+<ul class="simple">
+<li><p>Setup of the forests and training procedure <code class="docutils literal notranslate"><span class="pre">random_forest_regressor_args</span></code>, <code class="docutils literal notranslate"><span class="pre">random_forest_classifier_args</span></code></p></li>
+<li><p>Lists of Random Forest features used for the reconstruction - <code class="docutils literal notranslate"><span class="pre">energy_regression_features</span></code>, <code class="docutils literal notranslate"><span class="pre">disp_regression_features</span></code>, <code class="docutils literal notranslate"><span class="pre">disp_classification_features</span></code>, <code class="docutils literal notranslate"><span class="pre">particle_classification_features</span></code>. The very features used for the RF training have to be used later in <a class="reference internal" href="#dl1-dl2"><span class="std std-ref">DL1 to DL2</span></a> reconstruction!</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">n_training_events</span></code> - Total number of events used for individual RF training. I.e. if <code class="docutils literal notranslate"><span class="pre">n_training_events=200000</span></code>, 200k diffuse gammas are used for energy regressor and DISP regressor and classifier, and 100k diffuse gammas + 100k diffuse protons is used for particle classifier (if <code class="docutils literal notranslate"><span class="pre">gamma_to_proton_training_ratio=1</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">gamma_to_proton_training_ratio</span></code> - Ratio of gammas and protons in training sample for particle classifier.</p></li>
+</ul>
+</section>
+<section id="dl1-to-dl1-stereo">
+<span id="dl1-dl1-stereo"></span><h3>DL1 to DL1 stereo<a class="headerlink" href="#dl1-to-dl1-stereo" title="Permalink to this heading"></a></h3>
+<p>For stereo reconstruction, coincident events have first to be find. In current implementation, tel2 DL1 files are searched
+for each tel1 DL1 file to find the closest tel2 event for each tel1 event. Coincident event search results in a new DL1 file containing events from both
+telescopes, matched by their <code class="docutils literal notranslate"><span class="pre">event_id</span></code>. Only coincident events are stored in resulting DL1 files.</p>
+<p>This is performed by script <code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_dl1_dl1_stereo</span></code> (see <code class="docutils literal notranslate"><span class="pre">--help</span></code> for possible inputs). Input is a single DL1 file from tel1
+and a directory with all relevant DL1 files for tel2. Coincidence finder is driven by <strong>the config file</strong> field <code class="docutils literal notranslate"><span class="pre">stereo</span></code>. Possible
+options are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">SlidingWindow</span></code> - For analysis of the data without precise White Rabbit timestamps (i.e. taken before 25th September 2023) one needs to use this method. It first searches for the time offset between the two DL1 tables providing maximum number of coindicent events and then selects the closest ones.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">WhiteRabbitClosest</span></code> - Works on data with precise WR timestamps in the DL1 table, i.e. all data taken after 25th September 2023. It only finds the closest tel2 event to each tel1 event (precision of WR is high enough to avoid random coincidences for usual trigger rates of the telescopes).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SWATEventIDs</span></code> - After 30th January 2024 the coincident events are tagged by SWAT, providing them with the same <code class="docutils literal notranslate"><span class="pre">arrayEvtNum</span></code>, resulting in the same <code class="docutils literal notranslate"><span class="pre">event_id</span></code> in the DL1 files. The DL1 events can be then matched just based on their <code class="docutils literal notranslate"><span class="pre">event_id</span></code>.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_dl1_dl1_stereo</span></code> is <strong>not intended to be run on MC</strong>, as in MC DL1 the coincident events are already matched by their <code class="docutils literal notranslate"><span class="pre">event_id</span></code> (mono events are in MC DL1
+tables as well, so those can be used for both mono and stereo analysis).</p>
+</div>
+</section>
+<section id="dl1-to-dl2">
+<span id="dl1-dl2"></span><h3>DL1 to DL2<a class="headerlink" href="#dl1-to-dl2" title="Permalink to this heading"></a></h3>
+<p>This step uses pre-trained Random Forests to reconstruct parameters of primary gamma-ray photon (gammaness, direction and energy) using Hillas parameters stored in
+the DL1 files as features. One can run <code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_dl1_dl2</span></code> stript on either mono DL1 files (outputs of <code class="docutils literal notranslate"><span class="pre">sst1mpipe_r0_dl1</span></code>) for each telescope separately (using RFs for mono reconstruction),
+or on stereo DL1 containing coincident events only (outputs of <code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_dl1_dl1_stereo</span></code>). The script can handle both types of DL1,
+but stereo reconstruction has to be requested explicitely using <code class="docutils literal notranslate"><span class="pre">-—stereo</span></code> switch. RFs trained on MC can be found on <strong>Calculus</strong> for both mono and stereo
+reconstruction and different zenith angles:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/models_mono_psf_vaod0.2/</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/models_stereo_psf_vaod0.2/</span></code></p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>One should always use RF models trained with the same sst1mpipe version that is used for the analysis.</p>
+</div>
+<p><strong>Relevant parts of the config file</strong> applied in this analysis step:</p>
+<ul class="simple">
+<li><p>Random Forest features used for the reconstruction - <code class="docutils literal notranslate"><span class="pre">energy_regression_features</span></code>, <code class="docutils literal notranslate"><span class="pre">disp_regression_features</span></code>, <code class="docutils literal notranslate"><span class="pre">disp_classification_features</span></code>, <code class="docutils literal notranslate"><span class="pre">particle_classification_features</span></code>. These should be the very same features as those used for RF training (check cfg files stored in the directories together with the models)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">disp_method</span></code> - Direction reconstruction method used. For now we only use <code class="docutils literal notranslate"><span class="pre">disp_norm_sign</span></code> which requires RF regressor to reconstruct source distance from the image Center of Gravity, and RF classifier to determine on which side along the main axis of the Hillas ellipse the source lies.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">stereo_reco_weights</span></code> - Parameter used as a weight for averaging the stereo reconstructed parameters.</p></li>
+</ul>
+</section>
+<section id="dl2-mc-to-irfs">
+<span id="dl2-irfs"></span><h3>DL2 MC to IRFs<a class="headerlink" href="#dl2-mc-to-irfs" title="Permalink to this heading"></a></h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In most cases, <strong>analyser does not need to produce own Instrument Response Functions and this step can be safely skipped</strong> using default IRFs referenced in
+<a class="reference internal" href="#automatic-processing"><span class="std std-ref">Automatic data processing</span></a>. IRF production, however, is necessary in performance studies, or if one uses custom RFs to produce DL2, or applies
+custom selection cuts in DL2 to DL3 step.</p>
+</div>
+<p>To make IRFs from MC DL2 files, one can run <code class="docutils literal notranslate"><span class="pre">sst1mpipe_mc_make_irfs</span></code> script, which currently produces only full enclosure IRFs, so it has to be provided with
+diffuse protons and diffuse gammas. The script applies event selection cuts defined in the config file (<code class="docutils literal notranslate"><span class="pre">event_selection</span></code>), including cut on gammaness.
+The gammaness cut can be either global (one number independent on energy) or energy dependent (gammaness distribution naturaly depends on energy, so using optimised
+energy dependent gammaness cut results in performance improvement). Global gammaness cut can be set in the config file (<code class="docutils literal notranslate"><span class="pre">global_gammaness_cut</span></code> field), while energy dependent
+cuts, must be provided as <code class="docutils literal notranslate"><span class="pre">HDF5</span></code> table, where the cuts for individual energy bins are stored, using parameter
+<code class="docutils literal notranslate"><span class="pre">--gammaness-cut-dir</span></code>. These tables can be generated with <code class="docutils literal notranslate"><span class="pre">sst1mpipe_mc_performance</span></code> (see <a class="reference internal" href="#performance"><span class="std std-ref">RF performance and sensitivity</span></a>). Pre-calculated energy dependent gammaness
+cuts are stored on Calculus for mono/stereo and different zenith angles:</p>
+<p><code class="docutils literal notranslate"><span class="pre">/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/performance/*_performance_*</span></code></p>
+<p>Again, one should make sure that the event selection applied to produce the cuts is the same as for IRFs. The IRF maker creates
+some directory structure inside the <code class="docutils literal notranslate"><span class="pre">--output-dir</span></code>, automaticaly recognizing proper bin in zenith, azimuth, NSB level and gammaness cut applied.
+This directory structure should remain untouched for <a class="reference internal" href="#dl2-dl3"><span class="std std-ref">DL2 to DL3</span></a> to work properly.</p>
+<p>Output IRF files are fully compatible with gammapy and may be read and explored with the use of gammapy funkcionalities:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">from gammapy.irf import (</span>
+<span class="go">    EffectiveAreaTable2D,</span>
+<span class="go">    PSF3D,</span>
+<span class="go">    EnergyDispersion2D</span>
+<span class="go">    Background2D</span>
+<span class="go">)</span>
+<span class="go">irf_filename = &#39;SST1M_tel_021_Zen30deg_gcut0.75_irfs.fits&#39;</span>
+<span class="go">aeff = EffectiveAreaTable2D.read(irf_filename, hdu=&quot;EFFECTIVE AREA&quot;)</span>
+<span class="go">edisp = EnergyDispersion2D.read(irf_filename, hdu=&quot;ENERGY DISPERSION&quot;)</span>
+<span class="go">psf = PSF3D.read(irf_filename, hdu=&#39;POINT SPREAD FUNCTION&#39;)</span>
+<span class="go">bg_2d = Background2D.read(irf_filename, hdu=&#39;BACKGROUND&#39;)</span>
+</pre></div>
+</div>
+</section>
+<section id="dl2-to-dl3">
+<span id="dl2-dl3"></span><h3>DL2 to DL3<a class="headerlink" href="#dl2-to-dl3" title="Permalink to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_dl2_dl3</span></code> is a tool to create DL3 data files from DL2 data files. It is supposed to be provided with a directory with input DL2 files
+(typicaly a directory with DL2 for one source observed in one night, but can be run on larger sample as well). It merges the DL2 <code class="docutils literal notranslate"><span class="pre">HDF5</span></code> per-run
+files into per-wobble DL3 <code class="docutils literal notranslate"><span class="pre">fits</span></code> files containing only photon lists. It also finds proper IRF based on zenith, azimuth and NSB level for each input DL2 file. It creates
+per-night index files needed for further analysis in gammapy. The script applies event selection cuts defined in the config file (<code class="docutils literal notranslate"><span class="pre">event_selection</span></code>),
+including cut on gammaness, so <strong>one should make sure that these are the same as used on MC to produce IRFs</strong>. Energy dependent gammaness cuts can be used as well, following
+the same rules described in <a class="reference internal" href="#dl2-irfs"><span class="std std-ref">DL2 MC to IRFs</span></a>.</p>
+</section>
+<section id="high-level-analysis">
+<span id="higher-level"></span><h3>High level analysis<a class="headerlink" href="#high-level-analysis" title="Permalink to this heading"></a></h3>
+<p>Output DL3 files produced with <code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_dl2_dl3</span></code> are fully compatible with gammapy and may be further analyzed using gammapy tools. See e.g.</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://docs.gammapy.org/1.2/tutorials/analysis-1d/spectral_analysis.html">Tutorial on 1D spectral analysis</a></p></li>
+<li><p><a class="reference external" href="https://docs.gammapy.org/1.2/tutorials/analysis-2d/ring_background.html">Tutorial on 2D ring background map</a></p></li>
+</ul>
+<p>A typical use case is to run joint gammapy analysis on data from several nights. In such case one has to run <code class="docutils literal notranslate"><span class="pre">create_hdu_indexes</span></code> script to create
+HDU index files indexing all DL3s to be used in the final analysis.</p>
+</section>
+<section id="rf-performance-and-sensitivity">
+<span id="performance"></span><h3>RF performance and sensitivity<a class="headerlink" href="#rf-performance-and-sensitivity" title="Permalink to this heading"></a></h3>
+<p>TBD</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SST-1M collaboration.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
