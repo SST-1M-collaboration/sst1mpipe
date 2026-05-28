@@ -6,6 +6,7 @@ dependencies:
   - python=3.8
   - pip
   - ctapipe=0.17
+  - click
   - gammapy=1.0
   - jupyter
   - protozfits=2.0

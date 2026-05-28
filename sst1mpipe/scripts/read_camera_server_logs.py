@@ -1,12 +1,20 @@
-import argparse
 import re
+import click
 
+@click.command()
+@click.argument('file', nargs=1, type=click.Path(exists=True, readable=True))
+def main(file: str) -> None:
+    """
+    Reads a log file from the Camera Server print summary information.
+    Parameters
+    ----------
 
-def main():
+    file : str the name of the log file (e.g. camera_server_log.log)
 
-    parser = argparse.ArgumentParser(description="Extract information on logs of the camera server")
-    parser.add_argument('file', type=str, nargs='?', help='Path to log file')
-    args = parser.parse_args()
+    Returns
+    -------
+
+    """
 
     pattern = re.compile(
           r'^(INFO|DEBUG|WARN|ERROR)\s+' # LOG LEVEL
@@ -51,7 +59,7 @@ def main():
     merge_p = False
 
 
-    with open(args.file) as f:
+    with open(file) as f:
         lines = f.readlines()
         for line in lines:
 
