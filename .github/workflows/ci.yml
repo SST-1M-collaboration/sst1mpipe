@@ -30,7 +30,8 @@ jobs:
         with:
           environment-file: environment.yml
           init-shell: bash
-          cache-environment: true
+          cache-environment: false
+          cache-downloads: true
           generate-run-shell: true
           post-cleanup: 'all'
 
