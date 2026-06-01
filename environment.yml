@@ -18,10 +18,14 @@ dependencies:
   - setuptools
   - sphinx
   - sphinx-automodapi
+  - sphinx_argparse
   - sphinx-design
   - sphinx_rtd_theme
   - sphinx-togglebutton
+  - sphinxcontrib-mermaid
+  - nbsphinx
   - numpydoc
+
   - pip:
       - ctaplot~=0.6.2
       - pyirf~=0.8.0
