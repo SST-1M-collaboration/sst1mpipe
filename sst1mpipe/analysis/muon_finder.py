@@ -3,7 +3,6 @@ import datetime
 import glob
 import multiprocessing as mp
 import os
-from os import path
 
 import matplotlib.pyplot as plt
 import numpy as np

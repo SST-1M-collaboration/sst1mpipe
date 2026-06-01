@@ -131,11 +131,10 @@ class mes_fitter:
         self.dark_baselines = dark_baselines
 
 
-        subarray_file = resource_filename('sst1mpipe',
-                                          os.path.join('data',
-                                                    'sst1m_array.h5'
+        subarray_file = files('sst1mpipe,data').joinpath(
+            'sst1m_array.h5'
                                                     )
-                                          )
+
         subarray = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
 
         self.geom = subarray.tel[21].camera.geometry

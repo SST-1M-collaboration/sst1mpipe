@@ -7,7 +7,6 @@ import logging
 import os
 import re
 from datetime import datetime
-from os import path
 import json
 
 import astropy.constants as c

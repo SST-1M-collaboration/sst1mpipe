@@ -1,5 +1,3 @@
-from os import path
-
 from importlib.resources import files
 from cts_core import camera
 from scipy.sparse import csr_matrix

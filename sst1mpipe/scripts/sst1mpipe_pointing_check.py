@@ -22,7 +22,6 @@ $> python sst1mpipe_pointing_check.py
 import argparse
 import logging
 import sys
-from os import path
 
 import astropy.units as u
 import matplotlib.pyplot as plt

@@ -4,7 +4,6 @@ import logging
 import operator
 import os
 from datetime import datetime
-from os import path
 
 import astropy.units as u
 import numpy as np
