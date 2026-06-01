@@ -60,7 +60,8 @@ where = ["."]
 [tool.setuptools.package-data]
 sst1mpipe = [
   "data/*",
-  "resources/camera_config.cfg"
+  "resources/*",
+  "resources/zfits/*"
 ]
 
 
