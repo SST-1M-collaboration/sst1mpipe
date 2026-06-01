@@ -14,15 +14,10 @@ license = { file = "LICENSE" }
 readme = { file = "README.md", content-type = "text/markdown" }
 dependencies = [
   "h5py",
-  "ctaplot~=0.6.2",
-  "gammapy~=1.0",
-  "pyirf~=0.8.0",
   "jupyterlab~=3.5.2",
   "scikit-learn~=1.2.2",
-  "astroquery~=0.4.6",
   "seaborn~=0.13.0",
   "tables~=3.8.0",
-  "pydantic>=1.4,<2.0"
 ]
 
 [project.urls]
@@ -31,23 +26,6 @@ Repository = "https://github.com/SST-1M-collaboration/sst1mpipe"
 Documentation = "https://sst1mpipe.readthedocs.io/"
 
 [metadata]
-
-
-[project.optional-dependencies]
-docs = [
-  "sphinx",
-  "sphinx-automodapi",
-  "sphinx_argparse",
-  "sphinx_rtd_theme",
-  "numpydoc",
-  "nbsphinx",
-  "sphinxcontrib-mermaid",
-  "sphinx-togglebutton"
-]
-
-test = [
-    "pytest"
-]
 
 
 [tool.setuptools]
