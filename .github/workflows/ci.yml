@@ -13,7 +13,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
+      # ----------------------------
+      # Cache large files with git lfs
+      # ----------------------------
       - name: Cache Git LFS files
         uses: actions/cache@v4
         with:
@@ -21,11 +23,15 @@ jobs:
           key: ${{ runner.os }}-lfs-${{ hashFiles('.gitattributes') }}
           restore-keys: |
              ${{ runner.os }}-lfs-
-
+      # ----------------------------
+      # Pull large files needed for tests to pass
+      # ----------------------------
       - name: Pull LFS files
         run: git lfs pull
-
-      - name: Set up Micromamba env
+      # ----------------------------
+      # INSTALL PACKAGE
+      # ----------------------------
+      - name: Set up Mamba environment
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
@@ -33,9 +39,10 @@ jobs:
           cache-environment: true
           cache-downloads: true
           generate-run-shell: true
-          post-cleanup: 'all'
-
-      - name: Test install
+      # ----------------------------
+      # INSTALL PACKAGE
+      # ----------------------------
+      - name: Install package
         shell: micromamba-shell {0}
         run : |
           which python
@@ -44,11 +51,15 @@ jobs:
           python -c "import pkg_resources; print('ok')"
           python -m pip install .
           python -c "import pkg_resources; print('ok')"
-
+      # ----------------------------
+      # Execute ruff for static code analysis (rules in pyproject.toml)
+      # ----------------------------
       - name: Run Ruff (pyflakes + pycodestyle)
         shell: micromamba-shell {0}
         run: ruff check .
-
+      # ----------------------------
+      # Execute pytests -vv for high verbosity and -s to show output of `print()` statements
+      # ----------------------------
       - name: Run tests with pytest
         shell: micromamba-shell {0}
         run : pytest -vv -s tests/
