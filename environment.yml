@@ -3,17 +3,19 @@ channels:
   - conda-forge
   - default
 dependencies:
-  - python=3.8
+  - python>=3.10
   - pip
-  - ctapipe=0.17
+  - ctapipe=0.17.0
   - click
-  - gammapy=1.0
+  - gammapy>=1.0
   - jupyter
   - protozfits=2.0
   - astroquery=0.4.6
+  - matplotlib<=3.8
   - pydantic<2.0
   - pytest
   - ruff
+  - setuptools
   - sphinx
   - sphinx-automodapi
   - sphinx-design

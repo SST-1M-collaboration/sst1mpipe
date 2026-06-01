@@ -1,8 +1,17 @@
+import os.path
+from importlib.resources import files
+
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
-FILE_TEL_1 = 'sst1mpipe/resources/zfits/SST1M1_20260121_0001.fits.fz'
-FILE_TEL_2 = 'sst1mpipe/resources/zfits/SST1M2_20260121_0001.fits.fz'
+FILE_TEL_1 = str(files('sst1mpipe.resources.zfits').joinpath('SST1M1_20260121_0001.fits.fz'))
+FILE_TEL_2 = str(files('sst1mpipe.resources.zfits').joinpath('SST1M2_20260121_0001.fits.fz'))
+
 MAX_ITERATIONS = 10
+
+def test_test_tiles_exists():
+
+    assert os.path.exists(FILE_TEL_1)
+    assert os.path.exists(FILE_TEL_2)
 
 def test_read_events():
 
