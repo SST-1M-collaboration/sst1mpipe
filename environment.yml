@@ -15,6 +15,7 @@ dependencies:
   - pydantic<2.0
   - pytest
   - ruff
+  - setuptools
   - sphinx
   - sphinx-automodapi
   - sphinx-design
