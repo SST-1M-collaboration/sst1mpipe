@@ -44,4 +44,4 @@ jobs:
 
       - name: Run tests with pytest
         shell: micromamba-shell {0}
-        run : pytest -vv tests/
+        run : pytest -vv -s tests/
