@@ -9,7 +9,6 @@ MAX_ITERATIONS = 10
 
 def test_read_events():
 
-    print(type(FILE_TEL_1))
     source = SST1MEventSource([FILE_TEL_1], max_events=MAX_ITERATIONS)
 
     i = 0
