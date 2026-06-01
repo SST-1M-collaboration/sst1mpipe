@@ -12,13 +12,7 @@ authors = [
   ]
 license = { file = "LICENSE" }
 readme = { file = "README.md", content-type = "text/markdown" }
-dependencies = [
-  "h5py",
-  "jupyterlab~=3.5.2",
-  "scikit-learn~=1.2.2",
-  "seaborn~=0.13.0",
-  "tables~=3.8.0",
-]
+
 
 [project.urls]
 Homepage = "https://sst-1m.space/"
