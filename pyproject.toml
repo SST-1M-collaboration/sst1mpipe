@@ -14,7 +14,6 @@ license = { file = "LICENSE" }
 readme = { file = "README.md", content-type = "text/markdown" }
 dependencies = [
   "h5py",
-  "ctapipe~=0.17.0",
   "ctaplot~=0.6.2",
   "gammapy~=1.0",
   "pyirf~=0.8.0",
