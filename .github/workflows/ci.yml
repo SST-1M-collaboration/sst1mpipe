@@ -30,14 +30,20 @@ jobs:
         with:
           environment-file: environment.yml
           init-shell: bash
-          cache-environment: false
+          cache-environment: true
           cache-downloads: true
           generate-run-shell: true
           post-cleanup: 'all'
 
       - name: Test install
         shell: micromamba-shell {0}
-        run : pip install .
+        run : |
+          which python
+          which pip
+          pip install .
+          python -c "import pkg_resources; print('ok')"
+          python -m pip install .
+          python -c "import pkg_resources; print('ok')"
 
       - name: Run Ruff (pyflakes + pycodestyle)
         shell: micromamba-shell {0}

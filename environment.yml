@@ -30,6 +30,7 @@ dependencies:
   - sphinxcontrib-mermaid
   - nbsphinx
   - numpydoc
+  - wheel
   - pip:
       - ctaplot~=0.6.2
       - pyirf~=0.8.0
