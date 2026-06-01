@@ -81,3 +81,15 @@ To run these test yourself :
 mamba activate sst1m-dev
 ruff check .
 ```
+
+## Running the tests
+
+The code contains unit test under the folder `tests/`. 
+To run the tests yourself:
+
+```
+mamba activate sst1m-dev
+pytest -vv -s tests/
+```
+
+The `-vv` option increases verbosity of the tests results and the `-s` shows the output od the `print()` statements in the test functions.
