@@ -1,6 +1,6 @@
 from os import path
 
-import pkg_resources
+from importlib.resources import files
 from cts_core import camera
 from scipy.sparse import csr_matrix
 
@@ -25,13 +25,10 @@ class Camera(camera.Camera):
 
     def __init__(self, *args, **kwargs):
         if not args and kwargs.get('_config_file') is None:
-            kwargs['_config_file'] = pkg_resources.resource_filename(
-                'sst1mpipe',
-                path.join(
-                    'resources',
+            kwargs['_config_file'] = files('sst1mpipe.resources').joinpath(
                     'camera_config.cfg'
                 )
-            )
+
             self.config_file = kwargs['_config_file']
         elif args:
             self.config_file = args[0]

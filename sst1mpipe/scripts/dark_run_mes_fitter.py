@@ -60,7 +60,7 @@ import scipy.stats as scst
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.visualization import CameraDisplay
 from iminuit import Minuit
-from pkg_resources import resource_filename
+from importlib.resources import files
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 

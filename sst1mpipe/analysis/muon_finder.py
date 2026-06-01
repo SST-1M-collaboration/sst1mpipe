@@ -8,7 +8,7 @@ from os import path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pkg_resources
+from importlib.resources import files
 from ctapipe.image import tailcuts_clean
 from ctapipe.image.cleaning import number_of_islands
 from ctapipe.image.muon import ring_completeness
@@ -24,13 +24,8 @@ from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
 from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
 
-DEFAULT_CONFIG_FILE = pkg_resources.resource_filename(
-                            'sst1mpipe',
-                            path.join(
-                                'data',
-                                'sst1mpipe_data_config.json'
-                            )
-                        )
+DEFAULT_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json')
+
 DEFAULT_CONFIG = load_config(DEFAULT_CONFIG_FILE, ismc=False)
 def swap_r0_modules_59_88(event, tel=None):
 
@@ -141,13 +136,9 @@ class muon_finder:
 
 
 
-        subarray_file = pkg_resources.resource_filename(
-                            'sst1mpipe',
-                            path.join(
-                                'data',
+        subarray_file = files('sst1mpipe.data').joinpath(
                                 'sst1m_array.h5'
                             )
-                        )
 
         subarray  = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
         self.geom = subarray.camera_types[0].geometry
