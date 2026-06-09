@@ -60,17 +60,10 @@ jobs:
         run : pytest -vv -s tests/
       # ----------------------------
       # Runs the code coverage of the tests (see pyproject.toml for options)
-      # Make an xml report for the Action to publish in PR
       # Print the report
       # ----------------------------
       - name: Run test with coverage analysis
         shell: micromamba-shell {0}
         run: |
               coverage run
-              coverage xml
               coverage report
-      # ----------------------------
-      # Runs the code coverage action on the report and publish results to PR
-      # ----------------------------
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
