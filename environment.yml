@@ -5,6 +5,7 @@ channels:
 dependencies:
   - python>=3.10
   - pip
+  - coverage
   - ctapipe=0.17.0
   - click
   - gammapy>=1.0

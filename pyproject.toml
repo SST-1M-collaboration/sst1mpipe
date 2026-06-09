@@ -36,7 +36,18 @@ sst1mpipe = [
   "resources/zfits/*"
 ]
 
+[tool.coverage.run]
+branch = true
+command_line = "-m pytest tests/"
+source = ["sst1mpipe/"]
 
+[tool.coverage.report]
+fail_under = 50
+show_missing = true
+sort = "Cover"
+
+[tool.coverage.xml]
+output = "coverage.xml"
 
 [project.scripts]
 sst1mpipe_dl1_dl2 = "sst1mpipe.scripts.sst1mpipe_dl1_dl2:main"
