@@ -36,19 +36,6 @@ sst1mpipe = [
   "resources/zfits/*"
 ]
 
-[tool.coverage.run]
-branch = true
-command_line = "-m pytest tests/"
-source = ["sst1mpipe/"]
-
-[tool.coverage.report]
-fail_under = 5
-show_missing = true
-sort = "Cover"
-
-[tool.coverage.xml]
-output = "coverage.xml"
-
 [project.scripts]
 sst1mpipe_dl1_dl2 = "sst1mpipe.scripts.sst1mpipe_dl1_dl2:main"
 sst1mpipe_data_dl1_dl1_stereo = "sst1mpipe.scripts.sst1mpipe_data_dl1_dl1_stereo:main"
@@ -77,8 +64,22 @@ target-version = "py314"
 select = ["F", "E", "W"]
 extend-select = ["B", "RET505", "RET507", "PIE808", "UP015", "UP032", "RUF037", "SIM910"]
 ignore = ["E501"]
-
 per-file-ignores = { "**/__init__.py" = ["F401"] }
 
-[tool.pytest.ini_options]
-pythonpath = ["sst1mpipe"]
+[tool.pytest]
+addopts = ["-vv", "-s"]
+testpaths = ['tests/']
+
+[tool.coverage.run]
+branch = true
+command_line = "-m pytest tests/"
+source = ["sst1mpipe/"]
+
+[tool.coverage.report]
+fail_under = 5
+show_missing = true
+sort = "Cover"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
