@@ -45,12 +45,7 @@ jobs:
       - name: Install package
         shell: micromamba-shell {0}
         run : |
-          which python
-          which pip
           pip install .
-          python -c "import pkg_resources; print('ok')"
-          python -m pip install .
-          python -c "import pkg_resources; print('ok')"
       # ----------------------------
       # Execute ruff for static code analysis (rules in pyproject.toml)
       # ----------------------------
