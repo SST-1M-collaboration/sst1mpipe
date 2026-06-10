@@ -81,3 +81,29 @@ To run these test yourself :
 mamba activate sst1m-dev
 ruff check .
 ```
+
+## Running the tests
+
+The code contains unit test under the folder `tests/`. 
+To run the tests yourself:
+
+```
+mamba activate sst1m-dev
+pytest -vv -s tests/
+```
+
+The `-vv` option increases verbosity of the tests results and the `-s` shows the output od the `print()` statements in the test functions.
+
+To see the option used for `pytest`  see the [project.toml](pyproject.toml) file under `[tool.pytest]`
+### Running the code test coverage
+
+To see what part of the code in `sst1mpipe/` is covered by the tests in `tests/` the `coverage.py`
+software can be used as followed :
+
+```
+mamba activate sst1m-dev
+coverage run
+coverage report
+```
+
+To see the option used for the code analysis and reporting (i.e. coverage threshold), see the [project.toml](pyproject.toml) file under `[tool.coverage]`

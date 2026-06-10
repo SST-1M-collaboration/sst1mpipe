@@ -12,19 +12,7 @@ authors = [
   ]
 license = { file = "LICENSE" }
 readme = { file = "README.md", content-type = "text/markdown" }
-dependencies = [
-  "h5py",
-  "ctapipe~=0.17.0",
-  "ctaplot~=0.6.2",
-  "gammapy~=1.0",
-  "pyirf~=0.8.0",
-  "jupyterlab~=3.5.2",
-  "scikit-learn~=1.2.2",
-  "astroquery~=0.4.6",
-  "seaborn~=0.13.0",
-  "tables~=3.8.0",
-  "pydantic>=1.4,<2.0"
-]
+
 
 [project.urls]
 Homepage = "https://sst-1m.space/"
@@ -32,23 +20,6 @@ Repository = "https://github.com/SST-1M-collaboration/sst1mpipe"
 Documentation = "https://sst1mpipe.readthedocs.io/"
 
 [metadata]
-
-
-[project.optional-dependencies]
-docs = [
-  "sphinx",
-  "sphinx-automodapi",
-  "sphinx_argparse",
-  "sphinx_rtd_theme",
-  "numpydoc",
-  "nbsphinx",
-  "sphinxcontrib-mermaid",
-  "sphinx-togglebutton"
-]
-
-test = [
-    "pytest"
-]
 
 
 [tool.setuptools]
@@ -61,10 +32,9 @@ where = ["."]
 [tool.setuptools.package-data]
 sst1mpipe = [
   "data/*",
-  "resources/camera_config.cfg"
+  "resources/*",
+  "resources/zfits/*"
 ]
-
-
 
 [project.scripts]
 sst1mpipe_dl1_dl2 = "sst1mpipe.scripts.sst1mpipe_dl1_dl2:main"
@@ -87,13 +57,29 @@ sst1mpipe_mc_train_rfs_misdirection = "sst1mpipe.scripts.sst1mpipe_mc_train_rfs_
 sst1mpipe_event_classes = "sst1mpipe.scripts.sst1mpipe_event_classes:main"
 sst1mpipe_read_camera_server_logs = "sst1mpipe.scripts.read_camera_server_logs:main"
 
+[tool.ruff]
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["F", "E", "W"]
 extend-select = ["B", "RET505", "RET507", "PIE808", "UP015", "UP032", "RUF037", "SIM910"]
 ignore = ["E501"]
-
 per-file-ignores = { "**/__init__.py" = ["F401"] }
 
-[tool.pytest.ini_options]
-pythonpath = ["sst1mpipe"]
+[tool.pytest]
+addopts = ["-vv", "-s"]
+testpaths = ['tests/']
+
+[tool.coverage.run]
+branch = true
+command_line = "-m pytest tests/"
+source = ["sst1mpipe/"]
+
+[tool.coverage.report]
+fail_under = 5
+show_missing = true
+sort = "Cover"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+

@@ -7,7 +7,6 @@ import logging
 import os
 import re
 from datetime import datetime
-from os import path
 import json
 
 import astropy.constants as c
@@ -18,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 import pandas as pd
-import pkg_resources
+from importlib.resources import files
 import tables
 from astropy.coordinates import (
     AltAz,
@@ -1783,13 +1782,10 @@ def get_pointing_radec(input_file):
 
 def get_subarray():
 
-    subarray_file = pkg_resources.resource_filename(
-                            'sst1mpipe',
-                            path.join(
-                                'data',
+    subarray_file = files('sst1mpipe.data').joinpath(
                                 'sst1m_array.h5'
                             )
-                        )
+
     subarray = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
     return subarray
 

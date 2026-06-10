@@ -13,7 +13,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
+      # ----------------------------
+      # Cache large files with git lfs
+      # ----------------------------
       - name: Cache Git LFS files
         uses: actions/cache@v4
         with:
@@ -21,27 +23,47 @@ jobs:
           key: ${{ runner.os }}-lfs-${{ hashFiles('.gitattributes') }}
           restore-keys: |
              ${{ runner.os }}-lfs-
-
+      # ----------------------------
+      # Pull large files needed for tests to pass
+      # ----------------------------
       - name: Pull LFS files
         run: git lfs pull
-
-      - name: Set up Micromamba env
+      # ----------------------------
+      # INSTALL PACKAGE
+      # ----------------------------
+      - name: Set up Mamba environment
         uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
           init-shell: bash
           cache-environment: true
+          cache-downloads: true
           generate-run-shell: true
-          post-cleanup: 'all'
-
-      - name: Test install
+      # ----------------------------
+      # INSTALL PACKAGE
+      # ----------------------------
+      - name: Install package
         shell: micromamba-shell {0}
-        run : pip install .
-
+        run : |
+          pip install .
+      # ----------------------------
+      # Execute ruff for static code analysis (rules in pyproject.toml)
+      # ----------------------------
       - name: Run Ruff (pyflakes + pycodestyle)
         shell: micromamba-shell {0}
         run: ruff check .
-
-      - name: Run tests
+      # ----------------------------
+      # Execute pytests -vv for high verbosity and -s to show output of `print()` statements
+      # ----------------------------
+      - name: Run tests with pytest
         shell: micromamba-shell {0}
-        run : pytest tests/
+        run : pytest -vv -s tests/
+      # ----------------------------
+      # Runs the code coverage of the tests (see pyproject.toml for options)
+      # Print the report
+      # ----------------------------
+      - name: Run test with coverage analysis
+        shell: micromamba-shell {0}
+        run: |
+              coverage run
+              coverage report
