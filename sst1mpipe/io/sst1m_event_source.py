@@ -272,10 +272,18 @@ class SST1MEventSource(EventSource):
                         np.int64(event.local_time_sec * 1E9) +
                         np.int64(event.local_time_nanosec)
                     )
-                    r0.gps_time = (
-                        np.int64(event.trig.timeSec * 1E9) +
-                        np.int64(event.trig.timeNanoSec)
-                    )
+
+                    if event.trig is not None:
+
+                        r0.gps_time = (
+                            np.int64(event.trig.timeSec * 1E9) +
+                            np.int64(event.trig.timeNanoSec)
+                        )
+
+                    else:
+
+                        r0.gps_time = np.int64(0)
+
                     r0.camera_event_type = event.event_type
                     r0.array_event_type = event.eventType
                     r0.adc_samples = samples[_sort_ids]
