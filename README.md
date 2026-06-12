@@ -84,20 +84,18 @@ ruff check .
 
 ## Running the tests
 
-The code contains unit test under the folder `tests/`. 
+The code contains unit test under the folder [tests/](tests). The notebooks under [notebooks/](notebooks/) are also being tested
 To run the tests yourself:
 
 ```
 mamba activate sst1m-dev
-pytest -vv -s tests/
+pytest 
 ```
-
-The `-vv` option increases verbosity of the tests results and the `-s` shows the output od the `print()` statements in the test functions.
 
 To see the option used for `pytest`  see the [project.toml](pyproject.toml) file under `[tool.pytest]`
 ### Running the code test coverage
 
-To see what part of the code in `sst1mpipe/` is covered by the tests in `tests/` the `coverage.py`
+To see what part of the code in [sst1mpipe/](sst1mpipe) is covered by the tests in `tests/` the `coverage.py`
 software can be used as followed :
 
 ```

@@ -53,11 +53,12 @@ jobs:
         shell: micromamba-shell {0}
         run: ruff check .
       # ----------------------------
-      # Execute pytests -vv for high verbosity and -s to show output of `print()` statements
+      # Execute pytests look at pyproject.toml to see which tests are executed and options are used
       # ----------------------------
       - name: Run tests with pytest
         shell: micromamba-shell {0}
-        run : pytest -vv -s tests/
+        run : | 
+              pytest
       # ----------------------------
       # Runs the code coverage of the tests (see pyproject.toml for options)
       # Print the report

@@ -15,6 +15,7 @@ dependencies:
   - protozfits
   - astroquery=0.4.6
   - matplotlib<=3.8
+  - nbmake # used to pytest jupyter notebooks
   - pydantic<2.0
   - pytables=3.8.0
   - pytest
