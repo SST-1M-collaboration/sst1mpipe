@@ -1,14 +1,18 @@
 
-### For developers
-- download latest development vertsion from git repository
-- create and activate <b>conda</b> environment
+# Installation (for developers)
+- download latest development version from git repository
+- create and activate <b>mamba</b> environment
 - install <b>sst1mpipe</b>
 ```
 git clone git@github.com:SST-1M-collaboration/sst1mpipe.git
-conda env create -f sst1mpipe/environment.yml
-conda activate sst1m-dev
+mamba env create -f sst1mpipe/environment.yml
+mamba activate sst1m-dev
 pip install -e sst1mpipe
 ```
+
+# Contributing
+
+# Checking your change 
 
 ## Building the documentation
 
