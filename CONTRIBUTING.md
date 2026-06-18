@@ -1,4 +1,5 @@
-# Guideline for devellopers
+# Guideline for developers
+
 ## Installation
 
 To set up a development environment, follow these steps:
@@ -72,53 +73,107 @@ For more information about the available workflows and how to run them locally, 
 
 8. 🎉 **Celebrate your contribution to improving the project!**
 
-## Workflows and Actions 
+## GitHub Workflows and Actions
 
-[ci.yml](.github/workflows/ci.yml)
+GitHub Workflows (via **GitHub Actions**) are powerful automation tools available in GitHub repositories. They are used to automatically run jobs such as testing, linting, and documentation builds whenever changes are pushed or pull requests are opened.
 
-[documentation.yml](.github/workflows/documentation.yml)
+All workflows for this project are defined in the [.github/worflows/](.github/workflows/)
+folder.
 
-### Building the documentation
+Key workflows include:
 
-The documentation is built using sphynx. All necessary dependencies to build the documentation come with the [environement.yml](environment.yml) file.
+* [ci.yml](.github/workflows/ci.yml) — Continuous integration (tests, linting, and quality checks)
+* [documentation.yml](.github/workflows/documentation.yml) — Builds and deploys the project documentation
 
+---
+
+## Project Files Overview
+
+This project relies on a few key files that define how the codebase is tested, formatted, and managed:
+
+### `pyproject.toml`
+
+The [pyproject.toml](pyproject.toml) file is the central configuration file for most Python tooling in this project.
+
+It is used to configure:
+
+* **Setuptools** (how to install the software, create command line applications)
+* **Ruff** (linting and code style rules)
+* **Pytest** (test configuration and options)
+* **Coverage.py** (test coverage thresholds and reporting)
+* Potentially other tools used in the development workflow
+
+### `environment.yml`
+
+### `.gitattributes`
+
+The `.gitattributes` file defines how Git handles specific file types in the repository.
+It is especially important for:
+
+* Ensuring consistent line endings across platforms
+* Configuring Git LFS tracking for large files
+* Defining diff/merge behavior for specific file types
+
+### `.gitignore`
+
+### `.readthedocs.yaml`
+
+### `LICENSE`
+
+### `README.md`
+
+### `CONTRIBUTING.md`
+
+## Building the Documentation
+
+The project documentation is built using **Sphinx**.
+To build and preview the documentation locally:
+
+```bash
+sphinx-build docs/ _build/
+xdg-open _build/index.html
 ```
-mamba activate sst1m-dev
-cd docs/
-sphinx-build . _build/
-xdg-open _build/index.html  
-```
+## Running Ruff (Code Style Checks)
 
-### Running ruff checks
+The codebase is checked against a set of style and linting rules defined in [pyproject.toml](pyproject.toml).
 
-The code is tested against a set of syntax rules defined in the [project.toml](pyproject.toml) file.
-To run these test yourself :
+To run the checks locally:
 
-```
-mamba activate sst1m-dev
+```bash
 ruff check .
 ```
 
-### Running the tests
+## Running the Tests
 
-The code contains unit test under the folder [tests/](tests). The notebooks under [notebooks/](notebooks/) are also being tested
-To run the tests yourself:
+Unit tests are located in the [tests/](tests/) directory. In addition, Jupyter notebooks in [notebooks/](notebooks/) are included in the test suite.
+Configuration options for `pytest` can be found in [pyproject.toml](pyproject.toml) under the `[tool.pytest]` section.
 
+To run the full test suite:
+
+```bash
+pytest .
 ```
-mamba activate sst1m-dev
-pytest 
-```
 
-To see the option used for `pytest`  see the [project.toml](pyproject.toml) file under `[tool.pytest]`
-### Running the code test coverage
+## Code Coverage
 
-To see what part of the code in [sst1mpipe/](sst1mpipe) is covered by the tests in `tests/` the `coverage.py`
-software can be used as followed :
+To measure which parts of the codebase are covered by tests, the project uses `coverage.py`.
+Coverage thresholds and reporting options are defined in [pyproject.toml](pyproject.toml) under the `[tool.coverage]` section.
 
-```
-mamba activate sst1m-dev
-coverage run
+Run coverage analysis and show the result with:
+
+```bash
 coverage report
 ```
 
-To see the option used for the code analysis and reporting (i.e. coverage threshold), see the [project.toml](pyproject.toml) file under `[tool.coverage]`
+## Working with Large Files
+
+This repository uses **Git LFS (Large File Storage)** to handle large files that should not be stored directly in Git history.
+
+Make sure Git LFS is installed and initialized:
+
+```bash
+git lfs install
+```
+
+Large file tracking rules are defined in `.gitattributes`, which specifies which file types should be handled by Git LFS instead of standard Git storage.
+
