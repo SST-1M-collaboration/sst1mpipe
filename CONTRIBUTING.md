@@ -1,15 +1,35 @@
+# Guideline for devellopers
+## Installation
 
-# Installation (for developers)
-- download latest development version from git repository
-- create and activate <b>mamba</b> environment
-- install <b>sst1mpipe</b>
-```
+To set up a development environment, follow these steps:
+
+1. **Clone the repository:**
+
+```bash
 git clone git@github.com:SST-1M-collaboration/sst1mpipe.git
+```
+
+2. **Create the mamba environment** using the provided [environment file](environment.yml):
+
+```bash
 mamba env create -f sst1mpipe/environment.yml
+```
+
+3. **Activate the environment:**
+
+```bash
 mamba activate sst1m-dev
+```
+
+4. **Install `sst1mpipe` in editable mode:**
+
+```bash
 pip install -e sst1mpipe
 ```
-# Contributing
+
+Installing the package in editable mode (`-e`) allows your local modifications to the source code to be immediately reflected without reinstalling the package after each change.
+
+## Contributing
 
 Thank you for your interest in contributing to this project!
 
@@ -52,13 +72,13 @@ For more information about the available workflows and how to run them locally, 
 
 8. 🎉 **Celebrate your contribution to improving the project!**
 
-# Workflows and Actions 
+## Workflows and Actions 
 
 [ci.yml](.github/workflows/ci.yml)
 
 [documentation.yml](.github/workflows/documentation.yml)
 
-## Building the documentation
+### Building the documentation
 
 The documentation is built using sphynx. All necessary dependencies to build the documentation come with the [environement.yml](environment.yml) file.
 
@@ -69,7 +89,7 @@ sphinx-build . _build/
 xdg-open _build/index.html  
 ```
 
-## Running ruff checks
+### Running ruff checks
 
 The code is tested against a set of syntax rules defined in the [project.toml](pyproject.toml) file.
 To run these test yourself :
@@ -79,7 +99,7 @@ mamba activate sst1m-dev
 ruff check .
 ```
 
-## Running the tests
+### Running the tests
 
 The code contains unit test under the folder [tests/](tests). The notebooks under [notebooks/](notebooks/) are also being tested
 To run the tests yourself:
