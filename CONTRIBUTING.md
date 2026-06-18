@@ -9,10 +9,54 @@ mamba env create -f sst1mpipe/environment.yml
 mamba activate sst1m-dev
 pip install -e sst1mpipe
 ```
-
 # Contributing
 
-# Checking your change 
+Thank you for your interest in contributing to this project!
+
+The typical workflow for submitting changes is the following:
+
+1. **Open an issue** describing the feature you would like to implement or the bug you would like to fix.
+
+2. **Create a new branch** from the `main` branch:
+
+```bash
+git checkout -b branch-name
+```
+
+3. **Implement your changes** and commit them incrementally.
+
+It is recommended to create **small, focused commits** that each correspond to a logical change (for example, fixing a bug, adding a feature, or updating documentation). This makes it easier to review your work, understand the history of the project, and revert specific changes if needed.
+
+```bash
+git commit -m "A short message describing the change"
+```
+
+You are encouraged to commit your work regularly as you progress rather than creating a single large commit at the end.
+
+
+4. **Push your branch** to the GitHub repository (`origin`):
+
+```bash
+git push origin branch-name
+```
+
+5. **Open a Pull Request (PR)** and provide a clear description of the changes you have implemented.
+
+6. **Ensure that all tests pass** and fix any issues if necessary.
+
+The project uses automated GitHub Actions workflows to run tests, check code quality, and verify that changes do not introduce regressions. After opening your Pull Request, make sure that all checks complete successfully and address any reported issues if necessary.
+
+For more information about the available workflows and how to run them locally, see the [Workflows and Actions](#workflows-and-actions) section below.
+
+7. **Request a review** and address any feedback or requested changes from the reviewers.
+
+8. 🎉 **Celebrate your contribution to improving the project!**
+
+# Workflows and Actions 
+
+[ci.yml](.github/workflows/ci.yml)
+
+[documentation.yml](.github/workflows/documentation.yml)
 
 ## Building the documentation
 
