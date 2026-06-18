@@ -140,7 +140,7 @@ The codebase is checked against a set of style and linting rules defined in [pyp
 To run the checks locally:
 
 ```bash
-ruff check .
+ruff check 
 ```
 
 ## Running the Tests
@@ -151,7 +151,7 @@ Configuration options for `pytest` can be found in [pyproject.toml](pyproject.to
 To run the full test suite:
 
 ```bash
-pytest .
+pytest 
 ```
 
 ## Code Coverage
