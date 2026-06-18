@@ -13,7 +13,7 @@ sst1mpipe provides tools for low-level data analysis up to DL3, which can be fur
 
 v0.3.5 of *sst1mpipe* was the last one before the repository was made public. Old releases are available only to the members of SST-1M Consortium and can be found in a privare repository [sst1mpipe-old](https://github.com/SST-1M-collaboration/sst1mpipe-old).
 
-## Installation
+# Installation
 
 The advanced package and environment management system, [Anaconda](https://www.anaconda.com/distribution/#download-section), [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Mamba](https://anaconda.org/conda-forge/mamba), is needed to be installed first.
 
@@ -26,17 +26,9 @@ Set up environment based on Mamba
 curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
 bash Mambaforge-$(uname)-$(uname -m).sh
 ```
-or
-```
-wget "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
-bash Mambaforge-$(uname)-$(uname -m).sh
-```
 
-
-
-### For users
 - download stable version of <b>sst1mpipe</b> (latest version = 0.9.0)
-- create and activate <b>conda</b> environment
+- create and activate <b>mamba</b> environment
 - install <b>sst1mpipe</b>
 ```
 SST1MPIPE_VER=0.9.0
@@ -44,8 +36,7 @@ SST1MPIPE_VER=0.9.0
 wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz
 tar -xvf v$SST1MPIPE_VER.tar.gz
 cd sst1mpipe-$SST1MPIPE_VER
-conda env create -n sst1m-$SST1MPIPE_VER -f environment.yml
-conda activate sst1m-$SST1MPIPE_VER
-pip install -e .
-
+mamba env create -n sst1m-$SST1MPIPE_VER -f environment.yml
+mamba activate sst1m-$SST1MPIPE_VER
+pip install .
 ```
