@@ -13,7 +13,7 @@ sst1mpipe provides tools for low-level data analysis up to DL3, which can be fur
 
 v0.3.5 of *sst1mpipe* was the last one before the repository was made public. Old releases are available only to the members of SST-1M Consortium and can be found in a privare repository [sst1mpipe-old](https://github.com/SST-1M-collaboration/sst1mpipe-old).
 
-## Installation
+# Installation
 
 The advanced package and environment management system, [Anaconda](https://www.anaconda.com/distribution/#download-section), [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Mamba](https://anaconda.org/conda-forge/mamba), is needed to be installed first.
 
@@ -26,17 +26,9 @@ Set up environment based on Mamba
 curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
 bash Mambaforge-$(uname)-$(uname -m).sh
 ```
-or
-```
-wget "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
-bash Mambaforge-$(uname)-$(uname -m).sh
-```
 
-
-
-### For users
 - download stable version of <b>sst1mpipe</b> (latest version = 0.9.0)
-- create and activate <b>conda</b> environment
+- create and activate <b>mamba</b> environment
 - install <b>sst1mpipe</b>
 ```
 SST1MPIPE_VER=0.9.0
@@ -44,64 +36,7 @@ SST1MPIPE_VER=0.9.0
 wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz
 tar -xvf v$SST1MPIPE_VER.tar.gz
 cd sst1mpipe-$SST1MPIPE_VER
-conda env create -n sst1m-$SST1MPIPE_VER -f environment.yml
-conda activate sst1m-$SST1MPIPE_VER
-pip install -e .
-
+mamba env create -n sst1m-$SST1MPIPE_VER -f environment.yml
+mamba activate sst1m-$SST1MPIPE_VER
+pip install .
 ```
-
-### For developers
-- download latest development vertsion from git repository
-- create and activate <b>conda</b> environment
-- install <b>sst1mpipe</b>
-```
-git clone git@github.com:SST-1M-collaboration/sst1mpipe.git
-conda env create -f sst1mpipe/environment.yml
-conda activate sst1m-dev
-pip install -e sst1mpipe
-```
-
-## Building the documentation
-
-The documentation is built using sphynx. All necessary dependencies to build the documentation come with the [environement.yml](environment.yml) file.
-
-```
-mamba activate sst1m-dev
-cd docs/
-sphinx-build . _build/
-xdg-open _build/index.html  
-```
-
-## Running ruff checks
-
-The code is tested against a set of syntax rules defined in the [project.toml](pyproject.toml) file.
-To run these test yourself :
-
-```
-mamba activate sst1m-dev
-ruff check .
-```
-
-## Running the tests
-
-The code contains unit test under the folder [tests/](tests). The notebooks under [notebooks/](notebooks/) are also being tested
-To run the tests yourself:
-
-```
-mamba activate sst1m-dev
-pytest 
-```
-
-To see the option used for `pytest`  see the [project.toml](pyproject.toml) file under `[tool.pytest]`
-### Running the code test coverage
-
-To see what part of the code in [sst1mpipe/](sst1mpipe) is covered by the tests in `tests/` the `coverage.py`
-software can be used as followed :
-
-```
-mamba activate sst1m-dev
-coverage run
-coverage report
-```
-
-To see the option used for the code analysis and reporting (i.e. coverage threshold), see the [project.toml](pyproject.toml) file under `[tool.coverage]`
