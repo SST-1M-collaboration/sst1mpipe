@@ -26,4 +26,8 @@ def test_import_protozfits():
     module, version = get_module_and_version("protozfits")
     assert version is not None
 
+def test_import_scipy():
+    module, version = get_module_and_version("scipy")
+    assert version is not None
+
 
