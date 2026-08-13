@@ -29,7 +29,8 @@ def find_pixel_positions(
 def generate_geometry_from_camera(
         camera,
         source_x=0. * u.mm,
-        source_y=0. * u.mm
+        source_y=0. * u.mm,
+        name = 'SST-1M'
     ):
     """
     Generate the SST-1M geometry from the CTS configuration
@@ -55,7 +56,7 @@ def generate_geometry_from_camera(
     pix_area = np.array(pix_area) * u.mm**2
 
     geom = CameraGeometry(
-        0,
+        name,
         pix_id,
         pix_x,
         pix_y,
