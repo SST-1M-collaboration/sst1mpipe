@@ -76,7 +76,7 @@ command_line = "-m pytest tests/"
 source = ["sst1mpipe/"]
 
 [tool.coverage.report]
-fail_under = 5
+fail_under = 6
 show_missing = true
 sort = "Cover"
 
