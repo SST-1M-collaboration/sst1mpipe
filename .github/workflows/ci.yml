@@ -36,8 +36,8 @@ jobs:
         with:
           environment-file: environment.yml
           init-shell: bash
-          cache-environment: true
-          cache-downloads: true
+          cache-environment: false
+          cache-downloads: false
           generate-run-shell: true
       # ----------------------------
       # INSTALL PACKAGE
