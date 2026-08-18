@@ -21,7 +21,7 @@ dependencies:
   - pytest
   - ruff
   - setuptools<81 # required for ctapipe 0.17
-  - scikit-learn=1.2.2
+  - scikit-learn>=1.3 # required to use sklearn.cluster.HDBSCAN
   - scipy=1.13 # required for ctapipe 0.17 ('csr_matrix' object has no attribute 'A')
   - seaborn=0.13.0
   - sphinx
