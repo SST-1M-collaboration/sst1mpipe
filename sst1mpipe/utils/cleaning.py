@@ -9,9 +9,8 @@ from ctapipe.containers import (
 )
 
 from ctapipe.core.traits import (
-    BoolTelescopeParameter,
     FloatTelescopeParameter,
-    IntTelescopeParameter, TelescopeParameter,
+    IntTelescopeParameter
 )
 
 from ctapipe.image import (
@@ -170,7 +169,6 @@ class ImageCleanerSST_MC(ImageCleaner):
 class DBSCANImageCleaner(ImageCleaner):
     """
     An image cleaner based on the sklearn.cluster.DBSCAN algorithm
-
     """
     minimum_pe = IntTelescopeParameter(
         default_value=30, help="Minimum number of p.e. in cluster"
