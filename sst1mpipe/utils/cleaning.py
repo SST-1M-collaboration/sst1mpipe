@@ -175,8 +175,8 @@ class DBSCANImageCleaner(ImageCleaner):
         default_value=30, help="Minimum number of p.e. in cluster"
     ).tag(config=True)
 
-    epsilon = FloatTelescopeParameter(
-        default_value=1.1, help="Scale parameter for spatial coordinates (in pixel distances)"
+    epsilon_r = FloatTelescopeParameter(
+        default_value=38.0, help="Scale parameter for spatial coordinates (in mm)"
     ).tag(config=True)
 
     def __init__(self, subarray, config=None, parent=None, **kwargs):
@@ -186,7 +186,7 @@ class DBSCANImageCleaner(ImageCleaner):
 
     def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray = None) -> np.ndarray:
 
-        clustering = DBSCAN(eps=self.epsilon.tel[tel_id], min_samples=self.minimum_pe.tel[tel_id], metric='precomputed')
+        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed')
         clustering.fit(self._distances[tel_id], sample_weight=image)
 
         mask = clustering.labels_ >= 0
@@ -198,10 +198,9 @@ class DBSCANImageCleaner(ImageCleaner):
         for tel_id in self.subarray.tel_ids:
 
             geometry = self.subarray.tel[tel_id].camera.geometry
-            x = np.column_stack([geometry.pix_x, geometry.pix_y])
-            d = cdist(x.value, x.value) * x.unit
-            min_pixel_distance = np.min(d[d>0])
-            d /= min_pixel_distance
+            epsilon_r =self.epsilon_r.tel[tel_id] * u.mm
+            x = np.column_stack([geometry.pix_x, geometry.pix_y]) / epsilon_r
+            d = cdist(x.to(u.dimensionless_unscaled), x.to(u.dimensionless_unscaled))
 
             self._distances[tel_id] = d
 
@@ -214,11 +213,11 @@ class TimeDBSCANImageCleaner(ImageCleaner):
     ).tag(config=True)
 
     epsilon_r = FloatTelescopeParameter(
-        default_value=25.0, help="Scale parameter for spatial coordinates (in mm)"
+        default_value=38.0, help="Scale parameter for spatial coordinates (in mm)"
     ).tag(config=True)
 
     epsilon_t = FloatTelescopeParameter(
-        default_value=20.0, help="Scale parameter for time (in ns)"
+        default_value=40.0, help="Scale parameter for time (in ns)"
     ).tag(config=True)
 
     def __init__(self, subarray, config=None, parent=None, **kwargs):
