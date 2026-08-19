@@ -168,7 +168,10 @@ class ImageCleanerSST_MC(ImageCleaner):
 
 
 class DBSCANImageCleaner(ImageCleaner):
+    """
+    An image cleaner based on the sklearn.cluster.DBSCAN algorithm
 
+    """
     minimum_pe = IntTelescopeParameter(
         default_value=30, help="Minimum number of p.e. in cluster"
     ).tag(config=True)
