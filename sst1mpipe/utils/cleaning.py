@@ -1,6 +1,7 @@
 import logging
 from copy import deepcopy
 
+import astropy.units as u
 import numpy as np
 from ctapipe.containers import (
     CameraHillasParametersContainer,
@@ -186,7 +187,7 @@ class DBSCANImageCleaner(ImageCleaner):
     def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray = None) -> np.ndarray:
 
         clustering = DBSCAN(eps=self.epsilon.tel[tel_id], min_samples=self.minimum_pe.tel[tel_id], metric='precomputed')
-        clustering.fit_predict(self._distances[tel_id], sample_weight=image)
+        clustering.fit(self._distances[tel_id], sample_weight=image)
 
         mask = clustering.labels_ >= 0
         return mask
@@ -204,6 +205,50 @@ class DBSCANImageCleaner(ImageCleaner):
 
             self._distances[tel_id] = d
 
+class TimeDBSCANImageCleaner(ImageCleaner):
+    """
+       An image cleaner based on the sklearn.cluster.DBSCAN algorithm that uses the image and peak time image
+       """
+    minimum_pe = IntTelescopeParameter(
+        default_value=30, help="Minimum number of p.e. in cluster"
+    ).tag(config=True)
+
+    epsilon_r = FloatTelescopeParameter(
+        default_value=25.0, help="Scale parameter for spatial coordinates (in mm)"
+    ).tag(config=True)
+
+    epsilon_t = FloatTelescopeParameter(
+        default_value=20.0, help="Scale parameter for time (in ns)"
+    ).tag(config=True)
+
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
+        super().__init__(subarray, config, parent, **kwargs)
+
+        self._precompute_distances_squared()
+
+    def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray) -> np.ndarray:
+        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed')
+
+        times = arrival_times / self.epsilon_t.tel[tel_id]
+        d = (times[:, None] - times[None, :])**2 + self._distances_squared[tel_id]
+        d = np.sqrt(d)
+
+        clustering.fit(d, sample_weight=image)
+
+        mask = clustering.labels_ >= 0
+        return mask
+
+    def _precompute_distances_squared(self):
+        self._distances_squared = {}
+
+        for tel_id in self.subarray.tel_ids:
+
+            geometry = self.subarray.tel[tel_id].camera.geometry
+            x = np.column_stack([geometry.pix_x, geometry.pix_y])
+            d = cdist(x.value, x.value) * x.unit
+            d /= self.epsilon_r.tel[tel_id] * u.mm
+
+            self._distances_squared[tel_id] = d**2
 
 def image_cleaner_setup(subarray=None, config=None, ismc=False):
 
