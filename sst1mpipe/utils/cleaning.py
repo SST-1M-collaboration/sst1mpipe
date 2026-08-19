@@ -7,6 +7,13 @@ from ctapipe.containers import (
     CameraTimingParametersContainer,
     ImageParametersContainer,
 )
+
+from ctapipe.core.traits import (
+    BoolTelescopeParameter,
+    FloatTelescopeParameter,
+    IntTelescopeParameter, TelescopeParameter,
+)
+
 from ctapipe.image import (
     ImageCleaner,
     ImageProcessor,
@@ -14,6 +21,9 @@ from ctapipe.image import (
     number_of_islands,
     tailcuts_clean,
 )
+from scipy.spatial.distance import cdist
+
+from sklearn.cluster import DBSCAN
 
 
 def get_only_main_island_mask(geom, cleaning_mask):
@@ -155,6 +165,43 @@ class ImageCleanerSST_MC(ImageCleaner):
         if only_main_island:
             return get_only_main_island_mask(geom, time_delta_cleaning_mask)
         return time_delta_cleaning_mask
+
+
+class DBSCANImageCleaner(ImageCleaner):
+
+    minimum_pe = IntTelescopeParameter(
+        default_value=30, help="Minimum number of p.e. in cluster"
+    ).tag(config=True)
+
+    epsilon = FloatTelescopeParameter(
+        default_value=1.1, help="Scale parameter for spatial coordinates (in pixel distances)"
+    ).tag(config=True)
+
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
+        super().__init__(subarray, config, parent, **kwargs)
+
+        self._precompute_distances()
+
+    def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray = None) -> np.ndarray:
+
+        clustering = DBSCAN(eps=self.epsilon.tel[tel_id], min_samples=self.minimum_pe.tel[tel_id], metric='precomputed')
+        clustering.fit_predict(self._distances[tel_id], sample_weight=image)
+
+        mask = clustering.labels_ >= 0
+        return mask
+
+    def _precompute_distances(self):
+
+        self._distances = {}
+        for tel_id in self.subarray.tel_ids:
+
+            geometry = self.subarray.tel[tel_id].camera.geometry
+            x = np.column_stack([geometry.pix_x, geometry.pix_y])
+            d = cdist(x.value, x.value) * x.unit
+            min_pixel_distance = np.min(d[d>0])
+            d /= min_pixel_distance
+
+            self._distances[tel_id] = d
 
 
 def image_cleaner_setup(subarray=None, config=None, ismc=False):
