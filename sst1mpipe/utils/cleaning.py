@@ -24,7 +24,7 @@ from ctapipe.image import (
 from scipy.spatial.distance import cdist
 
 from sklearn.cluster import DBSCAN
-
+from sklearn.neighbors import radius_neighbors_graph, sort_graph_by_row_values
 
 def get_only_main_island_mask(geom, cleaning_mask):
 
@@ -200,7 +200,19 @@ class DBSCANImageCleaner(ImageCleaner):
             geometry = self.subarray.tel[tel_id].camera.geometry
             epsilon_r =self.epsilon_r.tel[tel_id] * u.mm
             x = np.column_stack([geometry.pix_x, geometry.pix_y]) / epsilon_r
-            d = cdist(x.to(u.dimensionless_unscaled), x.to(u.dimensionless_unscaled))
+
+            d = radius_neighbors_graph(
+                x.to(u.dimensionless_unscaled),
+                radius=1.0,
+                mode="distance",
+                include_self=True,
+                n_jobs=-1
+            )
+
+            d = sort_graph_by_row_values(
+                d,
+                warn_when_not_sorted=False
+            )
 
             self._distances[tel_id] = d
 
