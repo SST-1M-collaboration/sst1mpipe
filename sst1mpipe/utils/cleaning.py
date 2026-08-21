@@ -14,6 +14,8 @@ from ctapipe.core.traits import (
     IntTelescopeParameter
 )
 
+from ctapipe.core.component import TelescopeComponent
+
 from ctapipe.image import (
     ImageCleaner,
     ImageProcessor,
@@ -261,7 +263,7 @@ class TimeDBSCANImageCleaner(ImageCleaner):
 
             self._distances_squared[tel_id] = d**2
 
-class DBSCANImageCleaner3D(ImageCleaner):
+class DBSCANImageCleaner3D(TelescopeComponent):
     """
        An image cleaner based on the sklearn.cluster.DBSCAN algorithm that uses the waveforms
        """
