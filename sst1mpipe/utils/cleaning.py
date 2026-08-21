@@ -186,7 +186,7 @@ class DBSCANImageCleaner(ImageCleaner):
 
     def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray = None) -> np.ndarray:
 
-        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed')
+        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
         clustering.fit(self._distances[tel_id], sample_weight=image)
 
         mask = clustering.labels_ >= 0
@@ -238,8 +238,8 @@ class TimeDBSCANImageCleaner(ImageCleaner):
         self._precompute_distances_squared()
 
     def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray) -> np.ndarray:
-        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed')
 
+        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
         times = arrival_times / self.epsilon_t.tel[tel_id]
         d = (times[:, None] - times[None, :])**2 + self._distances_squared[tel_id]
         d = np.sqrt(d)
@@ -260,6 +260,70 @@ class TimeDBSCANImageCleaner(ImageCleaner):
             d /= self.epsilon_r.tel[tel_id] * u.mm
 
             self._distances_squared[tel_id] = d**2
+
+class DBSCANImageCleaner3D(ImageCleaner):
+    """
+       An image cleaner based on the sklearn.cluster.DBSCAN algorithm that uses the waveforms
+       """
+    minimum_pe = IntTelescopeParameter(
+        default_value=30, help="Minimum number of p.e. in cluster"
+    ).tag(config=True)
+
+    epsilon_r = FloatTelescopeParameter(
+        default_value=38.0, help="Scale parameter for spatial coordinates (in mm)"
+    ).tag(config=True)
+
+    epsilon_t = FloatTelescopeParameter(
+        default_value=40.0, help="Scale parameter for time (in ns)"
+    ).tag(config=True)
+
+    min_samples = IntTelescopeParameter(
+        default_value=1, help="Minimum number of time samples required"
+    ).tag(config=True)
+
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
+        super().__init__(subarray, config, parent, **kwargs)
+
+        self._precompute_distances()
+
+    def __call__(self, tel_id: int, waveform: np.ndarray) -> np.ndarray:
+
+        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
+        clustering.fit(self._distances[tel_id], sample_weight=waveform.ravel())
+
+        mask = clustering.labels_ >= 0
+        mask = mask.reshape((self.subarray.tel[tel_id].camera.readout.n_pixels, self.subarray.tel[tel_id].camera.readout.n_samples))
+        mask = mask.sum(axis=-1)
+        mask = mask >= self.min_samples.tel[tel_id]
+
+        return mask
+
+    def _precompute_distances(self):
+
+        self._distances = {}
+
+        for tel_id in self.subarray.tel_ids:
+
+            geometry = self.subarray.tel[tel_id].camera.geometry
+            readout = self.subarray.tel[tel_id].camera.readout
+
+            t = np.arange(readout.n_samples) / readout.sampling_rate
+
+
+            indices_xyt = np.column_stack([
+                np.repeat(geometry.pix_x.to(u.mm).value / self.epsilon_r.tel[tel_id], readout.n_samples),
+                np.repeat(geometry.pix_y.to(u.mm).value / self.epsilon_r.tel[tel_id], readout.n_samples),
+                np.tile(t.to(u.ns).value / self.epsilon_t.tel[tel_id], geometry.n_pixels)
+            ])
+
+            d = radius_neighbors_graph(indices_xyt, 1.0, mode="distance",
+                                           include_self=True)
+            d = sort_graph_by_row_values(
+                d,
+                warn_when_not_sorted=False
+            )
+
+            self._distances[tel_id] = d
 
 def image_cleaner_setup(subarray=None, config=None, ismc=False):
 
