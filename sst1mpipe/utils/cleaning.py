@@ -263,7 +263,7 @@ class TimeDBSCANImageCleaner(ImageCleaner):
 
             self._distances_squared[tel_id] = d**2
 
-class DBSCANImageCleaner3D(TelescopeComponent):
+class DBSCANImageCleaner3D(ImageCleaner):
     """
        An image cleaner based on the sklearn.cluster.DBSCAN algorithm that uses the waveforms
        """
@@ -288,7 +288,7 @@ class DBSCANImageCleaner3D(TelescopeComponent):
 
         self._precompute_distances()
 
-    def __call__(self, tel_id: int, waveform: np.ndarray) -> np.ndarray:
+    def __call__(self, tel_id: int, waveform: np.ndarray, arrival_times = None) -> np.ndarray:
 
         clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
         clustering.fit(self._distances[tel_id], sample_weight=waveform.ravel())
