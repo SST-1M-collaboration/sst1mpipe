@@ -1,5 +1,9 @@
+from importlib.resources import files
+import astropy.units as u
+
 import numpy as np
 from ctapipe.image import ImageProcessor
+from ctapipe.instrument import SubarrayDescription
 from scipy.sparse import csr_matrix
 
 from ctapipe.image.cleaning import apply_time_delta_cleaning, ImageCleaner
@@ -9,9 +13,13 @@ from sst1mpipe.instrument.camera import Camera
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner, DBSCANImageCleaner3D
 
+SUBARRAY_FILE = files('sst1mpipe.data').joinpath(
+    'sst1m_array.h5'
+)
+
 CAMERA = Camera()
 GEOMETRY = CAMERA.geometry
-SUBARRAY = SST1MEventSource.create_subarray()
+SUBARRAY =  SubarrayDescription.from_hdf(SUBARRAY_FILE)
 
 def test_sparse_matrix():
 
@@ -44,13 +52,29 @@ def test_DBSCAN_configurable_from_image_processor():
         "use_telescope_frame": False,
         "DBSCANImageCleaner": {
             "epsilon_r": [
-                ["id", 1, 38],
-                ["id", 2, 38]
+                ["id", 21, 38],
+                ["id", 22, 38]
             ],
             "minimum_pe": [
-                ["id", 1, 30],
-                ["id", 2, 30]
+                ["id", 21, 30],
+                ["id", 22, 30]
             ]
         }}})
 
     ImageProcessor(subarray=SUBARRAY, config=config)
+
+def test_DBSCANImageCleaner():
+
+    image = np.ones(GEOMETRY.n_pixels)
+
+    epsilon_r = (np.sqrt(GEOMETRY.pix_area[0] / np.sqrt(3.0) / 2)).to(u.mm).value * 2 # 2 pixel to pixel distance
+
+
+    n_pixels = [GEOMETRY.n_pixels, 1284, 1282, 1242, 857, 345, 133, 0, 0]
+
+    for i in range(9):
+
+        cleaner = DBSCANImageCleaner(subarray=SUBARRAY, minimum_pe=[("id", 21, i+1), ("id", 22, i+1)],
+                                     epsilon_r=[("id", 21, epsilon_r), ("id", 22, epsilon_r)])
+        mask = cleaner(21, image)
+        assert mask.sum() == n_pixels[i]
