@@ -10,7 +10,6 @@ from ctapipe.image.cleaning import apply_time_delta_cleaning, ImageCleaner
 from traitlets.config import Config
 
 from sst1mpipe.instrument.camera import Camera
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner, DBSCANImageCleaner3D
 
 SUBARRAY_FILE = files('sst1mpipe.data').joinpath(
