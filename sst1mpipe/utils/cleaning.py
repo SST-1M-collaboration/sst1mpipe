@@ -14,8 +14,6 @@ from ctapipe.core.traits import (
     IntTelescopeParameter
 )
 
-from ctapipe.core.component import TelescopeComponent
-
 from ctapipe.image import (
     ImageCleaner,
     ImageProcessor,

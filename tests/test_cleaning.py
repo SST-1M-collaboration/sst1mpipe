@@ -29,9 +29,9 @@ def test_load_DBSCANCleaning_from_name():
 
 
     cleaner = ImageCleaner.from_name(subarray=SUBARRAY, name='DBSCANImageCleaner')
-    assert type(cleaner) == DBSCANImageCleaner
+    assert isinstance(cleaner, DBSCANImageCleaner)
     cleaner = ImageCleaner.from_name(subarray=SUBARRAY, name='TimeDBSCANImageCleaner')
-    assert type(cleaner) == TimeDBSCANImageCleaner
+    assert isinstance(cleaner, TimeDBSCANImageCleaner)
     cleaner = ImageCleaner.from_name(subarray=SUBARRAY, name='DBSCANImageCleaner3D')
-    assert type(cleaner) == DBSCANImageCleaner3D
+    assert isinstance(cleaner, DBSCANImageCleaner3D)
 
