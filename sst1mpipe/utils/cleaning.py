@@ -190,6 +190,11 @@ class DBSCANImageCleaner(ImageCleaner):
         clustering.fit(self._distances[tel_id], sample_weight=image)
 
         mask = clustering.labels_ >= 0
+
+        if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
+
+            return np.zeros(self.subarray.tel[tel_id].camera.readout.n_pixels, dtype=bool)
+
         return mask
 
     def _precompute_distances(self):
@@ -247,6 +252,11 @@ class TimeDBSCANImageCleaner(ImageCleaner):
         clustering.fit(d, sample_weight=image)
 
         mask = clustering.labels_ >= 0
+
+        if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
+
+            return np.zeros(self.subarray.tel[tel_id].camera.readout.n_pixels, dtype=bool)
+
         return mask
 
     def _precompute_distances_squared(self):
@@ -295,6 +305,10 @@ class DBSCANImageCleaner3D(ImageCleaner):
         mask = mask.reshape((self.subarray.tel[tel_id].camera.readout.n_pixels, self.subarray.tel[tel_id].camera.readout.n_samples))
         mask = mask.sum(axis=-1)
         mask = mask >= self.min_samples.tel[tel_id]
+
+        if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
+
+            return np.zeros(self.subarray.tel[tel_id].camera.readout.n_pixels, dtype=bool)
 
         return mask
 
