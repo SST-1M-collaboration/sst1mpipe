@@ -1,12 +1,15 @@
 import numpy as np
 from scipy.sparse import csr_matrix
 
-from ctapipe.image.cleaning import apply_time_delta_cleaning
+from ctapipe.image.cleaning import apply_time_delta_cleaning, ImageCleaner
 
 from sst1mpipe.instrument.camera import Camera
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner, DBSCANImageCleaner3D
 
 CAMERA = Camera()
 GEOMETRY = CAMERA.geometry
+SUBARRAY = SST1MEventSource.create_subarray()
 
 def test_sparse_matrix():
 
@@ -20,4 +23,15 @@ def test_apply_time_delta_cleaning():
     times = np.ones(GEOMETRY.n_pixels)
 
     apply_time_delta_cleaning(GEOMETRY, mask, times, min_number_neighbors = 1, time_limit = 8)
+
+
+def test_load_DBSCANCleaning_from_name():
+
+
+    cleaner = ImageCleaner.from_name(subarray=SUBARRAY, name='DBSCANImageCleaner')
+    assert type(cleaner) == DBSCANImageCleaner
+    cleaner = ImageCleaner.from_name(subarray=SUBARRAY, name='TimeDBSCANImageCleaner')
+    assert type(cleaner) == TimeDBSCANImageCleaner
+    cleaner = ImageCleaner.from_name(subarray=SUBARRAY, name='DBSCANImageCleaner3D')
+    assert type(cleaner) == DBSCANImageCleaner3D
 
