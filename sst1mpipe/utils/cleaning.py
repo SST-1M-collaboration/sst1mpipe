@@ -175,6 +175,10 @@ class DBSCANImageCleaner(ImageCleaner):
         default_value=30, help="Minimum number of p.e. in cluster"
     ).tag(config=True)
 
+    picture_threshold_pe = FloatTelescopeParameter(default_value=0.0,
+                                                help="Minimum number of p.e. in the image the pixel.",
+                                                   ).tag(config=True)
+
     epsilon_r = FloatTelescopeParameter(
         default_value=38.0, help="Scale parameter for spatial coordinates (in mm)"
     ).tag(config=True)
@@ -189,11 +193,11 @@ class DBSCANImageCleaner(ImageCleaner):
         clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
         clustering.fit(self._distances[tel_id], sample_weight=image)
 
-        mask = clustering.labels_ >= 0
+        mask = (clustering.labels_ >= 0) & (image > self.picture_threshold_pe.tel[tel_id])
 
-        if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
+        if (mask.sum() <= 1) : # Cleaning with one pixel fails the timing computation (impossible with 0)
 
-            return np.zeros(self.subarray.tel[tel_id].camera.readout.n_pixels, dtype=bool)
+            mask[...] = False
 
         return mask
 
@@ -229,6 +233,10 @@ class TimeDBSCANImageCleaner(ImageCleaner):
         default_value=30, help="Minimum number of p.e. in cluster"
     ).tag(config=True)
 
+    picture_threshold_pe = FloatTelescopeParameter(default_value=0.0,
+                                                   help="Minimum number of p.e. in the image the pixel.",
+                                                   ).tag(config=True)
+
     epsilon_r = FloatTelescopeParameter(
         default_value=38.0, help="Scale parameter for spatial coordinates (in mm)"
     ).tag(config=True)
@@ -251,11 +259,11 @@ class TimeDBSCANImageCleaner(ImageCleaner):
 
         clustering.fit(d, sample_weight=image)
 
-        mask = clustering.labels_ >= 0
+        mask = (clustering.labels_) >= 0 & (image > self.picture_threshold_pe.tel[tel_id])
 
         if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
 
-            return np.zeros(self.subarray.tel[tel_id].camera.readout.n_pixels, dtype=bool)
+            mask[...] = False
 
         return mask
 
