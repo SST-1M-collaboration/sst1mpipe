@@ -213,7 +213,7 @@ class DBSCANImageCleaner(ImageCleaner):
             d = radius_neighbors_graph(
                 x.to(u.dimensionless_unscaled),
                 radius=1.0,
-                mode="distance",
+                mode="connectivity",
                 include_self=True,
                 n_jobs=-1
             )
@@ -338,7 +338,7 @@ class DBSCANImageCleaner3D(ImageCleaner):
                 np.tile(t.to(u.ns).value / self.epsilon_t.tel[tel_id], geometry.n_pixels)
             ])
 
-            d = radius_neighbors_graph(indices_xyt, 1.0, mode="distance",
+            d = radius_neighbors_graph(indices_xyt, 1.0, mode="connectivity",
                                            include_self=True)
             d = sort_graph_by_row_values(
                 d,
