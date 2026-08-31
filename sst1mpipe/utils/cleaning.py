@@ -203,12 +203,8 @@ class DBSCANImageCleaner(ImageCleaner):
 
     def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray = None) -> np.ndarray:
 
-        # clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
-        # clustering.fit(self._distances[tel_id], sample_weight=image)
-        #
-        # mask = (clustering.labels_ >= 0) & (image > self.picture_threshold_pe.tel[tel_id])
-
         mask = clean_dbscan_fast(self._distances[tel_id], weights=image, min_points=self.minimum_pe.tel[tel_id])
+        mask = mask & (image > self.picture_threshold_pe.tel[tel_id]) # negative value are not accepted for Hillas computation
 
         if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
 
@@ -231,11 +227,6 @@ class DBSCANImageCleaner(ImageCleaner):
                 mode="connectivity",
                 include_self=True,
                 n_jobs=-1
-            )
-
-            d = sort_graph_by_row_values(
-                d,
-                warn_when_not_sorted=False
             )
 
             self._distances[tel_id] = d
@@ -267,14 +258,12 @@ class TimeDBSCANImageCleaner(ImageCleaner):
 
     def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray) -> np.ndarray:
 
-        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
         times = arrival_times / self.epsilon_t.tel[tel_id]
         d = (times[:, None] - times[None, :])**2 + self._distances_squared[tel_id]
-        d = np.sqrt(d)
+        d = np.sqrt(d) <= 1.0
 
-        clustering.fit(d, sample_weight=image)
-
-        mask = (clustering.labels_) >= 0 & (image > self.picture_threshold_pe.tel[tel_id])
+        mask = clean_dbscan_fast(d, weights=image, min_points=self.minimum_pe.tel[tel_id])
+        mask = mask & (image > self.picture_threshold_pe.tel[tel_id])
 
         if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
 
@@ -356,14 +345,11 @@ class DBSCANImageCleaner3D(ImageCleaner):
                 np.tile(t.to(u.ns).value / self.epsilon_t.tel[tel_id], geometry.n_pixels)
             ])
 
+
             d = radius_neighbors_graph(indices_xyt, 1.0, mode="connectivity",
                                            include_self=True)
-            d = sort_graph_by_row_values(
-                d,
-                warn_when_not_sorted=False
-            )
 
-            self._distances[tel_id] = d.astype(bool)
+            self._distances[tel_id] = d
 
 def image_cleaner_setup(subarray=None, config=None, ismc=False):
 
