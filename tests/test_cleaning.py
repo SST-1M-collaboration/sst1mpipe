@@ -5,12 +5,15 @@ import numpy as np
 from ctapipe.image import ImageProcessor
 from ctapipe.instrument import SubarrayDescription
 from scipy.sparse import csr_matrix
+from scipy.spatial.distance import cdist
+
+from sklearn.cluster import DBSCAN
 
 from ctapipe.image.cleaning import apply_time_delta_cleaning, ImageCleaner
 from traitlets.config import Config
 
 from sst1mpipe.instrument.camera import Camera
-from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner, DBSCANImageCleaner3D
+from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner, DBSCANImageCleaner3D, clean_dbscan_fast
 
 SUBARRAY_FILE = files('sst1mpipe.data').joinpath(
     'sst1m_array.h5'
@@ -77,4 +80,22 @@ def test_DBSCANImageCleaner():
                                      epsilon_r=[("id", 21, epsilon_r), ("id", 22, epsilon_r)])
         mask = cleaner(21, image)
         assert mask.sum() == n_pixels[i]
+
+def test_fast_dbscan():
+
+    max_pe = 100
+    epsilon = 40
+
+    x = np.column_stack([GEOMETRY.pix_x.value, GEOMETRY.pix_y.value])
+    d = cdist(x, x)
+    connectivity = d <= epsilon
+
+    for _ in range(100):
+
+        image = np.random.randint(0, max_pe, GEOMETRY.n_pixels)
+        dbscan = DBSCAN(eps=epsilon, min_samples=max_pe // 2 * 10, metric='precomputed').fit(d, sample_weight=image)
+        mask_dbscan = (dbscan.labels_ >= 0)
+        mask = clean_dbscan_fast(connectivity, weights=image, min_points=max_pe // 2 * 10)
+
+        assert (mask == mask_dbscan).all()
 
