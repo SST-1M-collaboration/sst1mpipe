@@ -77,3 +77,4 @@ def test_DBSCANImageCleaner():
                                      epsilon_r=[("id", 21, epsilon_r), ("id", 22, epsilon_r)])
         mask = cleaner(21, image)
         assert mask.sum() == n_pixels[i]
+

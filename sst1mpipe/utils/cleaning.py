@@ -22,6 +22,7 @@ from ctapipe.image import (
     tailcuts_clean,
 )
 from scipy.spatial.distance import cdist
+from scipy.sparse import issparse
 
 from sklearn.cluster import DBSCAN
 from sklearn.neighbors import radius_neighbors_graph, sort_graph_by_row_values
@@ -39,6 +40,18 @@ def get_only_main_island_mask(geom, cleaning_mask):
     else:
         new_image_mask = cleaning_mask
     return new_image_mask
+
+def clean_dbscan_fast(sparse_connectivity_matrix, weights, min_points):
+
+    if not issparse(sparse_connectivity_matrix):
+        RuntimeWarning("Connectivity matrix is not sparse it might reduce computation performances")
+
+    n_points = sparse_connectivity_matrix.dot(weights)
+    mask_core = n_points >= min_points
+    mask_border = (sparse_connectivity_matrix.dot(mask_core)) > 0
+    mask = mask_core | mask_border
+
+    return mask
 
 
 class ImageCleanerSST(ImageCleaner):
@@ -190,12 +203,14 @@ class DBSCANImageCleaner(ImageCleaner):
 
     def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray = None) -> np.ndarray:
 
-        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
-        clustering.fit(self._distances[tel_id], sample_weight=image)
+        # clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
+        # clustering.fit(self._distances[tel_id], sample_weight=image)
+        #
+        # mask = (clustering.labels_ >= 0) & (image > self.picture_threshold_pe.tel[tel_id])
 
-        mask = (clustering.labels_ >= 0) & (image > self.picture_threshold_pe.tel[tel_id])
+        mask = clean_dbscan_fast(self._distances[tel_id], weights=image, min_points=self.minimum_pe.tel[tel_id])
 
-        if (mask.sum() <= 1) : # Cleaning with one pixel fails the timing computation (impossible with 0)
+        if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
 
             mask[...] = False
 
@@ -312,7 +327,14 @@ class DBSCANImageCleaner3D(ImageCleaner):
         mask = clustering.labels_ >= 0
         mask = mask.reshape((self.subarray.tel[tel_id].camera.readout.n_pixels, self.subarray.tel[tel_id].camera.readout.n_samples))
         mask = mask.sum(axis=-1)
-        mask = mask >= self.min_samples.tel[tel_id]
+        mask_1 = mask >= self.min_samples.tel[tel_id]
+
+        mask  = self._distances[tel_id].dot(waveform.ravel())
+        mask = mask.reshape((self.subarray.tel[tel_id].camera.readout.n_pixels, self.subarray.tel[tel_id].camera.readout.n_samples))
+        mask = mask.sum(axis=-1)
+        mask = mask >= self.minimum_pe.tel[tel_id]
+
+        print(mask.sum() - mask_1.sum())
 
         if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
 
@@ -345,7 +367,7 @@ class DBSCANImageCleaner3D(ImageCleaner):
                 warn_when_not_sorted=False
             )
 
-            self._distances[tel_id] = d
+            self._distances[tel_id] = d.astype(bool)
 
 def image_cleaner_setup(subarray=None, config=None, ismc=False):
 
