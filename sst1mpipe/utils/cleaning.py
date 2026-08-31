@@ -321,20 +321,16 @@ class DBSCANImageCleaner3D(ImageCleaner):
 
     def __call__(self, tel_id: int, waveform: np.ndarray, arrival_times = None) -> np.ndarray:
 
-        clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
-        clustering.fit(self._distances[tel_id], sample_weight=waveform.ravel())
+        # clustering = DBSCAN(eps=1.0, min_samples=self.minimum_pe.tel[tel_id], metric='precomputed', n_jobs=-1)
+        # clustering.fit(self._distances[tel_id], sample_weight=waveform.ravel())
+        #
+        # mask = clustering.labels_ >= 0
 
-        mask = clustering.labels_ >= 0
+        mask = clean_dbscan_fast(self._distances[tel_id], weights=waveform.ravel(), min_points=self.minimum_pe.tel[tel_id])
+
         mask = mask.reshape((self.subarray.tel[tel_id].camera.readout.n_pixels, self.subarray.tel[tel_id].camera.readout.n_samples))
         mask = mask.sum(axis=-1)
-        mask_1 = mask >= self.min_samples.tel[tel_id]
-
-        mask  = self._distances[tel_id].dot(waveform.ravel())
-        mask = mask.reshape((self.subarray.tel[tel_id].camera.readout.n_pixels, self.subarray.tel[tel_id].camera.readout.n_samples))
-        mask = mask.sum(axis=-1)
-        mask = mask >= self.minimum_pe.tel[tel_id]
-
-        print(mask.sum() - mask_1.sum())
+        mask = mask >= self.min_samples.tel[tel_id]
 
         if mask.sum() <= 1: # Cleaning with one pixel fails the timing computation (impossible with 0)
 
