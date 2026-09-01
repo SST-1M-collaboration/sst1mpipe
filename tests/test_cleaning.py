@@ -2,14 +2,16 @@ from importlib.resources import files
 import astropy.units as u
 
 import numpy as np
-from ctapipe.image import ImageProcessor
+from ctapipe.image import ImageProcessor, dilate
 from ctapipe.instrument import SubarrayDescription
 from scipy.sparse import csr_matrix
 from scipy.spatial.distance import cdist
 
 from sklearn.cluster import DBSCAN
 
-from ctapipe.image.cleaning import apply_time_delta_cleaning, ImageCleaner
+from ctapipe.image.cleaning import apply_time_delta_cleaning, tailcuts_clean, ImageCleaner
+from ctapipe.image.toymodel import Gaussian
+
 from traitlets.config import Config
 
 from sst1mpipe.instrument.camera import Camera
@@ -99,3 +101,21 @@ def test_fast_dbscan():
 
         assert (mask == mask_dbscan).all()
 
+def test_dbscan_similar_to_tailcuts():
+    """This test checks that the dbscan cleaning is identical to the
+    tailcuts cleaning under the condition that epsilon = 0"""
+
+    image, signal, noise = Gaussian(x=0 * u.mm, y=0 * u.mm, length=40 * u.mm, width=10 * u.mm, psi=0 * u.rad).generate_image(camera=CAMERA.geometry)
+    x = np.column_stack([GEOMETRY.pix_x.value, GEOMETRY.pix_y.value])
+    d = cdist(x, x)
+    connectivity = d == 0.0
+
+    for threshold in range(10):
+
+        mask_tailcuts = tailcuts_clean(CAMERA.geometry, image, picture_thresh=threshold,
+                                       boundary_thresh=-np.inf, keep_isolated_pixels=True,
+                                       min_number_picture_neighbors=0)
+        mask_dbscan = clean_dbscan_fast(connectivity, weights=image, min_points=threshold)
+        mask_dbscan = dilate(CAMERA.geometry, mask_dbscan)
+
+        assert (mask_dbscan == mask_tailcuts).all()
