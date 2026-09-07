@@ -3,22 +3,37 @@ channels:
   - conda-forge
   - default
 dependencies:
-  - python=3.8
+  - python>=3.10
   - pip
-  - ctapipe=0.17
-  - gammapy=1.0
+  - coverage
+  - ctapipe=0.17.0
+  - click
+  - gammapy>=1.0
+  - h5py
   - jupyter
-  - protozfits=2.0
+  - jupyterlab=3.5.2
+  - protozfits
   - astroquery=0.4.6
+  - matplotlib<=3.7 # required for CameraDisplay colorbar to work
+  - nbmake # used to pytest jupyter notebooks
   - pydantic<2.0
+  - pytables=3.8.0
   - pytest
   - ruff
+  - setuptools<81 # required for ctapipe 0.17
+  - scikit-learn=1.2.2
+  - scipy=1.13 # required for ctapipe 0.17 ('csr_matrix' object has no attribute 'A')
+  - seaborn=0.13.0
   - sphinx
   - sphinx-automodapi
+  - sphinx-argparse
   - sphinx-design
   - sphinx_rtd_theme
   - sphinx-togglebutton
+  - sphinxcontrib-mermaid
+  - nbsphinx
   - numpydoc
+  - wheel
   - pip:
       - ctaplot~=0.6.2
       - pyirf~=0.8.0

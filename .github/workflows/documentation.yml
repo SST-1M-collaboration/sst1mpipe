@@ -7,6 +7,8 @@ on:
 
   pull_request:
 
+  schedule:
+    - cron: '0 4 * * 1'
 permissions:
   contents: write
 
@@ -17,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up Micromamba env
-        uses: mamba-org/setup-micromamba@v2
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: environment.yml
           init-shell: bash

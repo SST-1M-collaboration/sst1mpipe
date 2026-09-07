@@ -22,12 +22,11 @@ $> python sst1mpipe_pointing_check.py
 import argparse
 import logging
 import sys
-from os import path
 
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
-import pkg_resources
+from importlib.resources import files
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
 from ctapipe.coordinates import CameraFrame
@@ -151,13 +150,8 @@ def main():
     source = SST1MEventSource([input_file], max_events=None)
 
     ### This sould probably be moved to sst1m_event_source
-    subarray_file = pkg_resources.resource_filename(
-                        'sst1mpipe',
-                        path.join(
-                            'data',
-                            'sst1m_array.h5'
-                        )
-                    )
+    subarray_file = files('sst1mpipe.data').joinpath('sst1m_array.h5')
+
     subarray = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
     source._subarray = subarray
 

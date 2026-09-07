@@ -4,12 +4,11 @@ import logging
 import operator
 import os
 from datetime import datetime
-from os import path
 
 import astropy.units as u
 import numpy as np
 import pandas as pd
-import pkg_resources
+from importlib.resources import files
 import tables
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.io import fits
@@ -126,7 +125,7 @@ def load_config(cfg_file, ismc=False):
             default_config = 'sst1mpipe_mc_config.json'
         else:
             default_config = 'sst1mpipe_data_config.json'
-        cfg_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_config))
+        cfg_file = files('sst1mpipe.data').joinpath(default_config)
 
     with open(cfg_file) as json_file:
             config = Config(json.load(json_file))
@@ -1521,7 +1520,7 @@ def get_pde_correction_factors():
 
     try:
         default_pde_corr_file = 'mc_pde_correction_factors.json'
-        pde_corr_file = pkg_resources.resource_filename('sst1mpipe',path.join('data',default_pde_corr_file))
+        pde_corr_file = files('sst1mpipe.data').joinpath(default_pde_corr_file)
 
         with open(pde_corr_file) as json_file:
                 pde_corr = Config(json.load(json_file))
