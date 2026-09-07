@@ -190,7 +190,7 @@ class DBSCANImageCleaner(ImageCleaner):
 
     minimum_pe = IntTelescopeParameter(
         default_value=30, help="Minimum number of p.e. in cluster"
-    ).tag(config=True)
+    ).tag(config=True) # TODO make this density per pixel
 
     picture_threshold_pe = FloatTelescopeParameter(
         default_value=0.0,
@@ -252,7 +252,7 @@ class TimeDBSCANImageCleaner(ImageCleaner):
 
     minimum_pe = IntTelescopeParameter(
         default_value=30, help="Minimum number of p.e. in cluster"
-    ).tag(config=True)
+    ).tag(config=True) # TODO make this density per pixel
 
     picture_threshold_pe = FloatTelescopeParameter(
         default_value=0.0,
@@ -311,7 +311,7 @@ class DBSCANImageCleaner3D(ImageCleaner):
 
     minimum_pe = IntTelescopeParameter(
         default_value=30, help="Minimum number of p.e. in cluster"
-    ).tag(config=True)
+    ).tag(config=True) # TODO make this density per pixel
 
     epsilon_r = FloatTelescopeParameter(
         default_value=38.0, help="Scale parameter for spatial coordinates (in mm)"

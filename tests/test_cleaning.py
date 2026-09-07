@@ -2,14 +2,14 @@ from importlib.resources import files
 import astropy.units as u
 
 import numpy as np
-from ctapipe.image import ImageProcessor, dilate
+from ctapipe.image import ImageProcessor
 from ctapipe.instrument import SubarrayDescription
 from scipy.sparse import csr_matrix
 from scipy.spatial.distance import cdist
 
 from sklearn.cluster import DBSCAN
 
-from ctapipe.image.cleaning import apply_time_delta_cleaning, tailcuts_clean, ImageCleaner
+from ctapipe.image.cleaning import apply_time_delta_cleaning, tailcuts_clean, ImageCleaner, dilate
 from ctapipe.image.toymodel import Gaussian
 
 from traitlets.config import Config
