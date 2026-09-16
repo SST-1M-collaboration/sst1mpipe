@@ -304,6 +304,50 @@ class TimeDBSCANImageCleaner(ImageCleaner):
             self._distances_squared[tel_id] = d**2
 
 
+
+
+class TimeImageDBSCANImageCleaner(ImageCleaner):
+    """
+    An image cleaner based on the sklearn.cluster.DBSCAN algorithm that uses the peak time image distances weighted
+    by the image intensity
+    """
+
+    minimum_pe = IntTelescopeParameter(
+        default_value=30, help="Minimum number of p.e. in cluster"
+    ).tag(config=True) # TODO make this density per pixel
+
+    picture_threshold_pe = FloatTelescopeParameter(
+        default_value=0.0,
+        help="Minimum number of p.e. in the image the pixel.",
+    ).tag(config=True)
+
+    epsilon_t = FloatTelescopeParameter(
+        default_value=40.0, help="Scale parameter for time (in ns)"
+    ).tag(config=True)
+
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
+
+        super().__init__(subarray, config, parent, **kwargs)
+
+    def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray) -> np.ndarray:
+
+        times = arrival_times / self.epsilon_t.tel[tel_id]
+        d = (times[:, None] - times[None, :]) ** 2
+        d = np.sqrt(d) <= 1.0
+
+        mask = clean_dbscan_fast(
+            d, weights=image, min_points=self.minimum_pe.tel[tel_id]
+        )
+        mask = mask & (image > self.picture_threshold_pe.tel[tel_id])
+
+        if (
+            mask.sum() <= 1
+        ):  # Cleaning with one pixel fails the timing computation (impossible with 0)
+            mask[...] = False
+
+        return mask
+
+
 class DBSCANImageCleaner3D(ImageCleaner):
     """
     An image cleaner based on the sklearn.cluster.DBSCAN algorithm that uses the waveforms
