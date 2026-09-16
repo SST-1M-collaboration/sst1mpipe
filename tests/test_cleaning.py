@@ -15,7 +15,8 @@ from ctapipe.image.toymodel import Gaussian
 from traitlets.config import Config
 
 from sst1mpipe.instrument.camera import Camera
-from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner, DBSCANImageCleaner3D, clean_dbscan_fast
+from sst1mpipe.utils.cleaning import (DBSCANImageCleaner, TimeDBSCANImageCleaner, DBSCANImageCleaner3D,
+                                      DBSCANTimeImageCleaner, clean_dbscan_fast)
 
 SUBARRAY_FILE = files('sst1mpipe.data').joinpath(
     'sst1m_array.h5'
@@ -48,6 +49,9 @@ def test_load_DBSCANCleaning_from_name():
     assert isinstance(cleaner, TimeDBSCANImageCleaner)
     cleaner = ImageCleaner.from_name(subarray=SUBARRAY, name='DBSCANImageCleaner3D')
     assert isinstance(cleaner, DBSCANImageCleaner3D)
+    cleaner = ImageCleaner.from_name(subarray=SUBARRAY, name='DBSCANTimeImageCleaner')
+    assert isinstance(cleaner, DBSCANTimeImageCleaner)
+
 
 def test_DBSCAN_configurable_from_image_processor():
 
