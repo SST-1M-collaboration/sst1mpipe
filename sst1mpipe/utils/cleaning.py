@@ -332,8 +332,8 @@ class DBSCANTimeImageCleaner(ImageCleaner):
     def __call__(self, tel_id: int, image: np.ndarray, arrival_times: np.ndarray) -> np.ndarray:
 
         times = arrival_times / self.epsilon_t.tel[tel_id]
-        d = (times[:, None] - times[None, :]) ** 2
-        d = np.sqrt(d) <= 1.0
+        d = np.abs(times[:, None] - times[None, :])
+        d = d <= 1.0
 
         mask = clean_dbscan_fast(
             d, weights=image, min_points=self.minimum_pe.tel[tel_id]
