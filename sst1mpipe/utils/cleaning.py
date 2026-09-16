@@ -306,7 +306,7 @@ class TimeDBSCANImageCleaner(ImageCleaner):
 
 
 
-class TimeImageDBSCANImageCleaner(ImageCleaner):
+class DBSCANTimeImageCleaner(ImageCleaner):
     """
     An image cleaner based on the sklearn.cluster.DBSCAN algorithm that uses the peak time image distances weighted
     by the image intensity
