@@ -6,7 +6,7 @@ dependencies:
   - python>=3.10
   - pip
   - coverage
-  - ctapipe=0.18.1
+  - ctapipe==0.20
   - click
   - gammapy>=1.0
   - h5py
