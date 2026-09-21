@@ -1,24 +1,64 @@
 from typing import Dict, Generator
 import zmq
+import ipaddress
 
 from ctapipe.io import EventSource
 from ctapipe.io.datalevels import DataLevel
 from ctapipe.instrument import SubarrayDescription
-from ctapipe.containers import SchedulingBlockContainer, ObservationBlockContainer, ArrayEventContainer
+from ctapipe.containers import SchedulingBlockContainer, ObservationBlockContainer, ArrayEventContainer, \
+    DL0Container
 from protozfits import DL0v1_Telescope_pb2, CoreMessages_pb2, any_array_to_numpy, R1v1_pb2
+from ctapipe.core.traits import Unicode
 
-from io.containers import SST1MArrayEventContainer
+from sst1mpipe.io.containers import SST1MArrayEventContainer
+
+def fill_DL0v1_Telescope_Event_to_DL0Container(payload: bytes, dl0: DL0Container) -> DL0Container:
+
+    dl0_event = DL0v1_Telescope_pb2.Event()
+    dl0_event.ParseFromString(payload)
+
+    tel_id = dl0_event.tel_id
+    dl0.tel[tel_id].waveform = any_array_to_numpy(dl0_event.waveform)
+    
+
 
 class ZMQEventSource(EventSource):
 
+    input_url = Unicode(info_text="URL of the input stream",
+                        help="TCP and port address for the input ZMQ stream. Example `tcp://192.168.1.1:1986` ")
 
     def __init__(self, input_url, config=None, parent=None, **kwargs):
 
         super().__init__(input_url=input_url, config=config, parent=parent, **kwargs)
         context = zmq.Context()
-        self.socket = context.socket(zmq.SUB)
+        self.socket = context.socket(zmq.PULL)
         self.socket.connect(self.input_url)
-        self.socket.subscribe(b"")
+
+    def is_compatible(self, file_path: str) -> bool:
+
+        try:
+            protocol, host, port = file_path.split(":", 2)
+        except ValueError:
+            return False
+
+        if protocol != "tcp":
+
+            return False
+
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            return False
+
+        try:
+            port = int(port)
+        except ValueError:
+            return False
+
+        if not 1 <= port <= 65535:
+            return False
+
+        return True
 
     @property
     def is_stream(self):
@@ -81,53 +121,53 @@ class ZMQEventSource(EventSource):
         msg = CoreMessages_pb2.CTAMessage()
         msg.ParseFromString(data)
 
-        msg_type = msg.payload_type
-        payload = msg.payload_data
+        msg_types = msg.payload_type
+        payloads = msg.payload_data
 
-        if msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
-            dl0_event =  DL0v1_Telescope_pb2.Event()
-            dl0_event.ParseFromString(payload)
+        for msg_type, payload in zip(msg_types, payloads):
 
-            tel_id = dl0_event.tel_id
-            event.dl0.tel[tel_id].waveform = any_array_to_numpy(dl0_event.waveform)
 
-        elif msg_type == CoreMessages_pb2.DL0_TELESCOPE_CAMERA_CONFIG:
-            dl0_config = DL0v1_Telescope_pb2.CameraConfiguration()
-            dl0_config.ParseFromString(payload)
+            if msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
+                
+                fill_DL0v1_Telescope_Event_to_DL0Container(payload, event.dl0)
 
-            print("CAMERA CONFIG")
-            print(dl0_config)
+            elif msg_type == CoreMessages_pb2.DL0_TELESCOPE_CAMERA_CONFIG:
+                dl0_config = DL0v1_Telescope_pb2.CameraConfiguration()
+                dl0_config.ParseFromString(payload)
 
-        elif msg_type == CoreMessages_pb2.DL0_TELESCOPE_DATA_STREAM:
-            dl0_stream = DL0v1_Telescope_pb2.DataStream()
-            dl0_stream.ParseFromString(payload)
+                print("CAMERA CONFIG")
+                print(dl0_config)
 
-            print("DATA STREAM")
-            print(dl0_stream)
+            elif msg_type == CoreMessages_pb2.DL0_TELESCOPE_DATA_STREAM:
+                dl0_stream = DL0v1_Telescope_pb2.DataStream()
+                dl0_stream.ParseFromString(payload)
 
-        elif msg_type == R1v1_pb2.TELESCOPE_DATA_STREAM:
+                print("DATA STREAM")
+                print(dl0_stream)
 
-            r1_stream = R1v1_pb2.TelescopeDataStream()
-            r1_stream.ParseFromString(payload)
+            elif msg_type == CoreMessages_pb2.TELESCOPE_DATA_STREAM:
 
-            pass
-        elif msg_type == R1v1_pb2.CAMERA_CONFIG:
+                r1_stream = R1v1_pb2.TelescopeDataStream()
+                r1_stream.ParseFromString(payload)
 
-            r1_config = R1v1_pb2.CameraConfiguration()
-            r1_config.ParseFromString(payload)
-            pass
+                pass
+            elif msg_type == CoreMessages_pb2.CAMERA_CONFIG:
 
-        elif msg_type == R1v1_pb2.R1_EVENT:
+                r1_config = R1v1_pb2.CameraConfiguration()
+                r1_config.ParseFromString(payload)
+                pass
 
-            r1_event = R1v1_pb2.Event()
-            r1_event.ParseFromString(payload)
-            pass
+            elif msg_type == CoreMessages_pb2.R1_EVENT:
 
-        if msg_type == R1v1_pb2.R1_EVENT or msg_type == DL0v1_Telescope_pb2.DL0_TELESCOPE_EVENT:
+                r1_event = R1v1_pb2.Event()
+                r1_event.ParseFromString(payload)
+                pass
 
-            return event
+            if msg_type == CoreMessages_pb2.R1_EVENT or msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
 
-        return self._generate_events(event=event)
+                return event
+
+            return self._generate_events(event=event)
 
 
 
