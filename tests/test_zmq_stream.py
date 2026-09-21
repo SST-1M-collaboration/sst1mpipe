@@ -1,6 +1,9 @@
+from ctapipe.io import EventSource
 from tqdm import tqdm as tqdm
 import numpy as np
 import zmq
+import pytest
+from traitlets import traitlets
 
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
 from sst1mpipe.constants import N_PIXELS, N_CHANNELS
@@ -54,3 +57,25 @@ def test_zmq_event_source():
         k += 1
 
     assert event.count == n_events - 1
+
+def test_zmq_address():
+
+    endpoint = "inproc://test"
+    assert ZMQEventSource.is_compatible(endpoint)
+
+    endpoint = "tcp://192.168.1.1:1986" # valid IPv4 address
+    assert ZMQEventSource.is_compatible(endpoint)
+
+    endpoint = "tcp://[2a7d:91c4:8f21:3b7a:5e12:aa90:1c44:72ef]:8000" # valid IPv6 address
+    assert ZMQEventSource.is_compatible(endpoint)
+
+    endpoint = "not_a_valid_endpoint"
+    assert not ZMQEventSource.is_compatible(endpoint)
+
+    endpoint = "/some/folder/on/linux"
+    assert not ZMQEventSource.is_compatible(endpoint)
+
+@pytest.mark.xfail(raises=traitlets.TraitError) # Unfortunately ctapipe does not allow urls but only Path
+def test_zmq_event_source_from_event_source():
+
+    EventSource(input_url="tcp://127.0.0.1:5555")

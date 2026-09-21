@@ -1,16 +1,14 @@
-from typing import Dict, Generator
+from typing import Dict
 
 import numpy as np
 import zmq
-import ipaddress
 from astropy.time import Time
 
 
 from ctapipe.io import EventSource
 from ctapipe.io.datalevels import DataLevel
 from ctapipe.instrument import SubarrayDescription
-from ctapipe.containers import SchedulingBlockContainer, ObservationBlockContainer, ArrayEventContainer, \
-    DL0Container, R1Container
+from ctapipe.containers import SchedulingBlockContainer, ObservationBlockContainer, DL0Container, R1Container
 from protozfits import DL0v1_Telescope_pb2, CoreMessages_pb2, any_array_to_numpy, R1v1_pb2
 from ctapipe.core.traits import Unicode
 
@@ -77,31 +75,23 @@ class ZMQEventSource(EventSource):
         self.socket = context.socket(zmq.PULL)
         self.socket.connect(self.input_url)
 
-    def is_compatible(self, file_path: str) -> bool:
+    @staticmethod
+    def is_compatible(file_path: str) -> bool:
+
+        context = zmq.Context()
+        socket = context.socket(zmq.PULL)
 
         try:
-            protocol, host, port = file_path.split(":", 2)
-        except ValueError:
+            socket.connect(file_path)
+            return True
+        except zmq.ZMQError:
             return False
-
-        if protocol != "tcp":
-
-            return False
-
-        try:
-            ipaddress.ip_address(host)
-        except ValueError:
-            return False
-
-        try:
-            port = int(port)
-        except ValueError:
-            return False
-
-        if not 1 <= port <= 65535:
-            return False
-
-        return True
+        finally:
+            try:
+                socket.close(linger=0)
+            except Exception:
+                pass
+            context.term()
 
     @property
     def is_stream(self):
