@@ -1,6 +1,7 @@
 import numpy as np
 from astropy import units as u
 from ctapipe.instrument.subarray import EarthLocation
+from sst1mpipe.instrument.camera import Camera
 
 # Should be SST1M position - #TODO
 REFERENCE_LOCATION = EarthLocation(
@@ -11,7 +12,9 @@ REFERENCE_LOCATION = EarthLocation(
 
 
 
-
+CAMERA = Camera()
+GEOMETRY = CAMERA.geometry
+N_PIXELS = GEOMETRY.n_pixels
 
 PATCH_ID_INPUT = [
     204, 216, 180, 192, 229, 241, 205, 217, 254, 266, 230, 242,
