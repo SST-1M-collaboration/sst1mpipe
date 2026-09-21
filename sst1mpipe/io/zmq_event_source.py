@@ -1,26 +1,69 @@
 from typing import Dict, Generator
+
+import numpy as np
 import zmq
 import ipaddress
+from astropy.time import Time
+
 
 from ctapipe.io import EventSource
 from ctapipe.io.datalevels import DataLevel
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.containers import SchedulingBlockContainer, ObservationBlockContainer, ArrayEventContainer, \
-    DL0Container
+    DL0Container, R1Container
 from protozfits import DL0v1_Telescope_pb2, CoreMessages_pb2, any_array_to_numpy, R1v1_pb2
 from ctapipe.core.traits import Unicode
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer
 
-def fill_DL0v1_Telescope_Event_to_DL0Container(payload: bytes, dl0: DL0Container) -> DL0Container:
+def ctao_high_res_to_time(seconds, quarter_nanoseconds):
+    """Convert CTAO high resolution timestamp to astropy Time."""
+    # unix_tai accepts two floats for maximum precision
+    # we can just pass integral and fractional part
+    fractional_seconds = quarter_nanoseconds * 0.25e-9
+    return Time(
+        seconds,
+        fractional_seconds,
+        format="unix_tai",
+        # this is only for displaying iso timestamp, not any actual precision
+        precision=9,
+    )
 
-    dl0_event = DL0v1_Telescope_pb2.Event()
-    dl0_event.ParseFromString(payload)
+def fill_DL0v1_Telescope_Event_to_DL0Container(payload: bytes, dl0: DL0Container) -> int:
 
-    tel_id = dl0_event.tel_id
-    dl0.tel[tel_id].waveform = any_array_to_numpy(dl0_event.waveform)
-    
+    dl0_message = DL0v1_Telescope_pb2.Event()
+    dl0_message.ParseFromString(payload)
 
+    n_chan, n_pix, n_samples = (dl0_message.num_channels, dl0_message.num_pixels_survived, dl0_message.num_samples)
+
+    tel_id = dl0_message.tel_id
+    dl0.tel[tel_id].event_type = dl0_message.event_type
+    dl0.tel[tel_id].event_time = ctao_high_res_to_time(dl0_message.event_time_s, dl0_message.event_time_qns) # TODO use ctapipe > 0.24 with ctapipe.time.ctao_high_res_to_time
+    dl0.tel[tel_id].waveform = any_array_to_numpy(dl0_message.waveform).reshape((n_chan, n_pix, n_samples)) - any_array_to_numpy(dl0_message.pedestal_intensity).reshape((n_chan, n_pix,))[..., np.newaxis]
+    dl0.tel[tel_id].pixel_status = any_array_to_numpy(dl0_message.pixel_status)
+    dl0.tel[tel_id].first_cell_id = any_array_to_numpy(dl0_message.first_cell_id)
+    dl0.tel[tel_id].calibration_monitoring_id = dl0_message.calibration_monitoring_id
+
+    return dl0_message.event_id
+
+def fill_R1v1_Event_to_R1Container(payload: bytes, r1: R1Container) -> int:
+
+    r1_message = R1v1_pb2.Event()
+    r1_message.ParseFromString(payload)
+
+    n_chan, n_pix, n_samples = (r1_message.num_channels, r1_message.num_pixels, r1_message.num_samples)
+
+    tel_id = r1_message.tel_id
+    r1.tel[tel_id].event_type = r1_message.event_type
+    r1.tel[tel_id].event_time = ctao_high_res_to_time(r1_message.event_time_s, r1_message.event_time_qns) # TODO use ctapipe > 0.24 with ctapipe.time.ctao_high_res_to_time
+    r1.tel[tel_id].waveform = any_array_to_numpy(r1_message.waveform).reshape((n_chan, n_pix, n_samples))
+    r1.tel[tel_id].pedestal_intensity = any_array_to_numpy(r1_message.pedestal_intensity).reshape((n_chan, n_pix))
+    r1.tel[tel_id].pixel_status = any_array_to_numpy(r1_message.pixel_status)
+    r1.tel[tel_id].first_cell_id = any_array_to_numpy(r1_message.first_cell_id)
+    r1.tel[tel_id].module_hires_local_clock_counter = any_array_to_numpy(r1_message.module_hires_local_clock_counter)
+    r1.tel[tel_id].calibration_monitoring_id = r1_message.calibration_monitoring_id
+
+    return r1_message.event_id, r1_message.local_run_id
 
 class ZMQEventSource(EventSource):
 
@@ -108,66 +151,68 @@ class ZMQEventSource(EventSource):
         return (DataLevel.R1, DataLevel.DL0)
 
 
-    def _generator(self) -> Generator[ArrayEventContainer, None, None]:
+    def _generator(self):
 
         yield from self._generate_events()
 
-    def _generate_events(self, event=None):
+    def _generate_events(self):
 
-        if event is None:
+        count = 0
+
+        while True:
+
             event = SST1MArrayEventContainer()
-        data = self.socket.recv()
+            data = self.socket.recv()
 
-        msg = CoreMessages_pb2.CTAMessage()
-        msg.ParseFromString(data)
+            msg = CoreMessages_pb2.CTAMessage()
+            msg.ParseFromString(data)
 
-        msg_types = msg.payload_type
-        payloads = msg.payload_data
+            msg_types = msg.payload_type
+            payloads = msg.payload_data
 
-        for msg_type, payload in zip(msg_types, payloads):
+            for msg_type, payload in zip(msg_types, payloads, strict=True):
+                if msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
+
+                    event_id = fill_DL0v1_Telescope_Event_to_DL0Container(payload, event.dl0)
+                    event.index.event_id = event_id
+
+                elif msg_type == CoreMessages_pb2.DL0_TELESCOPE_CAMERA_CONFIG:
+                    dl0_config = DL0v1_Telescope_pb2.CameraConfiguration()
+                    dl0_config.ParseFromString(payload)
+
+                    raise NotImplementedError
+
+                elif msg_type == CoreMessages_pb2.DL0_TELESCOPE_DATA_STREAM:
+                    dl0_stream = DL0v1_Telescope_pb2.DataStream()
+                    dl0_stream.ParseFromString(payload)
+
+                    raise NotImplementedError
+
+                elif msg_type == CoreMessages_pb2.TELESCOPE_DATA_STREAM:
+
+                    r1_stream = R1v1_pb2.TelescopeDataStream()
+                    r1_stream.ParseFromString(payload)
+
+                    raise NotImplementedError
+
+                elif msg_type == CoreMessages_pb2.CAMERA_CONFIG:
+
+                    r1_config = R1v1_pb2.CameraConfiguration()
+                    r1_config.ParseFromString(payload)
+
+                    raise NotImplementedError
+
+                elif msg_type == CoreMessages_pb2.R1_EVENT:
+
+                    event_id, local_id = fill_R1v1_Event_to_R1Container(payload, event.r1) # TODO use local_id
+                    event.index.event_id = event_id
 
 
-            if msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
-                
-                fill_DL0v1_Telescope_Event_to_DL0Container(payload, event.dl0)
+                if msg_type == CoreMessages_pb2.R1_EVENT or msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
 
-            elif msg_type == CoreMessages_pb2.DL0_TELESCOPE_CAMERA_CONFIG:
-                dl0_config = DL0v1_Telescope_pb2.CameraConfiguration()
-                dl0_config.ParseFromString(payload)
-
-                print("CAMERA CONFIG")
-                print(dl0_config)
-
-            elif msg_type == CoreMessages_pb2.DL0_TELESCOPE_DATA_STREAM:
-                dl0_stream = DL0v1_Telescope_pb2.DataStream()
-                dl0_stream.ParseFromString(payload)
-
-                print("DATA STREAM")
-                print(dl0_stream)
-
-            elif msg_type == CoreMessages_pb2.TELESCOPE_DATA_STREAM:
-
-                r1_stream = R1v1_pb2.TelescopeDataStream()
-                r1_stream.ParseFromString(payload)
-
-                pass
-            elif msg_type == CoreMessages_pb2.CAMERA_CONFIG:
-
-                r1_config = R1v1_pb2.CameraConfiguration()
-                r1_config.ParseFromString(payload)
-                pass
-
-            elif msg_type == CoreMessages_pb2.R1_EVENT:
-
-                r1_event = R1v1_pb2.Event()
-                r1_event.ParseFromString(payload)
-                pass
-
-            if msg_type == CoreMessages_pb2.R1_EVENT or msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
-
-                return event
-
-            return self._generate_events(event=event)
+                    event.count = count
+                    count += 1
+                    yield event
 
 
 
