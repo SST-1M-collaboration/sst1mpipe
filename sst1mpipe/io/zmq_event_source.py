@@ -15,7 +15,7 @@ from ctapipe.core.traits import Unicode, Path
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer
 
-def ctao_high_res_to_time(seconds, quarter_nanoseconds):
+def ctao_high_res_to_time(seconds, quarter_nanoseconds): # TODO import from ctapipe==0.24
     """Convert CTAO high resolution timestamp to astropy Time."""
     # unix_tai accepts two floats for maximum precision
     # we can just pass integral and fractional part
