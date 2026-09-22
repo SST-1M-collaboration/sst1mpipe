@@ -3,6 +3,7 @@ from typing import Dict
 import numpy as np
 import zmq
 from astropy.time import Time
+from importlib.resources import files
 
 
 from ctapipe.io import EventSource
@@ -10,7 +11,7 @@ from ctapipe.io.datalevels import DataLevel
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.containers import SchedulingBlockContainer, ObservationBlockContainer, DL0Container, R1Container
 from protozfits import DL0v1_Telescope_pb2, CoreMessages_pb2, any_array_to_numpy, R1v1_pb2
-from ctapipe.core.traits import Unicode
+from ctapipe.core.traits import Unicode, Path
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer
 
@@ -68,12 +69,16 @@ class ZMQEventSource(EventSource):
     input_url = Unicode(info_text="URL of the input stream",
                         help="TCP and port address for the input ZMQ stream. Example `tcp://192.168.1.1:1986` ")
 
+    subarray_file = Path(help="Path to the file containing the subarray-description.",
+                         default_value=files('sst1mpipe.data').joinpath('sst1m_array.h5')).tag(config=True)
+
     def __init__(self, input_url, config=None, parent=None, **kwargs):
 
         super().__init__(input_url=input_url, config=config, parent=parent, **kwargs)
         context = zmq.Context()
         self.socket = context.socket(zmq.PULL)
         self.socket.connect(self.input_url)
+        self._subarray = SubarrayDescription.from_hdf(self.subarray_file)
 
     @staticmethod
     def is_compatible(file_path: str) -> bool:
@@ -107,7 +112,7 @@ class ZMQEventSource(EventSource):
         ctapipe.instrument.SubarrayDecription
 
         """
-        return None # TODO pass via config
+        return self._subarray
 
     @property
     def observation_blocks(self) -> Dict[int, ObservationBlockContainer]:

@@ -1,9 +1,11 @@
+from ctapipe.instrument import SubarrayDescription, TelescopeDescription
 from ctapipe.io import EventSource
 from tqdm import tqdm as tqdm
 import numpy as np
 import zmq
 import pytest
 from traitlets import traitlets
+
 
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
 from sst1mpipe.constants import N_PIXELS, N_CHANNELS
@@ -69,6 +71,17 @@ def test_zmq_address(endpoint, valid):
 
     assert ZMQEventSource.is_compatible(endpoint) == valid
 
+def test_subarray(tmp_path):
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    file = data_dir / "dummy-array.h5"
+
+    subarray = SubarrayDescription('dummy-array', )
+    subarray.to_hdf(file)
+    source = ZMQEventSource(input_url="inproc://test", subarray_file=file)
+
+    assert subarray.name == source.subarray.name
 
 @pytest.mark.xfail(raises=traitlets.TraitError) # Unfortunately ctapipe does not allow urls but only Path
 def test_zmq_event_source_from_event_source():
