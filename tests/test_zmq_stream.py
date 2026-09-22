@@ -1,4 +1,5 @@
 from ctapipe.io import EventSource
+from pyvo.io.uws import endpoint
 from tqdm import tqdm as tqdm
 import numpy as np
 import zmq
@@ -58,22 +59,17 @@ def test_zmq_event_source():
 
     assert event.count == n_events - 1
 
-def test_zmq_address():
+@pytest.mark.parametrize(["endpoint", "valid"],
+                         [  ["inproc://test", True],
+                            ["tcp://192.168.1.1:1986", True],
+                            ["tcp://[2a7d:91c4:8f21:3b7a:5e12:aa90:1c44:72ef]:8000", True],
+                            [ "not_a_valid_endpoint", False],
+                            [ "/some/folder/on/linux", False],
+                          ])
+def test_zmq_address(endpoint, valid):
 
-    endpoint = "inproc://test"
-    assert ZMQEventSource.is_compatible(endpoint)
+    assert ZMQEventSource.is_compatible(endpoint) == valid
 
-    endpoint = "tcp://192.168.1.1:1986" # valid IPv4 address
-    assert ZMQEventSource.is_compatible(endpoint)
-
-    endpoint = "tcp://[2a7d:91c4:8f21:3b7a:5e12:aa90:1c44:72ef]:8000" # valid IPv6 address
-    assert ZMQEventSource.is_compatible(endpoint)
-
-    endpoint = "not_a_valid_endpoint"
-    assert not ZMQEventSource.is_compatible(endpoint)
-
-    endpoint = "/some/folder/on/linux"
-    assert not ZMQEventSource.is_compatible(endpoint)
 
 @pytest.mark.xfail(raises=traitlets.TraitError) # Unfortunately ctapipe does not allow urls but only Path
 def test_zmq_event_source_from_event_source():
