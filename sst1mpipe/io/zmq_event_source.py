@@ -79,6 +79,8 @@ class ZMQEventSource(EventSource):
         self.socket = context.socket(zmq.PULL)
         self.socket.connect(self.input_url)
         self._subarray = SubarrayDescription.from_hdf(self.subarray_file)
+        self._scheduling_blocks = {tel_id: SchedulingBlockContainer() for tel_id in self.subarray.tel_ids}
+        self._observations_blocks = {tel_id: ObservationBlockContainer() for tel_id in self.subarray.tel_ids}
 
     @staticmethod
     def is_compatible(file_path: str) -> bool:
@@ -119,14 +121,16 @@ class ZMQEventSource(EventSource):
         """
         Obtain the ObservationConfigurations from the EventSource, indexed by obs_id
         """
-        raise NotImplementedError
+        UserWarning("Observations blocks is not yet implemented returns default empty containers")
+        return self._observations_blocks
 
     @property
     def scheduling_blocks(self) -> Dict[int, SchedulingBlockContainer]:
         """
         Obtain the ObservationConfigurations from the EventSource, indexed by obs_id
         """
-        raise NotImplementedError
+        UserWarning("Scheduling blocks is not yet implemented returns default empty containers")
+        return self._scheduling_blocks
 
     @property
     def is_simulation(self) -> bool:
