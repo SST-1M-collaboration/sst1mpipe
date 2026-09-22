@@ -83,7 +83,8 @@ def test_subarray(tmp_path):
 
     assert subarray.name == source.subarray.name
 
-@pytest.mark.xfail(raises=traitlets.TraitError) # Unfortunately ctapipe does not allow urls but only Path
-def test_zmq_event_source_from_event_source():
+@pytest.mark.xfail(raises=traitlets.TraitError) # Unfortunately ctapipe does not allow urls with tcp:// but only Path
+@pytest.mark.parametrize("url", ["tcp://192.168.1.1:1986", "inproc://test"])
+def test_zmq_event_source_from_event_source(url):
 
-    EventSource(input_url="tcp://127.0.0.1:5555")
+    EventSource(input_url=url)
