@@ -1,5 +1,4 @@
 from ctapipe.io import EventSource
-from pyvo.io.uws import endpoint
 from tqdm import tqdm as tqdm
 import numpy as np
 import zmq
@@ -35,10 +34,10 @@ def create_fake_dl0_event_message(event_id: int, tel_id: int ):
 
     return message.SerializeToString()
 
-def test_zmq_event_source():
+@pytest.mark.parametrize("n_events", [1000])
+def test_zmq_event_source(n_events):
 
     endpoint = "inproc://test"
-    n_events = int(1E3)
     source = ZMQEventSource(endpoint, max_events=n_events)
     tel_id = 1
 
