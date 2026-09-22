@@ -1,6 +1,5 @@
-from ctapipe.instrument import SubarrayDescription, TelescopeDescription
+from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import EventSource
-from tqdm import tqdm as tqdm
 import numpy as np
 import zmq
 import pytest
@@ -50,7 +49,7 @@ def test_zmq_event_source(n_events):
         producer.send(create_fake_dl0_event_message(i, tel_id))
 
     k = 0
-    for event in tqdm(source):
+    for event in source:
 
 
         assert event.count == k

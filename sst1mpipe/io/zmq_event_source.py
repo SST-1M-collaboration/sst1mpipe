@@ -78,6 +78,7 @@ class ZMQEventSource(EventSource):
         context = zmq.Context()
         self.socket = context.socket(zmq.PULL)
         self.socket.connect(self.input_url)
+        self.log.info(f"Connect to socket {self.input_url}")
         self._subarray = SubarrayDescription.from_hdf(self.subarray_file)
         self._scheduling_blocks = {tel_id: SchedulingBlockContainer() for tel_id in self.subarray.tel_ids}
         self._observations_blocks = {tel_id: ObservationBlockContainer() for tel_id in self.subarray.tel_ids}
@@ -218,3 +219,4 @@ class ZMQEventSource(EventSource):
     def close(self):
 
         self.socket.close()
+        self.log.info(f"Closed ZMQ connection to {self.input_url}")
