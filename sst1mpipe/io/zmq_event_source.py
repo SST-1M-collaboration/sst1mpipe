@@ -11,7 +11,7 @@ from ctapipe.io.datalevels import DataLevel
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.containers import SchedulingBlockContainer, ObservationBlockContainer, DL0Container, R1Container
 from protozfits import DL0v1_Telescope_pb2, CoreMessages_pb2, any_array_to_numpy, R1v1_pb2
-from ctapipe.core.traits import Unicode, Path
+from ctapipe.core.traits import Unicode, Path, Undefined
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer
 
@@ -67,12 +67,12 @@ def fill_R1v1_Event_to_R1Container(payload: bytes, r1: R1Container) -> int:
 class ZMQEventSource(EventSource):
 
     input_url = Unicode(info_text="URL of the input stream",
-                        help="TCP and port address for the input ZMQ stream. Example `tcp://192.168.1.1:1986` ")
+                        help="TCP and port address for the input ZMQ stream. Example `tcp://192.168.1.1:1986` ").tag(config=True)
 
     subarray_file = Path(help="Path to the file containing the subarray-description.",
                          default_value=files('sst1mpipe.data').joinpath('sst1m_array.h5')).tag(config=True)
 
-    def __init__(self, input_url, config=None, parent=None, **kwargs):
+    def __init__(self, input_url=Undefined, config=None, parent=None, **kwargs):
 
         super().__init__(input_url=input_url, config=config, parent=parent, **kwargs)
         context = zmq.Context()
