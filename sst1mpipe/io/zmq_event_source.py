@@ -193,14 +193,24 @@ class ZMQEventSource(EventSource):
                     r1_stream = R1v1_pb2.TelescopeDataStream()
                     r1_stream.ParseFromString(payload)
 
-                    raise NotImplementedError
+                    self.log.info(f"Received R1 TelescopeDataStream from tel : {r1_stream.tel_id:d}")
+                    self.log.info(f"Scheduling block id {r1_stream.sb_id:d}, "
+                                  f"Observation id {r1_stream.obs_id:d}")
+                    self.log.info(f"Waveform scale {r1_stream.waveform_scale:.2f}, "
+                                  f"waveform offset {r1_stream.waveform_offset:.2f}")
 
                 elif msg_type == CoreMessages_pb2.CAMERA_CONFIG:
 
                     r1_config = R1v1_pb2.CameraConfiguration()
                     r1_config.ParseFromString(payload)
 
-                    raise NotImplementedError
+                    self.log.info(f"Received R1 CameraConfiguration from telescope {r1_config.tel_id:d}, "
+                                  f"local run id {r1_config.local_run_id:d}")
+                    self.log.info(f"Data shape ({r1_config.num_channels:d}, {r1_config.num_pixels:d}, "
+                                  f"{r1_config.num_samples_nominal:d})")
+
+                    # pixel_id_map = any_array_to_numpy(r1_config.pixel_id_map)
+                    # module_id_map = any_array_to_numpy(r1_config.module_id_map)
 
                 elif msg_type == CoreMessages_pb2.R1_EVENT:
 
