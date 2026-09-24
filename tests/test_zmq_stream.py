@@ -7,7 +7,7 @@ from traitlets import traitlets
 
 
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
-from sst1mpipe.constants import N_PIXELS, N_CHANNELS
+from sst1mpipe.constants import N_PIXELS, N_CHANNELS, SUBARRAY_DESCRIPTION
 from protozfits import DL0v1_Telescope_pb2, CoreMessages_pb2, numpy_to_any_array
 
 def create_fake_dl0_event_message(event_id: int, tel_id: int ):
@@ -76,7 +76,7 @@ def test_subarray(tmp_path):
     data_dir.mkdir()
     file = data_dir / "dummy-array.h5"
 
-    subarray = SubarrayDescription('dummy-array', )
+    subarray = SUBARRAY_DESCRIPTION
     subarray.to_hdf(file)
     source = ZMQEventSource(input_url="inproc://test", subarray_file=file)
 
