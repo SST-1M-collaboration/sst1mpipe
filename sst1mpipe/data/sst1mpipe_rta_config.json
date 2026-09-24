@@ -1,8 +1,8 @@
 {
   "ZMQEventSource": {
-    "input_url": "tcp://localhost:1593",
+    "input_url": "tcp://localhost:13581",
     "allowed_tels" : null,
-    "max_events": null
+    "max_events": 100000
   },
 
   "CameraCalibrator": {
@@ -71,8 +71,8 @@
     }
   },
   "DataWriter" : {
-    "write_images": false,
-    "write_parameters": true,
+    "write_dl1_images": false,
+    "write_dl1_parameters": true,
     "overwrite": true
   }
 }

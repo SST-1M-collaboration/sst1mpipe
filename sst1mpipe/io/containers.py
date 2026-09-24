@@ -33,6 +33,7 @@ from tables import (
     IsDescription,
     StringCol,
 )
+from sst1mpipe.constants import SUBARRAY_DESCRIPTION
 
 __all__ = ['CameraEventType',
            'InstrumentContainer',
@@ -73,7 +74,7 @@ class InstrumentContainer(Container):
     functions.
     """
 
-    subarray = Field(SubarrayDescription("MonteCarloArray"),
+    subarray = Field(SUBARRAY_DESCRIPTION,
                      "SubarrayDescription from the instrument module")
     optical_foclen = Field(Map(np.ndarray), "map of tel_id to focal length")
     tel_pos = Field(Map(np.ndarray), "map of tel_id to telescope position")
