@@ -10,7 +10,6 @@ from ctapipe.containers import (
     SchedulingBlockContainer,
 )
 from ctapipe.core.traits import Bool, Float
-from ctapipe.instrument.subarray import EarthLocation
 from ctapipe.io import (
     EventSource,
 )

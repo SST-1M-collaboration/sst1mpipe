@@ -1,4 +1,3 @@
-from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import EventSource
 import numpy as np
 import zmq
