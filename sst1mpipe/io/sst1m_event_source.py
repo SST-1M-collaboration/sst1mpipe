@@ -10,9 +10,6 @@ from ctapipe.containers import (
     SchedulingBlockContainer,
 )
 from ctapipe.core.traits import Bool, Float
-from ctapipe.instrument import (
-    SubarrayDescription,
-)
 from ctapipe.instrument.subarray import EarthLocation
 from ctapipe.io import (
     EventSource,
@@ -106,11 +103,6 @@ class SST1MEventSource(EventSource):
         self.camera_config = None
         self.run_start = Time(self.camera_config.date, format='unix') if self.camera_config is not None else None
 
-        reference_location = EarthLocation(
-            lon = self.reference_position_lon,
-            lat = self.reference_position_lat,
-            height = self.reference_position_height,
-        )
         self._subarray = SUBARRAY_DESCRIPTION
 
 

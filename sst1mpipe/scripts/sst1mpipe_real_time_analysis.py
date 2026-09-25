@@ -21,7 +21,7 @@ class ProcessorTool(Tool):
     examples = "sst1mpipe-rta -i tcp://localhost:24593 -o events.dl1.h5"
 
     progress_bar = Bool(
-        help="show progress bar during processing", default_value=False
+        help="show progress bar during processing", default_value=True
     ).tag(config=True)
 
     aliases = {
@@ -57,13 +57,16 @@ class ProcessorTool(Tool):
             total=self.event_source.max_events,
             disable=not self.progress_bar,
         ):
+            # a = (event.r1.tel[22].waveform - event.r1.tel[22].pedestal_intensity[..., np.newaxis]).sum()
+            # print(event)
+            # 0/0
             self.camera_calibrator(event)
             self.image_processor(event)
             self.writer(event)
 
     def finish(self):
 
-        pass
+        self.writer.close()
 
 def main():
     processor = ProcessorTool()
