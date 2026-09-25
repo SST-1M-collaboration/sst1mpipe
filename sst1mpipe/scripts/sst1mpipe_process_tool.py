@@ -46,7 +46,7 @@ class ProcessorTool(Tool):
 
     def setup(self):
 
-        if ZMQEventSource.is_compatible(self.config.EventSource.input_url):
+        if ZMQEventSource.is_compatible(self.config.EventSource.input_url): # temporary fix since tcp:// url is not accepted by EventSource
             self.event_source = self.enter_context(ZMQEventSource(parent=self))
         else:
             self.event_source = self.enter_context(EventSource(parent=self))
