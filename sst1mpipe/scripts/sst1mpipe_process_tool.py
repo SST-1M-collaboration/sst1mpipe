@@ -1,7 +1,7 @@
 from tqdm import tqdm
 from ctapipe.calib import CameraCalibrator
 from ctapipe.core import Tool
-from ctapipe.core.traits import Bool, flag, Unicode
+from ctapipe.core.traits import Bool, flag
 from ctapipe.image import ImageProcessor
 from ctapipe.io import EventSource, DataWriter
 
