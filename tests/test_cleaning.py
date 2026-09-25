@@ -1,5 +1,6 @@
 from importlib.resources import files
 import astropy.units as u
+import pytest
 
 import numpy as np
 from ctapipe.image import ImageProcessor
@@ -30,7 +31,8 @@ def test_sparse_matrix():
 
     a = csr_matrix([1])
 
-    assert a.A == a.toarray()
+    with pytest.raises(AttributeError): # this attribute .A should not exist in
+        print(a.A)
 
 def test_apply_time_delta_cleaning():
 

@@ -198,6 +198,8 @@ class ZMQEventSource(EventSource):
                                   f"Observation id {r1_stream.obs_id:d}")
                     self.log.info(f"Waveform scale {r1_stream.waveform_scale:.2f}, "
                                   f"waveform offset {r1_stream.waveform_offset:.2f}")
+                    self._scheduling_blocks[r1_stream.tel_id].sb_id = r1_stream.sb_id
+                    self._observations_blocks[r1_stream.tel_id].obs_id = r1_stream.obs_id
 
                 elif msg_type == CoreMessages_pb2.CAMERA_CONFIG:
 
