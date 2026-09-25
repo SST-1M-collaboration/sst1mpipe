@@ -1,0 +1,78 @@
+{
+  "ZMQEventSource": {
+    "input_url": "tcp://localhost:13581",
+    "allowed_tels" : null,
+    "max_events": 100000
+  },
+
+  "CameraCalibrator": {
+      "image_extractor_type" : "LocalPeakWindowSum",
+      "LocalPeakWindowSum": {
+          "apply_integration_correction": true,
+          "window_shift": 3,
+          "window_width": 7
+      },
+      "data_volume_reducer_type": "NullDataVolumeReducer",
+      "invalid_pixel_handler_type": "NeighborAverage"
+  },
+
+  "ImageProcessor": {
+    "image_cleaner_type": "TailcutsImageCleaner",
+    "use_telescope_frame": false,
+    "TailcutsImageCleaner": {
+        "picture_threshold_pe": [
+          ["type", "*", 8]
+        ],
+        "boundary_threshold_pe": [
+          ["type", "*", 4]
+        ],
+        "min_picture_neighbors": [
+          ["type", "*", 2]
+        ]
+      },
+    "DBSCANImageCleaner": {
+      "epsilon_r": [
+        ["type", "*", 38.0]
+      ],
+      "minimum_pe": [
+        ["type", "*", 30]
+      ]
+    },
+    "TimeDBSCANImageCleaner": {
+      "epsilon_r": [
+        ["type", "*", 38.0]
+      ],
+      "epsilon_t":[
+        ["type", "*", 40.0]
+      ],
+      "minimum_pe": [
+        ["type", "*", 30]
+      ]
+    },
+    "DBSCANTimeImageCleaner": {
+      "epsilon_t":[
+        ["type", "*", 40.0]
+      ],
+      "minimum_pe": [
+        ["type", "*", 30]
+      ]
+    },
+    "ImageQualityQuery": {
+      "quality_criteria": [
+        [
+          "size_greater_0",
+          "image.sum() > 0"
+        ],
+        [
+          "at_least_2_pixels",
+          "image.size > 1"
+        ]
+      ]
+    }
+  },
+  "DataWriter" : {
+    "write_dl1_images": false,
+    "write_dl1_parameters": true,
+    "overwrite": true
+  }
+}
