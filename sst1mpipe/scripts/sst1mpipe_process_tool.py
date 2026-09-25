@@ -1,12 +1,12 @@
 from tqdm import tqdm
 from ctapipe.calib import CameraCalibrator
 from ctapipe.core import Tool
-from ctapipe.core.traits import Bool, flag
+from ctapipe.core.traits import Bool, flag, Unicode
 from ctapipe.image import ImageProcessor
-from ctapipe.io import DataWriter
-from sst1mpipe.io.zmq_event_source import ZMQEventSource
+from ctapipe.io import EventSource, DataWriter
 
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
+from sst1mpipe.io.zmq_event_source import ZMQEventSource
 
 
 class ProcessorTool(Tool):
@@ -18,14 +18,16 @@ class ProcessorTool(Tool):
 
     name = 'sst1mpipe-process'
     description = __doc__
-    examples = "sst1mpipe-rta -i tcp://localhost:24593 -o events.dl1.h5"
+    examples = ("sst1mpipe-process -i mysim.simtel.gz -o events.dl1.h5",
+                "sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 "
+                "--config sst1mpipe/data/sst1mpipe_rta_config.json --log-level INFO")
 
     progress_bar = Bool(
-        help="show progress bar during processing", default_value=True
+        help="show progress bar during processing", default_value=False
     ).tag(config=True)
 
     aliases = {
-        ("i", "input"): "ZMQEventSource.input_url",
+        ("i", "input"): "EventSource.input_url",
         ("o", "output"): "DataWriter.output_path",
         ("t", "allowed-tels"): "EventSource.allowed_tels",
         ("m", "max-events"): "EventSource.max_events",
@@ -44,7 +46,10 @@ class ProcessorTool(Tool):
 
     def setup(self):
 
-        self.event_source = self.enter_context(ZMQEventSource(parent=self))
+        if ZMQEventSource.is_compatible(self.config.EventSource.input_url):
+            self.event_source = self.enter_context(ZMQEventSource(parent=self))
+        else:
+            self.event_source = self.enter_context(EventSource(parent=self))
         self.camera_calibrator = CameraCalibrator(parent=self, subarray=self.event_source.subarray)
         self.image_processor = ImageProcessor(parent=self, subarray=self.event_source.subarray)
         self.writer = self.enter_context(DataWriter(event_source=self.event_source, parent=self))
@@ -57,16 +62,13 @@ class ProcessorTool(Tool):
             total=self.event_source.max_events,
             disable=not self.progress_bar,
         ):
-            # a = (event.r1.tel[22].waveform - event.r1.tel[22].pedestal_intensity[..., np.newaxis]).sum()
-            # print(event)
-            # 0/0
             self.camera_calibrator(event)
             self.image_processor(event)
             self.writer(event)
 
     def finish(self):
 
-        self.writer.close()
+        pass
 
 def main():
     processor = ProcessorTool()
