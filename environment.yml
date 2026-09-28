@@ -15,7 +15,7 @@ dependencies:
   - astroquery=0.4.6
   - matplotlib
   - nbmake # used to pytest jupyter notebooks
-  - pytables # to read hdf5 tables
+  - pytables
   - pytest
   - ruff
   - setuptools
@@ -30,6 +30,7 @@ dependencies:
   - sphinxcontrib-mermaid
   - nbsphinx
   - numpydoc
+  - vitables # to visualize hdf5 tables
   - wheel
   - pip:
       - ctaplot~=0.6.2
