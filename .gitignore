@@ -6,3 +6,6 @@
 build
 ctapipe-merge.provenance.log
 *.log
+# pixi environments
+.pixi/*
+!.pixi/config.toml

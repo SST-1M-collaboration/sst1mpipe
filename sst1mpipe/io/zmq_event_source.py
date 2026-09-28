@@ -42,6 +42,7 @@ def fill_DL0v1_Telescope_Event_to_DL0Container(payload: bytes, dl0: DL0Container
     dl0.tel[tel_id].pixel_status = any_array_to_numpy(dl0_message.pixel_status)
     dl0.tel[tel_id].first_cell_id = any_array_to_numpy(dl0_message.first_cell_id)
     dl0.tel[tel_id].calibration_monitoring_id = dl0_message.calibration_monitoring_id
+    dl0.tel[tel_id].selected_gain_channel = np.zeros(n_pix, dtype=int)
 
     return dl0_message.event_id
 
@@ -61,6 +62,7 @@ def fill_R1v1_Event_to_R1Container(payload: bytes, r1: R1Container) -> int:
     r1.tel[tel_id].first_cell_id = any_array_to_numpy(r1_message.first_cell_id)
     r1.tel[tel_id].module_hires_local_clock_counter = any_array_to_numpy(r1_message.module_hires_local_clock_counter)
     r1.tel[tel_id].calibration_monitoring_id = r1_message.calibration_monitoring_id
+    r1.tel[tel_id].selected_gain_channel = np.zeros(n_pix, dtype=int)
 
     return r1_message.event_id, r1_message.local_run_id
 
@@ -223,6 +225,7 @@ class ZMQEventSource(EventSource):
                 if msg_type == CoreMessages_pb2.R1_EVENT or msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
 
                     event.count = count
+                    event.trigger
                     count += 1
                     yield event
 
