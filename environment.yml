@@ -8,7 +8,7 @@ dependencies:
   - coverage
   - ctapipe==0.21.2
   - click
-  - gammapy==1.3
+  - gammapy==1.3 # required for compatibilities with astropy
   - h5py
   - jupyter
   - protozfits # used to read zfits files and protocolbuffer messages
@@ -18,7 +18,7 @@ dependencies:
   - pytables # to read hdf5 tables
   - pytest
   - ruff
-  - setuptools<81 # required for ctapipe 0.17
+  - setuptools
   - scikit-learn
   - scipy
   - sphinx
