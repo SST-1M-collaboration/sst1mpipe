@@ -1,0 +1,18 @@
+{
+  "TriggerEmulator": {
+    "enabled": true,
+    "filter_events": false,
+    "filter_by": "tdscan",
+    "restrict_cleaning_to_tdscan_mask": false,
+    "patch7": {
+      "threshold": 222
+    },
+    "tdscan": {
+      "score_quantizer_edges": [16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128],
+      "eps_t": 2,
+      "ring_weights": [[0.5, -0.0078125], [-0.5, -0.03125], [-0.5, -0.125], [0.5, 0.0625], [0.5, 0.25]],
+      "quantize_step": null,
+      "threshold": 8.109374
+    }
+  }
+}
