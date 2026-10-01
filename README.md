@@ -22,10 +22,15 @@ The Mamba is recomended due to some (quite often occured) stucks at solving envi
 Set up environment based on Mamba
 (also described in https://github.com/conda-forge/miniforge#mambaforge)
 
+Download the latest miniforge installation script
 ```
 curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-bash Miniforge3-$(uname)-$(uname -m).sh
 ```
+
+Install miniforge by following the instructions
+```
+bash Miniforge3-$(uname)-$(uname -m).sh
+````
 
 - download stable version of <b>sst1mpipe</b> (latest version = 0.9.0)
 - create and activate <b>mamba</b> environment
