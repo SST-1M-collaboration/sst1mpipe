@@ -154,8 +154,7 @@ class shape_maker:
             mask_low_el_noise = np.ones(self.n_pixels,dtype=bool)
         else:
             data_stream = SST1MEventSource(
-                filelist=self.file_list,
-                disable_bar = True,
+                input_url=self.file_list,
                 max_events=self.max_evt
                 )
             calib_param = get_default_calibration(self.tel+20)[0]

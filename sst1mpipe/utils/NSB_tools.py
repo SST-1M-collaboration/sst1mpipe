@@ -179,7 +179,7 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
 
         raw_baselines  = [ [] for ii in range(1296)]
 
-        data_stream = SST1MEventSource([filename],
+        data_stream = SST1MEventSource(input_url=filename,
                                        max_events=max_evt)
         for _,event in enumerate(data_stream):
                     tel = event.sst1m.r0.tels_with_data[0]

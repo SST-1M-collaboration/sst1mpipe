@@ -210,7 +210,7 @@ def main():
             logging.info("PDE correction factors found in the calibration file mc_pde_correction_factors.json: %s", pde_corr_factors)
 
     else:
-        source = SST1MEventSource([processing_info.input_file], max_events=max_events)
+        source = SST1MEventSource(input_url=processing_info.input_file, max_events=max_events)
         source._subarray = get_subarray()
 
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_021']))

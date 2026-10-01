@@ -179,7 +179,7 @@ def load_first_pedestals(r0_monitor, dl1_monitor, input_file, config, max_events
     """
     log_pedestal_settings(config)
 
-    source = SST1MEventSource([input_file], max_events=max_events)
+    source = SST1MEventSource(input_url=input_file, max_events=max_events)
     source._subarray = get_subarray()
     tel = None
 
@@ -243,7 +243,7 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
     config = deepcopy(config)
     config["ImageProcessor"]["image_cleaner_type"] = "TailcutsImageCleaner"
 
-    source = SST1MEventSource([input_file], max_events=max_events)
+    source = SST1MEventSource(input_url=input_file, max_events=max_events)
     source._subarray = get_subarray()
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
     image_processor = ImageProcessor(subarray=source.subarray, config=config)

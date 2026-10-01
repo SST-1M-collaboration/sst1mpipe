@@ -189,8 +189,7 @@ class mes_fitter:
         print("starting. reading data. Loading histograms.")
 
         data_stream = SST1MEventSource(
-            self.file_list,
-            disable_bar = True,
+            input_url=self.file_list,
             max_events=self.max_evt
             )
 

@@ -147,7 +147,7 @@ def main():
 
     wobble_coords = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame='icrs')
 
-    source = SST1MEventSource([input_file], max_events=None)
+    source = SST1MEventSource(input_url=input_file)
 
     ### This sould probably be moved to sst1m_event_source
     subarray_file = files('sst1mpipe.data').joinpath('sst1m_array.h5')

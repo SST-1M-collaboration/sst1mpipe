@@ -3,18 +3,20 @@ import warnings
 
 import numpy as np
 from astropy import units as u
+from astropy.io import fits
 from astropy.time import Time
 from ctapipe.containers import (
     ObservationBlockContainer,
     PointingMode,
     SchedulingBlockContainer,
 )
-from ctapipe.core.traits import Bool, Float
+from ctapipe.core.traits import Bool, Float, UseEnum
+from ctapipe.instrument import FocalLengthKind
 from ctapipe.io import (
     EventSource,
 )
 from ctapipe.io.datalevels import DataLevel
-from protozfits import File, MultiZFitsFiles
+from protozfits import File
 
 from sst1mpipe.constants import (
     PATCH_ID_INPUT_SORT_IDS,
@@ -26,15 +28,6 @@ from sst1mpipe.instrument import camera
 from sst1mpipe.io.containers import (
     SST1MArrayEventContainer,
 )
-
-# from tqdm import tqdm
-
-# from sst1mpipe.io.zfits import (
-#     _prepare_trigger_input,
-#     _prepare_trigger_output
-# )
-
-
 
 
 class SST1MEventSource(EventSource):
@@ -74,29 +67,30 @@ class SST1MEventSource(EventSource):
         ),
     ).tag(config = True)
 
-    def __init__(self,
-                 filelist=None,
-                 camera=camera.DigiCam,
-                 max_events=None,
-                 event_id = None,
-                 allowed_tels = None,
-                 disable_bar = False,
-                 **kwargs
-        ):
+    focal_length_choice = UseEnum(
+        FocalLengthKind,
+        default_value=FocalLengthKind.EQUIVALENT,
+        help="Which focal length to use for the camera frame transformations.",
+    ).tag(config=True)
+
+    def __init__(self, input_url=None, config=None, parent=None, **kwargs):
         # LST/CTA uses differenct filename naming convention, how to work with the SST1M file naming convention?
-        # for nowadays EventSource obtains only the first file,
-        # but SST1MEventSource counts with all input files, implemented via MultiZFitsFiles
+        # A list of files can also be given as input_url, they are read one after the other.
+        # ctapipe.io.EventSource only knows about the first one.
+        input_urls = None
+        if isinstance(input_url, list | tuple):
+            input_urls = list(input_url)
+            input_url = input_urls[0]
 
-        super().__init__(input_url=filelist[0], **kwargs)
+        super().__init__(input_url=input_url, config=config, parent=parent, **kwargs)
 
-        self.filelist = filelist
+        self._input_urls = [self.input_url] if input_urls is None else [
+            EventSource.input_url.validate(self, url) for url in input_urls
+        ]
+
         self.run_id = 0
         self.tel_id = 0
-        self.camera = camera
-        self.max_events = max_events
-        self.event_id = event_id
-        self.allowed_tels = allowed_tels
-        self.disable_bar = disable_bar
+        self.camera = camera.DigiCam
 
         # LST reads camera_config from input files, is it needed such functionality for SST1M?
         self.camera_config = None
@@ -135,7 +129,12 @@ class SST1MEventSource(EventSource):
             )
         }
 
-        self._swat_event_ids_available = self.check_swat_event_ids_available(filelist)
+        self._swat_event_ids_available = self.check_swat_event_ids_available(self.filelist)
+
+    @property
+    def filelist(self):
+        """All the files read by the source"""
+        return [str(url) for url in self._input_urls]
 
     @property
     def subarray(self):
@@ -188,22 +187,27 @@ class SST1MEventSource(EventSource):
 
     def _generator(self):
         """
+        Read the files one after the other.
+        NOTE: protozfits.MultiZFitsFiles merges interleaved files by event_id (LST),
+        SST-1M files are written one after the other and have no event_id field
         """
-        yield from self.get_array_event(self.filelist)
+        count = 0
+        for input_path in self.filelist:
+            for array_event in self.get_array_event(input_path):
+                array_event.count = count
+                yield array_event
+                count += 1
 
-    def get_array_event(self, input_path : str):
+    def get_array_event(self, input_path):
         """
+        Read the events of a single file
         """
-        print(f"input_path : {input_path}")
+        self.log.info("Reading %s", input_path)
         loaded_telescopes = []
         array_event = SST1MArrayEventContainer()
-        with MultiZFitsFiles(input_path) as events:
+        with File(input_path) as f:
             array_event.r0.meta = dict(is_simulation=False)
-            for event_counter, event in enumerate(events):
-                # print(f" **** event: {event}")
-                if self.max_events is not None and event_counter > self.max_events:
-                    break
-                array_event.count = event_counter
+            for event_counter, event in enumerate(f.Events):
                 if self._swat_event_ids_available:
                     array_event.sst1m.r0.event_id = event.arrayEvtNum
                 else:
@@ -321,31 +325,13 @@ class SST1MEventSource(EventSource):
 
     @staticmethod
     def is_compatible(file_path):
-        pass
-        # from astropy.io import fits
-
-        # try:
-        #     with fits.open(file_path) as hdul:
-        #         if "Events" not in hdul:
-        #             return False
-
-        #         header = hdul["Events"].header
-        #         ttypes = {
-        #             value for key, value in header.items()
-        #             if 'TTYPE' in key
-        #         }
-        # except OSError:
-        #     return False
-
-
-        # is_protobuf_zfits_file = (
-        #     (header['XTENSION'] == 'BINTABLE')
-        #     and (header['ZTABLE'] is True)
-        #     and (header['ORIGIN'] == 'CTA')
-        #     and (header['PBFHEAD'] == 'R1.CameraEvent')
-        # )
-
-        # print(header["XTENSION"], header["ZTABLE"], header["ORIGIN"], header["PBFHEAD"])
-        # return True
-        # # is_lst_file = 'lstcam_counters' in ttypes
-        # # return is_protobuf_zfits_file & is_lst_file
+        """
+        SST-1M zfits files have an ``Events`` table of DigiCam protobuf messages
+        """
+        try:
+            with fits.open(file_path) as hdul:
+                if "Events" not in hdul:
+                    return False
+                return hdul["Events"].header.get("PBFHEAD") == "DataModel.CameraEvent"
+        except (OSError, TypeError, ValueError):
+            return False

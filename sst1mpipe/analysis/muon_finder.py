@@ -187,9 +187,8 @@ class muon_finder:
             print(f"file {self.filename} opened")
         else :
             data_stream = SST1MEventSource(
-                filelist    = [self.filename],
+                input_url   = self.filename,
                 max_events  = self.max_evt,
-                disable_bar = True
                 )
 
             r0_pedestal_monitor = R0PedestalMonitor(subarray=get_subarray(), config=DEFAULT_CONFIG)
