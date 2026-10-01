@@ -72,11 +72,6 @@ class Monitoring_R0_DL1:
         self.survived_charge_fraction_2 = []
         self.swat_event_ids_used = False
 
-    def guess_mc(self):
-        if "simtel" in self.input_file:
-            return True
-        return False
-
     def fill_target_info(self):
 
         target, ra_fits, dec_fits, wobble_fits = get_target(self.input_file,

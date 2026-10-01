@@ -29,7 +29,7 @@ import astropy.units as u
 import numpy as np
 from ctapipe.calib import CameraCalibrator
 from ctapipe.image import ImageProcessor
-from ctapipe.io import DataWriter, EventSource
+from ctapipe.io import DataWriter, EventSource, SimTelEventSource
 from ctapipe.reco import ShowerProcessor
 
 import sst1mpipe
@@ -53,7 +53,6 @@ from sst1mpipe.io import (
     write_extra_parameters,
     write_pixel_charges_table,
 )
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import (
     add_event_id,
     add_pointing_to_events,
@@ -156,24 +155,16 @@ def main():
     reclean = args.reclean
     precise_timestamps = args.precise_timestamps
 
-    ismc = processing_info.guess_mc()
-    input_basename = os.path.basename(processing_info.input_file)
+    # simtel or SST-1M zfits file, from the file content (the right EventSource is chosen by ctapipe)
+    ismc = SimTelEventSource.is_compatible(processing_info.input_file)
 
-    def strip_suffix(value, suffix):
-        if value.endswith(suffix):
-            return value[:-len(suffix)]
-        return value
-
-    if ismc:
-        base_name = strip_suffix(input_basename, ".corsika.gz.simtel.gz")
-        processing_info.output_file = os.path.join(outdir, base_name + "_dl1.h5")
-        output_logfile = os.path.join(outdir, base_name + "_r1_dl1.log")
-        processing_info.output_file_px_charges = os.path.join(outdir, base_name + "_pedestal_hist.h5")
-    else:
-        base_name = strip_suffix(input_basename, ".fits.fz")
-        processing_info.output_file = os.path.join(outdir, base_name + "_dl1.h5")
-        output_logfile = os.path.join(outdir, base_name + "_r1_dl1.log")
-        processing_info.output_file_px_charges = os.path.join(outdir, base_name + "_pedestal_hist.h5")
+    base_name = os.path.basename(processing_info.input_file)
+    for suffix in (".corsika.gz.simtel.gz", ".fits.fz"):
+        if base_name.endswith(suffix):
+            base_name = base_name[:-len(suffix)]
+    processing_info.output_file = os.path.join(outdir, base_name + "_dl1.h5")
+    output_logfile = os.path.join(outdir, base_name + "_r1_dl1.log")
+    processing_info.output_file_px_charges = os.path.join(outdir, base_name + "_pedestal_hist.h5")
 
     check_outdir(outdir)
 
@@ -197,9 +188,10 @@ def main():
 
     config = load_config(args.config_file, ismc=ismc)
 
-    if ismc:
-        source = EventSource(processing_info.input_file, max_events=max_events, allowed_tels=config["allowed_tels"])
+    source = EventSource(input_url=processing_info.input_file, max_events=max_events, allowed_tels=config.get("allowed_tels"))
+    logging.info("Event source: %s", source.__class__.__name__)
 
+    if source.is_simulation:
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_001']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_002']))
 
@@ -210,8 +202,6 @@ def main():
             logging.info("PDE correction factors found in the calibration file mc_pde_correction_factors.json: %s", pde_corr_factors)
 
     else:
-        source = SST1MEventSource(input_url=processing_info.input_file, max_events=max_events)
-        source._subarray = get_subarray()
 
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_021']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_022']))
