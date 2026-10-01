@@ -225,7 +225,6 @@ class ZMQEventSource(EventSource):
                 if msg_type == CoreMessages_pb2.R1_EVENT or msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
 
                     event.count = count
-                    event.trigger
                     count += 1
                     yield event
 
