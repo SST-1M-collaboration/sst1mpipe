@@ -23,8 +23,8 @@ Set up environment based on Mamba
 (also described in https://github.com/conda-forge/miniforge#mambaforge)
 
 ```
-curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
-bash Mambaforge-$(uname)-$(uname -m).sh
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+bash Miniforge3-$(uname)-$(uname -m).sh
 ```
 
 - download stable version of <b>sst1mpipe</b> (latest version = 0.9.0)
