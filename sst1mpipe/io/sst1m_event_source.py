@@ -10,10 +10,6 @@ from ctapipe.containers import (
     SchedulingBlockContainer,
 )
 from ctapipe.core.traits import Bool, Float
-from ctapipe.instrument import (
-    SubarrayDescription,
-)
-from ctapipe.instrument.subarray import EarthLocation
 from ctapipe.io import (
     EventSource,
 )
@@ -24,6 +20,7 @@ from sst1mpipe.constants import (
     PATCH_ID_INPUT_SORT_IDS,
     PATCH_ID_OUTPUT_SORT_IDS,
     REFERENCE_LOCATION,
+    SUBARRAY_DESCRIPTION
 )
 from sst1mpipe.instrument import camera
 from sst1mpipe.io.containers import (
@@ -105,12 +102,7 @@ class SST1MEventSource(EventSource):
         self.camera_config = None
         self.run_start = Time(self.camera_config.date, format='unix') if self.camera_config is not None else None
 
-        reference_location = EarthLocation(
-            lon = self.reference_position_lon,
-            lat = self.reference_position_lat,
-            height = self.reference_position_height,
-        )
-        self._subarray = self.create_subarray(self.tel_id, reference_location)
+        self._subarray = SUBARRAY_DESCRIPTION
 
 
         # self.pointing_source = PointingSource(subarray=self.subarray, parent=self)
@@ -193,24 +185,6 @@ class SST1MEventSource(EventSource):
         if id0 == id1 == 0:
             return False
         return True
-
-    @staticmethod
-    def create_subarray(tel_id=1, reference_location=None):
-        """
-        Obtain the subarray from the EventSource
-        Returns
-        -------
-        ctapipe.instrument.SubarrayDescription
-        """
-
-        subarray = SubarrayDescription(
-            name=f"SST1M-{tel_id} subarray",
-            # tel_descriptions=tel_descriptions,
-            # tel_positions=tel_positions,
-            # reference_location=LST1_LOCATION,
-        )
-
-        return subarray
 
     def _generator(self):
         """

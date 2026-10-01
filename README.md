@@ -15,17 +15,22 @@ v0.3.5 of *sst1mpipe* was the last one before the repository was made public. Ol
 
 # Installation
 
-The advanced package and environment management system, [Anaconda](https://www.anaconda.com/distribution/#download-section), [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Mamba](https://anaconda.org/conda-forge/mamba), is needed to be installed first.
+The advanced package and environment management system, [Anaconda](https://www.anaconda.com/distribution/#download-section), [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Mamba](https://anaconda.org/conda-forge/mamba), need to be installed first.
 
-The Mamba is recomended due to some (quite often occured) stucks at solving environment on Anaconda. Up to now Mamba works well.
+The Mamba is recommended due to some (quite often occurred) stuck at solving environment on Anaconda. Up to now Mamba works well.
 
 Set up environment based on Mamba
 (also described in https://github.com/conda-forge/miniforge#mambaforge)
 
+Download the latest miniforge installation script
 ```
-curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Mambaforge-$(uname)-$(uname -m).sh"
-bash Mambaforge-$(uname)-$(uname -m).sh
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
 ```
+
+Install miniforge by following the instructions
+```
+bash Miniforge3-$(uname)-$(uname -m).sh
+````
 
 - download stable version of <b>sst1mpipe</b> (latest version = 0.9.0)
 - create and activate <b>mamba</b> environment
