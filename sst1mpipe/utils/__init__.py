@@ -1,7 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
 
-from .cleaning import ImageCleanerSST, image_cleaner_setup
+from . import cleaning  # registers the custom ImageCleaners in ctapipe
 from .NSB_tools import (
     VAR_to_Idrop,
     VAR_to_NSB,

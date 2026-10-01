@@ -6,7 +6,7 @@ dependencies:
   - python==3.11
   - pip
   - coverage
-  - ctapipe==0.21.2
+  - ctapipe==0.22.0 # first version with NSBImageCleaner
   - click
   - gammapy==1.3 # required for compatibilities with astropy
   - h5py
@@ -14,6 +14,7 @@ dependencies:
   - protozfits # used to read zfits files and protocolbuffer messages
   - astroquery=0.4.6
   - matplotlib
+  - numpy<2 # astropy 6.1 fails to import with numpy 2.4 (np.in1d removed)
   - nbmake # used to pytest jupyter notebooks
   - pytables
   - pytest

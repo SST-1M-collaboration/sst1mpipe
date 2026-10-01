@@ -50,6 +50,7 @@
     },
 
     "analysis": {
+      "min_number_pedestals": 100,
       "global_theta_cut": 0.2,
       "global_gammaness_cut": 0.75,
       "stereo_delta_disp_cut_deg": null,
@@ -101,7 +102,7 @@
     },
 
     "ImageProcessor": {
-        "image_cleaner_type": "ImageCleanerSST",
+        "image_cleaner_type": "NSBImageCleaner",
         "use_telescope_frame": false,
         "TailcutsImageCleaner": {
             "picture_threshold_pe": [
@@ -117,54 +118,25 @@
               ["id", 22, 2]
             ]
           },
-        "ImageCleanerSST": {
-            "min_number_pedestals": 100,
-            "telescope_defaults": {
-                "tel_021": [
-                {
-                    "min_nsb_level": 0,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }, {
-                    "min_nsb_level": 2.3554,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }],
-                "tel_022": [
-                {
-                    "min_nsb_level": 0,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }, {
-                    "min_nsb_level": 2.4287,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }]
-            }
+        "NSBImageCleaner": {
+            "picture_threshold_pe": [
+              ["id", 21, 8],
+              ["id", 22, 8]
+            ],
+            "boundary_threshold_pe": [
+              ["id", 21, 4],
+              ["id", 22, 4]
+            ],
+            "min_picture_neighbors": [
+              ["id", 21, 2],
+              ["id", 22, 2]
+            ],
+            "keep_isolated_pixels": false,
+            "time_limit": 8,
+            "time_num_neighbors": 1,
+            "largest_island_only": false,
+            "pedestal_factor": 2.5,
+            "bright_cleaning_threshold": null
         }
     },
 
