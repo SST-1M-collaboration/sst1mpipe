@@ -28,6 +28,7 @@ import sys
 import astropy.units as u
 import numpy as np
 from ctapipe.calib import CameraCalibrator
+from ctapipe.image import ImageProcessor
 from ctapipe.io import DataWriter, EventSource
 from ctapipe.reco import ShowerProcessor
 
@@ -63,11 +64,10 @@ from sst1mpipe.utils import (
     get_subarray,
     get_swaped_modules,
     get_tel_string,
-    image_cleaner_setup,
     remove_bad_pixels,
     swap_modules_r0wf,
 )
-from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
+from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor, load_first_pedestals
 from sst1mpipe.utils.monitoring_r0_dl1 import Monitoring_R0_DL1
 
 
@@ -216,8 +216,12 @@ def main():
         logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_021']))
         logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_022']))
 
-        ## init pedestal_info and loading first pedestal events in pedestal_info
-        pedestal_info = sliding_pedestals(input_file=processing_info.input_file, config=config)
+        ## init the sliding windows of pedestal events and load the first pedestal events
+        # r0: statistics of the ADC samples in event.mon.tel[tel].r0 (voltage drop, dead pixels)
+        # dl1: statistics of the calibrated images in event.mon.tel[tel].pedestal (image cleaning)
+        r0_pedestal_monitor = R0PedestalMonitor(subarray=source.subarray, config=config)
+        dl1_pedestal_monitor = DL1PedestalMonitor(subarray=source.subarray, config=config)
+        pedestals_in_file = load_first_pedestals(r0_pedestal_monitor, dl1_pedestal_monitor, processing_info.input_file, config)
 
         # Reading target name and assumed pointing ra,dec from the target field
         # of the Events fits header
@@ -235,25 +239,26 @@ def main():
         input_file_px_charges = processing_info.output_file_px_charges
         processing_info.output_file_px_charges = os.path.join(outdir, processing_info.output_file_px_charges.split('/')[-1].rstrip(".h5") + "_recleaned.h5")
 
+    if source.is_simulation:
+        pedestals_in_file = False
+
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
-    image_processor   = image_cleaner_setup(subarray=source.subarray, config=config, ismc=ismc)
+    image_processor   = ImageProcessor(subarray=source.subarray, config=config)
 
     cleaner = config['ImageProcessor']['image_cleaner_type']
-    if (cleaner == 'ImageCleanerSST') and not ismc:
-        #to be sure about the order, sort telescope_defaults according to increasing nsb level
-        for key, value in config['ImageProcessor'][cleaner]['telescope_defaults'].items():
-            config['ImageProcessor'][cleaner]['telescope_defaults'][key] = sorted(value, key=lambda x: x['min_nsb_level'], reverse=True)
-
+    # NSBImageCleaner raises the picture threshold of each pixel to pedestal_factor * std of the
+    # pedestal images, taken from event.mon.tel[tel].pedestal.charge_std (see below)
+    adaptive_cleaning = (cleaner == 'NSBImageCleaner') and not ismc
+    pedestal_std_pe = None
+    if adaptive_cleaning:
         for key, value in config['mean_charge_to_nsb_rate'].items():
             config['mean_charge_to_nsb_rate'][key] = sorted(value, key=lambda x: x['mean_charge_bin_low'], reverse=True)
 
-        image_processor.clean.nsb_level = np.mean(pedestal_info.get_img_charge_mean())
-        image_processor.clean.config = config['ImageProcessor'][cleaner]
         ped_mean_charge = np.ndarray(shape=[0,3])
 
     if reclean:
         dl1_charges = read_charge_images(input_file_px_charges)
-        dl1_charges = dl1_charges[dl1_charges['n'] > config['ImageProcessor'][cleaner]['min_number_pedestals']]
+        dl1_charges = dl1_charges[dl1_charges['n'] > config['analysis']['min_number_pedestals']]
         dl1_charges['mean_charge'] = np.average(dl1_charges['average_q'], axis=1)
 
     shower_processor  = ShowerProcessor(subarray=source.subarray, config=config)
@@ -303,14 +308,16 @@ def main():
                     tel_string = get_tel_string(tel, mc=False)
                     location = get_location(config=config, tel=tel_string)
                     swaped_modules_list = get_swaped_modules(event)
-                    if (cleaner == 'ImageCleanerSST'):
+                    if adaptive_cleaning:
+                        dl1_pedestal_monitor.fill_monitoring(event, tel)
+                        nsb_level = np.mean(event.mon.tel[tel].pedestal.charge_mean)
                         charge_to_nsb = config['mean_charge_to_nsb_rate'][tel_string]
                         for setting in charge_to_nsb:
                             min_charge = setting['mean_charge_bin_low']
                             nsb_rate = setting['nsb_rate']
-                            if image_processor.clean.nsb_level >= min_charge:
+                            if nsb_level >= min_charge:
                                 break
-                        logging.info('Average charge from the first batch of pedestal events is %f which corresponds to NSB level %s in %s', image_processor.clean.nsb_level, nsb_rate, tel_string)
+                        logging.info('Average charge from the first batch of pedestal events is %f which corresponds to NSB level %s in %s', nsb_level, nsb_rate, tel_string)
 
                 ### REAL START OF THE LOOP
 
@@ -322,7 +329,8 @@ def main():
                 for mask_1, mask_2 in swaped_modules_list:
                     event = swap_modules_r0wf(event,mask_1, mask_2, tel=tel)
 
-                event = calibrator_r0_r1.calibrate(event, pedestal_info=pedestal_info)
+                r0_pedestal_monitor.fill_monitoring(event, tel)
+                event = calibrator_r0_r1.calibrate(event)
                 # print(calibrator_r0_r1.pixels_removed) # can be monitored
 
                 event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
@@ -367,12 +375,9 @@ def main():
             # Default is NeighborAverage, but can be turned off with 'null'
             event = remove_bad_pixels(event, config=config)
 
-            if (not source.is_simulation) and (not reclean) and pedestal_info.pedestals_in_file:
-                # ALWAYS use adaptive cleaning - take data from online pedestal_info
-                image_processor.clean.average_charge = pedestal_info.get_img_charge_mean()
-                image_processor.clean.stdev_charge = pedestal_info.get_img_charge_std()
+            if (not source.is_simulation) and (not reclean) and pedestals_in_file:
                 # in the current setup this value is common for the whole file but keep it like this for the future
-                ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, image_processor.clean.nsb_level]], axis=0)
+                ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, nsb_level]], axis=0)
 
             #set proper charge info according to time bins of pedestal events
             if reclean and (len(dl1_charges) > 0):
@@ -382,11 +387,8 @@ def main():
                     if event.trigger.time >= start_time:
                         selected_charge = charge_entry
                         break
-                _, _, Qped, sig_Qped, meanQ = selected_charge
-                image_processor.clean.average_charge = Qped
-                image_processor.clean.stdev_charge = sig_Qped
-                image_processor.clean.nsb_level = meanQ
-                image_processor.clean.config = config['ImageProcessor'][cleaner]
+                _, _, _, sig_Qped, meanQ = selected_charge
+                pedestal_std_pe = sig_Qped
                 ped_mean_charge = np.append(ped_mean_charge, [[event.index.obs_id, event.index.event_id, meanQ]], axis=0)
 
             r1_dl1_calibrator(event) # r1->dl1a (images, peak times)
@@ -403,41 +405,49 @@ def main():
                     swapped_modules=swaped_modules_list
                     )
 
-            image_processor(event) # dl1a->dl1b (hillas parameters)
+            if adaptive_cleaning:
+                # NSBImageCleaner reads the std of the pedestal images (in p.e.) from event.mon.tel[tel].pedestal
+                if reclean:
+                    event.mon.tel[tel].pedestal.charge_std = pedestal_std_pe
+                elif pedestals_in_file:
+                    # ALWAYS use adaptive cleaning - take data from the online pedestal events
+                    dl1_pedestal_monitor.fill_monitoring(event, tel)
+                else:
+                    event.mon.tel[tel].pedestal.charge_std = None
+                pedestal_std_pe = event.mon.tel[tel].pedestal.charge_std
+                if pedestal_std_pe is not None:
+                    picture_threshold = image_processor.clean.picture_threshold_pe.tel[tel]
+                    pedestal_threshold = image_processor.clean.pedestal_factor.tel[tel] * pedestal_std_pe
+                    processing_info.frac_rised += np.mean(pedestal_threshold > picture_threshold)
 
-            if (cleaner == 'ImageCleanerSST') and not ismc:
-                processing_info.frac_rised += image_processor.clean.frac_rised
+            image_processor(event) # dl1a->dl1b (hillas parameters)
 
             ## Fill monitoring container with baseline info :
             if not source.is_simulation:
                 if not bool(i % 100) and config["telescope_calibration"]["bad_calib_px_interpolation"]:
                     logging.info("N pixels interpolated (every 100th event): %d", calibrator_r0_r1.pixels_removed)
+                new_pedestal = False
                 if event_type==8:
-                    pedestal_info.add_ped_evt(event)
+                    r0_pedestal_monitor(event, tel)
+                    dl1_pedestal_monitor(event, tel)
+                    new_pedestal = True
 
-                    # writing pedestal info in dl1
-                    if ( (pedestal_info.processed_pedestals !=0) and \
-                         (pedestal_info.processed_pedestals%20 == 0)):
-
-                        pedestal_info.fill_mon_container(event)
-                        writer._writer.write(
-                            table_name='dl1/monitoring/telescope/pedestal',
-                            containers=[event.mon.tel[tel].pedestal],
-                        )
-
-                elif not pedestal_info.pedestals_in_file:
+                elif not pedestals_in_file:
 
                     clenaning_mask = event.dl1.tel[tel].image_mask
                     # Arbitrary cut, just to prevent too big showers from being used
                     # We also take only every x-th event to gain some cputime
                     if (sum(clenaning_mask) < 20) and not bool(i % 10):
-                        pedestal_info.add_ped_evt(event, cleaning_mask=clenaning_mask, store_image=False)
+                        r0_pedestal_monitor(event, tel, cleaning_mask=clenaning_mask)
+                        new_pedestal = True
 
-                    # writing pedestal info in dl1
-                    if ( (pedestal_info.processed_pedestals !=0) and \
-                         (pedestal_info.processed_pedestals%20 == 0)):
-
-                        pedestal_info.fill_mon_container(event)
+                # writing pedestal info: ADC samples (r0) and calibrated images (dl1)
+                if new_pedestal and (r0_pedestal_monitor.processed_events[tel] % 20 == 0):
+                    writer._writer.write(
+                        table_name='r0/monitoring/telescope/pedestal',
+                        containers=[event.mon.tel[tel].r0],
+                    )
+                    if pedestals_in_file:
                         writer._writer.write(
                             table_name='dl1/monitoring/telescope/pedestal',
                             containers=[event.mon.tel[tel].pedestal],
@@ -540,7 +550,7 @@ def main():
     # - some more parameters are extracted from other tables in the file and added to the parameters table for convenience
     # NOTE: unfortunately using this, units in all columns have to be dropped, because otherwise ctapipe merging tool fails.
     # I didn't find a solution, this should definitely be revisited!
-    if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file):
+    if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestals_in_file):
         write_extra_parameters(
                 processing_info.output_file,
                 config=config, ismc=ismc, meanQ=ped_mean_charge,
@@ -579,10 +589,8 @@ def main():
     # Logging all event counts
     processing_info.log_result_counts(ismc=source.is_simulation)
 
-    if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestal_info.pedestals_in_file):
+    if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestals_in_file):
         logging.info('Average (per event) fraction of pixels (N/1296) with raised picture threshold: %f', processing_info.frac_rised/i)
-        # to dump how many times particular pixels were raised
-        #image_processor.clean.dump()
 
     if source.is_simulation:
         # Cut on minimum mc_energy in the output file, which is needed if we want to safely combine MC from different productions

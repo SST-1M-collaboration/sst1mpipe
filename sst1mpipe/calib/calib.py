@@ -283,18 +283,18 @@ class Calibrator_R0_R1:
         self.get_dc_to_pe()
 
 
-    def calibrate(self, event, pedestal_info=None):
+    def calibrate(self, event):
 
         """
-        Runs the calibration.
+        Runs the calibration. The voltage drop correction and the dead pixels
+        identification use the statistics of the ADC samples of the pedestal events
+        in event.mon.tel[tel].r0 (see `sst1mpipe.utils.monitoring_pedestals.R0PedestalMonitor`).
+        They are not applied if this container is not filled.
 
         Parameters
         ----------
         event:
             sst1mpipe.io.containers.SST1MArrayEventContainer
-        pedestal_info:
-            class handling the parameters of pedesta events
-            in a sliding window
 
         Returns
         -------
@@ -305,13 +305,15 @@ class Calibrator_R0_R1:
         r0data = event.sst1m.r0.tel[self.telescope]
         baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
 
+        pedestal_std = event.mon.tel[self.telescope].r0.charge_std
+
         ## Apply (or not) pixel wise Voltage drop correction, VN: now also global
         ## TODO ?? TOTEST
-        if pedestal_info is not None:
+        if pedestal_std is not None:
             if self.config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-                VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, self.telescope)
+                VI = VAR_to_Idrop(pedestal_std**2, self.telescope)
             elif self.config['NsbCalibrator']['apply_global_Vdrop_correction']:
-                VI = VAR_to_Idrop(np.median(pedestal_info.get_charge_std()**2), self.telescope)
+                VI = VAR_to_Idrop(np.median(pedestal_std**2), self.telescope)
             else:
                 VI = 1.0
         else:
@@ -325,7 +327,7 @@ class Calibrator_R0_R1:
         # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
         # Default is NeighborAverage, but can be turned off with 'null'
         if self.config["telescope_calibration"]["bad_calib_px_interpolation"]:
-            event = self.remove_bad_pixels_calib(event, pedestal_info=pedestal_info)
+            event = self.remove_bad_pixels_calib(event)
 
         return event
 
@@ -394,7 +396,7 @@ class Calibrator_R0_R1:
         self.dc_to_pe[self.mask_bad] = self.dc_to_pe[~self.mask_bad].mean()
 
 
-    def remove_bad_pixels_calib(self, event, pedestal_info=None):
+    def remove_bad_pixels_calib(self, event):
         """
         Fills bad pixel waveforms with zeros and
         flags them in proper containers. Charges in
@@ -419,8 +421,9 @@ class Calibrator_R0_R1:
         mask_bad_calib = self.mask_bad.astype(bool)
 
         # masking pixels with too low baseline std
-        if pedestal_info is not None and self.config["telescope_calibration"]["dynamic_dead_px_interpolation"]:
-            mask_bad_std = pedestal_info.get_charge_std() < 2.5
+        pedestal_std = event.mon.tel[self.telescope].r0.charge_std
+        if pedestal_std is not None and self.config["telescope_calibration"]["dynamic_dead_px_interpolation"]:
+            mask_bad_std = pedestal_std < 2.5
             mask_bad = mask_bad_calib + mask_bad_std
         else:
             mask_bad = mask_bad_calib

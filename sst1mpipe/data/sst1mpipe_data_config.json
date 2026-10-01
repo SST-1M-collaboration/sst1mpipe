@@ -101,6 +101,14 @@
         }
     },
 
+    "R0PedestalMonitor": {
+        "n_events": 100
+    },
+
+    "DL1PedestalMonitor": {
+        "n_events": 1000
+    },
+
     "ImageProcessor": {
         "image_cleaner_type": "NSBImageCleaner",
         "use_telescope_frame": false,

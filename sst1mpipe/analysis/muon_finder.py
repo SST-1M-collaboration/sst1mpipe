@@ -20,7 +20,8 @@ from scipy.optimize import minimize
 from sst1mpipe.calib.calib import get_default_window
 from sst1mpipe.io import load_config
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
+from sst1mpipe.utils import get_subarray
+from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor, load_first_pedestals
 from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
 
 DEFAULT_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json')
@@ -191,12 +192,13 @@ class muon_finder:
                 disable_bar = True
                 )
 
-            pedestal_info = sliding_pedestals(input_file = self.filename,config=DEFAULT_CONFIG)
-            pedestal_info.load_firsts_pedestals()
-            if pedestal_info.get_n_events() == 0:
+            r0_pedestal_monitor = R0PedestalMonitor(subarray=get_subarray(), config=DEFAULT_CONFIG)
+            dl1_pedestal_monitor = DL1PedestalMonitor(subarray=get_subarray(), config=DEFAULT_CONFIG)
+            load_first_pedestals(r0_pedestal_monitor, dl1_pedestal_monitor, self.filename, DEFAULT_CONFIG)
+            if r0_pedestal_monitor.n_buffered(20 + self.tel) == 0:
                 print("No pedestal events found in firsts events. Skipping run")
                 return
-            print(f"{pedestal_info.get_n_events()} pedestals events loaded in buffer")
+            print(f"{r0_pedestal_monitor.n_buffered(20 + self.tel)} pedestals events loaded in buffer")
 
         #####################################
         ### Loop in all events to find muons:
@@ -233,8 +235,7 @@ class muon_finder:
                 r0data = event.sst1m.r0.tel[tel]
 
                 if r0data._camera_event_type.value==8:
-                    pedestal_info.add_ped_evt(event, store_image=False)
-                    pedestal_info.fill_mon_container(event)
+                    r0_pedestal_monitor(event, tel)
 
                     mbs   = r0data.adc_samples.mean(axis=1)
                     bsstd = r0data.adc_samples.std(axis=1)
@@ -245,7 +246,8 @@ class muon_finder:
                         self.bsstd = self.bsstd[-100:]
                     continue
                 ## intergrate signal in a fixed window :
-                VI = VAR_to_Idrop(pedestal_info.get_charge_std().mean()**2, 20+self.tel)
+                r0_pedestal_monitor.fill_monitoring(event, tel)
+                VI = VAR_to_Idrop(event.mon.tel[tel].r0.charge_std.mean()**2, 20+self.tel)
                 Q_sum_ADC    = (r0data.adc_samples.T[self.w_start:self.w_end] - r0data.digicam_baseline).sum(axis=0)
                 Q_sum_window = Q_sum_ADC /self.gain /VI /self.window_t
 

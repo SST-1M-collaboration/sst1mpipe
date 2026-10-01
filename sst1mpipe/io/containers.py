@@ -14,10 +14,15 @@ from enum import Flag
 #from gzip import open as gzip_open
 #from os import remove
 #from os.path import isfile
+from functools import partial
+
 import numpy as np
 from astropy import units as u
 from ctapipe.containers import (
     ArrayEventContainer,
+    MonitoringCameraContainer,
+    MonitoringContainer,
+    PedestalContainer,
     TriggerContainer,
 )
 from ctapipe.core import Container, Field, Map
@@ -250,6 +255,34 @@ class R1Container(Container):
 #     tel = Field(Map(DL0CameraContainer), "map of tel_id to DL0CameraContainer")
 
 
+class R0PedestalContainer(PedestalContainer):
+    """
+    Statistics of the ADC samples (in ADC) of the pedestal events.
+    The statistics of the calibrated images (in p.e.) are stored in the ctapipe
+    `~ctapipe.containers.PedestalContainer` of `~ctapipe.containers.MonitoringCameraContainer`.
+    """
+
+    default_prefix = "pedestal"
+
+
+class SST1MMonitoringCameraContainer(MonitoringCameraContainer):
+    """
+    ctapipe camera monitoring with the R0 level monitoring of SST-1M
+    """
+
+    r0 = Field(
+        default_factory=R0PedestalContainer,
+        description="Statistics of the ADC samples of the pedestal events",
+    )
+
+
+class SST1MMonitoringContainer(MonitoringContainer):
+    tel = Field(
+        default_factory=partial(Map, SST1MMonitoringCameraContainer),
+        description="map of tel_id to SST1MMonitoringCameraContainer",
+    )
+
+
 class SST1MContainer(Container):
     r0 = Field(R0Container(), "Raw Data")
     r1 = Field(R1Container(), "Raw Common Data")
@@ -269,6 +302,7 @@ class SST1MArrayEventContainer(ArrayEventContainer):
     Data container including SST1M and monitoring information
     """
     sst1m = Field(SST1MContainer(), "SST1M specific information")
+    mon = Field(default_factory=SST1MMonitoringContainer, description="container for monitoring data (MON)")
 
 
 

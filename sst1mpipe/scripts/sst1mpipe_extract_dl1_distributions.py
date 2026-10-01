@@ -28,7 +28,7 @@ from gammapy.data import DataStore
 
 from sst1mpipe.io import (
     check_outdir,
-    load_dl1_pedestals,
+    load_r0_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
 )
@@ -242,7 +242,7 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
             print('Broken file: ' + input_file + ', skipping.')
             continue
         try:
-            pt = load_dl1_pedestals(input_file)
+            pt = load_r0_pedestals(input_file)
             if '1' in tel:
                 cs=21
             else:

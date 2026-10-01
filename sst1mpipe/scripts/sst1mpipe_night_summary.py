@@ -44,7 +44,7 @@ from sst1mpipe.io import (
     check_outdir,
     load_config,
     load_distributions_sst1m,
-    load_dl1_pedestals,
+    load_r0_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
     load_source_catalog,
@@ -121,7 +121,7 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
                 df = load_dl1_sst1m(input_file, tel=tel, config=config, table='pandas', stereo=stereo)
                 if not stereo:
                     try:
-                        pt = load_dl1_pedestals(input_file)
+                        pt = load_r0_pedestals(input_file)
                     except Exception:
                         pass
             elif level == 'dl2':

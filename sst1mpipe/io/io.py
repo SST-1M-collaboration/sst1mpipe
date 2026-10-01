@@ -903,10 +903,18 @@ def load_photon_list_sst1m(input_file, tel=None, config=None, table='astropy', e
     return data
 
 
+R0_PEDESTAL_TABLE = "/r0/monitoring/telescope/pedestal"
+DL1_PEDESTAL_TABLE = "/dl1/monitoring/telescope/pedestal"
+
+
 def load_dl1_pedestals(input_file):
 
     """
-    Reads tables with pedestal info from the input HDF DL1 file.
+    Reads the statistics of the calibrated images (p.e.) of the
+    pedestal events from the input HDF DL1 file.
+
+    NOTE: in files produced before the r0 pedestal table existed,
+    this table contains the statistics of the ADC samples, see `load_r0_pedestals`.
 
     Parameters
     ----------
@@ -919,11 +927,36 @@ def load_dl1_pedestals(input_file):
 
     """
 
-    pedestals = read_table(input_file, "/dl1/monitoring/telescope/pedestal")
+    pedestals = read_table(input_file, DL1_PEDESTAL_TABLE)
     return pedestals
 
 
-def write_dl1_pedestals(input_file, pedestal_table=None):
+def load_r0_pedestals(input_file):
+
+    """
+    Reads the statistics of the ADC samples of the pedestal
+    events from the input HDF DL1 file.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+
+    Returns
+    -------
+    pedestals: astropy.table.Table
+
+    """
+
+    with tables.open_file(input_file) as f:
+        has_r0_table = R0_PEDESTAL_TABLE in f
+    if has_r0_table:
+        return read_table(input_file, R0_PEDESTAL_TABLE)
+    # older files stored the statistics of the ADC samples in the dl1 table
+    return read_table(input_file, DL1_PEDESTAL_TABLE)
+
+
+def write_pedestals(input_file, pedestal_table=None, path=DL1_PEDESTAL_TABLE):
 
     """
     Write table of pedestal events from DL1 file into
@@ -937,15 +970,26 @@ def write_dl1_pedestals(input_file, pedestal_table=None):
 
     pedestal_table: astropy.table.Table
 
+    path: string
+        Path of the table in the file
+
     """
 
     try:
         write_table_hdf5(pedestal_table, input_file,
-            append=True, path='/dl1/monitoring/telescope/pedestal',
+            append=True, path=path,
             serialize_meta=False
             )
     except Exception:
         logging.warning('Writing pedestals into the file failed!')
+
+
+def write_dl1_pedestals(input_file, pedestal_table=None):
+    write_pedestals(input_file, pedestal_table=pedestal_table, path=DL1_PEDESTAL_TABLE)
+
+
+def write_r0_pedestals(input_file, pedestal_table=None):
+    write_pedestals(input_file, pedestal_table=pedestal_table, path=R0_PEDESTAL_TABLE)
 
 
 def load_extra_table(input_file, key=None, remove_column=None):

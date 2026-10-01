@@ -10,7 +10,6 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.time import Time
-from ctapipe.io import read_table
 from scipy import interpolate
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
@@ -198,41 +197,39 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
 ############
 
 def get_ped_table(file_list):
+    from sst1mpipe.io import load_r0_pedestals
 
     bline_table = None
 
     for dl1file in sorted(file_list):
         if bline_table is None :
             try:
-                bline_table = read_table(dl1file,
-                                         '/dl1/monitoring/telescope/pedestal')
+                bline_table = load_r0_pedestals(dl1file)
             except Exception:
                 print(f"pedestal not found in {dl1file}")
         else :
             try:
                 bline_table = astropy.table.vstack([bline_table,
-                                                   read_table(dl1file,
-                                                              '/dl1/monitoring/telescope/pedestal')])
+                                                   load_r0_pedestals(dl1file)])
             except Exception:
                 print(f"pedestal not found in {dl1file}")
     return bline_table
 
 def get_ped_table_low_res(file_list):
+    from sst1mpipe.io import load_r0_pedestals
 
     bline_table = None
 
     for dl1file in sorted(file_list):
         if bline_table is None :
             try:
-                bline_table = read_table(dl1file,
-                                         '/dl1/monitoring/telescope/pedestal')[-1]
+                bline_table = load_r0_pedestals(dl1file)[-1]
             except Exception:
                 print(f"pedestal not found in {dl1file}")
         else :
             try:
                 bline_table = astropy.table.vstack([bline_table,
-                                                   read_table(dl1file,
-                                                              '/dl1/monitoring/telescope/pedestal')[-1]])
+                                                   load_r0_pedestals(dl1file)[-1]])
             except Exception:
                 print(f"pedestal not found in {dl1file}")
     return bline_table
