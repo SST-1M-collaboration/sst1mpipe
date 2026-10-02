@@ -10,7 +10,6 @@ might change rapidly as there is no final data level definition.
 from enum import Flag
 from functools import partial
 
-import numpy as np
 from ctapipe.containers import (
     ArrayEventContainer,
     MonitoringCameraContainer,
@@ -36,8 +35,6 @@ from tables import (
 __all__ = ['CameraEventType',
            'SST1MR0Container',
            'SST1MR0CameraContainer',
-           'R1Container',
-           'R1CameraContainer',
         #    'DL0Container',
         #    'DL0CameraContainer',
         #    'DL1Container',
@@ -100,14 +97,9 @@ class SST1MR0CameraContainer(R0CameraContainer):
     """
 
     pixel_flags = Field(None, "numpy array containing pixel flags (n_pixels)")
-    adc_samples = Field(
-        None,
-        "ADC samples (n_pixels, n_samples). Same as waveform[0] when read, but a separate"
-        " array: the waveform of the bad pixels is set to 0 by the calibration, not adc_samples",
-    )
     adc_sums = Field(None, "numpy array containing integrated ADC data (n_channels, n_pixels)")
     baseline = Field(None, "baseline computed using clocked triggers (n_pixels)")
-    digicam_baseline = Field(None, "baseline computed by DigiCam from 1024 pre-samples (n_pixels)")
+    pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels)")
     standard_deviation = Field(None, "baseline standard deviation computed using clocked triggers (n_pixels)")
     dark_baseline = Field(None, "baseline computed in dark condition, lid closed (n_pixels)")
     hv_off_baseline = Field(None, "baseline computed without bias voltage (n_pixels)")
@@ -144,30 +136,6 @@ class SST1MR0Container(R0Container):
         default_factory=partial(Map, SST1MR0CameraContainer),
         description="map of tel_id to SST1MR0CameraContainer",
     )
-
-
-class R1CameraContainer(Container):
-    """
-    Storage of r1 calibrated data from a single telescope
-    """
-
-    adc_samples = Field(np.ndarray, "baseline subtracted ADCs, (n_pixels, \
-                        n_samples)")
-    nsb = Field(np.ndarray, "nsb rate in GHz")
-    pde = Field(np.ndarray, "Photo Detection Efficiency at given NSB")
-    gain_drop = Field(np.ndarray, "gain drop")
-    saturated = Field(False, "True if the charge of saturated pixels was corrected")
-
-
-class R1Container(Container):
-    """
-    Storage of a r1 calibrated Data Event
-    """
-
-    run_id = Field(-1, "run id number")
-    event_id = Field(-1, "event id number")
-    tels_with_data = Field([], "list of telescopes with data")
-    tel = Field(Map(R1CameraContainer), "map of tel_id to R1CameraContainer")
 
 
 # class DL0CameraContainer(Container):
@@ -216,7 +184,6 @@ class SST1MMonitoringContainer(MonitoringContainer):
 
 
 class SST1MContainer(Container):
-    r1 = Field(R1Container(), "SST-1M specific information of the calibration")
     slow_data = Field(None, "Slow Data Information")
     trig = Field(TriggerContainer(), "central trigger information")
     count = Field(0, "number of events processed")

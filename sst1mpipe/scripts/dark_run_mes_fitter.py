@@ -202,7 +202,7 @@ class mes_fitter:
                     tot_evts +=1
 
                     if self.dark_baselines is None:
-                        wfs = (r0data.adc_samples.T - r0data.digicam_baseline).T
+                        wfs = (r0data.waveform[0].T - r0data.pedestal).T
 
                         #sums = convolve1d(
                         #    wfs[:,:],
@@ -222,12 +222,12 @@ class mes_fitter:
 
                         Qsum = np.array([wfs[ii,w_start[ii]:w_start[ii]+self.peak_search_window_width].sum() for ii in self.pixels])
 
-                        Qmax = (r0data.adc_samples.T       - r0data.digicam_baseline).max(axis=0)
+                        Qmax = (r0data.waveform[0].T       - r0data.pedestal).max(axis=0)
                         #Qsum_out = np.array([wfs[ii,:w_start[ii]].sum()+ \
                         #                     wfs[ii,w_start[ii]+self.peak_search_window_width:].sum() for ii in self.pixels])
                     else:
-                        #Qsum = (r0data.adc_samples.T[-15:] - self.dark_baselines ).sum(axis=0)
-                        #Qmax = (r0data.adc_samples.T       - self.dark_baselines ).max(axis=0)
+                        #Qsum = (r0data.waveform[0].T[-15:] - self.dark_baselines ).sum(axis=0)
+                        #Qmax = (r0data.waveform[0].T       - self.dark_baselines ).max(axis=0)
                         pass
 
                     i_to_fill_adcsum = np.searchsorted(centers_adcsum[1:-1], Qsum)

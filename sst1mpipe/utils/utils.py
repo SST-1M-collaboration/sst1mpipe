@@ -871,17 +871,17 @@ def swap_modules_r0wf(event,mask1,mask2,tel=None):
     """
 
 
-    waveform_1 = event.r0.tel[tel].adc_samples[mask1,:]
-    bs_1 = event.r0.tel[tel].digicam_baseline[mask1]
+    waveform_1 = event.r0.tel[tel].waveform[0][mask1,:]
+    bs_1 = event.r0.tel[tel].pedestal[mask1]
 
-    waveform_2 = event.r0.tel[tel].adc_samples[mask2,:]
-    bs_2 = event.r0.tel[tel].digicam_baseline[mask2]
+    waveform_2 = event.r0.tel[tel].waveform[0][mask2,:]
+    bs_2 = event.r0.tel[tel].pedestal[mask2]
 
-    event.r0.tel[tel].adc_samples[mask1] = waveform_2
-    event.r0.tel[tel].adc_samples[mask2] = waveform_1
+    event.r0.tel[tel].waveform[0][mask1] = waveform_2
+    event.r0.tel[tel].waveform[0][mask2] = waveform_1
 
-    event.r0.tel[tel].digicam_baseline[mask1] = bs_2
-    event.r0.tel[tel].digicam_baseline[mask2] = bs_1
+    event.r0.tel[tel].pedestal[mask1] = bs_2
+    event.r0.tel[tel].pedestal[mask2] = bs_1
 
     return event
 
@@ -917,9 +917,7 @@ def remove_bad_pixels(event, config=None):
                     mask_bad[config["analysis"]["bad_pixels"][tel_name]] = 1
                     mask_bad = mask_bad.astype(bool)
 
-                    N_samples = event.r0.tel[tel].waveform[0].shape[1]
-                    event.r0.tel[tel].waveform[0][mask_bad] = np.zeros(N_samples)
-                    event.r1.tel[tel].waveform[mask_bad] = np.zeros(N_samples)
+                    event.r1.tel[tel].waveform[:, mask_bad] = 0
                     event.simulation.tel[tel].true_image[mask_bad] = 0
                     event.mon.tel[tel].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
                     event.mon.tel[tel].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])

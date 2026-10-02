@@ -169,7 +169,7 @@ def main():
         event_type = event.r0.tel[tel]._camera_event_type.value
 
         if event_type == 8:
-            std_samples.append(np.std(r0data.adc_samples, axis=1))
+            std_samples.append(np.std(r0data.waveform[0], axis=1))
             time = event.r0.tel[tel].local_camera_clock/10**9
             time_all.append(time)
 

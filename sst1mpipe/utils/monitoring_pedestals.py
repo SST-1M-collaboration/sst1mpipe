@@ -122,7 +122,7 @@ class R0PedestalMonitor(SlidingWindowMonitor):
         Add the ADC samples of a pedestal event. Pixels in ``cleaning_mask``
         (e.g. Cherenkov pixels of a fake pedestal) are not used.
         """
-        samples = event.r0.tel[tel_id].adc_samples
+        samples = event.r0.tel[tel_id].waveform[0]
         if cleaning_mask is not None:
             samples = samples.astype(np.float64)
             samples[cleaning_mask] = MASKED_VALUE
@@ -220,11 +220,10 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
         # here we apply gain drop correction
         r0_monitor.fill_monitoring(event, tel)
         event = calibrator_r0_r1.calibrate(event)
-        event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels, dtype='int8')
         r1_dl1_calibrator(event)
 
         # Integration correction of saturated pixels
-        event = saturated_charge_correction(event)
+        saturated_charge_correction(event)
         event = window_transmittance_correction(
             event,
             window_corr_factors=window_corr_factors,
@@ -252,7 +251,6 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
 
     def clean(event):
         event = calibrator_r0_r1.calibrate(event)
-        event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels, dtype='int8')
         r1_dl1_calibrator(event)
         image_processor(event)
         return event.dl1.tel[tel].image_mask
@@ -282,7 +280,7 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
         cleaning_mask = clean(event)
         if sum(cleaning_mask) < 20:
             # Integration correction of saturated pixels - done only here because the fake pedestals must match in both loops
-            event = saturated_charge_correction(event)
+            saturated_charge_correction(event)
             event = window_transmittance_correction(
                 event,
                 window_corr_factors=window_corr_factors,

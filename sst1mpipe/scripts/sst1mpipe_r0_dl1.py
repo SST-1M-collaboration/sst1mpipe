@@ -300,9 +300,9 @@ def main():
     with DataWriter(
         source, output_path=output_file,
         overwrite        = True,
-        write_showers    = True,
-        write_parameters = True,
-        write_images     = True,
+        write_dl2         = True,
+        write_dl1_parameters = True,
+        write_dl1_images         = True,
 
     ) as writer:
         for i, event in enumerate(source):
@@ -342,7 +342,6 @@ def main():
                 event = calibrator_r0_r1.calibrate(event)
                 # print(calibrator_r0_r1.pixels_removed) # can be monitored
 
-                event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
                 event_type = event.r0.tel[tel]._camera_event_type.value
 
                 # NOTE: event.index, event.trigger and event.pointing are filled by SST1MEventSource
@@ -386,8 +385,7 @@ def main():
             if not source.is_simulation:
 
                 # Integration correction of saturated pixels
-                event = saturated_charge_correction(event)
-                n_saturated += event.sst1m.r1.tel[tel].saturated
+                n_saturated += saturated_charge_correction(event)
 
                 event = window_transmittance_correction(
                     event,

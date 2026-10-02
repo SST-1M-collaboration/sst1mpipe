@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from importlib.resources import files
 
+from ctapipe.containers import PixelStatus, R1CameraContainer
+
 from sst1mpipe.utils import VAR_to_Idrop, get_tel_string
 
 
@@ -127,8 +129,7 @@ def saturated_charge_correction(event):
     them, as the standard one does not perform well in such cases. This
     method integrates the peak above 20\% of the amplitude.
     Peak time for saturated events is also corrected as the middle of
-    the integration window. ``event.sst1m.r1.tel[tel].saturated`` is set to
-    True if the charges were corrected.
+    the integration window.
 
     Parameters
     ----------
@@ -137,8 +138,8 @@ def saturated_charge_correction(event):
 
     Returns
     -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
+    saturated: bool
+        True if the charges of saturated pixels were corrected
 
     """
 
@@ -149,10 +150,10 @@ def saturated_charge_correction(event):
 
     telescope = event.trigger.tels_with_trigger[0]
     r0data = event.r0.tel[telescope]
-    adc_samples = (r0data.adc_samples.T - r0data.digicam_baseline)
+    waveforms = (r0data.waveform[0].T - r0data.pedestal)
 
     # saturated pixels
-    mask_saturated = np.max(adc_samples, axis=0) > saturated_threshold
+    mask_saturated = np.max(waveforms, axis=0) > saturated_threshold
     saturated = False
 
     if sum(mask_saturated) > 0:
@@ -162,7 +163,7 @@ def saturated_charge_correction(event):
 
         # iterate over baseline subtracted waveforms and correct integration of those peaking above
         # saturation threshold and with larger width
-        for k, w in enumerate(adc_samples.T):
+        for k, w in enumerate(waveforms.T):
 
             if mask_saturated[k]:
                 mask_width = w > width_level
@@ -190,7 +191,7 @@ def saturated_charge_correction(event):
                 if width > width_threshold:
 
                     # Peak integration correction
-                    image_new[k] = sum(event.r1.tel[telescope].waveform[k][integration_start:integration_stop+1])
+                    image_new[k] = sum(event.r1.tel[telescope].waveform[0, k][integration_start:integration_stop+1])
                     peaktime_new[k] = peak_time
                     saturated = True
 
@@ -198,8 +199,7 @@ def saturated_charge_correction(event):
             event.dl1.tel[telescope].image = image_new
             event.dl1.tel[telescope].peak_time = peaktime_new
 
-    event.sst1m.r1.tel[telescope].saturated = saturated
-    return event
+    return saturated
 
 
 def correct_MC_for_PDE_drop(event, simtel_config_qe=None, pde_corr_factors=None):
@@ -304,7 +304,7 @@ class Calibrator_R0_R1:
         """
 
         r0data = event.r0.tel[self.telescope]
-        baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
+        baseline_subtracted = (r0data.waveform[0].T - r0data.pedestal)
 
         pedestal_std = event.mon.tel[self.telescope].r0.charge_std
 
@@ -320,7 +320,16 @@ class Calibrator_R0_R1:
         else:
             VI = 1.0
 
-        event.r1.tel[self.telescope].waveform = (baseline_subtracted / self.dc_to_pe / VI ).T
+        # as in ctapipe: waveform of shape (n_channels, n_pixels, n_samples),
+        # with the single (high gain) channel of DigiCam
+        n_pixels = baseline_subtracted.shape[1]
+        event.r1.tel[self.telescope] = R1CameraContainer(
+            event_type=event.trigger.event_type,
+            event_time=event.trigger.tel[self.telescope].time,
+            waveform=(baseline_subtracted / self.dc_to_pe / VI).T[np.newaxis],
+            selected_gain_channel=np.zeros(n_pixels, dtype=np.int8),
+            pixel_status=np.full(n_pixels, PixelStatus.HIGH_GAIN_STORED, dtype=np.uint8),
+        )
 
         # This function removes bad pixels
         # - with not well determined dc_to_pe
@@ -430,9 +439,8 @@ class Calibrator_R0_R1:
             mask_bad = mask_bad_calib
         self.pixels_removed = sum(mask_bad)
 
-        N_samples = event.r0.tel[self.telescope].waveform[0].shape[1]
-        event.r0.tel[self.telescope].waveform[0][mask_bad] = np.zeros(N_samples)
-        event.r1.tel[self.telescope].waveform[mask_bad] = np.zeros(N_samples)
+        # the R0 waveforms are kept: they are used afterwards by the R0 pedestal monitor
+        event.r1.tel[self.telescope].waveform[:, mask_bad] = 0
         event.mon.tel[self.telescope].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
         event.mon.tel[self.telescope].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
         event.mon.tel[self.telescope].pixel_status['pedestal_failing_pixels'] = np.array([mask_bad])

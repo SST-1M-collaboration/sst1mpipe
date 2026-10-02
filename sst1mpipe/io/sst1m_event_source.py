@@ -418,9 +418,8 @@ class SST1MEventSource(EventSource):
                 array_event.r0.tel.clear()
                 r0 = array_event.r0.tel[tel_id]
                 r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
-                r0.adc_samples = samples[sort_ids]
                 r0.num_samples = n_samples
-                r0.digicam_baseline = unsorted_baseline[sort_ids] / 16
+                r0.pedestal = unsorted_baseline[sort_ids] / 16
                 r0.camera_event_number = event.eventNumber
                 r0.pixel_flags = event.pixels_flags[sort_ids]
                 r0.local_camera_clock = (

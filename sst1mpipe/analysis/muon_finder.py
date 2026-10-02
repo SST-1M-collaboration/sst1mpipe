@@ -35,8 +35,8 @@ def swap_r0_modules_59_88(event, tel=None):
     mask59[1098:1102+1] = True
     mask59[1133:1134+1] = True
     mask59[1064:1067+1] = True
-    waveform_59 = event.r0.tel[tel].adc_samples[mask59, :]
-    bls59 = event.r0.tel[tel].digicam_baseline[mask59]
+    waveform_59 = event.r0.tel[tel].waveform[0][mask59, :]
+    bls59 = event.r0.tel[tel].pedestal[mask59]
 
     # module 88
     mask88 = np.zeros(1296, dtype=bool)
@@ -44,14 +44,14 @@ def swap_r0_modules_59_88(event, tel=None):
     mask88[1165:1169+1] = True
     mask88[1194:1195+1] = True
     mask88[1135:1138+1] = True
-    waveform_88 = event.r0.tel[tel].adc_samples[mask88, :]
-    bls88 = event.r0.tel[tel].digicam_baseline[mask88]
+    waveform_88 = event.r0.tel[tel].waveform[0][mask88, :]
+    bls88 = event.r0.tel[tel].pedestal[mask88]
 
-    event.r0.tel[tel].adc_samples[mask59] = waveform_88
-    event.r0.tel[tel].adc_samples[mask88] = waveform_59
+    event.r0.tel[tel].waveform[0][mask59] = waveform_88
+    event.r0.tel[tel].waveform[0][mask88] = waveform_59
 
-    event.r0.tel[tel].digicam_baseline[mask59] = bls88
-    event.r0.tel[tel].digicam_baseline[mask88] = bls59
+    event.r0.tel[tel].pedestal[mask59] = bls88
+    event.r0.tel[tel].pedestal[mask88] = bls59
 
     return event
 
@@ -209,8 +209,8 @@ class muon_finder:
                     continue
                 r0data = event.r0.tel[self.tel]
                 r1data = event.r1.tel[self.tel]
-                Q_sum_ADC    = (r0data.waveform.T[self.w_start:self.w_end]).sum(axis=0)
-                Q_sum_window = (r1data.waveform.T[self.w_start:self.w_end]).sum(axis=0)
+                Q_sum_ADC    = (r0data.waveform[0].T[self.w_start:self.w_end]).sum(axis=0)
+                Q_sum_window = (r1data.waveform[0].T[self.w_start:self.w_end]).sum(axis=0)
                 E_mu = event.simulation.shower.energy
             else:
 
@@ -236,8 +236,8 @@ class muon_finder:
                 if r0data._camera_event_type.value==8:
                     r0_pedestal_monitor(event, tel)
 
-                    mbs   = r0data.adc_samples.mean(axis=1)
-                    bsstd = r0data.adc_samples.std(axis=1)
+                    mbs   = r0data.waveform[0].mean(axis=1)
+                    bsstd = r0data.waveform[0].std(axis=1)
                     self.mbs.append(mbs[mbs>0].mean())
                     self.bsstd.append(bsstd[bsstd>2].mean())
                     if len(self.mbs)>100:
@@ -247,7 +247,7 @@ class muon_finder:
                 ## intergrate signal in a fixed window :
                 r0_pedestal_monitor.fill_monitoring(event, tel)
                 VI = VAR_to_Idrop(event.mon.tel[tel].r0.charge_std.mean()**2, 20+self.tel)
-                Q_sum_ADC    = (r0data.adc_samples.T[self.w_start:self.w_end] - r0data.digicam_baseline).sum(axis=0)
+                Q_sum_ADC    = (r0data.waveform[0].T[self.w_start:self.w_end] - r0data.pedestal).sum(axis=0)
                 Q_sum_window = Q_sum_ADC /self.gain /VI /self.window_t
 
 
@@ -348,7 +348,7 @@ class muon_finder:
 
                     ## looking at the time dispersion.. Is it useful? If not, I'll remove this
                     if False:
-                        wfs  = r0data.adc_samples[mu_mask * Q_sum_window > 8, 4:16]
+                        wfs  = r0data.waveform[0][mu_mask * Q_sum_window > 8, 4:16]
                         peak_search_window_width = 3
                         sums = convolve1d(
                             wfs, np.ones(peak_search_window_width), axis=1, mode="nearest"

@@ -52,8 +52,8 @@ def test_read_events():
     i = 0
     for event in source:
 
-        waveform = event.r0.tel[TEL_1_ID].adc_samples
-        baseline = event.r0.tel[TEL_1_ID].digicam_baseline
+        waveform = event.r0.tel[TEL_1_ID].waveform[0]
+        baseline = event.r0.tel[TEL_1_ID].pedestal
         assert waveform.sum() == SUM_WAVEFORM_1[i]
         assert event.index.event_id == FIRST_EVENT_ID_1 + i
         assert event.r0.tel[TEL_1_ID].camera_event_number == FIRST_CAMERA_EVENT_NUMBER_1 + i
@@ -356,9 +356,9 @@ def test_only_r0_trigger_and_pointing_are_filled():
         assert isinstance(r0, SST1MR0CameraContainer)
         # one DigiCam channel
         assert r0.waveform.shape == (1, n_pixels, r0.num_samples)
-        np.testing.assert_array_equal(r0.waveform[0], r0.adc_samples)
-        # separate arrays: the calibration sets the waveform of bad pixels to 0, not adc_samples
-        assert not np.shares_memory(r0.waveform, r0.adc_samples)
+        assert r0.pedestal.shape == (n_pixels, )
+        assert "adc_samples" not in r0.fields
+        assert "digicam_baseline" not in r0.fields
         assert r0.trigger_input_traces.shape == (432, r0.num_samples)
 
         assert event.trigger.tels_with_trigger == [TEL_1_ID]
@@ -367,6 +367,4 @@ def test_only_r0_trigger_and_pointing_are_filled():
         assert len(event.r1.tel) == 0
         assert len(event.dl0.tel) == 0
         assert len(event.dl1.tel) == 0
-        assert len(event.sst1m.r1.tel) == 0
-        assert "r0" not in event.sst1m.fields
-        assert "inst" not in event.sst1m.fields
+        assert not {"r0", "r1", "inst"} & set(event.sst1m.fields)

@@ -183,18 +183,18 @@ class shape_maker:
 
                 if self.isMC:
                     mcdata = event.mc.tel[tel]
-                    Qsum = (r0data.adc_samples[0].T[20:35] - mcdata.pedestal/50.+self.bshift).sum(axis=0)
-                    wfs = (r0data.adc_samples[0].T - mcdata.pedestal/50.+self.bshift).T
+                    Qsum = (r0data.waveform[0].T[20:35] - mcdata.pedestal/50.+self.bshift).sum(axis=0)
+                    wfs = (r0data.waveform[0].T - mcdata.pedestal/50.+self.bshift).T
 
                 else:
                     if r0data._camera_event_type.value==8:
                         if self.dark_baselines is None:
-                            Qsum = (r0data.adc_samples.T[20:35]+self.bshift - r0data.digicam_baseline).sum(axis=0)
-                            wfs = (r0data.adc_samples.T+self.bshift - r0data.digicam_baseline).T
+                            Qsum = (r0data.waveform[0].T[20:35]+self.bshift - r0data.pedestal).sum(axis=0)
+                            wfs = (r0data.waveform[0].T+self.bshift - r0data.pedestal).T
 
                         else:
-                            Qsum = (r0data.adc_samples.T[20:35] - self.dark_baselines ).sum(axis=0)
-                            wfs = (r0data.adc_samples.T - self.dark_baselines).T
+                            Qsum = (r0data.waveform[0].T[20:35] - self.dark_baselines ).sum(axis=0)
+                            wfs = (r0data.waveform[0].T - self.dark_baselines).T
                     else:
                         continue
 
