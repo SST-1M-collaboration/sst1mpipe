@@ -15,6 +15,8 @@ from astropy.io import fits
 from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
 from astropy.table import QTable, Table, join
 from astropy.time import Time
+from ctapipe.containers import EventType
+from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
 from gammapy.data import DataStore
 from pyirf.cuts import evaluate_binned_cut
@@ -494,26 +496,29 @@ def write_wr_timestamps(file, event_source=None):
 
 
 def write_assumed_pointing(
-        processing_info, config=None):
+        dl1_file, ra=None, dec=None, config=None):
     """
     Writes pointing info (per event true_tel_az, true_tel_alt)
     in the main DL1 table.
 
     Parameters
     ----------
-    processing_info:
-        Class Monitoring_R0_DL1
+    dl1_file: string
+        Path
+    ra: float
+        Pointing RA in deg
+    dec: float
+        Pointing DEC in deg
     config: dict
 
     Returns
     -------
 
     """
-    dl1_file = processing_info.output_file
     telescopes = get_telescopes(dl1_file)
 
-    pointing_ra = float(processing_info.pointing_ra) * u.deg
-    pointing_dec = float(processing_info.pointing_dec) * u.deg
+    pointing_ra = float(ra) * u.deg
+    pointing_dec = float(dec) * u.deg
     wobble_coords = SkyCoord(ra=pointing_ra, dec=pointing_dec, frame='icrs')
 
     for tel in telescopes:
@@ -1220,20 +1225,23 @@ def write_dl2_info(dl2_file, rfs_used=None):
         info.append()
 
 
-def write_dl1_info(processing_info):
+def write_dl1_info(dl1_file, info):
     """
     Stores info tab in the DL1 file
 
     Parameters
     ----------
-        processing_info: Class Monitoring_R0_DL1
+    dl1_file: string
+        Path
+    info: dict
+        Values of the columns of `sst1mpipe.io.containers.DL1_info`.
+        Missing values (None) are stored as '', NaN, -1 or False
+        depending on the type of the column.
 
     Returns
     -------
 
     """
-    dl1_file = processing_info.output_file
-
     with tables.open_file(dl1_file, mode='a') as file:
 
         table = file.create_table(
@@ -1242,22 +1250,62 @@ def write_dl1_info(processing_info):
             DL1_info,
             "DL1 production info"
         )
-        info = table.row
-        info['sst1mpipe_version'] = sst1mpipe.__version__
-        info['target'] = processing_info.target
-        info['ra'] = processing_info.pointing_ra
-        info['dec'] = processing_info.pointing_dec
-        info['manual_coords'] = processing_info.pointing_manual
-        info['wobble'] = processing_info.wobble
-        info['calib_file'] = processing_info.calibration_file
-        info['window_file'] = processing_info.window_file
-        info['n_saturated'] = processing_info.n_saturated
-        info['n_pedestal'] = processing_info.n_pedestals
-        info['n_survived_pedestals'] = processing_info.n_pedestals_survived
-        info['n_triggered_tel1'] = processing_info.n_triggered_tel1
-        info['n_triggered_tel2'] = processing_info.n_triggered_tel2
-        info['swat_event_ids_used'] = processing_info.swat_event_ids_used
-        info.append()
+        row = table.row
+        row['sst1mpipe_version'] = sst1mpipe.__version__
+        # value of the missing (None) entries for each kind of column
+        missing = {'S': '', 'f': np.nan, 'i': -1, 'b': False}
+        for key, value in info.items():
+            row[key] = missing[table.coldtypes[key].kind] if value is None else value
+        row.append()
+
+
+def compute_dl1_summary(dl1_file):
+    """
+    Counts the events stored in a DL1 file.
+
+    Parameters
+    ----------
+    dl1_file: string
+        Path
+
+    Returns
+    -------
+    dict:
+        n_events: number of events
+        n_triggered: number of triggered events per telescope id
+        n_pedestal: number of pedestal events
+        n_survived_pedestals: number of pedestal events with an image
+        surviving the cleaning (finite hillas intensity) in any telescope
+    """
+    subarray = SubarrayDescription.from_hdf(dl1_file)
+    trigger = read_table(dl1_file, "/dl1/event/subarray/trigger")
+
+    tels_with_trigger = np.asarray(trigger["tels_with_trigger"], dtype=bool).reshape(len(trigger), -1)
+    n_triggered = {
+        int(tel_id): int(n) for tel_id, n in zip(subarray.tel_ids, tels_with_trigger.sum(axis=0), strict=True)
+    }
+
+    is_pedestal = np.asarray(trigger["event_type"]) == EventType.SKY_PEDESTAL.value
+    pedestals = {(obs_id, event_id) for obs_id, event_id in trigger["obs_id", "event_id"][is_pedestal]}
+
+    survived = set()
+    with tables.open_file(dl1_file) as f:
+        parameter_tables = [
+            node._v_pathname for node in f.root.dl1.event.telescope.parameters
+        ] if "/dl1/event/telescope/parameters" in f else []
+    for path in parameter_tables:
+        parameters = read_table(dl1_file, path)
+        has_image = np.isfinite(parameters["hillas_intensity"])
+        survived |= {
+            (obs_id, event_id) for obs_id, event_id in parameters["obs_id", "event_id"][has_image]
+        } & pedestals
+
+    return dict(
+        n_events=len(trigger),
+        n_triggered=n_triggered,
+        n_pedestal=int(is_pedestal.sum()),
+        n_survived_pedestals=len(survived),
+    )
 
 
 def get_dl1_info(file):
