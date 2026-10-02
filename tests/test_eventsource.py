@@ -5,7 +5,17 @@ from importlib.resources import files
 
 from ctapipe.io import EventSource
 
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+import astropy.units as u
+import numpy as np
+from astropy.coordinates import AltAz, SkyCoord
+from ctapipe.containers import CoordinateFrameType, PointingMode
+
+from sst1mpipe.io.sst1m_event_source import (
+    SST1MEventSource,
+    camera_clock_to_time,
+    parse_file_name,
+    parse_target_field,
+)
 from sst1mpipe.io.containers import CameraEventType, SST1MArrayEventContainer
 
 FILE_TEL_1 = files('sst1mpipe.resources.zfits').joinpath('SST1M1_20260121_0001.fits.fz')
@@ -14,6 +24,7 @@ FILE_TEL_2 = files('sst1mpipe.resources.zfits').joinpath('SST1M2_20260121_0001.f
 MAX_ITERATIONS = 5
 
 TEL_1_ID = 21
+OBS_ID_1 = 202601210001
 FIRST_EVENT_ID_1 = 29901023
 FIRST_CAMERA_EVENT_NUMBER_1 = 21079
 SUM_WAVEFORM_1 = [22699322, 22695204, 22699302, 22700002, 22699551]
@@ -143,3 +154,96 @@ def test_max_events_across_files(fake_files):
 
     assert [count for count, _ in events] == [0, 1, 2, 3]
     assert events[-1][1] == str(FILE_TEL_2)
+
+
+@pytest.mark.parametrize("field, expected", [
+    ("Crab_W1_83.63_22.01", ("Crab", "W1", 83.63, 22.01)),
+    ("Crab,W2,83.63,22.01", ("Crab", "W2", 83.63, 22.01)),
+    ("CrabW3_83.63_22.01", ("CrabW3", "W3", 83.63, 22.01)),
+    ("Crab_83.63_22.01", ("Crab", "UNDEF", 83.63, 22.01)),
+    ("Crab_W1_ra_dec", ("Crab", "W1", None, None)),
+    ("Crab_W1_1_2_3", ("Crab", "W1", None, None)),
+    ("dark", ("dark", None, None, None)),
+    (None, (None, None, None, None)),
+])
+def test_parse_target_field(field, expected):
+
+    assert parse_target_field(field) == expected
+
+
+def test_camera_clock_to_time():
+
+    time = camera_clock_to_time(LOCAL_CAMERA_CLOCK_1[1])
+
+    assert time.scale == "tai"
+    # ns precision is kept
+    delta = time - camera_clock_to_time(LOCAL_CAMERA_CLOCK_1[0])
+    assert np.isclose(delta.to_value(u.ns), LOCAL_CAMERA_CLOCK_1[1] - LOCAL_CAMERA_CLOCK_1[0], atol=1)
+
+
+def test_trigger_and_no_pointing_for_dark_run():
+
+    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=MAX_ITERATIONS)
+
+    assert source.target == "dark"
+    assert source.wobble is None
+    assert source.pointing is None
+    assert not source.pointing_manual
+    observation_block = source.observation_blocks[OBS_ID_1]
+    assert np.isnan(observation_block.subarray_pointing_lon)
+    assert source.scheduling_blocks[OBS_ID_1].pointing_mode == PointingMode.UNKNOWN
+
+    for i, event in enumerate(source):
+        assert event.trigger.tels_with_trigger == [TEL_1_ID]
+        assert event.trigger.time == camera_clock_to_time(LOCAL_CAMERA_CLOCK_1[i])
+        assert event.trigger.tel[TEL_1_ID].time == event.trigger.time
+        assert np.isnan(event.pointing.tel[TEL_1_ID].altitude)
+
+
+@pytest.mark.parametrize("pointing_update_interval, tolerance", [(0, 1e-6 * u.arcsec), (3600, 1 * u.arcmin)])
+def test_pointing_given_by_user(pointing_update_interval, tolerance):
+
+    ra, dec = 83.633, 22.0145
+    source = SST1MEventSource(
+        input_url=FILE_TEL_1, max_events=MAX_ITERATIONS,
+        pointing_ra=ra, pointing_dec=dec, pointing_update_interval=pointing_update_interval,
+    )
+
+    assert source.pointing_manual
+    observation_block = source.observation_blocks[OBS_ID_1]
+    assert observation_block.subarray_pointing_lon == ra * u.deg
+    assert observation_block.subarray_pointing_lat == dec * u.deg
+    assert observation_block.subarray_pointing_frame == CoordinateFrameType.ICRS
+    assert source.scheduling_blocks[OBS_ID_1].pointing_mode == PointingMode.TRACK
+
+    location = source.subarray.tel_coords.to_earth_location()[source.subarray.tel_index_array[TEL_1_ID]]
+    target = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs")
+    for event in source:
+        expected = target.transform_to(AltAz(obstime=event.trigger.time, location=location))
+        pointing = event.pointing.tel[TEL_1_ID]
+        filled = SkyCoord(az=pointing.azimuth, alt=pointing.altitude, frame=expected)
+        assert filled.separation(expected) < tolerance
+        assert u.isclose(event.pointing.array_ra, ra * u.deg)
+        assert u.isclose(event.pointing.array_dec, dec * u.deg)
+
+
+@pytest.mark.parametrize("file_name, expected", [
+    ("SST1M1_20260121_0001.fits.fz", ("20260121", "0001")),
+    ("/data/SST1M2_20251003_0123.fits.fz", ("20251003", "0123")),
+    ("events.fits.fz", None),
+])
+def test_parse_file_name(file_name, expected):
+
+    assert parse_file_name(file_name) == expected
+
+
+def test_event_index():
+
+    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=MAX_ITERATIONS)
+
+    assert source.run_id == OBS_ID_1
+    assert list(source.observation_blocks) == [OBS_ID_1]
+    assert source.observation_blocks[OBS_ID_1].obs_id == OBS_ID_1
+    for i, event in enumerate(source):
+        assert event.index.obs_id == OBS_ID_1
+        assert event.index.event_id == FIRST_EVENT_ID_1 + i

@@ -4,6 +4,7 @@
 from .io import (
     add_wr_dl1_stereo,
     check_outdir,
+    compute_dl1_summary,
     get_dl1_info,
     get_pde_correction_factors,
     get_used_qe_simtel,

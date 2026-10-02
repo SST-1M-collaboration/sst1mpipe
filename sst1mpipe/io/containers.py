@@ -7,13 +7,7 @@ In general each major pipeline step is associated with a given data level.
 Please keep in mind that the data level definition and the associated fields
 might change rapidly as there is no final data level definition.
 """
-# from aenum import IntFlag
 from enum import Flag
-
-#import pickle
-#from gzip import open as gzip_open
-#from os import remove
-#from os.path import isfile
 from functools import partial
 
 import numpy as np
@@ -225,6 +219,7 @@ class R1CameraContainer(Container):
     nsb = Field(np.ndarray, "nsb rate in GHz")
     pde = Field(np.ndarray, "Photo Detection Efficiency at given NSB")
     gain_drop = Field(np.ndarray, "gain drop")
+    saturated = Field(False, "True if the charge of saturated pixels was corrected")
 
 
 class R1Container(Container):

@@ -121,13 +121,14 @@ def window_transmittance_correction(
     return event
 
 
-def saturated_charge_correction(event, processing_info=None):
+def saturated_charge_correction(event):
     r"""
     Finds saturated waveforms and applies different peak integration on
     them, as the standard one does not perform well in such cases. This
     method integrates the peak above 20\% of the amplitude.
     Peak time for saturated events is also corrected as the middle of
-    the integration window.
+    the integration window. ``event.sst1m.r1.tel[tel].saturated`` is set to
+    True if the charges were corrected.
 
     Parameters
     ----------
@@ -196,8 +197,8 @@ def saturated_charge_correction(event, processing_info=None):
         if saturated:
             event.dl1.tel[telescope].image = image_new
             event.dl1.tel[telescope].peak_time = peaktime_new
-            processing_info.n_saturated += 1
 
+    event.sst1m.r1.tel[telescope].saturated = saturated
     return event
 
 
