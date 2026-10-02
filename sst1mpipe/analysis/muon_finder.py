@@ -20,7 +20,8 @@ from scipy.optimize import minimize
 from sst1mpipe.calib.calib import get_default_window
 from sst1mpipe.io import load_config
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.utils.monitoring_pedestals import sliding_pedestals
+from sst1mpipe.utils import get_subarray
+from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor, load_first_pedestals
 from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
 
 DEFAULT_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json')
@@ -34,8 +35,8 @@ def swap_r0_modules_59_88(event, tel=None):
     mask59[1098:1102+1] = True
     mask59[1133:1134+1] = True
     mask59[1064:1067+1] = True
-    waveform_59 = event.sst1m.r0.tel[tel].adc_samples[mask59, :]
-    bls59 = event.sst1m.r0.tel[tel].digicam_baseline[mask59]
+    waveform_59 = event.r0.tel[tel].waveform[0][mask59, :]
+    bls59 = event.r0.tel[tel].pedestal[mask59]
 
     # module 88
     mask88 = np.zeros(1296, dtype=bool)
@@ -43,14 +44,14 @@ def swap_r0_modules_59_88(event, tel=None):
     mask88[1165:1169+1] = True
     mask88[1194:1195+1] = True
     mask88[1135:1138+1] = True
-    waveform_88 = event.sst1m.r0.tel[tel].adc_samples[mask88, :]
-    bls88 = event.sst1m.r0.tel[tel].digicam_baseline[mask88]
+    waveform_88 = event.r0.tel[tel].waveform[0][mask88, :]
+    bls88 = event.r0.tel[tel].pedestal[mask88]
 
-    event.sst1m.r0.tel[tel].adc_samples[mask59] = waveform_88
-    event.sst1m.r0.tel[tel].adc_samples[mask88] = waveform_59
+    event.r0.tel[tel].waveform[0][mask59] = waveform_88
+    event.r0.tel[tel].waveform[0][mask88] = waveform_59
 
-    event.sst1m.r0.tel[tel].digicam_baseline[mask59] = bls88
-    event.sst1m.r0.tel[tel].digicam_baseline[mask88] = bls59
+    event.r0.tel[tel].pedestal[mask59] = bls88
+    event.r0.tel[tel].pedestal[mask88] = bls59
 
     return event
 
@@ -186,17 +187,17 @@ class muon_finder:
             print(f"file {self.filename} opened")
         else :
             data_stream = SST1MEventSource(
-                filelist    = [self.filename],
+                input_url   = self.filename,
                 max_events  = self.max_evt,
-                disable_bar = True
                 )
 
-            pedestal_info = sliding_pedestals(input_file = self.filename,config=DEFAULT_CONFIG)
-            pedestal_info.load_firsts_pedestals()
-            if pedestal_info.get_n_events() == 0:
+            r0_pedestal_monitor = R0PedestalMonitor(subarray=get_subarray(), config=DEFAULT_CONFIG)
+            dl1_pedestal_monitor = DL1PedestalMonitor(subarray=get_subarray(), config=DEFAULT_CONFIG)
+            load_first_pedestals(r0_pedestal_monitor, dl1_pedestal_monitor, self.filename, DEFAULT_CONFIG)
+            if r0_pedestal_monitor.n_buffered(20 + self.tel) == 0:
                 print("No pedestal events found in firsts events. Skipping run")
                 return
-            print(f"{pedestal_info.get_n_events()} pedestals events loaded in buffer")
+            print(f"{r0_pedestal_monitor.n_buffered(20 + self.tel)} pedestals events loaded in buffer")
 
         #####################################
         ### Loop in all events to find muons:
@@ -208,15 +209,15 @@ class muon_finder:
                     continue
                 r0data = event.r0.tel[self.tel]
                 r1data = event.r1.tel[self.tel]
-                Q_sum_ADC    = (r0data.waveform.T[self.w_start:self.w_end]).sum(axis=0)
-                Q_sum_window = (r1data.waveform.T[self.w_start:self.w_end]).sum(axis=0)
+                Q_sum_ADC    = (r0data.waveform[0].T[self.w_start:self.w_end]).sum(axis=0)
+                Q_sum_window = (r1data.waveform[0].T[self.w_start:self.w_end]).sum(axis=0)
                 E_mu = event.simulation.shower.energy
             else:
 
 
-                tel = event.sst1m.r0.tels_with_data[0]
+                tel = event.trigger.tels_with_trigger[0]
                 if ii==0:
-                    T0 = event.sst1m.r0.tel[tel].local_camera_clock/1e9
+                    T0 = event.r0.tel[tel].local_camera_clock/1e9
                     start_date = datetime.datetime.fromtimestamp(T0)
                     # datestr = "{}/{}/{} at {}h{}".format(start_date.day,
                     #                                      start_date.month,
@@ -230,14 +231,13 @@ class muon_finder:
                 if (tel==22) and (start_date<datetime.datetime(2024,7,18)):
                     event = swap_r0_modules_59_88(event, tel=tel)
                     #pass
-                r0data = event.sst1m.r0.tel[tel]
+                r0data = event.r0.tel[tel]
 
                 if r0data._camera_event_type.value==8:
-                    pedestal_info.add_ped_evt(event, store_image=False)
-                    pedestal_info.fill_mon_container(event)
+                    r0_pedestal_monitor(event, tel)
 
-                    mbs   = r0data.adc_samples.mean(axis=1)
-                    bsstd = r0data.adc_samples.std(axis=1)
+                    mbs   = r0data.waveform[0].mean(axis=1)
+                    bsstd = r0data.waveform[0].std(axis=1)
                     self.mbs.append(mbs[mbs>0].mean())
                     self.bsstd.append(bsstd[bsstd>2].mean())
                     if len(self.mbs)>100:
@@ -245,8 +245,9 @@ class muon_finder:
                         self.bsstd = self.bsstd[-100:]
                     continue
                 ## intergrate signal in a fixed window :
-                VI = VAR_to_Idrop(pedestal_info.get_charge_std().mean()**2, 20+self.tel)
-                Q_sum_ADC    = (r0data.adc_samples.T[self.w_start:self.w_end] - r0data.digicam_baseline).sum(axis=0)
+                r0_pedestal_monitor.fill_monitoring(event, tel)
+                VI = VAR_to_Idrop(event.mon.tel[tel].r0.charge_std.mean()**2, 20+self.tel)
+                Q_sum_ADC    = (r0data.waveform[0].T[self.w_start:self.w_end] - r0data.pedestal).sum(axis=0)
                 Q_sum_window = Q_sum_ADC /self.gain /VI /self.window_t
 
 
@@ -347,7 +348,7 @@ class muon_finder:
 
                     ## looking at the time dispersion.. Is it useful? If not, I'll remove this
                     if False:
-                        wfs  = r0data.adc_samples[mu_mask * Q_sum_window > 8, 4:16]
+                        wfs  = r0data.waveform[0][mu_mask * Q_sum_window > 8, 4:16]
                         peak_search_window_width = 3
                         sums = convolve1d(
                             wfs, np.ones(peak_search_window_width), axis=1, mode="nearest"
@@ -396,7 +397,7 @@ class muon_finder:
                     else:
                         self.mu_data['mbs'].append(np.median(self.mbs))
                         self.mu_data['bsstd'].append(np.median(self.bsstd))
-                        self.mu_data['event_id'].append(event.sst1m.r0.event_id)
+                        self.mu_data['event_id'].append(event.index.event_id)
                         self.mu_data['toa'].append(r0data.local_camera_clock/1e9)
 
                     #self.mbs   = []

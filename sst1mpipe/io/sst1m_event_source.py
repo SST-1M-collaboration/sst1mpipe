@@ -1,20 +1,29 @@
 
+import logging
+import os
+import re
 import warnings
+from itertools import islice
 
 import numpy as np
 from astropy import units as u
+from astropy.coordinates import AltAz, SkyCoord
+from astropy.io import fits
 from astropy.time import Time
 from ctapipe.containers import (
+    CoordinateFrameType,
+    EventType,
     ObservationBlockContainer,
     PointingMode,
     SchedulingBlockContainer,
 )
-from ctapipe.core.traits import Bool, Float
+from ctapipe.core.traits import Bool, Float, UseEnum
+from ctapipe.instrument import FocalLengthKind
 from ctapipe.io import (
     EventSource,
 )
 from ctapipe.io.datalevels import DataLevel
-from protozfits import File, MultiZFitsFiles
+from protozfits import File
 
 from sst1mpipe.constants import (
     PATCH_ID_INPUT_SORT_IDS,
@@ -22,19 +31,86 @@ from sst1mpipe.constants import (
     REFERENCE_LOCATION,
     SUBARRAY_DESCRIPTION
 )
-from sst1mpipe.instrument import camera
 from sst1mpipe.io.containers import (
+    CameraEventType,
     SST1MArrayEventContainer,
 )
 
-# from tqdm import tqdm
+logger = logging.getLogger(__name__)
 
-# from sst1mpipe.io.zfits import (
-#     _prepare_trigger_input,
-#     _prepare_trigger_output
-# )
+# Number of events read at the beginning of each file to look for SWAT event ids
+N_EVENTS_SWAT_ID_CHECK = 10
 
 
+def parse_target_field(field):
+    """
+    Parse the TARGET field of the header of the ``Events`` table, expected as
+    ``target[_,]wobble[_,]ra[_,]dec`` or ``target[_,]ra[_,]dec`` with ra, dec in deg,
+    e.g. ``Crab_W1_83.63_22.01``. Files without pointing (e.g. ``dark`` or
+    ``transition``) only contain the target.
+
+    Parameters
+    ----------
+    field: str or None
+
+    Returns
+    -------
+    target, wobble, ra, dec:
+        None for the missing entries. wobble is None if the field has
+        no delimiter and ``UNDEF`` if it has no ``W<n>`` entry.
+    """
+    if field is None:
+        return None, None, None, None
+
+    if field.count('_') > 1:
+        delimiter = '_'
+    elif field.count(',') > 1:
+        delimiter = ','
+    else:
+        return field, None, None, None
+
+    entries = field.split(delimiter)
+    target = entries[0]
+    match = re.search(r'W\d+', field)
+    wobble = match.group(0) if match else 'UNDEF'
+
+    if len(entries) not in (3, 4):
+        return target, wobble, None, None
+    try:
+        ra, dec = float(entries[-2]), float(entries[-1])
+    except ValueError:
+        return target, wobble, None, None
+    return target, wobble, ra, dec
+
+
+def parse_file_name(file_name):
+    """
+    Date and run number of a SST-1M raw data file name ``SST1M<tel>_<date>_<run>.fits.fz``,
+    e.g. ``SST1M1_20260121_0001.fits.fz`` -> ("20260121", "0001"). None if it does not match.
+    """
+    match = re.match(r'SST1M\d*_(\d+)_(\d+)', os.path.basename(str(file_name)))
+    return match.groups() if match else None
+
+
+def camera_clock_to_time(local_camera_clock):
+    """
+    Convert the camera clock (ns, TAI scale) to an astropy Time with ns precision, see
+    https://github.com/cta-observatory/ctapipe_io_nectarcam/issues/24
+    """
+    localtime = np.uint64(local_camera_clock)
+    S_TO_NS = np.uint64(1e9)
+    full_seconds = localtime // S_TO_NS
+    fractional_seconds = (localtime % S_TO_NS) / S_TO_NS
+    return Time(full_seconds, fractional_seconds, format='unix_tai')
+
+
+def file_has_swat_event_ids(path, n_events=N_EVENTS_SWAT_ID_CHECK):
+    """
+    True if any of the first ``n_events`` events of the file has a non zero
+    array event id (``arrayEvtNum``) written by SWAT. False for an empty file.
+    """
+    with File(str(path)) as f:
+        return any(event.arrayEvtNum != 0 for event in islice(f.Events, n_events))
 
 
 class SST1MEventSource(EventSource):
@@ -74,29 +150,52 @@ class SST1MEventSource(EventSource):
         ),
     ).tag(config = True)
 
-    def __init__(self,
-                 filelist=None,
-                 camera=camera.DigiCam,
-                 max_events=None,
-                 event_id = None,
-                 allowed_tels = None,
-                 disable_bar = False,
-                 **kwargs
-        ):
+    pointing_ra = Float(
+        default_value=None,
+        allow_none=True,
+        help="Pointing right ascension in deg. Overrides the TARGET field of the file.",
+    ).tag(config=True)
+
+    pointing_dec = Float(
+        default_value=None,
+        allow_none=True,
+        help="Pointing declination in deg. Overrides the TARGET field of the file.",
+    ).tag(config=True)
+
+    pointing_update_interval = Float(
+        default_value=1.0,
+        help=(
+            "The altitude and azimuth of the pointing are recomputed when the time of the"
+            " event differs by more than this value (in s) from the last computation."
+        ),
+    ).tag(config=True)
+
+    focal_length_choice = UseEnum(
+        FocalLengthKind,
+        default_value=FocalLengthKind.EQUIVALENT,
+        help="Which focal length to use for the camera frame transformations.",
+    ).tag(config=True)
+
+    def __init__(self, input_url=None, config=None, parent=None, **kwargs):
         # LST/CTA uses differenct filename naming convention, how to work with the SST1M file naming convention?
-        # for nowadays EventSource obtains only the first file,
-        # but SST1MEventSource counts with all input files, implemented via MultiZFitsFiles
+        # A list of files can also be given as input_url, they are read one after the other.
+        # ctapipe.io.EventSource only knows about the first one.
+        input_urls = None
+        if isinstance(input_url, list | tuple):
+            input_urls = list(input_url)
+            input_url = input_urls[0]
 
-        super().__init__(input_url=filelist[0], **kwargs)
+        super().__init__(input_url=input_url, config=config, parent=parent, **kwargs)
 
-        self.filelist = filelist
-        self.run_id = 0
+        self._input_urls = [self.input_url] if input_urls is None else [
+            EventSource.input_url.validate(self, url) for url in input_urls
+        ]
+
+        # obs_id from the date and run number of the file name
+        date_run = parse_file_name(self.filelist[0])
+        self.run_number = int(date_run[1]) if date_run else 0
+        self.run_id = int(''.join(date_run)) if date_run else 0
         self.tel_id = 0
-        self.camera = camera
-        self.max_events = max_events
-        self.event_id = event_id
-        self.allowed_tels = allowed_tels
-        self.disable_bar = disable_bar
 
         # LST reads camera_config from input files, is it needed such functionality for SST1M?
         self.camera_config = None
@@ -105,17 +204,24 @@ class SST1MEventSource(EventSource):
         self._subarray = SUBARRAY_DESCRIPTION
 
 
-        # self.pointing_source = PointingSource(subarray=self.subarray, parent=self)
+        # Target and pointing from the TARGET field of the file, unless given by the user
+        header = fits.getheader(self.filelist[0], 'Events')
+        self._target, self._wobble, ra, dec = parse_target_field(header.get('TARGET'))
+        self._pointing_manual = (self.pointing_ra is not None) and (self.pointing_dec is not None)
+        if self._pointing_manual:
+            ra, dec = self.pointing_ra, self.pointing_dec
 
+        self._pointing = None
+        self._tel_locations = {}
+        self._altaz_cache = {}
         target_info = {}
         pointing_mode = PointingMode.UNKNOWN
-        # if self.pointing_information:
-        #     target = self.pointing_source.get_target(tel_id=self.tel_id, time=self.run_start)
-        #     if target is not None:
-        #         target_info["subarray_pointing_lon"] = target["ra"]
-        #         target_info["subarray_pointing_lat"] = target["dec"]
-        #         target_info["subarray_pointing_frame"] = CoordinateFrameType.ICRS
-        #         pointing_mode = PointingMode.TRACK
+        if (ra is not None) and (dec is not None):
+            self._pointing = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame='icrs')
+            target_info["subarray_pointing_lon"] = ra * u.deg
+            target_info["subarray_pointing_lat"] = dec * u.deg
+            target_info["subarray_pointing_frame"] = CoordinateFrameType.ICRS
+            pointing_mode = PointingMode.TRACK
 
         self._scheduling_blocks = {
             self.run_id: SchedulingBlockContainer(
@@ -135,11 +241,68 @@ class SST1MEventSource(EventSource):
             )
         }
 
-        self._swat_event_ids_available = self.check_swat_event_ids_available(filelist)
+        self._swat_event_ids_available = self.check_swat_event_ids_available(self.filelist)
+
+    @property
+    def filelist(self):
+        """All the files read by the source"""
+        return [str(url) for url in self._input_urls]
 
     @property
     def subarray(self):
         return self._subarray
+
+    @property
+    def target(self):
+        """Target name from the TARGET field of the file"""
+        return self._target
+
+    @property
+    def wobble(self):
+        """Wobble from the TARGET field of the file (``W<n>``, ``UNDEF`` or None)"""
+        return self._wobble
+
+    @property
+    def pointing(self):
+        """Pointing direction (ICRS) of the run, None if unknown"""
+        return self._pointing
+
+    @property
+    def pointing_manual(self):
+        """True if the pointing is given by the user and not read from the file"""
+        return self._pointing_manual
+
+    def _tel_location(self, tel_id):
+        if tel_id not in self._tel_locations:
+            locations = self.subarray.tel_coords.to_earth_location()
+            self._tel_locations[tel_id] = locations[self.subarray.tel_index_array[tel_id]]
+        return self._tel_locations[tel_id]
+
+    def _fill_trigger_and_pointing(self, array_event, tel_id, local_camera_clock):
+        time = camera_clock_to_time(local_camera_clock)
+        array_event.trigger.time = time
+        array_event.trigger.tel[tel_id].time = time
+        array_event.trigger.tels_with_trigger = [tel_id]
+
+        if not self.pointing_information or self._pointing is None:
+            return
+
+        # the alt/az transformation is slow, it is only recomputed when the time changed enough
+        cached = self._altaz_cache.get(tel_id)
+        if cached is None or abs((time - cached[0]).to_value(u.s)) > self.pointing_update_interval:
+            horizon_frame = AltAz(obstime=time, location=self._tel_location(tel_id))
+            altaz = self._pointing.transform_to(horizon_frame)
+            cached = (time, altaz.az.to(u.rad), altaz.alt.to(u.rad))
+            self._altaz_cache[tel_id] = cached
+        _, azimuth, altitude = cached
+
+        pointing = array_event.pointing
+        pointing.tel[tel_id].azimuth = azimuth
+        pointing.tel[tel_id].altitude = altitude
+        pointing.array_azimuth = azimuth
+        pointing.array_altitude = altitude
+        pointing.array_ra = self._pointing.ra.to(u.rad)
+        pointing.array_dec = self._pointing.dec.to(u.rad)
 
     @property
     def is_simulation(self):
@@ -169,135 +332,136 @@ class SST1MEventSource(EventSource):
         return self._swat_event_ids_available
 
     @staticmethod
-    def check_swat_event_ids_available(filelist):
+    def check_swat_event_ids_available(filelist, n_events=N_EVENTS_SWAT_ID_CHECK):
         """
-        Determine if the files contain SWAT-generated arrayEvtNum IDs
+        Determine if the files contain the array event ids (``arrayEvtNum``)
+        written by SWAT.
+
+        If SWAT did not write them, ``arrayEvtNum`` is always 0. Otherwise it can
+        be 0 at most once, if SWAT was just restarted. The ids are thus considered
+        available in a file if any of its first ``n_events`` events has a non zero
+        ``arrayEvtNum``.
+
+        Parameters
+        ----------
+        filelist: list of str or str
+            Files of the run
+        n_events: int
+            Number of events read at the beginning of each file
+
         Returns
         -------
-        True  if the files contain array-level IDs
-        False if the files do not contain array-level IDs
+        bool:
+            True if all the files contain the SWAT ids. If only some of them do,
+            False is returned (with a warning) so that the event ids of the run
+            are consistent.
         """
-        with File(filelist[0]) as f:
-            id0 = f.Events[0].arrayEvtNum
-            id1 = f.Events[1].arrayEvtNum
-        # If SWAT arrayEvtNum was not written, the value is always 0
-        # Otherwise, we can expect 0 at most once, if SWAT was just restarted
-        if id0 == id1 == 0:
-            return False
-        return True
+        if isinstance(filelist, str | os.PathLike):
+            filelist = [filelist]
+
+        available = [file_has_swat_event_ids(path, n_events) for path in filelist]
+
+        if any(available) and not all(available):
+            logger.warning(
+                "SWAT event ids are available only in some of the files, they are not used: %s",
+                {str(path): has_ids for path, has_ids in zip(filelist, available, strict=True)},
+            )
+
+        return len(available) > 0 and all(available)
 
     def _generator(self):
         """
+        Read the files one after the other.
+        NOTE: protozfits.MultiZFitsFiles merges interleaved files by event_id (LST),
+        SST-1M files are written one after the other and have no event_id field
         """
-        yield from self.get_array_event(self.filelist)
-
-    def get_array_event(self, input_path : str):
-        """
-        """
-        print(f"input_path : {input_path}")
-        loaded_telescopes = []
-        array_event = SST1MArrayEventContainer()
-        with MultiZFitsFiles(input_path) as events:
-            array_event.r0.meta = dict(is_simulation=False)
-            for event_counter, event in enumerate(events):
-                # print(f" **** event: {event}")
-                if self.max_events is not None and event_counter > self.max_events:
-                    break
-                array_event.count = event_counter
-                if self._swat_event_ids_available:
-                    array_event.sst1m.r0.event_id = event.arrayEvtNum
-                else:
-                    array_event.sst1m.r0.event_id = event.eventNumber
-                array_event.sst1m.r0.tels_with_data = [event.telescopeID, ]
-                _sort_ids = None
-                for tel_id in array_event.sst1m.r0.tels_with_data:
-                    pixel_ids = event.hiGain.waveforms.pixelsIndices
-                    n_pixels = len(pixel_ids)
-                    if _sort_ids is None:
-                        _sort_ids = np.argsort(pixel_ids)
-                    samples = event.hiGain.waveforms.samples.reshape(n_pixels, -1)
-
-                    try:
-                        unsorted_baseline = event.hiGain.waveforms.baselines
-                    except AttributeError as err:
-                        raise AttributeError("Could not read `hiGain.waveforms.baselines`"
-                            f"for event:{event_counter} (eventNumber {event.eventNumber})\n"
-                            f"of file:{self.input_url}\n") from err
-
-                    if tel_id not in loaded_telescopes:
-                        array_event.sst1m.inst.num_channels[tel_id] = event.num_gains
-                        array_event.sst1m.inst.geom[tel_id] = self.camera.geometry
-                        array_event.sst1m.inst.cluster_matrix_7[tel_id] = \
-                            self.camera.cluster_7_matrix
-                        array_event.sst1m.inst.cluster_matrix_19[tel_id] = \
-                            self.camera.cluster_19_matrix
-                        array_event.sst1m.inst.patch_matrix[tel_id] = self.camera.patch_matrix
-                        array_event.sst1m.inst.num_pixels[tel_id] = samples.shape[0]
-                        array_event.sst1m.inst.num_samples[tel_id] = samples.shape[1]
-                        loaded_telescopes.append(tel_id)
-
-                    cta_r0 = array_event.r0.tel[tel_id]
-                    cta_r0.waveform = samples[_sort_ids].reshape(1, n_pixels, -1)
-
-                    r0 = array_event.sst1m.r0.tel[tel_id]
-                    r0.camera_event_number = event.eventNumber
-                    r0.pixel_flags = event.pixels_flags[_sort_ids]
-                    r0.local_camera_clock = (
-                        np.int64(event.local_time_sec * 1E9) +
-                        np.int64(event.local_time_nanosec)
-                    )
-
-                    if event.trig is not None:
-
-                        r0.gps_time = (
-                            np.int64(event.trig.timeSec * 1E9) +
-                            np.int64(event.trig.timeNanoSec)
-                        )
-
-                    else:
-
-                        r0.gps_time = np.int64(0)
-
-                    r0.camera_event_type = event.event_type
-                    r0.array_event_type = event.eventType
-                    r0.adc_samples = samples[_sort_ids]
-
-                    if len(event.trigger_input_traces) > 0:
-                        r0.trigger_input_traces = self._prepare_trigger_input(
-                            event.trigger_input_traces
-                        )
-                    else:
-                        warnings.warn(
-                            'trigger_input_traces does not exist: --> nan',
-                            stacklevel=2,
-                        )
-                        r0.trigger_input_traces = np.zeros(
-                            (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
-
-                    if len(event.trigger_output_patch7) > 0:
-                        r0.trigger_output_patch7 = self._prepare_trigger_output(
-                            event.trigger_output_patch7)
-                    else:
-                        warnings.warn(
-                            'trigger_output_patch7 does not exist: --> nan',
-                            stacklevel=2,
-                        )
-                        r0.trigger_output_patch7 = np.zeros(
-                            (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
-
-                    if len(event.trigger_output_patch19) > 0:
-                        r0.trigger_output_patch19 = self._prepare_trigger_output(
-                            event.trigger_output_patch19)
-                    else:
-                        warnings.warn(
-                            'trigger_output_patch19 does not exist: --> nan',
-                            stacklevel=2,
-                        )
-                        r0.trigger_output_patch19 = np.zeros(
-                            (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
-
-                    r0.digicam_baseline = unsorted_baseline[_sort_ids] / 16
+        count = 0
+        for input_path in self.filelist:
+            for array_event in self.get_array_event(input_path):
+                array_event.count = count
+                array_event.index.obs_id = self.run_id
+                if array_event.index.event_id <= 0:
+                    # no event id in the file, use the run number and the event count
+                    array_event.index.event_id = int(str(self.run_number) + str(count).zfill(6))
                 yield array_event
+                count += 1
+
+    def get_array_event(self, input_path):
+        """
+        Read the events of a single file. Only the R0 data (``event.r0``),
+        the trigger and the pointing are filled.
+        """
+        self.log.info("Reading %s", input_path)
+        array_event = SST1MArrayEventContainer()
+        with File(input_path) as f:
+            array_event.r0.meta = dict(is_simulation=False)
+            for event_counter, event in enumerate(f.Events):
+                if self._swat_event_ids_available:
+                    array_event.index.event_id = event.arrayEvtNum
+                else:
+                    array_event.index.event_id = event.eventNumber
+
+                tel_id = event.telescopeID
+                pixel_ids = event.hiGain.waveforms.pixelsIndices
+                n_pixels = len(pixel_ids)
+                sort_ids = np.argsort(pixel_ids)
+                samples = event.hiGain.waveforms.samples.reshape(n_pixels, -1)
+                n_samples = samples.shape[1]
+
+                try:
+                    unsorted_baseline = event.hiGain.waveforms.baselines
+                except AttributeError as err:
+                    raise AttributeError("Could not read `hiGain.waveforms.baselines`"
+                        f"for event:{event_counter} (eventNumber {event.eventNumber})\n"
+                        f"of file:{input_path}\n") from err
+
+                array_event.r0.tel.clear()
+                r0 = array_event.r0.tel[tel_id]
+                r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
+                r0.num_samples = n_samples
+                r0.pedestal = unsorted_baseline[sort_ids] / 16
+                r0.camera_event_number = event.eventNumber
+                r0.pixel_flags = event.pixels_flags[sort_ids]
+                r0.local_camera_clock = (
+                    np.int64(event.local_time_sec * 1E9) +
+                    np.int64(event.local_time_nanosec)
+                )
+                if event.trig is not None:
+                    r0.gps_time = (
+                        np.int64(event.trig.timeSec * 1E9) +
+                        np.int64(event.trig.timeNanoSec)
+                    )
+                else:
+                    r0.gps_time = np.int64(0)
+                r0.camera_event_type = event.event_type
+                r0.array_event_type = event.eventType
+                r0.trigger_input_traces = self._read_trigger_traces(
+                    event.trigger_input_traces, self._prepare_trigger_input,
+                    "trigger_input_traces", n_samples,
+                )
+                r0.trigger_output_patch7 = self._read_trigger_traces(
+                    event.trigger_output_patch7, self._prepare_trigger_output,
+                    "trigger_output_patch7", n_samples,
+                )
+                r0.trigger_output_patch19 = self._read_trigger_traces(
+                    event.trigger_output_patch19, self._prepare_trigger_output,
+                    "trigger_output_patch19", n_samples,
+                )
+
+                self._fill_trigger_and_pointing(array_event, tel_id, r0.local_camera_clock)
+                # internal triggers are the pedestal events
+                array_event.trigger.event_type = (
+                    EventType.SKY_PEDESTAL if r0.camera_event_type == CameraEventType.INTERNAL
+                    else EventType.SUBARRAY
+                )
+                yield array_event
+
+    @staticmethod
+    def _read_trigger_traces(traces, prepare, name, n_samples):
+        if len(traces) > 0:
+            return prepare(traces)
+        warnings.warn(f'{name} does not exist: --> nan', stacklevel=3)
+        return np.full((432, n_samples), np.nan)
 
     def _prepare_trigger_input(self, _a):
         A, B = 3, 192
@@ -321,31 +485,13 @@ class SST1MEventSource(EventSource):
 
     @staticmethod
     def is_compatible(file_path):
-        pass
-        # from astropy.io import fits
-
-        # try:
-        #     with fits.open(file_path) as hdul:
-        #         if "Events" not in hdul:
-        #             return False
-
-        #         header = hdul["Events"].header
-        #         ttypes = {
-        #             value for key, value in header.items()
-        #             if 'TTYPE' in key
-        #         }
-        # except OSError:
-        #     return False
-
-
-        # is_protobuf_zfits_file = (
-        #     (header['XTENSION'] == 'BINTABLE')
-        #     and (header['ZTABLE'] is True)
-        #     and (header['ORIGIN'] == 'CTA')
-        #     and (header['PBFHEAD'] == 'R1.CameraEvent')
-        # )
-
-        # print(header["XTENSION"], header["ZTABLE"], header["ORIGIN"], header["PBFHEAD"])
-        # return True
-        # # is_lst_file = 'lstcam_counters' in ttypes
-        # # return is_protobuf_zfits_file & is_lst_file
+        """
+        SST-1M zfits files have an ``Events`` table of DigiCam protobuf messages
+        """
+        try:
+            with fits.open(file_path) as hdul:
+                if "Events" not in hdul:
+                    return False
+                return hdul["Events"].header.get("PBFHEAD") == "DataModel.CameraEvent"
+        except (OSError, TypeError, ValueError):
+            return False

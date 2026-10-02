@@ -189,21 +189,20 @@ class mes_fitter:
         print("starting. reading data. Loading histograms.")
 
         data_stream = SST1MEventSource(
-            self.file_list,
-            disable_bar = True,
+            input_url=self.file_list,
             max_events=self.max_evt
             )
 
         for ii,event in enumerate(data_stream):
-                tel = event.sst1m.r0.tels_with_data[0]
-                r0data = event.sst1m.r0.tel[tel]
+                tel = event.trigger.tels_with_trigger[0]
+                r0data = event.r0.tel[tel]
 
 
                 if r0data._camera_event_type.value==8:
                     tot_evts +=1
 
                     if self.dark_baselines is None:
-                        wfs = (r0data.adc_samples.T - r0data.digicam_baseline).T
+                        wfs = (r0data.waveform[0].T - r0data.pedestal).T
 
                         #sums = convolve1d(
                         #    wfs[:,:],
@@ -223,12 +222,12 @@ class mes_fitter:
 
                         Qsum = np.array([wfs[ii,w_start[ii]:w_start[ii]+self.peak_search_window_width].sum() for ii in self.pixels])
 
-                        Qmax = (r0data.adc_samples.T       - r0data.digicam_baseline).max(axis=0)
+                        Qmax = (r0data.waveform[0].T       - r0data.pedestal).max(axis=0)
                         #Qsum_out = np.array([wfs[ii,:w_start[ii]].sum()+ \
                         #                     wfs[ii,w_start[ii]+self.peak_search_window_width:].sum() for ii in self.pixels])
                     else:
-                        #Qsum = (r0data.adc_samples.T[-15:] - self.dark_baselines ).sum(axis=0)
-                        #Qmax = (r0data.adc_samples.T       - self.dark_baselines ).max(axis=0)
+                        #Qsum = (r0data.waveform[0].T[-15:] - self.dark_baselines ).sum(axis=0)
+                        #Qmax = (r0data.waveform[0].T       - self.dark_baselines ).max(axis=0)
                         pass
 
                     i_to_fill_adcsum = np.searchsorted(centers_adcsum[1:-1], Qsum)

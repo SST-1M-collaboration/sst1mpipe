@@ -1,14 +1,17 @@
 import logging
+from abc import abstractmethod
 from collections import deque
-from statistics import mean
+from copy import deepcopy
 
 import astropy.units as u
 import numpy as np
 from ctapipe.calib import CameraCalibrator
+from ctapipe.core import TelescopeComponent
+from ctapipe.core.traits import IntTelescopeParameter
 from ctapipe.image import ImageProcessor
 
 from sst1mpipe.calib import (
-    Calibrator_R0_R1,
+    R0R1Calibrator,
     get_window_corr_factors,
     saturated_charge_correction,
     window_transmittance_correction,
@@ -17,275 +20,272 @@ from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import get_subarray, get_swaped_modules
 
 MON_EVT_TYPE = 8
-class sliding_pedestals:
-    def __init__(self, input_file=None, max_array_size = 100, max_images_array = 1000, config=None):
+MASKED_VALUE = -100
 
-        self.timestamps = deque()
-        self.ped_mean_array   = deque()
-        self.ped_std_array    = deque()
-        self.ped_img_array    = deque()
-        self.max_array_size   = max_array_size
-        self.max_images_array = max_images_array
-        self.ped_img_sum      = None
-        self.ped_img_sum2     = None
-        self.processed_pedestals = 0
-        self.config = config
-        self.input_file = input_file
-        self.pedestals_in_file = True
 
-        self.log_pedestal_settings()
-        self.load_firsts_pedestals()
+class SlidingWindowMonitor(TelescopeComponent):
+    """
+    Base class keeping per pixel quantities of the last ``n_events`` events of each
+    telescope in a sliding window, and filling a monitoring container of
+    ``event.mon.tel[tel_id]`` with their statistics.
 
-        if self.get_n_events() == 0:
-            logging.warning("No pedestal events found in firsts events. Cleaned shower/NSB events used instead.")
-            self.load_firsts_fake_pedestals()
-            logging.info(f"{self.get_n_events()} fake pedestals events loaded in buffer")
-            self.pedestals_in_file = False
-        else:
-            logging.info(f"{self.get_n_events()} pedestals events loaded in buffer")
-            self.pedestals_in_file = True
+    Subclasses define which quantities are extracted from an event (`add_event`),
+    how their statistics are computed (`_compute_statistics`) and which container
+    is filled (`_container`).
+    """
 
-    def add_ped_evt(self, evt, cleaning_mask=None, store_image=True):
-        tel = evt.sst1m.r0.tels_with_data[0]
-        pedestal = evt.sst1m.r0.tel[tel].adc_samples
-        if store_image:
-            image = evt.dl1.tel[tel].image
-        else:
-            image = np.zeros(pedestal.shape[0], dtype=np.float64)
-        self.processed_pedestals = self.processed_pedestals + 1
+    n_events = IntTelescopeParameter(
+        default_value=100, help="Number of events in the sliding window"
+    ).tag(config=True)
+
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
+        super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
+        self._timestamps = {}
+        self._values = {}
+        self._statistics = {}
+        self.processed_events = {}
+
+    def __call__(self, event, tel_id, **kwargs):
+        """
+        Add the event to the sliding window and fill the monitoring container.
+        ``kwargs`` are passed to `add_event`.
+        """
+        self.add_event(event, tel_id, **kwargs)
+        self.fill_monitoring(event, tel_id)
+
+    @abstractmethod
+    def add_event(self, event, tel_id, **kwargs):
+        """
+        Add an event to the sliding window, extracting its quantities and
+        passing them to `_append`.
+        """
+
+    @abstractmethod
+    def _container(self, event, tel_id):
+        """The container of ``event`` to fill"""
+
+    @abstractmethod
+    def _compute_statistics(self, values):
+        """
+        Return charge_mean, charge_median, charge_std of ``values``, an array
+        of shape (n_buffered, ...) of the quantities given to `_append`
+        """
+
+    def n_buffered(self, tel_id):
+        """Number of events in the sliding window"""
+        return len(self._timestamps.get(tel_id, ()))
+
+    def _append(self, event, tel_id, values):
+        if tel_id not in self._timestamps:
+            self._timestamps[tel_id] = deque(maxlen=self.n_events.tel[tel_id])
+            self._values[tel_id] = deque(maxlen=self.n_events.tel[tel_id])
+            self.processed_events[tel_id] = 0
+
+        self._timestamps[tel_id].append(event.r0.tel[tel_id].local_camera_clock / 1e9)
+        self._values[tel_id].append(values)
+        self.processed_events[tel_id] += 1
+        self._statistics.pop(tel_id, None)
+
+    def fill_monitoring(self, event, tel_id):
+        """
+        Fill the monitoring container of ``event.mon.tel[tel_id]``.
+        Nothing is done if the sliding window is empty.
+        """
+        if self.n_buffered(tel_id) == 0:
+            return
+
+        # statistics are only recomputed when a new event is added
+        if tel_id not in self._statistics:
+            self._statistics[tel_id] = self._compute_statistics(np.array(self._values[tel_id]))
+        charge_mean, charge_median, charge_std = self._statistics[tel_id]
+
+        timestamps = self._timestamps[tel_id]
+        container = self._container(event, tel_id)
+        container.n_events = len(timestamps)
+        container.sample_time = np.mean(timestamps) * u.s
+        container.sample_time_min = timestamps[0] * u.s
+        container.sample_time_max = timestamps[-1] * u.s
+        container.charge_mean = charge_mean
+        container.charge_median = charge_median
+        container.charge_std = charge_std
+
+
+class R0PedestalMonitor(SlidingWindowMonitor):
+    """
+    Statistics of the ADC samples of the pedestal events, filled in
+    ``event.mon.tel[tel_id].r0``. Used for the voltage drop
+    correction and the identification of dead pixels.
+    """
+
+    def add_event(self, event, tel_id, cleaning_mask=None):
+        """
+        Add the ADC samples of a pedestal event. Pixels in ``cleaning_mask``
+        (e.g. Cherenkov pixels of a fake pedestal) are not used.
+        """
+        samples = event.r0.tel[tel_id].waveform[0]
         if cleaning_mask is not None:
-            pedestal[cleaning_mask] = -100 * np.ones(pedestal.shape[1])
-            image[cleaning_mask] = -100
-        timestamp = evt.sst1m.r0.tel[tel].local_camera_clock/1e9
+            samples = samples.astype(np.float64)
+            samples[cleaning_mask] = MASKED_VALUE
+        self._append(event, tel_id, np.stack([samples.mean(axis=1), samples.std(axis=1)]))
 
-        self.ped_img_array.append(image)
-        if self.ped_img_sum is None:
-            self.ped_img_sum = image
-            self.ped_img_sum2 = image**2
-        else:
-            self.ped_img_sum += image
-            self.ped_img_sum2 += image**2
+    def _container(self, event, tel_id):
+        return event.mon.tel[tel_id].r0
 
-        if len(self.ped_img_array) > self.max_images_array:
-            self.ped_img_sum -= self.ped_img_array[0]
-            self.ped_img_sum2 -= self.ped_img_array[0]**2
-            self.ped_img_array.popleft()
+    def _compute_statistics(self, values):
+        means = np.ma.masked_values(values[:, 0], MASKED_VALUE)
+        # masked pixels have a null standard deviation
+        stds = np.ma.masked_values(values[:, 1], 0)
+        return (
+            means.mean(axis=0).filled(np.nan),
+            np.ma.median(means, axis=0).filled(np.nan),
+            stds.mean(axis=0).filled(0),
+        )
 
-        self.ped_mean_array.append(pedestal.mean(axis=1))
-        self.ped_std_array.append(pedestal.std(axis=1))
-        self.timestamps.append(timestamp)
-        if len(self.timestamps) > self.max_array_size:
-            self.ped_mean_array.popleft()
-            self.ped_std_array.popleft()
-            self.timestamps.popleft()
 
-    def get_n_events(self):
-        return len(self.timestamps)
+class DL1PedestalMonitor(SlidingWindowMonitor):
+    """
+    Statistics of the calibrated images (p.e.) of the pedestal events, filled in
+    ``event.mon.tel[tel_id].pedestal``. Used by `ctapipe.image.cleaning.NSBImageCleaner`.
+    """
 
-    def get_mean_ts(self):
-        return mean(self.timestamps) *u.s
+    n_events = IntTelescopeParameter(
+        default_value=1000, help="Number of events in the sliding window"
+    ).tag(config=True)
 
-    def get_min_ts(self):
-        return self.timestamps[0] *u.s
+    def add_event(self, event, tel_id):
+        """Add the calibrated image of a pedestal event."""
+        self._append(event, tel_id, np.array(event.dl1.tel[tel_id].image, dtype=np.float64))
 
-    def get_max_ts(self):
-        return self.timestamps[-1] *u.s
+    def _container(self, event, tel_id):
+        return event.mon.tel[tel_id].pedestal
 
-    def get_charge_mean(self):
-        pedarray = np.array(self.ped_mean_array)
-        masked = np.ma.masked_values(pedarray, -100)
-        return masked.mean(axis=0).data
+    def _compute_statistics(self, values):
+        return values.mean(axis=0), np.median(values, axis=0), values.std(axis=0)
 
-    def get_charge_median(self):
-        pedarray = np.array(self.ped_mean_array)
-        masked = np.ma.masked_values(pedarray, -100)
-        return np.median(masked.data,axis=0)
 
-    def get_charge_std(self):
-        pedarray = np.array(self.ped_std_array)
-        masked = np.ma.masked_values(pedarray, 0)
-        return masked.data.mean(axis=0)
+def load_first_pedestals(r0_monitor, dl1_monitor, input_file, config, max_events=100000):
+    """
+    Fill the monitors with the first pedestal events of ``input_file``.
+    The ADC samples of the first pedestal events are needed to estimate the voltage
+    drop, which is used to calibrate the images of the pedestal events.
 
-    def get_img_charge_mean(self):
-        return self.ped_img_sum/len(self.ped_img_array)
+    If there are no pedestal events, shower/NSB events with their Cherenkov pixels
+    masked out (fake pedestals) are used instead.
 
-    def get_img_charge_std(self):
-        return np.sqrt(self.ped_img_sum2/len(self.ped_img_array) - (self.ped_img_sum/len(self.ped_img_array))**2)
+    Returns
+    -------
+    pedestals_in_file: bool
+        False if fake pedestals were used
+    """
+    source = SST1MEventSource(input_url=input_file, max_events=max_events)
+    source._subarray = get_subarray()
+    tel = None
 
-    def fill_mon_container(self, evt):
-        tel = evt.sst1m.r0.tels_with_data[0]
-        mon_container=evt.mon.tel[tel].pedestal
-        mon_container.n_events        = self.get_n_events()
-        mon_container.sample_time     = self.get_mean_ts()
-        mon_container.sample_time_min = self.get_min_ts()
-        mon_container.sample_time_max = self.get_max_ts()
-        mon_container.charge_mean     = self.get_charge_mean()
-        mon_container.charge_median   = self.get_charge_median()
-        mon_container.charge_std      = self.get_charge_std()
-        return
+    for event in source:
+        tel = event.trigger.tels_with_trigger[0]
+        if event.r0.tel[tel]._camera_event_type.value == MON_EVT_TYPE:
+            r0_monitor.add_event(event, tel)
+        if r0_monitor.n_buffered(tel) >= r0_monitor.n_events.tel[tel]:
+            break
 
-    def load_firsts_pedestals(self,max_n_ped=100,max_n_img=1000,max_evt=100000):
-        """
-        Reads first max_n_ped pedestal events in the buffer.
-        """
+    if tel is not None and r0_monitor.n_buffered(tel) > 0:
+        _load_first_images(r0_monitor, dl1_monitor, source, tel, config)
+        logging.info("%d pedestal events loaded in buffer", r0_monitor.n_buffered(tel))
+        return True
 
-        data_stream = SST1MEventSource([self.input_file],
-                                       max_events=max_evt)
+    logging.warning("No pedestal events found in firsts events. Cleaned shower/NSB events used instead.")
+    tel = _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config)
+    if tel is not None:
+        logging.info("%d fake pedestal events loaded in buffer", r0_monitor.n_buffered(tel))
+    return False
 
-        for ii,event in enumerate(data_stream):
 
-            if ii == 0:
-                tel = event.sst1m.r0.tels_with_data[0]
+def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
 
-            r0data = event.sst1m.r0.tel[tel]
-            if r0data._camera_event_type.value == MON_EVT_TYPE:
-                self.add_ped_evt(event, store_image=False)
+    r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
+    calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
+    window_corr_factors, _ = get_window_corr_factors(telescope=tel, config=config)
+    swapped_modules = None
 
-            if len(self.timestamps) >= max_n_ped:
+    for event in source:
+
+        if swapped_modules is None:
+            swapped_modules = get_swaped_modules(event)
+
+        if event.r0.tel[tel]._camera_event_type.value != MON_EVT_TYPE:
+            continue
+
+        # here we apply gain drop correction
+        r0_monitor.fill_monitoring(event, tel)
+        calibrator_r0_r1(event, tel)
+        r1_dl1_calibrator(event)
+
+        # Integration correction of saturated pixels
+        saturated_charge_correction(event)
+        event = window_transmittance_correction(
+            event,
+            window_corr_factors=window_corr_factors,
+            telescope=tel,
+            swapped_modules=swapped_modules
+            )
+
+        dl1_monitor.add_event(event, tel)
+        if dl1_monitor.n_buffered(tel) >= dl1_monitor.n_events.tel[tel]:
+            break
+
+
+def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_events=10):
+
+    # Here (for the first few events) we use just the simple ImageProcessor, nothing fancy
+    config = deepcopy(config)
+    config["ImageProcessor"]["image_cleaner_type"] = "TailcutsImageCleaner"
+
+    source = SST1MEventSource(input_url=input_file, max_events=max_events)
+    source._subarray = get_subarray()
+    r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
+    image_processor = ImageProcessor(subarray=source.subarray, config=config)
+    calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
+    tel = None
+
+    def clean(event):
+        calibrator_r0_r1(event, tel)
+        r1_dl1_calibrator(event)
+        image_processor(event)
+        return event.dl1.tel[tel].image_mask
+
+    for event in source:
+        if tel is None:
+            tel = event.trigger.tels_with_trigger[0]
+
+        cleaning_mask = clean(event)
+        # Arbitrary cut, just to prevent too big showers from being used
+        if sum(cleaning_mask) < 20:
+            r0_monitor.add_event(event, tel, cleaning_mask=cleaning_mask)
+
+    if tel is None or r0_monitor.n_buffered(tel) == 0:
+        return tel
+
+    # to treat images we need to estimate gain drop from pedestals, so calibrate the events once more
+    window_corr_factors, _ = get_window_corr_factors(telescope=tel, config=config)
+    swapped_modules = None
+    for event in source:
+
+        if swapped_modules is None:
+            swapped_modules = get_swaped_modules(event)
+
+        r0_monitor.fill_monitoring(event, tel)
+        cleaning_mask = clean(event)
+        if sum(cleaning_mask) < 20:
+            # Integration correction of saturated pixels - done only here because the fake pedestals must match in both loops
+            saturated_charge_correction(event)
+            event = window_transmittance_correction(
+                event,
+                window_corr_factors=window_corr_factors,
+                telescope=tel,
+                swapped_modules=swapped_modules
+                )
+            dl1_monitor.add_event(event, tel)
+            if dl1_monitor.n_buffered(tel) >= dl1_monitor.n_events.tel[tel]:
                 break
 
-        data_stream._subarray = get_subarray()
-        r1_dl1_calibrator = CameraCalibrator(subarray=data_stream.subarray, config=self.config)
-
-        # to treat images we need to estimate gain drop from pedestals, so redo pedestals once more...
-        keep_size = self.max_array_size
-        self.max_array_size = self.max_images_array
-        for jj,event in enumerate(data_stream):
-
-            if jj == 0:
-                calibrator_r0_r1 = Calibrator_R0_R1(config=self.config, telescope=tel)
-                window_corr_factors, _ = get_window_corr_factors(
-                            telescope=tel, config=self.config
-                            )
-                swapped_modules = get_swaped_modules(event)
-
-            r0data = event.sst1m.r0.tel[tel]
-            if r0data._camera_event_type.value == MON_EVT_TYPE:
-
-                # here we apply gain drop correction
-                event = calibrator_r0_r1.calibrate(event, pedestal_info=self)
-                event.r1.tel[tel].selected_gain_channel = np.zeros(data_stream.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
-
-                r1_dl1_calibrator(event)
-
-                # Integration correction of saturated pixels
-                event = saturated_charge_correction(event)
-
-                event = window_transmittance_correction(
-                    event,
-                    window_corr_factors=window_corr_factors,
-                    telescope=tel,
-                    swapped_modules=swapped_modules
-                    )
-
-                if jj <= ii:
-                    self.ped_mean_array.popleft()
-                    self.ped_std_array.popleft()
-                    self.timestamps.popleft()
-                    self.ped_img_array.popleft()
-
-                self.add_ped_evt(event)
-
-                if len(self.ped_img_array) >= max_n_img:
-                    break
-
-        self.max_array_size = keep_size
-        for _ in range(len(self.timestamps)-keep_size):
-            self.ped_mean_array.pop()
-            self.ped_std_array.pop()
-            self.timestamps.pop()
-
-    def load_firsts_fake_pedestals(self, max_evt=10):
-        """
-        Reads first max_evt fake pedestal events in the buffer.
-        Fake pedestal is a shower event with Cherenkov pixels masked out.
-        """
-
-        source = SST1MEventSource([self.input_file],
-                                       max_events=max_evt)
-        source._subarray = get_subarray()
-        r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=self.config)
-
-        # Here (for the first few events) we use just the simple ImageProcessor, nothing fancy
-        self.config["ImageProcessor"]["image_cleaner_type"] = "TailcutsImageCleaner"
-        image_processor   = ImageProcessor(subarray=source.subarray, config=self.config)
-
-        for ii,event in enumerate(source):
-
-            if ii == 0:
-                tel = event.sst1m.r0.tels_with_data[0]
-                calibrator_r0_r1 = Calibrator_R0_R1(config=self.config, telescope=tel)
-
-            event = calibrator_r0_r1.calibrate(event)
-            event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
-
-            r1_dl1_calibrator(event)
-            image_processor(event)
-
-            clenaning_mask = event.dl1.tel[tel].image_mask
-            # Arbitrary cut, just to prevent too big showers from being used
-            if sum(clenaning_mask) < 20:
-                self.add_ped_evt(event, cleaning_mask=clenaning_mask, store_image=False)
-
-        # to treat images we need to estimate gain drop from pedestals, so redo pedestals once more...
-        keep_size = self.max_array_size
-        self.max_array_size = self.max_images_array
-        for jj,event in enumerate(source):
-
-            if jj == 0:
-                window_corr_factors, _ = get_window_corr_factors(
-                            telescope=tel, config=self.config
-                            )
-                swapped_modules = get_swaped_modules(event)
-
-            # here we apply gain drop correction
-            event = calibrator_r0_r1.calibrate(event, pedestal_info=self)
-            event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
-
-            r1_dl1_calibrator(event)
-            image_processor(event)
-
-            clenaning_mask = event.dl1.tel[tel].image_mask
-            # Arbitrary cut, just to prevent too big showers from being used
-            if sum(clenaning_mask) < 20:
-              # Integration correction of saturated pixels - done only here because the fake pedestals must match in both loops
-              event = saturated_charge_correction(event)
-
-              event = window_transmittance_correction(
-                  event,
-                  window_corr_factors=window_corr_factors,
-                  telescope=tel,
-                  swapped_modules=swapped_modules
-                  )
-
-              if jj <= ii:
-                  self.ped_mean_array.popleft()
-                  self.ped_std_array.popleft()
-                  self.timestamps.popleft()
-                  self.ped_img_array.popleft()
-
-              self.add_ped_evt(event)
-
-              if len(self.ped_img_array) >= self.max_images_array:
-                  break
-
-        self.max_array_size = keep_size
-        for _ in range(len(self.timestamps)-keep_size):
-            self.ped_mean_array.pop()
-            self.ped_std_array.pop()
-            self.timestamps.pop()
-
-
-    def log_pedestal_settings(self):
-
-        if self.config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-            logging.info("Voltage drop correction is applied pixelwise")
-
-        if self.config['NsbCalibrator']['apply_global_Vdrop_correction']:
-            logging.info("Voltage drop correction is applied globaly")
-
-        if self.config['NsbCalibrator']['apply_global_Vdrop_correction'] == self.config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-            if self.config['NsbCalibrator']['apply_global_Vdrop_correction']:
-                logging.error("Voltage drop correction is applied 2 times!!! this is WRONG!")
-            else:
-                logging.warning("NO Voltage drop correction is applied")
+    return tel

@@ -16,11 +16,14 @@
       }
     },
 
-    "telescope_calibration": {
-      "tel_021": null,
-      "tel_022": null,
-      "bad_calib_px_interpolation": true,
-      "dynamic_dead_px_interpolation": true
+    "R0R1Calibrator": {
+      "calibration_file": [
+        ["type", "*", null]
+      ],
+      "voltage_drop_correction": "global",
+      "flag_bad_calibration_pixels": true,
+      "flag_dead_pixels": true,
+      "dead_pixel_std_threshold": 2.5
     },
 
     "window_transmittance": {
@@ -50,6 +53,7 @@
     },
 
     "analysis": {
+      "min_number_pedestals": 100,
       "global_theta_cut": 0.2,
       "global_gammaness_cut": 0.75,
       "stereo_delta_disp_cut_deg": null,
@@ -92,16 +96,22 @@
     },
 
     "NsbCalibrator": {
-        "apply_pixelwise_Vdrop_correction": false,
-        "apply_global_Vdrop_correction": true,
         "intensity_correction": {
           "tel_021": 1.0,
           "tel_022": 1.0
         }
     },
 
+    "R0PedestalMonitor": {
+        "n_events": 100
+    },
+
+    "DL1PedestalMonitor": {
+        "n_events": 1000
+    },
+
     "ImageProcessor": {
-        "image_cleaner_type": "ImageCleanerSST",
+        "image_cleaner_type": "NSBImageCleaner",
         "use_telescope_frame": false,
         "TailcutsImageCleaner": {
             "picture_threshold_pe": [
@@ -117,54 +127,25 @@
               ["id", 22, 2]
             ]
           },
-        "ImageCleanerSST": {
-            "min_number_pedestals": 100,
-            "telescope_defaults": {
-                "tel_021": [
-                {
-                    "min_nsb_level": 0,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }, {
-                    "min_nsb_level": 2.3554,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }],
-                "tel_022": [
-                {
-                    "min_nsb_level": 0,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }, {
-                    "min_nsb_level": 2.4287,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }]
-            }
+        "NSBImageCleaner": {
+            "picture_threshold_pe": [
+              ["id", 21, 8],
+              ["id", 22, 8]
+            ],
+            "boundary_threshold_pe": [
+              ["id", 21, 4],
+              ["id", 22, 4]
+            ],
+            "min_picture_neighbors": [
+              ["id", 21, 2],
+              ["id", 22, 2]
+            ],
+            "keep_isolated_pixels": false,
+            "time_limit": 8,
+            "time_num_neighbors": 1,
+            "largest_island_only": false,
+            "pedestal_factor": 2.5,
+            "bright_cleaning_threshold": null
         }
     },
 

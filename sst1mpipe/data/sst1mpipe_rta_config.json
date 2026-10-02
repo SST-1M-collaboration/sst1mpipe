@@ -8,6 +8,20 @@
     "max_events": 100000
   },
 
+  "R0PedestalMonitor": {
+    "n_events": 100
+  },
+
+  "R0R1Calibrator": {
+    "calibration_file": [
+      ["type", "*", null]
+    ],
+    "voltage_drop_correction": "global",
+    "flag_bad_calibration_pixels": true,
+    "flag_dead_pixels": true,
+    "dead_pixel_std_threshold": 2.5
+  },
+
   "CameraCalibrator": {
       "image_extractor_type" : "LocalPeakWindowSum",
       "LocalPeakWindowSum": {

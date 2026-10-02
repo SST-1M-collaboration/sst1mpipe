@@ -20,9 +20,11 @@ from sst1mpipe.io import (
     check_outdir,
     get_dl1_info,
     load_dl1_pedestals,
+    load_r0_pedestals,
     load_dl1_sst1m,
     load_more_dl1_tables_mono,
     write_dl1_pedestals,
+    write_r0_pedestals,
 )
 from sst1mpipe.utils import (
     camera_to_altaz,
@@ -1271,9 +1273,9 @@ def make_dl1_stereo(
     with DataWriter(source,
                     output_path=output_path,
                     overwrite        = True,
-                    write_showers    = True,
-                    write_parameters = True,
-                    write_images     = True,
+                    write_dl2         = True,
+                    write_dl1_parameters = True,
+                    write_dl1_images         = True,
                     ) as writer:
 
 
@@ -1393,7 +1395,12 @@ def make_dl1_stereo(
     # table is not compatible with ctapipe readers
     logging.info('Propagating pedestals from mono tel1 DL1 to stereo DL1..')
     try:
+        pedestals = load_r0_pedestals(dl1_file_tel1)
+        write_r0_pedestals(output_path, pedestal_table=pedestals)
+    except Exception:
+        logging.warning('No pedestals found in tel1 DL1 file!')
+    try:
         pedestals = load_dl1_pedestals(dl1_file_tel1)
         write_dl1_pedestals(output_path, pedestal_table=pedestals)
     except Exception:
-        logging.warning('No pedestals found in tel1 DL1 file!')
+        logging.warning('No pedestal images found in tel1 DL1 file!')

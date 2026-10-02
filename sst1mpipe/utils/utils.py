@@ -5,7 +5,6 @@ Licensed under the 3-clause BSD style license.
 
 import logging
 import os
-import re
 from datetime import datetime
 import json
 
@@ -38,6 +37,7 @@ from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
 from gammapy.data import DataStore
 
+from sst1mpipe.io.sst1m_event_source import parse_target_field, camera_clock_to_time
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MAPPING_FILE_PATH = BASE_DIR / "data" / "digicam_pixels_mapping_V5T.txt"
@@ -86,31 +86,12 @@ def get_target(file, force_pointing=False):
                 logging.info('Transition to the next wobble, or dark file, not on-source pointing direction, FILE SKIPPED.')
                 hdul.close()
                 exit()
-            if pointing_string.count('_') > 1:
-                delimiter = '_'
-            elif pointing_string.count(',') > 1:
-                delimiter = ','
-            else:
+            target, wobble, ra, dec = parse_target_field(pointing_string)
+            if wobble is None:
                 logging.warning('Wrong format of coordinates in the fits header, unknown delimiter')
-                target, ra, dec, wobble = None, None, None, None
-                return target, ra, dec, wobble
-
-            target = pointing_string.split(delimiter)[0]
-            try:
-                if len(pointing_string.split(delimiter)) == 4:
-                    ra = float(pointing_string.split(delimiter)[2])
-                    dec = float(pointing_string.split(delimiter)[3])
-                elif len(pointing_string.split(delimiter)) == 3:
-                    ra = float(pointing_string.split(delimiter)[1])
-                    dec = float(pointing_string.split(delimiter)[2])
-                else:
-                    logging.warning('Wrong format of coordinates in the fits header. Field with either 3 or 4 entries is expected.')
-                    ra, dec = None, None
-            except ValueError:
-                logging.warning('Wrong format of coordinates in the fits header, cannot convert to float!')
-                ra, dec = None, None
-            match = re.search(r'W\d+', pointing_string)
-            wobble = match.group(0) if match else 'UNDEF'
+                return None, None, None, None
+            if ra is None:
+                logging.warning('Wrong format of coordinates in the fits header, cannot read RA, DEC')
         except KeyError:
             logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
             target, ra, dec, wobble = None, None, None, None
@@ -186,7 +167,7 @@ def get_tel_string(tel, mc=True):
     ----------
     tel: int
         Telescope number as in
-        event.sst1m.r0.tels_with_data
+        event.trigger.tels_with_trigger
     mc: bool
 
     Returns
@@ -330,25 +311,10 @@ def add_trigger_time(event, telescope=None):
 
     """
 
-    localtime = event.sst1m.r0.tel[telescope].local_camera_clock.astype(np.uint64)
-    # assuming local_camera_clock in gps (gps = tai - 19s), gps scale does not exist in astropy
-    # tai = utc + 37 s (this is not constant in time and depend on leap seconds)
-    #event.trigger.time = Time(localtime * u.s + 19 * u.s, format='unix', scale='tai') - 37 * u.s
 
-    # assuming local_camera_clock in tai and conversion to utc
-    #event.trigger.time = Time(localtime * u.s, format='unix', scale='tai') - 37 * u.s
 
-    # assuming local_camera_clock in utc
-    #event.trigger.time = Time(localtime, format='unix', scale='utc')
-
-    # Time in event.trigger.time is stored in seconds, but should have ns precision, see
-    # https://github.com/cta-observatory/ctapipe_io_nectarcam/issues/24
-    # But if we read the data, using ctapipe.io.read_table, the numerical precision is lost anyway
     # We assume tai scale
-    S_TO_NS = np.uint64(1e9)
-    full_seconds = localtime // S_TO_NS
-    fractional_seconds = (localtime % S_TO_NS) / S_TO_NS
-    event.trigger.time = Time(full_seconds, fractional_seconds, format='unix_tai')
+    event.trigger.time = camera_clock_to_time(event.r0.tel[telescope].local_camera_clock)
     event.trigger.tel[telescope].time = event.trigger.time
 
     return event
@@ -378,8 +344,8 @@ def add_event_id(event, filename=None, event_number=0):
     date = filename.split('/')[-1].split('_')[1]
     obs_id = date + filename.split('/')[-1].split('_')[2]
 
-    if event.sst1m.r0.event_id > 0:
-        event_id = event.sst1m.r0.event_id
+    if event.index.event_id > 0:
+        event_id = event.index.event_id
     else:
         event_id = str(int(filename.split('/')[-1].split('_')[2])) + str(event_number).zfill(6)
         logging.warning('Event IDs are not stored in raw data. Replacing with event ID based on date and event count.')
@@ -858,12 +824,12 @@ def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingf
     pix_maps = aio.read(mappingfilepath)
 
     mask_list = []
-    tel = event.sst1m.r0.tels_with_data[0]
+    tel = event.trigger.tels_with_trigger[0]
     with open(inv_list_path, encoding="utf-8") as f:
         inv_list = json.load(f)
     for key in inv_list.keys():
         if inv_list[key]['ntel'] == tel:
-            localtime = event.sst1m.r0.tel[tel].local_camera_clock/1e9
+            localtime = event.r0.tel[tel].local_camera_clock/1e9
             time = Time(localtime, format='unix_tai')
             time_min = Time(inv_list[key]['date_sart'], format='isot', scale='utc')
             time_max = Time(inv_list[key]['date_stop'], format='isot', scale='utc')
@@ -905,17 +871,17 @@ def swap_modules_r0wf(event,mask1,mask2,tel=None):
     """
 
 
-    waveform_1 = event.sst1m.r0.tel[tel].adc_samples[mask1,:]
-    bs_1 = event.sst1m.r0.tel[tel].digicam_baseline[mask1]
+    waveform_1 = event.r0.tel[tel].waveform[0][mask1,:]
+    bs_1 = event.r0.tel[tel].pedestal[mask1]
 
-    waveform_2 = event.sst1m.r0.tel[tel].adc_samples[mask2,:]
-    bs_2 = event.sst1m.r0.tel[tel].digicam_baseline[mask2]
+    waveform_2 = event.r0.tel[tel].waveform[0][mask2,:]
+    bs_2 = event.r0.tel[tel].pedestal[mask2]
 
-    event.sst1m.r0.tel[tel].adc_samples[mask1] = waveform_2
-    event.sst1m.r0.tel[tel].adc_samples[mask2] = waveform_1
+    event.r0.tel[tel].waveform[0][mask1] = waveform_2
+    event.r0.tel[tel].waveform[0][mask2] = waveform_1
 
-    event.sst1m.r0.tel[tel].digicam_baseline[mask1] = bs_2
-    event.sst1m.r0.tel[tel].digicam_baseline[mask2] = bs_1
+    event.r0.tel[tel].pedestal[mask1] = bs_2
+    event.r0.tel[tel].pedestal[mask2] = bs_1
 
     return event
 
@@ -951,9 +917,7 @@ def remove_bad_pixels(event, config=None):
                     mask_bad[config["analysis"]["bad_pixels"][tel_name]] = 1
                     mask_bad = mask_bad.astype(bool)
 
-                    N_samples = event.r0.tel[tel].waveform[0].shape[1]
-                    event.r0.tel[tel].waveform[0][mask_bad] = np.zeros(N_samples)
-                    event.r1.tel[tel].waveform[mask_bad] = np.zeros(N_samples)
+                    event.r1.tel[tel].waveform[:, mask_bad] = 0
                     event.simulation.tel[tel].true_image[mask_bad] = 0
                     event.mon.tel[tel].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
                     event.mon.tel[tel].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
