@@ -16,11 +16,14 @@
       }
     },
 
-    "telescope_calibration": {
-      "tel_021": null,
-      "tel_022": null,
-      "bad_calib_px_interpolation": true,
-      "dynamic_dead_px_interpolation": true
+    "R0R1Calibrator": {
+      "calibration_file": [
+        ["type", "*", null]
+      ],
+      "voltage_drop_correction": "global",
+      "flag_bad_calibration_pixels": true,
+      "flag_dead_pixels": true,
+      "dead_pixel_std_threshold": 2.5
     },
 
     "window_transmittance": {
@@ -93,8 +96,6 @@
     },
 
     "NsbCalibrator": {
-        "apply_pixelwise_Vdrop_correction": false,
-        "apply_global_Vdrop_correction": true,
         "intensity_correction": {
           "tel_021": 1.0,
           "tel_022": 1.0

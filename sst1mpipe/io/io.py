@@ -130,8 +130,63 @@ def load_config(cfg_file, ismc=False):
         cfg_file = files('sst1mpipe.data').joinpath(default_config)
 
     with open(cfg_file) as json_file:
-            config = Config(json.load(json_file))
+        config = json.load(json_file)
 
+    return Config(translate_legacy_calibration_config(config))
+
+
+def translate_legacy_calibration_config(config):
+    """
+    Translates the R0 -> R1 calibration settings of the configuration files written
+    before `sst1mpipe.calib.R0R1Calibrator` (``telescope_calibration`` and
+    ``NsbCalibrator.apply_*_Vdrop_correction``) into its ``R0R1Calibrator`` section.
+    Nothing is done if the configuration has a ``R0R1Calibrator`` section.
+
+    Parameters
+    ----------
+    config: dict
+
+    Returns
+    -------
+    config: dict
+    """
+    legacy_calibration = config.pop("telescope_calibration", None)
+    nsb_calibrator = config.get("NsbCalibrator", {})
+    pixelwise = nsb_calibrator.pop("apply_pixelwise_Vdrop_correction", None)
+    global_ = nsb_calibrator.pop("apply_global_Vdrop_correction", None)
+
+    if legacy_calibration is None and pixelwise is None and global_ is None:
+        return config
+    if "R0R1Calibrator" in config:
+        logging.warning(
+            "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction)"
+            " are ignored, the R0R1Calibrator section is used."
+        )
+        return config
+
+    logging.warning(
+        "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction)"
+        " are translated into the R0R1Calibrator section, please update the config file."
+    )
+    calibrator = {}
+    if legacy_calibration is not None:
+        calibration_files = [["type", "*", None]]
+        for key, path in legacy_calibration.items():
+            if key.startswith("tel_") and path is not None:
+                calibration_files.append(["id", int(key[len("tel_"):]), path])
+        calibrator["calibration_file"] = calibration_files
+        flag_bad_pixels = legacy_calibration.get("bad_calib_px_interpolation", True)
+        calibrator["flag_bad_calibration_pixels"] = flag_bad_pixels
+        # the dead pixels were only flagged with the pixels with bad calibration
+        calibrator["flag_dead_pixels"] = flag_bad_pixels and legacy_calibration.get(
+            "dynamic_dead_px_interpolation", True
+        )
+    if pixelwise or global_ is not None:
+        # the pixelwise correction was applied if both were set
+        calibrator["voltage_drop_correction"] = (
+            "pixelwise" if pixelwise else "global" if global_ else "none"
+        )
+    config["R0R1Calibrator"] = calibrator
     return config
 
 
@@ -1295,7 +1350,9 @@ def compute_dl1_summary(dl1_file):
         ] if "/dl1/event/telescope/parameters" in f else []
     for path in parameter_tables:
         parameters = read_table(dl1_file, path)
-        has_image = np.isfinite(parameters["hillas_intensity"])
+        # camera_frame_ prefix if the parameters are computed in the camera frame
+        intensity = "hillas_intensity" if "hillas_intensity" in parameters.colnames else "camera_frame_hillas_intensity"
+        has_image = np.isfinite(parameters[intensity])
         survived |= {
             (obs_id, event_id) for obs_id, event_id in parameters["obs_id", "event_id"][has_image]
         } & pedestals

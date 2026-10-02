@@ -105,7 +105,13 @@ See ``--help`` for possible inputs. Some of them, which might not be obvious:
 
 **Relevant parts of the config file** applied in this analysis step:
 
-* ``telescope_calibration`` - calibration files based on analysis of dark runs. Should be taken relatively close to the date of observation
+* ``R0R1Calibrator`` - R0 -> R1 calibration (``sst1mpipe.calib.R0R1Calibrator``). All settings can be given per telescope, e.g. ``[["type", "*", "global"], ["id", 22, "none"]]``:
+
+  * ``calibration_file`` - calibration files based on analysis of dark runs (``null``: default file of the telescope). Should be taken relatively close to the date of observation
+  * ``voltage_drop_correction`` - ``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB
+  * ``flag_bad_calibration_pixels``, ``flag_dead_pixels`` and ``dead_pixel_std_threshold`` - pixels set to 0 and interpolated
+
+  Config files with the former ``telescope_calibration`` and ``NsbCalibrator.apply_*_Vdrop_correction`` settings are still read (translated with a warning).
 
 * ``window_transmittance`` - files with for camera window transmittance correction (measured in the lab and can be kept default)
 

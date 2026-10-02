@@ -35,7 +35,7 @@ from ctapipe.reco import ShowerProcessor
 
 import sst1mpipe
 from sst1mpipe.calib import (
-    Calibrator_R0_R1,
+    R0R1Calibrator,
     correct_MC_for_PDE_drop,
     get_window_corr_factors,
     saturated_charge_correction,
@@ -126,6 +126,13 @@ def parse_args():
                     )
 
     parser.add_argument(
+                    '--max-events', '-m', type=int,
+                    help='Maximum number of events read from the input file. Overrides max_events of the config file (all events if none).',
+                    dest='max_events',
+                    default=None
+                    )
+
+    parser.add_argument(
                     '--reclean',
                     action='store_true',
                     help='Perform cleaning based on pre-calculated charge distributions from pedestal events.',
@@ -178,8 +185,6 @@ def main():
     logging.info('Input file: %s',  input_file)
     logging.info('Output file: %s', output_file)
 
-    max_events = None
-
     # processing information written in /dl1/info
     target, wobble, pointing_manual = None, None, False
     calibration_file, window_file = None, None
@@ -191,6 +196,10 @@ def main():
     survived_charge_fraction = {1: [], 2: []}
 
     config = load_config(args.config_file, ismc=ismc)
+
+    max_events = args.max_events if args.max_events is not None else config.get("max_events")
+    if max_events is not None:
+        logging.info('Maximum number of events read: %d', max_events)
 
     source_kwargs = {}
     if (not ismc) and force_pointing and (pointing_ra is not None) and (pointing_dec is not None):
@@ -312,8 +321,8 @@ def main():
                 # NOTE: This needs to be changed in the future when event source hopefuly provides events with both telescope data
                 if i == 0:
                     tel = event.trigger.tels_with_trigger[0]
-                    calibrator_r0_r1 = Calibrator_R0_R1(config=config, telescope=tel)
-                    calibration_file = calibrator_r0_r1.calibration_file
+                    calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
+                    calibration_file = str(calibrator_r0_r1.calibration_file_path(tel))
                     window_corr_factors, window_file = get_window_corr_factors(
                         telescope=tel, config=config
                         )
@@ -339,8 +348,7 @@ def main():
                     event = swap_modules_r0wf(event,mask_1, mask_2, tel=tel)
 
                 r0_pedestal_monitor.fill_monitoring(event, tel)
-                event = calibrator_r0_r1.calibrate(event)
-                # print(calibrator_r0_r1.pixels_removed) # can be monitored
+                calibrator_r0_r1(event, tel)
 
                 event_type = event.r0.tel[tel]._camera_event_type.value
 
@@ -413,8 +421,8 @@ def main():
 
             ## Fill monitoring container with baseline info :
             if not source.is_simulation:
-                if not bool(i % 100) and config["telescope_calibration"]["bad_calib_px_interpolation"]:
-                    logging.info("N pixels interpolated (every 100th event): %d", calibrator_r0_r1.pixels_removed)
+                if not bool(i % 100):
+                    logging.info("N pixels interpolated (every 100th event): %d", calibrator_r0_r1.n_bad_pixels[tel])
                 new_pedestal = False
                 if event_type==8:
                     r0_pedestal_monitor(event, tel)

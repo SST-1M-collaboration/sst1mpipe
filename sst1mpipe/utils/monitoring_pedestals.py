@@ -11,7 +11,7 @@ from ctapipe.core.traits import IntTelescopeParameter
 from ctapipe.image import ImageProcessor
 
 from sst1mpipe.calib import (
-    Calibrator_R0_R1,
+    R0R1Calibrator,
     get_window_corr_factors,
     saturated_charge_correction,
     window_transmittance_correction,
@@ -177,8 +177,6 @@ def load_first_pedestals(r0_monitor, dl1_monitor, input_file, config, max_events
     pedestals_in_file: bool
         False if fake pedestals were used
     """
-    log_pedestal_settings(config)
-
     source = SST1MEventSource(input_url=input_file, max_events=max_events)
     source._subarray = get_subarray()
     tel = None
@@ -205,7 +203,7 @@ def load_first_pedestals(r0_monitor, dl1_monitor, input_file, config, max_events
 def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
 
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
-    calibrator_r0_r1 = Calibrator_R0_R1(config=config, telescope=tel)
+    calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
     window_corr_factors, _ = get_window_corr_factors(telescope=tel, config=config)
     swapped_modules = None
 
@@ -219,7 +217,7 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
 
         # here we apply gain drop correction
         r0_monitor.fill_monitoring(event, tel)
-        event = calibrator_r0_r1.calibrate(event)
+        calibrator_r0_r1(event, tel)
         r1_dl1_calibrator(event)
 
         # Integration correction of saturated pixels
@@ -246,19 +244,18 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
     source._subarray = get_subarray()
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
     image_processor = ImageProcessor(subarray=source.subarray, config=config)
-    calibrator_r0_r1 = None
+    calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
     tel = None
 
     def clean(event):
-        event = calibrator_r0_r1.calibrate(event)
+        calibrator_r0_r1(event, tel)
         r1_dl1_calibrator(event)
         image_processor(event)
         return event.dl1.tel[tel].image_mask
 
     for event in source:
-        if calibrator_r0_r1 is None:
+        if tel is None:
             tel = event.trigger.tels_with_trigger[0]
-            calibrator_r0_r1 = Calibrator_R0_R1(config=config, telescope=tel)
 
         cleaning_mask = clean(event)
         # Arbitrary cut, just to prevent too big showers from being used
@@ -292,18 +289,3 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
                 break
 
     return tel
-
-
-def log_pedestal_settings(config):
-
-    if config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-        logging.info("Voltage drop correction is applied pixelwise")
-
-    if config['NsbCalibrator']['apply_global_Vdrop_correction']:
-        logging.info("Voltage drop correction is applied globaly")
-
-    if config['NsbCalibrator']['apply_global_Vdrop_correction'] == config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-        if config['NsbCalibrator']['apply_global_Vdrop_correction']:
-            logging.error("Voltage drop correction is applied 2 times!!! this is WRONG!")
-        else:
-            logging.warning("NO Voltage drop correction is applied")
