@@ -5,7 +5,6 @@ Licensed under the 3-clause BSD style license.
 
 import logging
 import os
-import re
 from datetime import datetime
 import json
 
@@ -38,6 +37,7 @@ from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
 from gammapy.data import DataStore
 
+from sst1mpipe.io.sst1m_event_source import parse_target_field, camera_clock_to_time
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MAPPING_FILE_PATH = BASE_DIR / "data" / "digicam_pixels_mapping_V5T.txt"
@@ -86,31 +86,12 @@ def get_target(file, force_pointing=False):
                 logging.info('Transition to the next wobble, or dark file, not on-source pointing direction, FILE SKIPPED.')
                 hdul.close()
                 exit()
-            if pointing_string.count('_') > 1:
-                delimiter = '_'
-            elif pointing_string.count(',') > 1:
-                delimiter = ','
-            else:
+            target, wobble, ra, dec = parse_target_field(pointing_string)
+            if wobble is None:
                 logging.warning('Wrong format of coordinates in the fits header, unknown delimiter')
-                target, ra, dec, wobble = None, None, None, None
-                return target, ra, dec, wobble
-
-            target = pointing_string.split(delimiter)[0]
-            try:
-                if len(pointing_string.split(delimiter)) == 4:
-                    ra = float(pointing_string.split(delimiter)[2])
-                    dec = float(pointing_string.split(delimiter)[3])
-                elif len(pointing_string.split(delimiter)) == 3:
-                    ra = float(pointing_string.split(delimiter)[1])
-                    dec = float(pointing_string.split(delimiter)[2])
-                else:
-                    logging.warning('Wrong format of coordinates in the fits header. Field with either 3 or 4 entries is expected.')
-                    ra, dec = None, None
-            except ValueError:
-                logging.warning('Wrong format of coordinates in the fits header, cannot convert to float!')
-                ra, dec = None, None
-            match = re.search(r'W\d+', pointing_string)
-            wobble = match.group(0) if match else 'UNDEF'
+                return None, None, None, None
+            if ra is None:
+                logging.warning('Wrong format of coordinates in the fits header, cannot read RA, DEC')
         except KeyError:
             logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
             target, ra, dec, wobble = None, None, None, None
@@ -330,25 +311,10 @@ def add_trigger_time(event, telescope=None):
 
     """
 
-    localtime = event.sst1m.r0.tel[telescope].local_camera_clock.astype(np.uint64)
-    # assuming local_camera_clock in gps (gps = tai - 19s), gps scale does not exist in astropy
-    # tai = utc + 37 s (this is not constant in time and depend on leap seconds)
-    #event.trigger.time = Time(localtime * u.s + 19 * u.s, format='unix', scale='tai') - 37 * u.s
 
-    # assuming local_camera_clock in tai and conversion to utc
-    #event.trigger.time = Time(localtime * u.s, format='unix', scale='tai') - 37 * u.s
 
-    # assuming local_camera_clock in utc
-    #event.trigger.time = Time(localtime, format='unix', scale='utc')
-
-    # Time in event.trigger.time is stored in seconds, but should have ns precision, see
-    # https://github.com/cta-observatory/ctapipe_io_nectarcam/issues/24
-    # But if we read the data, using ctapipe.io.read_table, the numerical precision is lost anyway
     # We assume tai scale
-    S_TO_NS = np.uint64(1e9)
-    full_seconds = localtime // S_TO_NS
-    fractional_seconds = (localtime % S_TO_NS) / S_TO_NS
-    event.trigger.time = Time(full_seconds, fractional_seconds, format='unix_tai')
+    event.trigger.time = camera_clock_to_time(event.sst1m.r0.tel[telescope].local_camera_clock)
     event.trigger.tel[telescope].time = event.trigger.time
 
     return event
