@@ -1,7 +1,9 @@
 
+import logging
 import os
 import re
 import warnings
+from itertools import islice
 
 import numpy as np
 from astropy import units as u
@@ -34,6 +36,11 @@ from sst1mpipe.io.containers import (
     CameraEventType,
     SST1MArrayEventContainer,
 )
+
+logger = logging.getLogger(__name__)
+
+# Number of events read at the beginning of each file to look for SWAT event ids
+N_EVENTS_SWAT_ID_CHECK = 10
 
 
 def parse_target_field(field):
@@ -96,6 +103,15 @@ def camera_clock_to_time(local_camera_clock):
     full_seconds = localtime // S_TO_NS
     fractional_seconds = (localtime % S_TO_NS) / S_TO_NS
     return Time(full_seconds, fractional_seconds, format='unix_tai')
+
+
+def file_has_swat_event_ids(path, n_events=N_EVENTS_SWAT_ID_CHECK):
+    """
+    True if any of the first ``n_events`` events of the file has a non zero
+    array event id (``arrayEvtNum``) written by SWAT. False for an empty file.
+    """
+    with File(str(path)) as f:
+        return any(event.arrayEvtNum != 0 for event in islice(f.Events, n_events))
 
 
 class SST1MEventSource(EventSource):
@@ -318,22 +334,42 @@ class SST1MEventSource(EventSource):
         return self._swat_event_ids_available
 
     @staticmethod
-    def check_swat_event_ids_available(filelist):
+    def check_swat_event_ids_available(filelist, n_events=N_EVENTS_SWAT_ID_CHECK):
         """
-        Determine if the files contain SWAT-generated arrayEvtNum IDs
+        Determine if the files contain the array event ids (``arrayEvtNum``)
+        written by SWAT.
+
+        If SWAT did not write them, ``arrayEvtNum`` is always 0. Otherwise it can
+        be 0 at most once, if SWAT was just restarted. The ids are thus considered
+        available in a file if any of its first ``n_events`` events has a non zero
+        ``arrayEvtNum``.
+
+        Parameters
+        ----------
+        filelist: list of str or str
+            Files of the run
+        n_events: int
+            Number of events read at the beginning of each file
+
         Returns
         -------
-        True  if the files contain array-level IDs
-        False if the files do not contain array-level IDs
+        bool:
+            True if all the files contain the SWAT ids. If only some of them do,
+            False is returned (with a warning) so that the event ids of the run
+            are consistent.
         """
-        with File(filelist[0]) as f:
-            id0 = f.Events[0].arrayEvtNum
-            id1 = f.Events[1].arrayEvtNum
-        # If SWAT arrayEvtNum was not written, the value is always 0
-        # Otherwise, we can expect 0 at most once, if SWAT was just restarted
-        if id0 == id1 == 0:
-            return False
-        return True
+        if isinstance(filelist, str | os.PathLike):
+            filelist = [filelist]
+
+        available = [file_has_swat_event_ids(path, n_events) for path in filelist]
+
+        if any(available) and not all(available):
+            logger.warning(
+                "SWAT event ids are available only in some of the files, they are not used: %s",
+                {str(path): has_ids for path, has_ids in zip(filelist, available, strict=True)},
+            )
+
+        return len(available) > 0 and all(available)
 
     def _generator(self):
         """

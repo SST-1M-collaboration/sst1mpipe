@@ -1,5 +1,8 @@
 import os.path
 
+import logging
+from types import SimpleNamespace
+
 import pytest
 from importlib.resources import files
 
@@ -10,9 +13,11 @@ import numpy as np
 from astropy.coordinates import AltAz, SkyCoord
 from ctapipe.containers import CoordinateFrameType, PointingMode
 
+import sst1mpipe.io.sst1m_event_source as sst1m_event_source
 from sst1mpipe.io.sst1m_event_source import (
     SST1MEventSource,
     camera_clock_to_time,
+    file_has_swat_event_ids,
     parse_file_name,
     parse_target_field,
 )
@@ -247,3 +252,94 @@ def test_event_index():
     for i, event in enumerate(source):
         assert event.index.obs_id == OBS_ID_1
         assert event.index.event_id == FIRST_EVENT_ID_1 + i
+
+
+@pytest.mark.parametrize("input_file", [FILE_TEL_1, FILE_TEL_2])
+def test_swat_event_ids_in_files(input_file):
+
+    assert file_has_swat_event_ids(input_file)
+    assert SST1MEventSource.check_swat_event_ids_available([input_file])
+    assert SST1MEventSource.check_swat_event_ids_available(input_file)
+
+
+def test_swat_event_ids_used_as_event_id():
+
+    source = SST1MEventSource(input_url=[FILE_TEL_1, FILE_TEL_2], max_events=MAX_ITERATIONS)
+
+    assert source.swat_event_ids_available
+    for i, event in enumerate(source):
+        # arrayEvtNum, not the camera event number
+        assert event.sst1m.r0.event_id == FIRST_EVENT_ID_1 + i
+        assert event.sst1m.r0.event_id != event.sst1m.r0.tel[TEL_1_ID].camera_event_number
+
+
+@pytest.fixture
+def fake_array_event_numbers(monkeypatch):
+    """Replace the zfits files by files with the given arrayEvtNum of their events"""
+    array_event_numbers = {}
+
+    class FakeFile:
+        def __init__(self, path):
+            self.Events = [SimpleNamespace(arrayEvtNum=n) for n in array_event_numbers[path]]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(sst1m_event_source, "File", FakeFile)
+    return array_event_numbers
+
+
+@pytest.mark.parametrize("numbers, expected", [
+    ([0, 0, 0, 0], False),  # not written by SWAT
+    ([], False),  # empty file
+    ([12], True),  # single event
+    ([0, 12, 13], True),  # SWAT just restarted
+    ([12, 0, 1], True),  # SWAT restarted during the file
+    ([0] * 10 + [12], False),  # only the first events are read
+])
+def test_file_has_swat_event_ids(fake_array_event_numbers, numbers, expected):
+
+    fake_array_event_numbers["file.fits.fz"] = numbers
+
+    assert file_has_swat_event_ids("file.fits.fz") is expected
+
+
+def test_file_has_swat_event_ids_n_events(fake_array_event_numbers):
+
+    fake_array_event_numbers["file.fits.fz"] = [0, 0, 12]
+
+    assert not file_has_swat_event_ids("file.fits.fz", n_events=2)
+    assert file_has_swat_event_ids("file.fits.fz", n_events=3)
+
+
+@pytest.mark.parametrize("numbers_1, numbers_2, expected", [
+    ([1, 2], [3, 4], True),
+    ([0, 0], [0, 0], False),
+    ([1, 2], [0, 0], False),  # mixing ids would give inconsistent event ids
+    ([0, 0], [3, 4], False),
+])
+def test_check_swat_event_ids_available_all_files(fake_array_event_numbers, numbers_1, numbers_2, expected):
+
+    fake_array_event_numbers.update({"file_1.fits.fz": numbers_1, "file_2.fits.fz": numbers_2})
+
+    available = SST1MEventSource.check_swat_event_ids_available(["file_1.fits.fz", "file_2.fits.fz"])
+
+    assert available is expected
+
+
+def test_check_swat_event_ids_warns_if_only_some_files(fake_array_event_numbers, caplog):
+
+    fake_array_event_numbers.update({"file_1.fits.fz": [1, 2], "file_2.fits.fz": [0, 0]})
+
+    with caplog.at_level(logging.WARNING):
+        assert not SST1MEventSource.check_swat_event_ids_available(["file_1.fits.fz", "file_2.fits.fz"])
+
+    assert "only in some of the files" in caplog.text
+
+
+def test_check_swat_event_ids_no_file():
+
+    assert not SST1MEventSource.check_swat_event_ids_available([])
