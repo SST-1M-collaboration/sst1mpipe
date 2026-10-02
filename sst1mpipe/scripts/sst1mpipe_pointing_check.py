@@ -163,14 +163,14 @@ def main():
     for i, event in enumerate(source):
         # NOTE: This needs to be changed in the future when event source hopefuly provides events with both telescope data
         if i == 0:
-            tel = event.sst1m.r0.tels_with_data[0]
+            tel = event.trigger.tels_with_trigger[0]
 
-        r0data = event.sst1m.r0.tel[tel]
-        event_type = event.sst1m.r0.tel[tel]._camera_event_type.value
+        r0data = event.r0.tel[tel]
+        event_type = event.r0.tel[tel]._camera_event_type.value
 
         if event_type == 8:
             std_samples.append(np.std(r0data.adc_samples, axis=1))
-            time = event.sst1m.r0.tel[tel].local_camera_clock/10**9
+            time = event.r0.tel[tel].local_camera_clock/10**9
             time_all.append(time)
 
     std_samples = np.array(std_samples)

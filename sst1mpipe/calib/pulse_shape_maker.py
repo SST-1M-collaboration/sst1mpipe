@@ -164,12 +164,12 @@ class shape_maker:
         tot_evts = 0
 
         for ii,event in enumerate(data_stream):
-            #for tel in event.sst1m.r0.tels_with_data:
+            #for tel in event.trigger.tels_with_trigger:
                 tel = self.tel+20
                 if self.isMC:
                     r0data = event.r0.tel[tel]
                 else:
-                    r0data = event.sst1m.r0.tel[tel]
+                    r0data = event.r0.tel[tel]
 
                 if ii==0 and not self.isMC:
                     self.T0 = r0data.local_camera_clock/1e9

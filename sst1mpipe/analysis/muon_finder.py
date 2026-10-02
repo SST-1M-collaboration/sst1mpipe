@@ -35,8 +35,8 @@ def swap_r0_modules_59_88(event, tel=None):
     mask59[1098:1102+1] = True
     mask59[1133:1134+1] = True
     mask59[1064:1067+1] = True
-    waveform_59 = event.sst1m.r0.tel[tel].adc_samples[mask59, :]
-    bls59 = event.sst1m.r0.tel[tel].digicam_baseline[mask59]
+    waveform_59 = event.r0.tel[tel].adc_samples[mask59, :]
+    bls59 = event.r0.tel[tel].digicam_baseline[mask59]
 
     # module 88
     mask88 = np.zeros(1296, dtype=bool)
@@ -44,14 +44,14 @@ def swap_r0_modules_59_88(event, tel=None):
     mask88[1165:1169+1] = True
     mask88[1194:1195+1] = True
     mask88[1135:1138+1] = True
-    waveform_88 = event.sst1m.r0.tel[tel].adc_samples[mask88, :]
-    bls88 = event.sst1m.r0.tel[tel].digicam_baseline[mask88]
+    waveform_88 = event.r0.tel[tel].adc_samples[mask88, :]
+    bls88 = event.r0.tel[tel].digicam_baseline[mask88]
 
-    event.sst1m.r0.tel[tel].adc_samples[mask59] = waveform_88
-    event.sst1m.r0.tel[tel].adc_samples[mask88] = waveform_59
+    event.r0.tel[tel].adc_samples[mask59] = waveform_88
+    event.r0.tel[tel].adc_samples[mask88] = waveform_59
 
-    event.sst1m.r0.tel[tel].digicam_baseline[mask59] = bls88
-    event.sst1m.r0.tel[tel].digicam_baseline[mask88] = bls59
+    event.r0.tel[tel].digicam_baseline[mask59] = bls88
+    event.r0.tel[tel].digicam_baseline[mask88] = bls59
 
     return event
 
@@ -215,9 +215,9 @@ class muon_finder:
             else:
 
 
-                tel = event.sst1m.r0.tels_with_data[0]
+                tel = event.trigger.tels_with_trigger[0]
                 if ii==0:
-                    T0 = event.sst1m.r0.tel[tel].local_camera_clock/1e9
+                    T0 = event.r0.tel[tel].local_camera_clock/1e9
                     start_date = datetime.datetime.fromtimestamp(T0)
                     # datestr = "{}/{}/{} at {}h{}".format(start_date.day,
                     #                                      start_date.month,
@@ -231,7 +231,7 @@ class muon_finder:
                 if (tel==22) and (start_date<datetime.datetime(2024,7,18)):
                     event = swap_r0_modules_59_88(event, tel=tel)
                     #pass
-                r0data = event.sst1m.r0.tel[tel]
+                r0data = event.r0.tel[tel]
 
                 if r0data._camera_event_type.value==8:
                     r0_pedestal_monitor(event, tel)
@@ -397,7 +397,7 @@ class muon_finder:
                     else:
                         self.mu_data['mbs'].append(np.median(self.mbs))
                         self.mu_data['bsstd'].append(np.median(self.bsstd))
-                        self.mu_data['event_id'].append(event.sst1m.r0.event_id)
+                        self.mu_data['event_id'].append(event.index.event_id)
                         self.mu_data['toa'].append(r0data.local_camera_clock/1e9)
 
                     #self.mbs   = []

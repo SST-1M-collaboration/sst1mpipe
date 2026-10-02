@@ -182,8 +182,8 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
         data_stream = SST1MEventSource(input_url=filename,
                                        max_events=max_evt)
         for _,event in enumerate(data_stream):
-                    tel = event.sst1m.r0.tels_with_data[0]
-                    r0data = event.sst1m.r0.tel[tel]
+                    tel = event.trigger.tels_with_trigger[0]
+                    r0data = event.r0.tel[tel]
 
                     if r0data._camera_event_type.value==event_type:
                         for pix in range(1296):

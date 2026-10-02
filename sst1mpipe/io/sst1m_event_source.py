@@ -31,7 +31,6 @@ from sst1mpipe.constants import (
     REFERENCE_LOCATION,
     SUBARRAY_DESCRIPTION
 )
-from sst1mpipe.instrument import camera
 from sst1mpipe.io.containers import (
     CameraEventType,
     SST1MArrayEventContainer,
@@ -197,7 +196,6 @@ class SST1MEventSource(EventSource):
         self.run_number = int(date_run[1]) if date_run else 0
         self.run_id = int(''.join(date_run)) if date_run else 0
         self.tel_id = 0
-        self.camera = camera.DigiCam
 
         # LST reads camera_config from input files, is it needed such functionality for SST1M?
         self.camera_config = None
@@ -382,9 +380,7 @@ class SST1MEventSource(EventSource):
             for array_event in self.get_array_event(input_path):
                 array_event.count = count
                 array_event.index.obs_id = self.run_id
-                if array_event.sst1m.r0.event_id > 0:
-                    array_event.index.event_id = array_event.sst1m.r0.event_id
-                else:
+                if array_event.index.event_id <= 0:
                     # no event id in the file, use the run number and the event count
                     array_event.index.event_id = int(str(self.run_number) + str(count).zfill(6))
                 yield array_event
@@ -392,114 +388,81 @@ class SST1MEventSource(EventSource):
 
     def get_array_event(self, input_path):
         """
-        Read the events of a single file
+        Read the events of a single file. Only the R0 data (``event.r0``),
+        the trigger and the pointing are filled.
         """
         self.log.info("Reading %s", input_path)
-        loaded_telescopes = []
         array_event = SST1MArrayEventContainer()
         with File(input_path) as f:
             array_event.r0.meta = dict(is_simulation=False)
             for event_counter, event in enumerate(f.Events):
                 if self._swat_event_ids_available:
-                    array_event.sst1m.r0.event_id = event.arrayEvtNum
+                    array_event.index.event_id = event.arrayEvtNum
                 else:
-                    array_event.sst1m.r0.event_id = event.eventNumber
-                array_event.sst1m.r0.tels_with_data = [event.telescopeID, ]
-                _sort_ids = None
-                for tel_id in array_event.sst1m.r0.tels_with_data:
-                    pixel_ids = event.hiGain.waveforms.pixelsIndices
-                    n_pixels = len(pixel_ids)
-                    if _sort_ids is None:
-                        _sort_ids = np.argsort(pixel_ids)
-                    samples = event.hiGain.waveforms.samples.reshape(n_pixels, -1)
+                    array_event.index.event_id = event.eventNumber
 
-                    try:
-                        unsorted_baseline = event.hiGain.waveforms.baselines
-                    except AttributeError as err:
-                        raise AttributeError("Could not read `hiGain.waveforms.baselines`"
-                            f"for event:{event_counter} (eventNumber {event.eventNumber})\n"
-                            f"of file:{self.input_url}\n") from err
+                tel_id = event.telescopeID
+                pixel_ids = event.hiGain.waveforms.pixelsIndices
+                n_pixels = len(pixel_ids)
+                sort_ids = np.argsort(pixel_ids)
+                samples = event.hiGain.waveforms.samples.reshape(n_pixels, -1)
+                n_samples = samples.shape[1]
 
-                    if tel_id not in loaded_telescopes:
-                        array_event.sst1m.inst.num_channels[tel_id] = event.num_gains
-                        array_event.sst1m.inst.geom[tel_id] = self.camera.geometry
-                        array_event.sst1m.inst.cluster_matrix_7[tel_id] = \
-                            self.camera.cluster_7_matrix
-                        array_event.sst1m.inst.cluster_matrix_19[tel_id] = \
-                            self.camera.cluster_19_matrix
-                        array_event.sst1m.inst.patch_matrix[tel_id] = self.camera.patch_matrix
-                        array_event.sst1m.inst.num_pixels[tel_id] = samples.shape[0]
-                        array_event.sst1m.inst.num_samples[tel_id] = samples.shape[1]
-                        loaded_telescopes.append(tel_id)
+                try:
+                    unsorted_baseline = event.hiGain.waveforms.baselines
+                except AttributeError as err:
+                    raise AttributeError("Could not read `hiGain.waveforms.baselines`"
+                        f"for event:{event_counter} (eventNumber {event.eventNumber})\n"
+                        f"of file:{input_path}\n") from err
 
-                    cta_r0 = array_event.r0.tel[tel_id]
-                    cta_r0.waveform = samples[_sort_ids].reshape(1, n_pixels, -1)
-
-                    r0 = array_event.sst1m.r0.tel[tel_id]
-                    r0.camera_event_number = event.eventNumber
-                    r0.pixel_flags = event.pixels_flags[_sort_ids]
-                    r0.local_camera_clock = (
-                        np.int64(event.local_time_sec * 1E9) +
-                        np.int64(event.local_time_nanosec)
+                array_event.r0.tel.clear()
+                r0 = array_event.r0.tel[tel_id]
+                r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
+                r0.adc_samples = samples[sort_ids]
+                r0.num_samples = n_samples
+                r0.digicam_baseline = unsorted_baseline[sort_ids] / 16
+                r0.camera_event_number = event.eventNumber
+                r0.pixel_flags = event.pixels_flags[sort_ids]
+                r0.local_camera_clock = (
+                    np.int64(event.local_time_sec * 1E9) +
+                    np.int64(event.local_time_nanosec)
+                )
+                if event.trig is not None:
+                    r0.gps_time = (
+                        np.int64(event.trig.timeSec * 1E9) +
+                        np.int64(event.trig.timeNanoSec)
                     )
-                    self._fill_trigger_and_pointing(array_event, tel_id, r0.local_camera_clock)
+                else:
+                    r0.gps_time = np.int64(0)
+                r0.camera_event_type = event.event_type
+                r0.array_event_type = event.eventType
+                r0.trigger_input_traces = self._read_trigger_traces(
+                    event.trigger_input_traces, self._prepare_trigger_input,
+                    "trigger_input_traces", n_samples,
+                )
+                r0.trigger_output_patch7 = self._read_trigger_traces(
+                    event.trigger_output_patch7, self._prepare_trigger_output,
+                    "trigger_output_patch7", n_samples,
+                )
+                r0.trigger_output_patch19 = self._read_trigger_traces(
+                    event.trigger_output_patch19, self._prepare_trigger_output,
+                    "trigger_output_patch19", n_samples,
+                )
 
-                    if event.trig is not None:
-
-                        r0.gps_time = (
-                            np.int64(event.trig.timeSec * 1E9) +
-                            np.int64(event.trig.timeNanoSec)
-                        )
-
-                    else:
-
-                        r0.gps_time = np.int64(0)
-
-                    r0.camera_event_type = event.event_type
-                    # internal triggers are the pedestal events
-                    array_event.trigger.event_type = (
-                        EventType.SKY_PEDESTAL if r0.camera_event_type == CameraEventType.INTERNAL
-                        else EventType.SUBARRAY
-                    )
-                    r0.array_event_type = event.eventType
-                    r0.adc_samples = samples[_sort_ids]
-
-                    if len(event.trigger_input_traces) > 0:
-                        r0.trigger_input_traces = self._prepare_trigger_input(
-                            event.trigger_input_traces
-                        )
-                    else:
-                        warnings.warn(
-                            'trigger_input_traces does not exist: --> nan',
-                            stacklevel=2,
-                        )
-                        r0.trigger_input_traces = np.zeros(
-                            (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
-
-                    if len(event.trigger_output_patch7) > 0:
-                        r0.trigger_output_patch7 = self._prepare_trigger_output(
-                            event.trigger_output_patch7)
-                    else:
-                        warnings.warn(
-                            'trigger_output_patch7 does not exist: --> nan',
-                            stacklevel=2,
-                        )
-                        r0.trigger_output_patch7 = np.zeros(
-                            (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
-
-                    if len(event.trigger_output_patch19) > 0:
-                        r0.trigger_output_patch19 = self._prepare_trigger_output(
-                            event.trigger_output_patch19)
-                    else:
-                        warnings.warn(
-                            'trigger_output_patch19 does not exist: --> nan',
-                            stacklevel=2,
-                        )
-                        r0.trigger_output_patch19 = np.zeros(
-                            (432, array_event.sst1m.inst.num_samples[tel_id])) * np.nan
-
-                    r0.digicam_baseline = unsorted_baseline[_sort_ids] / 16
+                self._fill_trigger_and_pointing(array_event, tel_id, r0.local_camera_clock)
+                # internal triggers are the pedestal events
+                array_event.trigger.event_type = (
+                    EventType.SKY_PEDESTAL if r0.camera_event_type == CameraEventType.INTERNAL
+                    else EventType.SUBARRAY
+                )
                 yield array_event
+
+    @staticmethod
+    def _read_trigger_traces(traces, prepare, name, n_samples):
+        if len(traces) > 0:
+            return prepare(traces)
+        warnings.warn(f'{name} does not exist: --> nan', stacklevel=3)
+        return np.full((432, n_samples), np.nan)
 
     def _prepare_trigger_input(self, _a):
         A, B = 3, 192

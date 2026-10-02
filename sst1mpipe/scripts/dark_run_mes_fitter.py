@@ -194,8 +194,8 @@ class mes_fitter:
             )
 
         for ii,event in enumerate(data_stream):
-                tel = event.sst1m.r0.tels_with_data[0]
-                r0data = event.sst1m.r0.tel[tel]
+                tel = event.trigger.tels_with_trigger[0]
+                r0data = event.r0.tel[tel]
 
 
                 if r0data._camera_event_type.value==8:

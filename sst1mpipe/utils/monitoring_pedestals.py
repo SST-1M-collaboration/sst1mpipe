@@ -81,7 +81,7 @@ class SlidingWindowMonitor(TelescopeComponent):
             self._values[tel_id] = deque(maxlen=self.n_events.tel[tel_id])
             self.processed_events[tel_id] = 0
 
-        self._timestamps[tel_id].append(event.sst1m.r0.tel[tel_id].local_camera_clock / 1e9)
+        self._timestamps[tel_id].append(event.r0.tel[tel_id].local_camera_clock / 1e9)
         self._values[tel_id].append(values)
         self.processed_events[tel_id] += 1
         self._statistics.pop(tel_id, None)
@@ -122,7 +122,7 @@ class R0PedestalMonitor(SlidingWindowMonitor):
         Add the ADC samples of a pedestal event. Pixels in ``cleaning_mask``
         (e.g. Cherenkov pixels of a fake pedestal) are not used.
         """
-        samples = event.sst1m.r0.tel[tel_id].adc_samples
+        samples = event.r0.tel[tel_id].adc_samples
         if cleaning_mask is not None:
             samples = samples.astype(np.float64)
             samples[cleaning_mask] = MASKED_VALUE
@@ -184,8 +184,8 @@ def load_first_pedestals(r0_monitor, dl1_monitor, input_file, config, max_events
     tel = None
 
     for event in source:
-        tel = event.sst1m.r0.tels_with_data[0]
-        if event.sst1m.r0.tel[tel]._camera_event_type.value == MON_EVT_TYPE:
+        tel = event.trigger.tels_with_trigger[0]
+        if event.r0.tel[tel]._camera_event_type.value == MON_EVT_TYPE:
             r0_monitor.add_event(event, tel)
         if r0_monitor.n_buffered(tel) >= r0_monitor.n_events.tel[tel]:
             break
@@ -214,7 +214,7 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
         if swapped_modules is None:
             swapped_modules = get_swaped_modules(event)
 
-        if event.sst1m.r0.tel[tel]._camera_event_type.value != MON_EVT_TYPE:
+        if event.r0.tel[tel]._camera_event_type.value != MON_EVT_TYPE:
             continue
 
         # here we apply gain drop correction
@@ -259,7 +259,7 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
 
     for event in source:
         if calibrator_r0_r1 is None:
-            tel = event.sst1m.r0.tels_with_data[0]
+            tel = event.trigger.tels_with_trigger[0]
             calibrator_r0_r1 = Calibrator_R0_R1(config=config, telescope=tel)
 
         cleaning_mask = clean(event)

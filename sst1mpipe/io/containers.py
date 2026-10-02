@@ -11,12 +11,13 @@ from enum import Flag
 from functools import partial
 
 import numpy as np
-from astropy import units as u
 from ctapipe.containers import (
     ArrayEventContainer,
     MonitoringCameraContainer,
     MonitoringContainer,
     PedestalContainer,
+    R0CameraContainer,
+    R0Container,
     TriggerContainer,
 )
 from ctapipe.core import Container, Field, Map
@@ -31,12 +32,10 @@ from tables import (
     IsDescription,
     StringCol,
 )
-from sst1mpipe.constants import SUBARRAY_DESCRIPTION
 
 __all__ = ['CameraEventType',
-           'InstrumentContainer',
-           'R0Container',
-           'R0CameraContainer',
+           'SST1MR0Container',
+           'SST1MR0CameraContainer',
            'R1Container',
            'R1CameraContainer',
         #    'DL0Container',
@@ -64,40 +63,6 @@ class CameraEventType(Flag):
     HILLAS = 0x20000  # camera server computed Hillas parametrs
 
 
-class InstrumentContainer(Container):
-    """Storage of header info that does not change with event. This is a
-    temporary hack until the Instrument module and database is fully
-    implemented.  Eventually static information like this will not be
-    part of the data stream, but be loaded and accessed from
-    functions.
-    """
-
-    subarray = Field(SUBARRAY_DESCRIPTION,
-                     "SubarrayDescription from the instrument module")
-    optical_foclen = Field(Map(np.ndarray), "map of tel_id to focal length")
-    tel_pos = Field(Map(np.ndarray), "map of tel_id to telescope position")
-    pixel_pos = Field(Map(np.ndarray), "map of tel_id to pixel positions")
-    telescope_ids = Field([], "list of IDs of telescopes used in the run")
-    num_pixels = Field(Map(int), "map of tel_id to number of pixels in camera")
-    num_channels = Field(Map(int), "map of tel_id to number of channels")
-    num_samples = Field(Map(int), "map of tel_id to number of samples")
-    geom = Field(Map(None), 'map of tel_if to CameraGeometry')
-    cam = Field(Map(None), 'map of tel_id to Camera')
-    optics = Field(Map(None), 'map of tel_id to CameraOptics')
-    cluster_matrix_7 = Field(Map(np.ndarray), 'map of tel_id of cluster 7 matrix')
-    cluster_matrix_19 = Field(
-        Map(np.ndarray),
-        'map of tel_id of cluster 19 matrix'
-    )
-    patch_matrix = Field(Map(np.ndarray), 'map of tel_id of patch matrix')
-    mirror_dish_area = Field(Map(float),
-                             "map of tel_id to the area of the mirror dish",
-                             unit=u.m ** 2)
-    mirror_numtiles = Field(Map(int),
-                            "map of tel_id to the number of \
-                            tiles for the mirror")
-
-
 # class DL1CameraContainer(Container):
 #     """Storage of output of camera calibrationm e.g the final calibrated
 #     image in intensity units and other per-event calculated
@@ -122,61 +87,44 @@ class InstrumentContainer(Container):
 #     tel = Field(Map(DL1CameraContainer), "map of tel_id to DL1CameraContainer")
 
 
-class R0CameraContainer(Container):
+class SST1MR0CameraContainer(R0CameraContainer):
     """
-    Storage of raw data from a single telescope
+    Raw data of a single SST-1M telescope: the ctapipe
+    `~ctapipe.containers.R0CameraContainer` (``waveform`` of shape
+    (n_channels, n_pixels, n_samples), n_channels = 1 for DigiCam)
+    with the DigiCam specific information.
 
-    :param pixel_flags: a ndarray to flag the pixels
-    :type pixel_flags: ndarray (n_pixels, ) (bool)
-    :param adc_samples: a ndarray (n_pixels, n_samples) containing
-                        the waveforms in each pixel
-    :type adc_samples: ndarray (n_pixels, n_samples, ) (uint16)
-    :param adc_sums: numpy array containing integrated ADC data
-                     (n_channels, x n_pixels)
-    :type adc_sums: ndarray (n_channels, x n_pixels)
-    :param baseline: baseline holder for baseline computation using
-                     clocked triggers
-    :type baseline: ndarray (n_pixels, ) (float)
-    :param digicam_baseline: baseline computed by DigiCam of pre-samples
-                             (using 1024 samples)
-    :type digicam_baseline: ndarray (n_pixels, ) (uint16)
-    :param standard_deviation: baseline standard deviation holder for baseline
-                               computed using clocked triggers
-    :type standard deviation: ndarray (n_pixels, ) (float)
-    :param dark_baseline: baseline holder for baseline computed in dark
-                          condition (lid closed)
-    :type dark_baseline: ndarray (n_pixels, ) (float)
-    :param hv_off_baseline: baseline computed with sensors just bellow
-                            breakdown voltage (or without bias voltage applied)
-    :type hv_off_baseline: ndarray (n_pixels, ) (float)
-    :param camera_event_id: unique event identification provided by DigiCam
-    :type camera_event_id: (int)
-    :param camera_event_number: event number within the first trigger of
-                                operation
-    :type camera_event_number: (int)
-    :param local_camera_clock: time stamp from internal DigiCam clock (ns)
-    :type local_camera_clock: (int)
-    :param gps_time: time stamp provided by a precise external clock
-                     (synchronized between hardware components)
-    :type gps_time: (int)
+    The static information of the camera (geometry, number of pixels and samples)
+    is in the `~ctapipe.instrument.SubarrayDescription` of the event source,
+    the trigger cluster and patch matrices in `sst1mpipe.instrument.camera.DigiCam`.
     """
-    pixel_flags = Field(np.ndarray, 'numpy array containing pixel flags')
-    adc_samples = Field(np.ndarray,
-                        "numpy array containing ADC samples"
-                        "(n_channels x n_pixels, n_samples)")
-    adc_sums = Field(np.ndarray, "numpy array containing integrated ADC data"
-                              "(n_channels, x n_pixels)")
-    baseline = Field(None, "number of time samples for telescope")
-    digicam_baseline = Field(np.ndarray, 'Baseline computed by DigiCam')
-    standard_deviation = Field(np.ndarray, "number of time samples for telescope")
-    dark_baseline = Field(np.ndarray, 'dark baseline')
-    hv_off_baseline = Field(np.ndarray, 'HV off baseline')
-    camera_event_id = Field(int, 'Camera event number')
-    camera_event_number = Field(int, "camera event number")
-    local_camera_clock = Field(np.int64, "camera timestamp")
-    gps_time = Field(np.int64, "gps timestamp")
-    white_rabbit_time = Field(float, "precise white rabbit based timestamp")
-    _camera_event_type = Field(CameraEventType, "camera event type")
+
+    pixel_flags = Field(None, "numpy array containing pixel flags (n_pixels)")
+    adc_samples = Field(
+        None,
+        "ADC samples (n_pixels, n_samples). Same as waveform[0] when read, but a separate"
+        " array: the waveform of the bad pixels is set to 0 by the calibration, not adc_samples",
+    )
+    adc_sums = Field(None, "numpy array containing integrated ADC data (n_channels, n_pixels)")
+    baseline = Field(None, "baseline computed using clocked triggers (n_pixels)")
+    digicam_baseline = Field(None, "baseline computed by DigiCam from 1024 pre-samples (n_pixels)")
+    standard_deviation = Field(None, "baseline standard deviation computed using clocked triggers (n_pixels)")
+    dark_baseline = Field(None, "baseline computed in dark condition, lid closed (n_pixels)")
+    hv_off_baseline = Field(None, "baseline computed without bias voltage (n_pixels)")
+    camera_event_id = Field(None, "unique event identification provided by DigiCam")
+    camera_event_number = Field(None, "event number within the first trigger of operation")
+    local_camera_clock = Field(None, "timestamp from the internal DigiCam clock (ns, TAI)")
+    gps_time = Field(None, "timestamp from a precise external clock (ns)")
+    white_rabbit_time = Field(None, "precise White Rabbit based timestamp")
+    _camera_event_type = Field(None, "camera event type")
+    array_event_type = Field(None, "array event type")
+    trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples)")
+    trigger_input_offline = Field(None, "trigger patch traces computed offline (n_patches, n_samples)")
+    trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples)")
+    trigger_output_patch19 = Field(None, "trigger 19 patch cluster traces (n_clusters, n_samples)")
+    trigger_input_7 = Field(None, "trigger input CLUSTER7")
+    trigger_input_19 = Field(None, "trigger input CLUSTER19")
+    num_samples = Field(None, "number of time samples")
 
     @property
     def camera_event_type(self):
@@ -186,27 +134,16 @@ class R0CameraContainer(Container):
     def camera_event_type(self, value):
         self._camera_event_type = CameraEventType(value)
 
-    array_event_type = Field(int, "array event type")
-    trigger_input_traces = Field(np.ndarray, "trigger patch trace (n_patches)")
-    trigger_input_offline = Field(np.ndarray, "trigger patch trace (n_patches)")
-    trigger_output_patch7 = Field(np.ndarray, "trigger 7 patch cluster trace \
-                                  (n_clusters)")
-    trigger_output_patch19 = Field(np.ndarray, "trigger 19 patch cluster trace \
-                                   (n_clusters)")
-    trigger_input_7 = Field(np.ndarray, 'trigger input CLUSTER7')
-    trigger_input_19 = Field(np.ndarray, 'trigger input CLUSTER19')
-    num_samples = Field(int, "number of time samples for telescope")
 
-
-class R0Container(Container):
+class SST1MR0Container(R0Container):
     """
-    Storage of a Merged Raw Data Event
+    Raw data of the SST-1M telescopes
     """
 
-    run_id = Field(-1, "run id number")
-    event_id = Field(-1, "event id number")
-    tels_with_data = Field([], "list of telescopes with data")
-    tel = Field(Map(R0CameraContainer), "map of tel_id to R0CameraContainer")
+    tel = Field(
+        default_factory=partial(Map, SST1MR0CameraContainer),
+        description="map of tel_id to SST1MR0CameraContainer",
+    )
 
 
 class R1CameraContainer(Container):
@@ -279,10 +216,7 @@ class SST1MMonitoringContainer(MonitoringContainer):
 
 
 class SST1MContainer(Container):
-    r0 = Field(R0Container(), "Raw Data")
-    r1 = Field(R1Container(), "Raw Common Data")
-
-    inst = Field(InstrumentContainer(), "Instrumental information")
+    r1 = Field(R1Container(), "SST-1M specific information of the calibration")
     slow_data = Field(None, "Slow Data Information")
     trig = Field(TriggerContainer(), "central trigger information")
     count = Field(0, "number of events processed")
@@ -296,6 +230,7 @@ class SST1MArrayEventContainer(ArrayEventContainer):
     """
     Data container including SST1M and monitoring information
     """
+    r0 = Field(default_factory=SST1MR0Container, description="Raw data of the SST-1M telescopes")
     sst1m = Field(SST1MContainer(), "SST1M specific information")
     mon = Field(default_factory=SST1MMonitoringContainer, description="container for monitoring data (MON)")
 

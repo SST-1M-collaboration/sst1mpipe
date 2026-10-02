@@ -18,7 +18,7 @@ def get_default_window(telescope=None):
     ----------
     telescope: int
         Telescope number as in
-        event.sst1m.r0.tels_with_data
+        event.trigger.tels_with_trigger
 
     Returns
     -------
@@ -49,7 +49,7 @@ def get_window_corr_factors(telescope=None, config=None):
     ----------
     telescope: int
         Telescope number as in
-        event.sst1m.r0.tels_with_data
+        event.trigger.tels_with_trigger
     config: dict
 
     Returns
@@ -90,7 +90,7 @@ def window_transmittance_correction(
     window_corr_factors: numpy.ndarray
     telescope: int
         Telescope number as in
-        event.sst1m.r0.tels_with_data
+        event.trigger.tels_with_trigger
     swapped_modules: list
         list of masks
 
@@ -147,8 +147,8 @@ def saturated_charge_correction(event):
     width_threshold = 5
     integration_level = 0.2
 
-    telescope = event.sst1m.r0.tels_with_data[0]
-    r0data = event.sst1m.r0.tel[telescope]
+    telescope = event.trigger.tels_with_trigger[0]
+    r0data = event.r0.tel[telescope]
     adc_samples = (r0data.adc_samples.T - r0data.digicam_baseline)
 
     # saturated pixels
@@ -303,7 +303,7 @@ class Calibrator_R0_R1:
             sst1mpipe.io.containers.SST1MArrayEventContainer
         """
 
-        r0data = event.sst1m.r0.tel[self.telescope]
+        r0data = event.r0.tel[self.telescope]
         baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
 
         pedestal_std = event.mon.tel[self.telescope].r0.charge_std

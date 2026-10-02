@@ -311,7 +311,7 @@ def main():
 
                 # NOTE: This needs to be changed in the future when event source hopefuly provides events with both telescope data
                 if i == 0:
-                    tel = event.sst1m.r0.tels_with_data[0]
+                    tel = event.trigger.tels_with_trigger[0]
                     calibrator_r0_r1 = Calibrator_R0_R1(config=config, telescope=tel)
                     calibration_file = calibrator_r0_r1.calibration_file
                     window_corr_factors, window_file = get_window_corr_factors(
@@ -343,7 +343,7 @@ def main():
                 # print(calibrator_r0_r1.pixels_removed) # can be monitored
 
                 event.r1.tel[tel].selected_gain_channel = np.zeros(source.subarray.tel[tel].camera.readout.n_pixels,dtype='int8')
-                event_type = event.sst1m.r0.tel[tel]._camera_event_type.value
+                event_type = event.r0.tel[tel]._camera_event_type.value
 
                 # NOTE: event.index, event.trigger and event.pointing are filled by SST1MEventSource
 
@@ -448,7 +448,7 @@ def main():
             # Extraction of pixel charge distribution for MC-data tuning
             if pixel_charges:
                 if not source.is_simulation:
-                    event_type = event.sst1m.r0.tel[tel]._camera_event_type.value
+                    event_type = event.r0.tel[tel]._camera_event_type.value
                     if ped_time_start is None:
                         ped_time_start = event.trigger.time
                     if event_type == 8:
@@ -525,7 +525,7 @@ def main():
 
             # Extracting WR timestamps with high numerical precision
             if not source.is_simulation and precise_timestamps:
-                localtime = event.sst1m.r0.tel[tel].local_camera_clock.astype(np.uint64)
+                localtime = event.r0.tel[tel].local_camera_clock.astype(np.uint64)
                 S_TO_NS = np.uint64(1e9)
                 full_seconds.append(localtime // S_TO_NS)
                 fractional_seconds.append((localtime % S_TO_NS) / S_TO_NS)

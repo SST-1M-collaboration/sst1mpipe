@@ -167,7 +167,7 @@ def get_tel_string(tel, mc=True):
     ----------
     tel: int
         Telescope number as in
-        event.sst1m.r0.tels_with_data
+        event.trigger.tels_with_trigger
     mc: bool
 
     Returns
@@ -314,7 +314,7 @@ def add_trigger_time(event, telescope=None):
 
 
     # We assume tai scale
-    event.trigger.time = camera_clock_to_time(event.sst1m.r0.tel[telescope].local_camera_clock)
+    event.trigger.time = camera_clock_to_time(event.r0.tel[telescope].local_camera_clock)
     event.trigger.tel[telescope].time = event.trigger.time
 
     return event
@@ -344,8 +344,8 @@ def add_event_id(event, filename=None, event_number=0):
     date = filename.split('/')[-1].split('_')[1]
     obs_id = date + filename.split('/')[-1].split('_')[2]
 
-    if event.sst1m.r0.event_id > 0:
-        event_id = event.sst1m.r0.event_id
+    if event.index.event_id > 0:
+        event_id = event.index.event_id
     else:
         event_id = str(int(filename.split('/')[-1].split('_')[2])) + str(event_number).zfill(6)
         logging.warning('Event IDs are not stored in raw data. Replacing with event ID based on date and event count.')
@@ -824,12 +824,12 @@ def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingf
     pix_maps = aio.read(mappingfilepath)
 
     mask_list = []
-    tel = event.sst1m.r0.tels_with_data[0]
+    tel = event.trigger.tels_with_trigger[0]
     with open(inv_list_path, encoding="utf-8") as f:
         inv_list = json.load(f)
     for key in inv_list.keys():
         if inv_list[key]['ntel'] == tel:
-            localtime = event.sst1m.r0.tel[tel].local_camera_clock/1e9
+            localtime = event.r0.tel[tel].local_camera_clock/1e9
             time = Time(localtime, format='unix_tai')
             time_min = Time(inv_list[key]['date_sart'], format='isot', scale='utc')
             time_max = Time(inv_list[key]['date_stop'], format='isot', scale='utc')
@@ -871,17 +871,17 @@ def swap_modules_r0wf(event,mask1,mask2,tel=None):
     """
 
 
-    waveform_1 = event.sst1m.r0.tel[tel].adc_samples[mask1,:]
-    bs_1 = event.sst1m.r0.tel[tel].digicam_baseline[mask1]
+    waveform_1 = event.r0.tel[tel].adc_samples[mask1,:]
+    bs_1 = event.r0.tel[tel].digicam_baseline[mask1]
 
-    waveform_2 = event.sst1m.r0.tel[tel].adc_samples[mask2,:]
-    bs_2 = event.sst1m.r0.tel[tel].digicam_baseline[mask2]
+    waveform_2 = event.r0.tel[tel].adc_samples[mask2,:]
+    bs_2 = event.r0.tel[tel].digicam_baseline[mask2]
 
-    event.sst1m.r0.tel[tel].adc_samples[mask1] = waveform_2
-    event.sst1m.r0.tel[tel].adc_samples[mask2] = waveform_1
+    event.r0.tel[tel].adc_samples[mask1] = waveform_2
+    event.r0.tel[tel].adc_samples[mask2] = waveform_1
 
-    event.sst1m.r0.tel[tel].digicam_baseline[mask1] = bs_2
-    event.sst1m.r0.tel[tel].digicam_baseline[mask2] = bs_1
+    event.r0.tel[tel].digicam_baseline[mask1] = bs_2
+    event.r0.tel[tel].digicam_baseline[mask2] = bs_1
 
     return event
 

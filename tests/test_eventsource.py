@@ -21,7 +21,7 @@ from sst1mpipe.io.sst1m_event_source import (
     parse_file_name,
     parse_target_field,
 )
-from sst1mpipe.io.containers import CameraEventType, SST1MArrayEventContainer
+from sst1mpipe.io.containers import CameraEventType, SST1MArrayEventContainer, SST1MR0CameraContainer
 
 FILE_TEL_1 = files('sst1mpipe.resources.zfits').joinpath('SST1M1_20260121_0001.fits.fz')
 FILE_TEL_2 = files('sst1mpipe.resources.zfits').joinpath('SST1M2_20260121_0001.fits.fz')
@@ -52,15 +52,15 @@ def test_read_events():
     i = 0
     for event in source:
 
-        waveform = event.sst1m.r0.tel[TEL_1_ID].adc_samples
-        baseline = event.sst1m.r0.tel[TEL_1_ID].digicam_baseline
+        waveform = event.r0.tel[TEL_1_ID].adc_samples
+        baseline = event.r0.tel[TEL_1_ID].digicam_baseline
         assert waveform.sum() == SUM_WAVEFORM_1[i]
-        assert event.sst1m.r0.event_id == FIRST_EVENT_ID_1 + i
-        assert event.sst1m.r0.tel[TEL_1_ID].camera_event_number == FIRST_CAMERA_EVENT_NUMBER_1 + i
+        assert event.index.event_id == FIRST_EVENT_ID_1 + i
+        assert event.r0.tel[TEL_1_ID].camera_event_number == FIRST_CAMERA_EVENT_NUMBER_1 + i
         assert baseline.sum() == SUM_BASELINE_1[i]
-        assert event.sst1m.r0.tel[TEL_1_ID].gps_time == 0
-        assert event.sst1m.r0.tel[TEL_1_ID].local_camera_clock == LOCAL_CAMERA_CLOCK_1[i]
-        assert event.sst1m.r0.tel[TEL_1_ID].camera_event_type == CAMERA_EVENT_TYPE_1[i]
+        assert event.r0.tel[TEL_1_ID].gps_time == 0
+        assert event.r0.tel[TEL_1_ID].local_camera_clock == LOCAL_CAMERA_CLOCK_1[i]
+        assert event.r0.tel[TEL_1_ID].camera_event_type == CAMERA_EVENT_TYPE_1[i]
         i += 1
     assert i == MAX_ITERATIONS
 
@@ -92,7 +92,7 @@ def test_input_url_list_of_files(input_url):
     assert source.filelist == [str(FILE_TEL_1), str(FILE_TEL_2)]
 
     # events are read starting with the first file
-    event_ids = [event.sst1m.r0.event_id for event in source]
+    event_ids = [event.index.event_id for event in source]
     assert event_ids == [FIRST_EVENT_ID_1 + i for i in range(MAX_ITERATIONS)]
 
 
@@ -110,7 +110,7 @@ def test_files_are_read_one_after_the_other():
     source = SST1MEventSource(input_url=[FILE_TEL_1, FILE_TEL_2])
 
     for event in source:
-        if event.sst1m.r0.tels_with_data[0] == TEL_2_ID:
+        if event.trigger.tels_with_trigger[0] == TEL_2_ID:
             break
 
     assert event.count == n_events_file_1
@@ -269,8 +269,8 @@ def test_swat_event_ids_used_as_event_id():
     assert source.swat_event_ids_available
     for i, event in enumerate(source):
         # arrayEvtNum, not the camera event number
-        assert event.sst1m.r0.event_id == FIRST_EVENT_ID_1 + i
-        assert event.sst1m.r0.event_id != event.sst1m.r0.tel[TEL_1_ID].camera_event_number
+        assert event.index.event_id == FIRST_EVENT_ID_1 + i
+        assert event.index.event_id != event.r0.tel[TEL_1_ID].camera_event_number
 
 
 @pytest.fixture
@@ -343,3 +343,30 @@ def test_check_swat_event_ids_warns_if_only_some_files(fake_array_event_numbers,
 def test_check_swat_event_ids_no_file():
 
     assert not SST1MEventSource.check_swat_event_ids_available([])
+
+
+def test_only_r0_trigger_and_pointing_are_filled():
+
+    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=MAX_ITERATIONS)
+    n_pixels = source.subarray.tel[TEL_1_ID].camera.readout.n_pixels
+
+    for event in source:
+        assert list(event.r0.tel.keys()) == [TEL_1_ID]
+        r0 = event.r0.tel[TEL_1_ID]
+        assert isinstance(r0, SST1MR0CameraContainer)
+        # one DigiCam channel
+        assert r0.waveform.shape == (1, n_pixels, r0.num_samples)
+        np.testing.assert_array_equal(r0.waveform[0], r0.adc_samples)
+        # separate arrays: the calibration sets the waveform of bad pixels to 0, not adc_samples
+        assert not np.shares_memory(r0.waveform, r0.adc_samples)
+        assert r0.trigger_input_traces.shape == (432, r0.num_samples)
+
+        assert event.trigger.tels_with_trigger == [TEL_1_ID]
+        assert event.trigger.time is not None
+
+        assert len(event.r1.tel) == 0
+        assert len(event.dl0.tel) == 0
+        assert len(event.dl1.tel) == 0
+        assert len(event.sst1m.r1.tel) == 0
+        assert "r0" not in event.sst1m.fields
+        assert "inst" not in event.sst1m.fields
