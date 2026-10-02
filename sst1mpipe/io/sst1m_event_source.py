@@ -1,11 +1,16 @@
 
+import os
+import re
 import warnings
 
 import numpy as np
 from astropy import units as u
+from astropy.coordinates import AltAz, SkyCoord
 from astropy.io import fits
 from astropy.time import Time
 from ctapipe.containers import (
+    CoordinateFrameType,
+    EventType,
     ObservationBlockContainer,
     PointingMode,
     SchedulingBlockContainer,
@@ -26,8 +31,71 @@ from sst1mpipe.constants import (
 )
 from sst1mpipe.instrument import camera
 from sst1mpipe.io.containers import (
+    CameraEventType,
     SST1MArrayEventContainer,
 )
+
+
+def parse_target_field(field):
+    """
+    Parse the TARGET field of the header of the ``Events`` table, expected as
+    ``target[_,]wobble[_,]ra[_,]dec`` or ``target[_,]ra[_,]dec`` with ra, dec in deg,
+    e.g. ``Crab_W1_83.63_22.01``. Files without pointing (e.g. ``dark`` or
+    ``transition``) only contain the target.
+
+    Parameters
+    ----------
+    field: str or None
+
+    Returns
+    -------
+    target, wobble, ra, dec:
+        None for the missing entries. wobble is None if the field has
+        no delimiter and ``UNDEF`` if it has no ``W<n>`` entry.
+    """
+    if field is None:
+        return None, None, None, None
+
+    if field.count('_') > 1:
+        delimiter = '_'
+    elif field.count(',') > 1:
+        delimiter = ','
+    else:
+        return field, None, None, None
+
+    entries = field.split(delimiter)
+    target = entries[0]
+    match = re.search(r'W\d+', field)
+    wobble = match.group(0) if match else 'UNDEF'
+
+    if len(entries) not in (3, 4):
+        return target, wobble, None, None
+    try:
+        ra, dec = float(entries[-2]), float(entries[-1])
+    except ValueError:
+        return target, wobble, None, None
+    return target, wobble, ra, dec
+
+
+def parse_file_name(file_name):
+    """
+    Date and run number of a SST-1M raw data file name ``SST1M<tel>_<date>_<run>.fits.fz``,
+    e.g. ``SST1M1_20260121_0001.fits.fz`` -> ("20260121", "0001"). None if it does not match.
+    """
+    match = re.match(r'SST1M\d*_(\d+)_(\d+)', os.path.basename(str(file_name)))
+    return match.groups() if match else None
+
+
+def camera_clock_to_time(local_camera_clock):
+    """
+    Convert the camera clock (ns, TAI scale) to an astropy Time with ns precision, see
+    https://github.com/cta-observatory/ctapipe_io_nectarcam/issues/24
+    """
+    localtime = np.uint64(local_camera_clock)
+    S_TO_NS = np.uint64(1e9)
+    full_seconds = localtime // S_TO_NS
+    fractional_seconds = (localtime % S_TO_NS) / S_TO_NS
+    return Time(full_seconds, fractional_seconds, format='unix_tai')
 
 
 class SST1MEventSource(EventSource):
@@ -67,6 +135,26 @@ class SST1MEventSource(EventSource):
         ),
     ).tag(config = True)
 
+    pointing_ra = Float(
+        default_value=None,
+        allow_none=True,
+        help="Pointing right ascension in deg. Overrides the TARGET field of the file.",
+    ).tag(config=True)
+
+    pointing_dec = Float(
+        default_value=None,
+        allow_none=True,
+        help="Pointing declination in deg. Overrides the TARGET field of the file.",
+    ).tag(config=True)
+
+    pointing_update_interval = Float(
+        default_value=1.0,
+        help=(
+            "The altitude and azimuth of the pointing are recomputed when the time of the"
+            " event differs by more than this value (in s) from the last computation."
+        ),
+    ).tag(config=True)
+
     focal_length_choice = UseEnum(
         FocalLengthKind,
         default_value=FocalLengthKind.EQUIVALENT,
@@ -88,7 +176,10 @@ class SST1MEventSource(EventSource):
             EventSource.input_url.validate(self, url) for url in input_urls
         ]
 
-        self.run_id = 0
+        # obs_id from the date and run number of the file name
+        date_run = parse_file_name(self.filelist[0])
+        self.run_number = int(date_run[1]) if date_run else 0
+        self.run_id = int(''.join(date_run)) if date_run else 0
         self.tel_id = 0
         self.camera = camera.DigiCam
 
@@ -99,17 +190,24 @@ class SST1MEventSource(EventSource):
         self._subarray = SUBARRAY_DESCRIPTION
 
 
-        # self.pointing_source = PointingSource(subarray=self.subarray, parent=self)
+        # Target and pointing from the TARGET field of the file, unless given by the user
+        header = fits.getheader(self.filelist[0], 'Events')
+        self._target, self._wobble, ra, dec = parse_target_field(header.get('TARGET'))
+        self._pointing_manual = (self.pointing_ra is not None) and (self.pointing_dec is not None)
+        if self._pointing_manual:
+            ra, dec = self.pointing_ra, self.pointing_dec
 
+        self._pointing = None
+        self._tel_locations = {}
+        self._altaz_cache = {}
         target_info = {}
         pointing_mode = PointingMode.UNKNOWN
-        # if self.pointing_information:
-        #     target = self.pointing_source.get_target(tel_id=self.tel_id, time=self.run_start)
-        #     if target is not None:
-        #         target_info["subarray_pointing_lon"] = target["ra"]
-        #         target_info["subarray_pointing_lat"] = target["dec"]
-        #         target_info["subarray_pointing_frame"] = CoordinateFrameType.ICRS
-        #         pointing_mode = PointingMode.TRACK
+        if (ra is not None) and (dec is not None):
+            self._pointing = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame='icrs')
+            target_info["subarray_pointing_lon"] = ra * u.deg
+            target_info["subarray_pointing_lat"] = dec * u.deg
+            target_info["subarray_pointing_frame"] = CoordinateFrameType.ICRS
+            pointing_mode = PointingMode.TRACK
 
         self._scheduling_blocks = {
             self.run_id: SchedulingBlockContainer(
@@ -139,6 +237,58 @@ class SST1MEventSource(EventSource):
     @property
     def subarray(self):
         return self._subarray
+
+    @property
+    def target(self):
+        """Target name from the TARGET field of the file"""
+        return self._target
+
+    @property
+    def wobble(self):
+        """Wobble from the TARGET field of the file (``W<n>``, ``UNDEF`` or None)"""
+        return self._wobble
+
+    @property
+    def pointing(self):
+        """Pointing direction (ICRS) of the run, None if unknown"""
+        return self._pointing
+
+    @property
+    def pointing_manual(self):
+        """True if the pointing is given by the user and not read from the file"""
+        return self._pointing_manual
+
+    def _tel_location(self, tel_id):
+        if tel_id not in self._tel_locations:
+            locations = self.subarray.tel_coords.to_earth_location()
+            self._tel_locations[tel_id] = locations[self.subarray.tel_index_array[tel_id]]
+        return self._tel_locations[tel_id]
+
+    def _fill_trigger_and_pointing(self, array_event, tel_id, local_camera_clock):
+        time = camera_clock_to_time(local_camera_clock)
+        array_event.trigger.time = time
+        array_event.trigger.tel[tel_id].time = time
+        array_event.trigger.tels_with_trigger = [tel_id]
+
+        if not self.pointing_information or self._pointing is None:
+            return
+
+        # the alt/az transformation is slow, it is only recomputed when the time changed enough
+        cached = self._altaz_cache.get(tel_id)
+        if cached is None or abs((time - cached[0]).to_value(u.s)) > self.pointing_update_interval:
+            horizon_frame = AltAz(obstime=time, location=self._tel_location(tel_id))
+            altaz = self._pointing.transform_to(horizon_frame)
+            cached = (time, altaz.az.to(u.rad), altaz.alt.to(u.rad))
+            self._altaz_cache[tel_id] = cached
+        _, azimuth, altitude = cached
+
+        pointing = array_event.pointing
+        pointing.tel[tel_id].azimuth = azimuth
+        pointing.tel[tel_id].altitude = altitude
+        pointing.array_azimuth = azimuth
+        pointing.array_altitude = altitude
+        pointing.array_ra = self._pointing.ra.to(u.rad)
+        pointing.array_dec = self._pointing.dec.to(u.rad)
 
     @property
     def is_simulation(self):
@@ -195,6 +345,12 @@ class SST1MEventSource(EventSource):
         for input_path in self.filelist:
             for array_event in self.get_array_event(input_path):
                 array_event.count = count
+                array_event.index.obs_id = self.run_id
+                if array_event.sst1m.r0.event_id > 0:
+                    array_event.index.event_id = array_event.sst1m.r0.event_id
+                else:
+                    # no event id in the file, use the run number and the event count
+                    array_event.index.event_id = int(str(self.run_number) + str(count).zfill(6))
                 yield array_event
                 count += 1
 
@@ -250,6 +406,7 @@ class SST1MEventSource(EventSource):
                         np.int64(event.local_time_sec * 1E9) +
                         np.int64(event.local_time_nanosec)
                     )
+                    self._fill_trigger_and_pointing(array_event, tel_id, r0.local_camera_clock)
 
                     if event.trig is not None:
 
@@ -263,6 +420,11 @@ class SST1MEventSource(EventSource):
                         r0.gps_time = np.int64(0)
 
                     r0.camera_event_type = event.event_type
+                    # internal triggers are the pedestal events
+                    array_event.trigger.event_type = (
+                        EventType.SKY_PEDESTAL if r0.camera_event_type == CameraEventType.INTERNAL
+                        else EventType.SUBARRAY
+                    )
                     r0.array_event_type = event.eventType
                     r0.adc_samples = samples[_sort_ids]
 
