@@ -17,9 +17,8 @@ from ctapipe.containers import (
     PedestalContainer,
     R0CameraContainer,
     R0Container,
-    TriggerContainer,
 )
-from ctapipe.core import Container, Field, Map
+from ctapipe.core import Field, Map
 
 # from ctapipe.serializer import Serializer
 # from ctapipe.containers import MCEventContainer, ReconstructedContainer, \
@@ -183,22 +182,12 @@ class SST1MMonitoringContainer(MonitoringContainer):
     )
 
 
-class SST1MContainer(Container):
-    slow_data = Field(None, "Slow Data Information")
-    trig = Field(TriggerContainer(), "central trigger information")
-    count = Field(0, "number of events processed")
-    # dl0 = Field(DL0Container(), "DL0 Data Volume Reduced Data")
-    # dl1 = Field(DL1Container(), "DL1 Calibrated image")
-    # dl2 = Field(ReconstructedContainer(), "Reconstructed Shower Information")
-    # mc = Field(MCEventContainer(), "Monte-Carlo data")
-    # mcheader = Field(MCHeaderContainer(), "Monte-Carlo run header data")
-
 class SST1MArrayEventContainer(ArrayEventContainer):
     """
-    Data container including SST1M and monitoring information
+    ctapipe array event with the SST-1M raw data (DigiCam specific R0 fields)
+    and the R0 level monitoring (statistics of the ADC samples of the pedestal events)
     """
     r0 = Field(default_factory=SST1MR0Container, description="Raw data of the SST-1M telescopes")
-    sst1m = Field(SST1MContainer(), "SST1M specific information")
     mon = Field(default_factory=SST1MMonitoringContainer, description="container for monitoring data (MON)")
 
 

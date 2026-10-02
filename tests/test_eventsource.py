@@ -367,4 +367,4 @@ def test_only_r0_trigger_and_pointing_are_filled():
         assert len(event.r1.tel) == 0
         assert len(event.dl0.tel) == 0
         assert len(event.dl1.tel) == 0
-        assert not {"r0", "r1", "inst"} & set(event.sst1m.fields)
+        assert "sst1m" not in event.fields
