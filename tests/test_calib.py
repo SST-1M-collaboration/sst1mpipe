@@ -119,8 +119,8 @@ def test_no_voltage_drop_correction_without_pedestals(event):
 def test_bad_pixels(event, flag_bad_calibration, flag_dead, threshold, expected_dead):
 
     dead_pixel = 100
-    pedestal_std = np.full(1296, 4.0)
-    pedestal_std[dead_pixel] = 1.0
+    pedestal_std = np.full((1, 1296), 4.0)
+    pedestal_std[0, dead_pixel] = 1.0
     calibrator_r0_r1 = calibrator(
         flag_bad_calibration_pixels=flag_bad_calibration,
         flag_dead_pixels=flag_dead,

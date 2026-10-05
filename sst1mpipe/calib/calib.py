@@ -373,11 +373,12 @@ class R0R1Calibrator(TelescopeComponent):
     def bad_pixels(self, tel_id, pedestal_std):
         """Mask of the pixels set to 0 and flagged"""
         dc_to_pe, mask_bad_calibration = self.calibration_parameters(tel_id)
-        mask_bad = np.zeros(len(dc_to_pe), dtype=bool)
+        mask_bad = np.zeros(dc_to_pe.shape, dtype=bool)
+
         if self.flag_bad_calibration_pixels.tel[tel_id]:
             mask_bad |= mask_bad_calibration
         if self.flag_dead_pixels.tel[tel_id] and pedestal_std is not None:
-            mask_bad |= pedestal_std < self.dead_pixel_std_threshold.tel[tel_id]
+            mask_bad |= pedestal_std[0, :] < self.dead_pixel_std_threshold.tel[tel_id]
         return mask_bad
 
     def __call__(self, event, tel_id=None):
