@@ -122,11 +122,11 @@ class R0PedestalMonitor(SlidingWindowMonitor):
         Add the ADC samples of a pedestal event. Pixels in ``cleaning_mask``
         (e.g. Cherenkov pixels of a fake pedestal) are not used.
         """
-        samples = event.r0.tel[tel_id].waveform[0]
+        samples = event.r0.tel[tel_id].waveform
         if cleaning_mask is not None:
             samples = samples.astype(np.float64)
             samples[cleaning_mask] = MASKED_VALUE
-        self._append(event, tel_id, np.stack([samples.mean(axis=1), samples.std(axis=1)]))
+        self._append(event, tel_id, np.stack([samples.mean(axis=-1), samples.std(axis=-1)]))
 
     def _container(self, event, tel_id):
         return event.mon.tel[tel_id].r0
