@@ -198,11 +198,16 @@ def test_translate_legacy_calibration_config(pixelwise, global_, expected):
         "flag_bad_calibration_pixels": True,
         "flag_dead_pixels": False,
         "voltage_drop_correction": expected,
-        "mc_pde_correction": False,
     }
     calibrator_r0_r1 = R0R1Calibrator(subarray=get_subarray(), config=Config(config))
     assert calibrator_r0_r1.voltage_drop_correction.tel[21] == expected
     assert str(calibrator_r0_r1.calibration_file_path(22)) == CALIBRATION_FILE_TEL_2
+
+
+def test_translate_legacy_mc_pde_correction():
+
+    with pytest.raises(ValueError, match="pde_drop_factor"):
+        translate_legacy_calibration_config({"NsbCalibrator": {"mc_correction_for_PDE": True}})
 
 
 def test_config_without_legacy_settings_is_unchanged():
@@ -225,8 +230,14 @@ def test_default_config_settings():
 
 
 # PDE drop correction of the simulations
-PDE_FILES = ["qe_SST1M_5477_ave_TEL1_NSB251.0", "qe_SST1M_5477_ave_TEL2_NSB300.0", "qe_dummy"]
-PDE_DROP_FACTORS = {1: 0.9393873691700036, 2: 0.9819055121768047}  # mc_pde_correction_factors.json
+MC_CONFIG_FILES = {
+    nsb: files('sst1mpipe.data').joinpath(f'sst1mpipe_mc_config_{nsb}_nsb.json') for nsb in ("low", "high")
+}
+# PDE files of the low and high NSB simulations, see mc_pde_correction_factors.json
+PDE_FILES = {
+    "low": {1: "qe_SST1M_5477_ave_TEL1_NSB136.0", 2: "qe_SST1M_5477_ave_TEL2_NSB177.0"},
+    "high": {1: "qe_SST1M_5477_ave_TEL1_NSB251.0", 2: "qe_SST1M_5477_ave_TEL2_NSB300.0"},
+}
 
 
 @pytest.fixture(scope="module")
@@ -249,87 +260,78 @@ def simulated_event(tel_ids=(1, 2)):
     return event
 
 
-def mc_calibrator(mc_subarray, simulated_pde_files=PDE_FILES, **settings):
-    return R0R1Calibrator(
-        subarray=mc_subarray, config=Config({"R0R1Calibrator": settings}),
-        simulated_pde_files=simulated_pde_files,
-    )
+def mc_calibrator(mc_subarray, **settings):
+    return R0R1Calibrator(subarray=mc_subarray, config=Config({"R0R1Calibrator": settings}))
 
 
-def test_mc_pde_correction(mc_subarray):
+def test_pde_drop_correction(mc_subarray):
 
     event = simulated_event()
-    calibrator_r0_r1 = mc_calibrator(mc_subarray)
+    calibrator_r0_r1 = mc_calibrator(mc_subarray, pde_drop_factor=[["id", 1, 0.5], ["id", 2, 0.8]])
     calibrator_r0_r1(event)
 
-    for tel_id, factor in PDE_DROP_FACTORS.items():
-        assert calibrator_r0_r1.pde_drop_factor(tel_id) == factor
-        np.testing.assert_allclose(event.r1.tel[tel_id].waveform, 1 / factor, rtol=1e-6)
+    np.testing.assert_allclose(event.r1.tel[1].waveform, 2)
+    np.testing.assert_allclose(event.r1.tel[2].waveform, 1.25)
     # the R0 data of the simulations are not used
     assert len(event.r0.tel) == 0
 
 
-def test_mc_pde_correction_single_telescope(mc_subarray):
+def test_pde_drop_correction_single_telescope(mc_subarray):
 
     event = simulated_event()
-    mc_calibrator(mc_subarray)(event, 2)
+    mc_calibrator(mc_subarray, pde_drop_factor=0.5)(event, 2)
 
     np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
-    np.testing.assert_allclose(event.r1.tel[2].waveform, 1 / PDE_DROP_FACTORS[2], rtol=1e-6)
+    np.testing.assert_allclose(event.r1.tel[2].waveform, 2)
 
 
-def test_mc_pde_correction_disabled(mc_subarray):
+@pytest.mark.parametrize("settings", [{}, {"pde_drop_factor": None}, {"pde_drop_factor": [["id", 1, 0.5]]}])
+def test_no_pde_drop_correction(mc_subarray, settings):
 
-    event = simulated_event()
-    # PDE files are not needed if the correction is disabled
-    calibrator_r0_r1 = mc_calibrator(
-        mc_subarray, simulated_pde_files=None, mc_pde_correction=[["type", "*", True], ["id", 1, False]],
-    )
-    calibrator_r0_r1(event, 1)
-    np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
+    event = simulated_event(tel_ids=[2])
+    calibrator_r0_r1 = mc_calibrator(mc_subarray, **settings)
+    calibrator_r0_r1(event)
 
-    with pytest.raises(ValueError, match="simulated_pde_files"):
-        calibrator_r0_r1(event, 2)
+    assert calibrator_r0_r1.pde_drop(2) is None
+    np.testing.assert_array_equal(event.r1.tel[2].waveform, 1)
 
 
-def test_mc_pde_correction_unknown_pde_file(mc_subarray):
+@pytest.mark.parametrize("nsb", ["low", "high"])
+def test_mc_configs_pde_drop_factors(mc_subarray, nsb):
 
-    calibrator_r0_r1 = mc_calibrator(mc_subarray, simulated_pde_files=["qe_unknown"])
+    with open(files('sst1mpipe.data').joinpath('mc_pde_correction_factors.json')) as f:
+        factors = json.load(f)["mc_correction_for_PDE"]
+    config = load_config(MC_CONFIG_FILES[nsb], ismc=True)
+    calibrator_r0_r1 = R0R1Calibrator(subarray=mc_subarray, config=config)
 
-    with pytest.raises(ValueError, match="No PDE drop correction factor of telescope 1"):
-        calibrator_r0_r1(simulated_event(tel_ids=[1]))
-
-
-def test_mc_pde_correction_file(mc_subarray, tmp_path):
-
-    path = tmp_path / "pde_factors.json"
-    path.write_text(json.dumps({"mc_correction_for_PDE": {"tel_001": {"qe_custom": 0.5}}}))
-    event = simulated_event(tel_ids=[1])
-    mc_calibrator(mc_subarray, simulated_pde_files=["qe_custom"], mc_pde_correction_file=str(path))(event)
-
-    np.testing.assert_array_equal(event.r1.tel[1].waveform, 2)
-
-
-def test_mc_config_settings(mc_subarray):
-
-    config = load_config(MC_CONFIG_FILE, ismc=True)
-    calibrator_r0_r1 = R0R1Calibrator(subarray=mc_subarray, config=config, simulated_pde_files=PDE_FILES)
-
-    assert "mc_correction_for_PDE" not in config["NsbCalibrator"]
+    for tel_id in (1, 2):
+        expected = factors[f"tel_00{tel_id}"][PDE_FILES[nsb][tel_id]]
+        assert calibrator_r0_r1.pde_drop(tel_id) == expected
+        assert PDE_FILES[nsb][tel_id] in config["_comment_R0R1Calibrator"]
     assert "intensity_correction" in config["NsbCalibrator"]  # used by sst1mpipe_dl1_dl2
-    assert calibrator_r0_r1.mc_pde_correction.tel[1] and calibrator_r0_r1.mc_pde_correction.tel[2]
-    assert calibrator_r0_r1.pde_drop_factor(1) == PDE_DROP_FACTORS[1]
 
 
-def test_data_events_are_not_pde_corrected(event):
+def test_default_mc_config_is_low_nsb():
 
-    # observed data: R0 -> R1 calibration, no PDE drop correction (the PDE files are not needed)
-    event.r1.tel.clear()
-    calibrator(voltage_drop_correction="none", flag_bad_calibration_pixels=False)(
-        with_pedestal_std(event, None), TEL_ID,
-    )
-    r0 = event.r0.tel[TEL_ID]
-    dc_to_pe, _ = calibrator().calibration_parameters(TEL_ID)
-    np.testing.assert_allclose(
-        event.r1.tel[TEL_ID].waveform[0], (r0.waveform[0] - r0.pedestal[:, np.newaxis]) / dc_to_pe[:, np.newaxis],
-    )
+    with open(MC_CONFIG_FILE) as default, open(MC_CONFIG_FILES["low"]) as low:
+        assert json.load(default) == json.load(low)
+
+
+@pytest.mark.parametrize("config_file", [DATA_CONFIG_FILE, *MC_CONFIG_FILES.values()])
+def test_no_pde_drop_correction_of_real_telescopes(config_file):
+
+    calibrator_r0_r1 = R0R1Calibrator(subarray=get_subarray(), config=load_config(config_file))
+
+    assert calibrator_r0_r1.pde_drop(21) is None
+    assert calibrator_r0_r1.pde_drop(22) is None
+
+
+def test_pde_drop_correction_of_data(event):
+
+    pdes = []
+    for factor in (None, 0.5):
+        event.r1.tel.clear()
+        calibrator(voltage_drop_correction="none", pde_drop_factor=factor)(with_pedestal_std(event, None), TEL_ID)
+        pdes.append(event.r1.tel[TEL_ID].waveform.copy())
+
+    np.testing.assert_allclose(pdes[1], pdes[0] / 0.5)

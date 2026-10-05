@@ -139,8 +139,9 @@ def translate_legacy_calibration_config(config):
     """
     Translates the R0 -> R1 calibration settings of the configuration files written
     before `sst1mpipe.calib.R0R1Calibrator` (``telescope_calibration``,
-    ``NsbCalibrator.apply_*_Vdrop_correction`` and ``NsbCalibrator.mc_correction_for_PDE``)
-    into its ``R0R1Calibrator`` section.
+    ``NsbCalibrator.apply_*_Vdrop_correction``) into its ``R0R1Calibrator`` section.
+    ``NsbCalibrator.mc_correction_for_PDE`` can not be translated: if true, the PDE drop
+    factors must be set in ``R0R1Calibrator.pde_drop_factor`` (a ValueError is raised).
     Nothing is done if the configuration has a ``R0R1Calibrator`` section.
 
     Parameters
@@ -156,6 +157,12 @@ def translate_legacy_calibration_config(config):
     pixelwise = nsb_calibrator.pop("apply_pixelwise_Vdrop_correction", None)
     global_ = nsb_calibrator.pop("apply_global_Vdrop_correction", None)
     mc_pde_correction = nsb_calibrator.pop("mc_correction_for_PDE", None)
+    if mc_pde_correction:
+        raise ValueError(
+            "NsbCalibrator.mc_correction_for_PDE is replaced by R0R1Calibrator.pde_drop_factor, which"
+            " must match the PDE files of the simulation: see sst1mpipe_mc_config_low_nsb.json and"
+            " sst1mpipe_mc_config_high_nsb.json"
+        )
 
     if all(value is None for value in (legacy_calibration, pixelwise, global_, mc_pde_correction)):
         return config
@@ -189,8 +196,6 @@ def translate_legacy_calibration_config(config):
         calibrator["voltage_drop_correction"] = (
             "pixelwise" if pixelwise else "global" if global_ else "none"
         )
-    if mc_pde_correction is not None:
-        calibrator["mc_pde_correction"] = bool(mc_pde_correction)
     config["R0R1Calibrator"] = calibrator
     return config
 

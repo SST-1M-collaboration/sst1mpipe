@@ -210,7 +210,10 @@ def main():
     if source.is_simulation:
         used_qe = get_used_qe_simtel(source)
         logging.info("QE files used in the MC production (including the default ones): {}".format(' '.join(map(str, used_qe))))
-        calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config, simulated_pde_files=used_qe)
+        calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
+        # the factors must match the QE files above, see mc_pde_correction_factors.json
+        for tel_id in source.subarray.tel_ids:
+            logging.info("Tel %d PDE drop correction factor: %s", tel_id, calibrator_r0_r1.pde_drop(tel_id))
 
     else:
         calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
@@ -351,7 +354,7 @@ def main():
             # and simulation histogram is not saved. Here we repace it with an array of zeros.
             if source.is_simulation:
                 event = correct_true_image(event)
-                # PDE drop correction (R0R1Calibrator.mc_pde_correction)
+                # PDE drop correction (R0R1Calibrator.pde_drop_factor)
                 calibrator_r0_r1(event)
 
             # This function flags the bad pixel according to the cfg file, and just for sure also kills the waveforms.

@@ -9,7 +9,7 @@ from ctapipe.image import ImageProcessor
 from ctapipe.io import EventSource, DataWriter, SimTelEventSource
 
 from sst1mpipe.calib import R0R1Calibrator
-from sst1mpipe.io import compute_dl1_summary, get_used_qe_simtel, write_dl1_info
+from sst1mpipe.io import compute_dl1_summary, write_dl1_info
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.monitoring_pedestals import R0PedestalMonitor
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
@@ -28,7 +28,7 @@ class ProcessorTool(Tool):
     window by the R0PedestalMonitor: these corrections are applied once the first
     pedestal event of the telescope is read.
     For the simulations (SimTelEventSource), the R1 waveforms are corrected for the
-    PDE drop by the R0R1Calibrator (mc_pde_correction).
+    PDE drop by the R0R1Calibrator (pde_drop_factor).
     """
 
     name = 'sst1mpipe-process'
@@ -82,9 +82,7 @@ class ProcessorTool(Tool):
             self.r0_pedestal_monitor = R0PedestalMonitor(parent=self, subarray=subarray)
             self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
         elif isinstance(self.event_source, SimTelEventSource):
-            self.r0_r1_calibrator = R0R1Calibrator(
-                parent=self, subarray=subarray, simulated_pde_files=get_used_qe_simtel(self.event_source),
-            )
+            self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
         self.camera_calibrator = CameraCalibrator(parent=self, subarray=self.event_source.subarray)
         self.image_processor = ImageProcessor(parent=self, subarray=self.event_source.subarray)
         # the writer is closed in finish(), to read back the output file. If the processing

@@ -1,4 +1,3 @@
-import json
 import logging
 
 import numpy as np
@@ -10,12 +9,13 @@ from ctapipe.core import TelescopeComponent
 from ctapipe.core.traits import (
     BoolTelescopeParameter,
     CaselessStrEnum,
+    Float,
     FloatTelescopeParameter,
     Path,
     TelescopeParameter,
 )
 
-from sst1mpipe.utils import VAR_to_Idrop, get_tel_string
+from sst1mpipe.utils import VAR_to_Idrop
 
 
 
@@ -228,8 +228,6 @@ DEFAULT_CALIBRATION_FILES[2] = DEFAULT_CALIBRATION_FILES[22]
 
 VOLTAGE_DROP_CORRECTIONS = ("none", "global", "pixelwise")
 
-DEFAULT_PDE_CORRECTION_FILE = 'mc_pde_correction_factors.json'
-
 
 class R0R1Calibrator(TelescopeComponent):
     """
@@ -251,11 +249,14 @@ class R0R1Calibrator(TelescopeComponent):
     if ``event.mon.tel[tel_id].r0`` is not filled.
 
     For the simulated events (``event.simulation`` filled), the R1 waveforms are given by the
-    event source. They are corrected for the PDE drop due to the NSB (``mc_pde_correction``):
-    the simulations use PDE files which include the drop for a given NSB level, while the
-    observed data are corrected for it by the voltage drop correction. The R1 waveforms are
-    divided by the factor of ``mc_pde_correction_file`` of the PDE file used in the simulation
-    (``simulated_pde_files``, see `sst1mpipe.io.get_used_qe_simtel`).
+    event source. They are only corrected for the PDE drop due to the NSB.
+
+    PDE drop correction (``pde_drop_factor``): the R1 waveforms are divided by this factor.
+    The simulations use PDE files which include the drop for a given NSB level, while the
+    observed data are corrected for it by the voltage drop correction: the factor must match
+    the PDE file of the simulation (see ``mc_pde_correction_factors.json`` and the
+    sst1mpipe_mc_config_low_nsb.json and sst1mpipe_mc_config_high_nsb.json configs).
+    ``null`` (the default, and for the real telescopes 21 and 22) applies no correction.
 
     All the parameters can be set per telescope,
     e.g. ``"voltage_drop_correction": [["type", "*", "global"], ["id", 22, "none"]]``.
@@ -298,34 +299,20 @@ class R0R1Calibrator(TelescopeComponent):
         help="Std of the ADC samples of the pedestal events (in ADC) below which a pixel is dead",
     ).tag(config=True)
 
-    mc_pde_correction = BoolTelescopeParameter(
-        default_value=True,
-        help="Correct the simulated events for the PDE drop due to the NSB",
-    ).tag(config=True)
-
-    mc_pde_correction_file = Path(
-        exists=True,
-        directory_ok=False,
-        allow_none=True,
+    pde_drop_factor = TelescopeParameter(
+        trait=Float(allow_none=True),
         default_value=None,
+        allow_none=True,
         help=(
-            "JSON file with the PDE drop correction factors of the simulations, per telescope"
-            " (tel_00N) and PDE file. If None, the default file of sst1mpipe is used."
+            "The R1 waveforms are divided by this factor to correct the simulations for the"
+            " PDE drop due to the NSB. It must match the PDE file of the simulation, see"
+            " mc_pde_correction_factors.json. None: no correction (real telescopes)."
         ),
     ).tag(config=True)
 
-    def __init__(self, subarray, config=None, parent=None, simulated_pde_files=None, **kwargs):
-        """
-        Parameters
-        ----------
-        simulated_pde_files: list of str
-            PDE (QE) files used in the simulation, needed for the PDE drop correction
-            of the simulated events (see `sst1mpipe.io.get_used_qe_simtel`)
-        """
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
-        self.simulated_pde_files = None if simulated_pde_files is None else [str(f) for f in simulated_pde_files]
         self._calibration = {}
-        self._pde_drop_factors = {}
         self.n_bad_pixels = {}
 
     def calibration_file_path(self, tel_id):
@@ -381,42 +368,12 @@ class R0R1Calibrator(TelescopeComponent):
             mask_bad |= pedestal_std[0, :] < self.dead_pixel_std_threshold.tel[tel_id]
         return mask_bad
 
-    def pde_drop_factor(self, tel_id):
-        """
-        Factor by which the R1 waveforms of the simulated events of the telescope ``tel_id``
-        are divided, from the PDE file used in the simulation
-        """
-        if tel_id in self._pde_drop_factors:
-            return self._pde_drop_factors[tel_id]
-
-        if self.simulated_pde_files is None:
-            raise ValueError(
-                "The PDE files used in the simulation (simulated_pde_files) are needed"
-                " for the PDE drop correction, or set mc_pde_correction to False"
-            )
-        path = self.mc_pde_correction_file
-        if path is None:
-            path = files('sst1mpipe.data').joinpath(DEFAULT_PDE_CORRECTION_FILE)
-        with open(path) as f:
-            factors = json.load(f)["mc_correction_for_PDE"].get(get_tel_string(tel_id, mc=True), {})
-
-        matches = [pde_file for pde_file in factors if pde_file in self.simulated_pde_files]
-        if len(matches) == 0:
-            raise ValueError(
-                f"No PDE drop correction factor of telescope {tel_id} in {path} for the PDE files"
-                f" of the simulation {self.simulated_pde_files}. Add it, or set mc_pde_correction to False."
-            )
-        if len({factors[pde_file] for pde_file in matches}) > 1:
-            self.log.warning(
-                "Telescope %d: several PDE files with a correction factor in the simulation: %s, %s is used",
-                tel_id, matches, matches[0],
-            )
-        self._pde_drop_factors[tel_id] = float(factors[matches[0]])
-        self.log.info(
-            "Telescope %d: PDE drop correction of the simulation: %f (%s, %s)",
-            tel_id, self._pde_drop_factors[tel_id], matches[0], path,
-        )
-        return self._pde_drop_factors[tel_id]
+    def pde_drop(self, tel_id):
+        """PDE drop factor by which the R1 waveforms are divided, None if not corrected"""
+        try:
+            return self.pde_drop_factor.tel[tel_id]
+        except KeyError:
+            return None
 
     def __call__(self, event, tel_id=None):
         """
@@ -435,8 +392,9 @@ class R0R1Calibrator(TelescopeComponent):
         return event
 
     def _correct_simulated_pde_drop(self, event, tel_id):
-        if self.mc_pde_correction.tel[tel_id]:
-            event.r1.tel[tel_id].waveform = event.r1.tel[tel_id].waveform / self.pde_drop_factor(tel_id)
+        pde_drop = self.pde_drop(tel_id)
+        if pde_drop is not None:
+            event.r1.tel[tel_id].waveform = event.r1.tel[tel_id].waveform / pde_drop
 
     def _calibrate_telescope(self, event, tel_id):
         r0 = event.r0.tel[tel_id]
@@ -446,6 +404,9 @@ class R0R1Calibrator(TelescopeComponent):
         voltage_drop = np.asarray(self.voltage_drop(tel_id, pedestal_std))
         waveform = (r0.waveform - r0.pedestal[:, np.newaxis]) / dc_to_pe[:, np.newaxis]
         waveform /= voltage_drop[..., np.newaxis]
+        pde_drop = self.pde_drop(tel_id)
+        if pde_drop is not None:
+            waveform /= pde_drop
 
         # the R0 waveforms are kept: they are used afterwards by the R0 pedestal monitor
         mask_bad = self.bad_pixels(tel_id, pedestal_std)
