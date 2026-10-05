@@ -41,6 +41,7 @@ import tables
 from astropy.table import Table
 from ctapipe.io import read_table
 
+from sst1mpipe.constants import PATCH_ID_INPUT_SORT_IDS
 from sst1mpipe.io.containers import SST1MArrayEventContainer
 from sst1mpipe.trigger import fixed_point
 from sst1mpipe.utils import get_telescopes
@@ -66,8 +67,6 @@ def read_trigger_geometry():
     neighbors: (432, 7) array
         The hexagonal neighbours of each patch used by TDSCAN, -1 when the
         patch is at the camera edge.
-    hardware_to_csv: (432,) array
-        ``hardware_to_csv[h]`` is the patch of hardware patch ``h``.
     """
     data = files("sst1mpipe.data")
 
@@ -83,10 +82,41 @@ def read_trigger_geometry():
 
     with data.joinpath("sst1m_trigger_neighbors_eps1.csv").open() as f:
         neighbors = np.loadtxt(f, delimiter=",", skiprows=1, dtype=int)
-    with data.joinpath("sst1m_trigger_patch_hw_to_csv.txt").open() as f:
-        hardware_to_csv = np.loadtxt(f, dtype=int)
 
-    return triplets, clusters, neighbors, hardware_to_csv
+    return triplets, clusters, neighbors
+
+
+# Order of the three camera sectors (micro_crate in camera_config.cfg) in the
+# readout of trigger_input_traces, per telescope. Measured by comparing
+# trigger_input_traces with the triplets rebuilt from the pixel waveforms
+# (correlation 0.997 for tel 21, 0.999 for tel 22). The sst1mpipe reader
+# (PATCH_ID_INPUT) assumes (1, 2, 3).
+READOUT_SECTOR_ORDER = {21: (1, 2, 3), 22: (2, 3, 1)}
+
+
+def readout_to_patch_order(sector_order):
+    """Indices putting ``trigger_input_traces`` (as read by sst1mpipe) in patch_sw_id order.
+
+    In the readout, each sector fills a block of 144 patches, ordered by module
+    (module_fw_id) then by patch in the module (patch_in_mod_fw), as given by
+    the official camera_config.cfg.
+    """
+    with files("sst1mpipe.resources").joinpath("camera_config.cfg").open() as f:
+        rows = [line.split() for line in f if line.strip() and not line.startswith("#")]
+    sector, module, patch_in_module = {}, {}, {}
+    for row in rows:
+        patch = int(row[11])                  # patch_sw_id
+        sector[patch] = int(row[3])           # micro_crate
+        module[patch] = int(row[14])          # module_fw_id
+        patch_in_module[patch] = int(row[13]) # patch_in_mod_fw
+    module_rank = {m: i for i, m in enumerate(sorted(set(module.values())))}
+    readout_position = np.array([
+        144 * sector_order.index(sector[p]) + 4 * module_rank[module[p]] + patch_in_module[p]
+        for p in range(len(sector))
+    ])
+    # sst1mpipe row h holds readout position PATCH_ID_INPUT_SORT_IDS[h].
+    row_of_readout_position = np.argsort(PATCH_ID_INPUT_SORT_IDS)
+    return row_of_readout_position[readout_position]
 
 
 # ---------------------------------------------------------------------------
@@ -218,8 +248,8 @@ class TriggerEmulator:
     """
 
     def __init__(self, config):
-        self.triplets, self.clusters, neighbors, hardware_to_csv = read_trigger_geometry()
-        self.csv_to_hardware = np.argsort(hardware_to_csv)
+        self.triplets, self.clusters, neighbors = read_trigger_geometry()
+        self.readout_to_patch = {tel: readout_to_patch_order(order) for tel, order in READOUT_SECTOR_ORDER.items()}
 
         self.patch7_threshold = config["patch7"]["threshold"]
         tdscan = config["tdscan"]
@@ -255,8 +285,10 @@ class TriggerEmulator:
             waveform = event.r0.tel[tel_id].waveform[0]
             baseline = event.mon.tel[tel_id].calibration.pedestal_per_sample[0]
             return fadc(waveform, baseline, self.triplets)
+        if tel_id not in self.readout_to_patch:
+            raise ValueError(f"No trigger readout order known for telescope {tel_id}, see READOUT_SECTOR_ORDER")
         traces = np.asarray(event.sst1m.r0.tel[tel_id].trigger_input_traces)
-        return traces[self.csv_to_hardware]
+        return traces[self.readout_to_patch[tel_id]]
 
     def run(self, traces):
         """patch7 and TDSCAN on one set of triplet traces (432, T).

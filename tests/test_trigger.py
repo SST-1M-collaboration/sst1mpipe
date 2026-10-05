@@ -4,7 +4,14 @@ from importlib.resources import files
 import numpy as np
 
 from sst1mpipe.trigger import fixed_point
-from sst1mpipe.trigger.emulator import TriggerEmulator, fadc, read_trigger_geometry, score_quantizer
+from sst1mpipe.trigger.emulator import (
+    READOUT_SECTOR_ORDER,
+    TriggerEmulator,
+    fadc,
+    read_trigger_geometry,
+    readout_to_patch_order,
+    score_quantizer,
+)
 
 
 def trigger_config(quantize_step):
@@ -75,13 +82,21 @@ def test_score_quantizer():
 
 
 def test_trigger_geometry():
-    triplets, clusters, neighbors, hardware_to_csv = read_trigger_geometry()
+    triplets, clusters, neighbors = read_trigger_geometry()
     assert sorted(triplets.ravel().tolist()) == list(range(1296))
     for patch, cluster in enumerate(clusters):
         assert cluster[0] == patch
         assert len(cluster) <= 7
     assert np.array_equal(neighbors[:, 3], np.arange(432))
-    assert sorted(hardware_to_csv.tolist()) == list(range(432))
+
+
+def test_readout_order():
+    # Sectors in the order sst1mpipe's reader assumes: nothing to reorder.
+    assert np.array_equal(readout_to_patch_order((1, 2, 3)), np.arange(432))
+    # Telescope 2: same layout inside each sector, sectors shifted by one.
+    tel2 = readout_to_patch_order(READOUT_SECTOR_ORDER[22])
+    assert sorted(tel2.tolist()) == list(range(432))
+    assert not np.array_equal(tel2, np.arange(432))
 
 
 def test_tdscan_single_impulse():
