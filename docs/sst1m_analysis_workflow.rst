@@ -67,11 +67,16 @@ There are two slightly different configuration files. One is to be used for MC p
 for real data processing. These contain configuration for all reconstruction/analysis steps 
 from R0 to DL3 (or performance evaluation in case of MC).
 
-Default config file for MC:
+Config files for MC, for the simulations at low and high NSB (they differ by the PDE drop correction factors):
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/data/sst1mpipe_mc_config.json
+    .. include:: ../sst1mpipe/data/sst1mpipe_mc_config_low_nsb.json
+       :code: json
+
+.. toggle:: 
+
+    .. include:: ../sst1mpipe/data/sst1mpipe_mc_config_high_nsb.json
        :code: json
 
 Default config file for data:
@@ -111,7 +116,7 @@ See ``--help`` for possible inputs. Some of them, which might not be obvious:
   * ``voltage_drop_correction`` - ``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB
   * ``flag_bad_calibration_pixels``, ``flag_dead_pixels`` and ``dead_pixel_std_threshold`` - pixels set to 0 and interpolated
 
-  * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the R1 waveforms are divided by this factor, which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.json`` (default, also ``sst1mpipe_mc_config.json``) and ``sst1mpipe_mc_config_high_nsb.json`` have the factors of the low and high NSB simulations
+  * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the R1 waveforms are divided by this factor, which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.json`` and ``sst1mpipe_mc_config_high_nsb.json`` have the factors of the low and high NSB simulations
 
   Config files with the former ``telescope_calibration``, ``NsbCalibrator.apply_*_Vdrop_correction`` settings are still read (translated with a warning). ``NsbCalibrator.mc_correction_for_PDE`` must be replaced by ``pde_drop_factor``.
 

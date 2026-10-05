@@ -124,7 +124,7 @@ def load_config(cfg_file, ismc=False):
     if cfg_file is None:
         logging.info('No config file specified, loading default config.')
         if ismc:
-            default_config = 'sst1mpipe_mc_config.json'
+            default_config = 'sst1mpipe_mc_config_low_nsb.json'
         else:
             default_config = 'sst1mpipe_data_config.json'
         cfg_file = files('sst1mpipe.data').joinpath(default_config)
@@ -1633,36 +1633,6 @@ def load_distributions_sst1m(dist_path=None, dl3_path=None):
     livetimes = np.array(livetimes).flatten()
 
     return histograms, histograms_diff, zeniths, obsids_sorted, livetimes, survived_ped, bins
-
-
-def get_used_qe_simtel(source):
-    """
-    Reads the simtel cfg file used to run current MC production and extracts
-    all Quntum efficiency (PDE) files listed there. There are also default (dummy)
-    PDE files there as the proper fields in simtel must be first initialized with
-    something before running. This is not dangerous as long us one does not
-    use one of the real PDE files used for the real production as the dummy file..
-
-    Parameters
-    ----------
-    source: ctapipe.io.EventSource
-
-    Returns
-    -------
-    used_qe: numpy.array
-        Array of used PDEs to produce given simtel file
-
-    """
-
-    used_qe = []
-    stringlist=[x[1].decode('utf-8') for x in source.file_.history]
-    string_array = np.array(stringlist)
-    indices = np.arange(0, len(string_array))
-    index_array_eff = indices[np.char.find(string_array, 'QUANTUM_EFFiciency') != -1]
-    for string in string_array[index_array_eff]:
-        s = string.replace('QUANTUM_EFFiciency ', '').split('%')[0].strip()
-        used_qe.append(s[:s.rfind('.')])
-    return np.array(used_qe)
 
 
 def get_pde_correction_factors():

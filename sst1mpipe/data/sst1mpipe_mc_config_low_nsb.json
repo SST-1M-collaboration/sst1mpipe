@@ -63,7 +63,6 @@
         "invalid_pixel_handler_type": "NeighborAverage"
     },
 
-    "_comment_R0R1Calibrator": "pde_drop_factor: PDE drop correction of the low NSB simulations, from mc_pde_correction_factors.json. tel 1: 0.9656945022506267 (NSB 136.0, qe_SST1M_5477_ave_TEL1_NSB136.0), tel 2: 0.9891814057303215 (NSB 177.0, qe_SST1M_5477_ave_TEL2_NSB177.0). tel 21, 22 (real telescopes): null, no correction.",
     "R0R1Calibrator": {
       "pde_drop_factor": [
         ["type", "*", null],

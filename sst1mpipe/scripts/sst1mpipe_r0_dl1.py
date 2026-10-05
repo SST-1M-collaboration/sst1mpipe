@@ -42,7 +42,6 @@ from sst1mpipe.calib import (
 )
 from sst1mpipe.io import (
     check_outdir,
-    get_used_qe_simtel,
     load_config,
     read_charge_images,
     write_assumed_pointing,
@@ -207,17 +206,11 @@ def main():
     logging.info("Event source: %s", source.__class__.__name__)
 
     # R0 -> R1 calibration of the data, PDE drop correction of the simulated R1
-    if source.is_simulation:
-        used_qe = get_used_qe_simtel(source)
-        logging.info("QE files used in the MC production (including the default ones): {}".format(' '.join(map(str, used_qe))))
-        calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
-        # the factors must match the QE files above, see mc_pde_correction_factors.json
-        for tel_id in source.subarray.tel_ids:
-            logging.info("Tel %d PDE drop correction factor: %s", tel_id, calibrator_r0_r1.pde_drop(tel_id))
+    calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
+    for tel_id in source.subarray.tel_ids:
+        logging.info("Tel %d PDE drop correction factor: %s", tel_id, calibrator_r0_r1.pde_drop(tel_id))
 
-    else:
-        calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
-
+    if not source.is_simulation:
         # Target and pointing read by SST1MEventSource from the TARGET field of the Events fits header
         # (or given by the user with --force-pointing)
         target, wobble, pointing_manual = source.target, source.wobble, source.pointing_manual

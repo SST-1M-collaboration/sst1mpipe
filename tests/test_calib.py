@@ -17,7 +17,6 @@ from sst1mpipe.utils import get_subarray
 
 FILE_TEL_1 = files('sst1mpipe.resources.zfits').joinpath('SST1M1_20260121_0001.fits.fz')
 DATA_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json')
-MC_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_mc_config.json')
 CONFIG = load_config(DATA_CONFIG_FILE, ismc=False)
 TEL_ID = 21
 CALIBRATION_FILE_TEL_2 = str(files('sst1mpipe.data').joinpath(DEFAULT_CALIBRATION_FILES[22]))
@@ -307,14 +306,15 @@ def test_mc_configs_pde_drop_factors(mc_subarray, nsb):
     for tel_id in (1, 2):
         expected = factors[f"tel_00{tel_id}"][PDE_FILES[nsb][tel_id]]
         assert calibrator_r0_r1.pde_drop(tel_id) == expected
-        assert PDE_FILES[nsb][tel_id] in config["_comment_R0R1Calibrator"]
     assert "intensity_correction" in config["NsbCalibrator"]  # used by sst1mpipe_dl1_dl2
 
 
 def test_default_mc_config_is_low_nsb():
 
-    with open(MC_CONFIG_FILE) as default, open(MC_CONFIG_FILES["low"]) as low:
-        assert json.load(default) == json.load(low)
+    # one MC config per NSB level, the low NSB one is used when no config is given
+    assert load_config(None, ismc=True) == load_config(MC_CONFIG_FILES["low"])
+    assert load_config(None, ismc=True) != load_config(MC_CONFIG_FILES["high"])
+    assert not files('sst1mpipe.data').joinpath('sst1mpipe_mc_config.json').is_file()
 
 
 @pytest.mark.parametrize("config_file", [DATA_CONFIG_FILE, *MC_CONFIG_FILES.values()])

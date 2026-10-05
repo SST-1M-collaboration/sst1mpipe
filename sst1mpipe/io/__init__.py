@@ -7,7 +7,6 @@ from .io import (
     compute_dl1_summary,
     get_dl1_info,
     get_pde_correction_factors,
-    get_used_qe_simtel,
     load_config,
     translate_legacy_calibration_config,
     load_distributions_sst1m,
