@@ -53,7 +53,7 @@ from sst1mpipe.io import (
     write_pixel_charges_table,
 )
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.trigger import TriggerEmulator
+from sst1mpipe.trigger import TriggerEmulator, as_sst1m_event
 from sst1mpipe.utils import (
     add_event_id,
     add_pointing_to_events,
@@ -298,6 +298,9 @@ def main():
 
     ) as writer:
         for i, event in enumerate(source):
+
+            if source.is_simulation and trigger_emulator is not None:
+                event = as_sst1m_event(event)  # room for the R0 trigger output, see sst1mpipe/trigger
 
             if not source.is_simulation:
 

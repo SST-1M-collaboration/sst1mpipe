@@ -41,6 +41,7 @@ import tables
 from astropy.table import Table
 from ctapipe.io import read_table
 
+from sst1mpipe.io.containers import SST1MArrayEventContainer
 from sst1mpipe.trigger import fixed_point
 from sst1mpipe.utils import get_telescopes
 
@@ -91,6 +92,14 @@ def read_trigger_geometry():
 # ---------------------------------------------------------------------------
 # Trigger stages
 # ---------------------------------------------------------------------------
+
+def as_sst1m_event(event):
+    """Copy a simulated ctapipe array event into an SST1M one (shared fields, no data copy)."""
+    sst1m_event = SST1MArrayEventContainer()
+    for name in event.keys():
+        setattr(sst1m_event, name, event[name])
+    return sst1m_event
+
 
 def fadc(waveform, baseline, triplets):
     """Triplet traces (432, T) from the raw waveforms (1296, T), like the FADC gateware.
@@ -250,21 +259,26 @@ class TriggerEmulator:
         return traces[self.csv_to_hardware]
 
     def run(self, traces):
-        """patch7 and TDSCAN on one set of triplet traces (432, T)."""
+        """patch7 and TDSCAN on one set of triplet traces (432, T).
+
+        Returns the summary and the TDSCAN binary output (432, T).
+        """
         cluster_sums = patch7(traces, self.clusters)
         scores = self.tdscan(score_quantizer(traces, self.score_edges))
+        tdscan_output = scores > self.tdscan_threshold
 
-        fired_patches = (scores > self.tdscan_threshold).any(axis=1)
+        fired_patches = tdscan_output.any(axis=1)
         pixel_mask = np.zeros(N_PIXELS, dtype=bool)
         pixel_mask[self.triplets[fired_patches].ravel()] = True
 
-        return {
+        summary = {
             "patch7_max": int(cluster_sums.max()),
             "patch7": bool(cluster_sums.max() > self.patch7_threshold),
             "tdscan_max": float(scores.max()),
             "tdscan": bool(fired_patches.any()),
             "tdscan_pixel_mask": pixel_mask,
         }
+        return summary, tdscan_output
 
     def process(self, event, tel_ids, is_simulation, is_pedestal):
         """Emulate the trigger of every telescope of the event. Call on raw (R0) data.
@@ -272,12 +286,16 @@ class TriggerEmulator:
         Pedestal events (real data, random triggers) are emulated and counted,
         which tells how often the trigger fires on NSB alone, but they are not
         stored: they are never written in the DL1 file.
+
+        The TDSCAN output is also set on ``event.sst1m.r0.tel[tel_id]``. The
+        event must be an SST1M event (see ``as_sst1m_event``).
         """
         self.current = {}
         self.current_is_pedestal = is_pedestal
         for tel_id in tel_ids:
-            result = self.run(self.triplet_traces(event, tel_id, is_simulation))
+            result, tdscan_output = self.run(self.triplet_traces(event, tel_id, is_simulation))
             self.current[tel_id] = result
+            event.sst1m.r0.tel[tel_id].trigger_output_tdscan = tdscan_output
 
             kind = "pedestal" if is_pedestal else "shower"
             counts = self.counts.setdefault(tel_id, Counter())

@@ -194,6 +194,7 @@ class R0CameraContainer(Container):
                                   (n_clusters)")
     trigger_output_patch19 = Field(np.ndarray, "trigger 19 patch cluster trace \
                                    (n_clusters)")
+    trigger_output_tdscan = Field(np.ndarray, "TDSCAN trigger output (n_patches, n_samples), emulated")
     trigger_input_7 = Field(np.ndarray, 'trigger input CLUSTER7')
     trigger_input_19 = Field(np.ndarray, 'trigger input CLUSTER19')
     num_samples = Field(int, "number of time samples for telescope")
