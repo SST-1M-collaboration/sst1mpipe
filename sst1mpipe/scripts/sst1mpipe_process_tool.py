@@ -6,10 +6,10 @@ from ctapipe.containers import EventType
 from ctapipe.core import Tool
 from ctapipe.core.traits import Bool, flag
 from ctapipe.image import ImageProcessor
-from ctapipe.io import EventSource, DataWriter
+from ctapipe.io import EventSource, DataWriter, SimTelEventSource
 
 from sst1mpipe.calib import R0R1Calibrator
-from sst1mpipe.io import compute_dl1_summary, write_dl1_info
+from sst1mpipe.io import compute_dl1_summary, get_used_qe_simtel, write_dl1_info
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.monitoring_pedestals import R0PedestalMonitor
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
@@ -27,6 +27,8 @@ class ProcessorTool(Tool):
     used for the voltage drop correction and the dead pixels, are computed in a sliding
     window by the R0PedestalMonitor: these corrections are applied once the first
     pedestal event of the telescope is read.
+    For the simulations (SimTelEventSource), the R1 waveforms are corrected for the
+    PDE drop by the R0R1Calibrator (mc_pde_correction).
     """
 
     name = 'sst1mpipe-process'
@@ -71,12 +73,18 @@ class ProcessorTool(Tool):
             self.event_source = self.enter_context(ZMQEventSource(parent=self))
         else:
             self.event_source = self.enter_context(EventSource(parent=self))
-        # R0 -> R1 calibration of the SST-1M raw data, the other sources provide R1 data
+        # R0 -> R1 calibration of the SST-1M raw data, PDE drop correction of the simulations.
+        # The other sources (ZMQ) provide calibrated R1 data
         self.r0_pedestal_monitor = None
         self.r0_r1_calibrator = None
+        subarray = self.event_source.subarray
         if isinstance(self.event_source, SST1MEventSource):
-            self.r0_pedestal_monitor = R0PedestalMonitor(parent=self, subarray=self.event_source.subarray)
-            self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=self.event_source.subarray)
+            self.r0_pedestal_monitor = R0PedestalMonitor(parent=self, subarray=subarray)
+            self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
+        elif isinstance(self.event_source, SimTelEventSource):
+            self.r0_r1_calibrator = R0R1Calibrator(
+                parent=self, subarray=subarray, simulated_pde_files=get_used_qe_simtel(self.event_source),
+            )
         self.camera_calibrator = CameraCalibrator(parent=self, subarray=self.event_source.subarray)
         self.image_processor = ImageProcessor(parent=self, subarray=self.event_source.subarray)
         # the writer is closed in finish(), to read back the output file. If the processing
@@ -106,6 +114,10 @@ class ProcessorTool(Tool):
 
     def calibrate_r0_r1(self, event):
         """R0 -> R1 calibration, with the pedestal statistics of the sliding window"""
+        if self.r0_pedestal_monitor is None:
+            # simulation: PDE drop correction of the R1 waveforms
+            self.r0_r1_calibrator(event)
+            return
         for tel_id in event.r0.tel:
             if event.trigger.event_type == EventType.SKY_PEDESTAL:
                 self.r0_pedestal_monitor.add_event(event, tel_id)
@@ -138,7 +150,7 @@ class ProcessorTool(Tool):
         self.log.info("Target: %s, wobble: %s, pointing: %s (manual: %s)", target, wobble, pointing, pointing_manual)
 
         calibration_files = None
-        if self.r0_r1_calibrator is not None:
+        if self.r0_pedestal_monitor is not None:  # observed data
             calibration_files = ",".join(
                 str(self.r0_r1_calibrator.calibration_file_path(tel_id))
                 for tel_id, n in summary["n_triggered"].items() if n > 0

@@ -138,8 +138,9 @@ def load_config(cfg_file, ismc=False):
 def translate_legacy_calibration_config(config):
     """
     Translates the R0 -> R1 calibration settings of the configuration files written
-    before `sst1mpipe.calib.R0R1Calibrator` (``telescope_calibration`` and
-    ``NsbCalibrator.apply_*_Vdrop_correction``) into its ``R0R1Calibrator`` section.
+    before `sst1mpipe.calib.R0R1Calibrator` (``telescope_calibration``,
+    ``NsbCalibrator.apply_*_Vdrop_correction`` and ``NsbCalibrator.mc_correction_for_PDE``)
+    into its ``R0R1Calibrator`` section.
     Nothing is done if the configuration has a ``R0R1Calibrator`` section.
 
     Parameters
@@ -154,19 +155,21 @@ def translate_legacy_calibration_config(config):
     nsb_calibrator = config.get("NsbCalibrator", {})
     pixelwise = nsb_calibrator.pop("apply_pixelwise_Vdrop_correction", None)
     global_ = nsb_calibrator.pop("apply_global_Vdrop_correction", None)
+    mc_pde_correction = nsb_calibrator.pop("mc_correction_for_PDE", None)
 
-    if legacy_calibration is None and pixelwise is None and global_ is None:
+    if all(value is None for value in (legacy_calibration, pixelwise, global_, mc_pde_correction)):
         return config
     if "R0R1Calibrator" in config:
         logging.warning(
-            "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction)"
-            " are ignored, the R0R1Calibrator section is used."
+            "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction,"
+            " mc_correction_for_PDE) are ignored, the R0R1Calibrator section is used."
         )
         return config
 
     logging.warning(
-        "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction)"
-        " are translated into the R0R1Calibrator section, please update the config file."
+        "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction,"
+        " mc_correction_for_PDE) are translated into the R0R1Calibrator section,"
+        " please update the config file."
     )
     calibrator = {}
     if legacy_calibration is not None:
@@ -186,6 +189,8 @@ def translate_legacy_calibration_config(config):
         calibrator["voltage_drop_correction"] = (
             "pixelwise" if pixelwise else "global" if global_ else "none"
         )
+    if mc_pde_correction is not None:
+        calibrator["mc_pde_correction"] = bool(mc_pde_correction)
     config["R0R1Calibrator"] = calibrator
     return config
 

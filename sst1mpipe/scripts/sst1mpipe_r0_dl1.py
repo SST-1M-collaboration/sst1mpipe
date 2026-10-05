@@ -36,14 +36,12 @@ from ctapipe.reco import ShowerProcessor
 import sst1mpipe
 from sst1mpipe.calib import (
     R0R1Calibrator,
-    correct_MC_for_PDE_drop,
     get_window_corr_factors,
     saturated_charge_correction,
     window_transmittance_correction,
 )
 from sst1mpipe.io import (
     check_outdir,
-    get_pde_correction_factors,
     get_used_qe_simtel,
     load_config,
     read_charge_images,
@@ -208,20 +206,14 @@ def main():
     source = EventSource(input_url=input_file, max_events=max_events, allowed_tels=config.get("allowed_tels"), **source_kwargs)
     logging.info("Event source: %s", source.__class__.__name__)
 
+    # R0 -> R1 calibration of the data, PDE drop correction of the simulated R1
     if source.is_simulation:
-        logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_001']))
-        logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_002']))
-
-        if config['NsbCalibrator']['mc_correction_for_PDE']:
-            used_qe = get_used_qe_simtel(source)
-            logging.info("QE files used in the MC production (including the default ones): {}".format(' '.join(map(str, used_qe))))
-            pde_corr_factors = get_pde_correction_factors()
-            logging.info("PDE correction factors found in the calibration file mc_pde_correction_factors.json: %s", pde_corr_factors)
+        used_qe = get_used_qe_simtel(source)
+        logging.info("QE files used in the MC production (including the default ones): {}".format(' '.join(map(str, used_qe))))
+        calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config, simulated_pde_files=used_qe)
 
     else:
-
-        logging.info("Tel 1 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_021']))
-        logging.info("Tel 2 Intensity correction factor: {}".format(config['NsbCalibrator']['intensity_correction']['tel_022']))
+        calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
 
         # Target and pointing read by SST1MEventSource from the TARGET field of the Events fits header
         # (or given by the user with --force-pointing)
@@ -321,7 +313,6 @@ def main():
                 # NOTE: This needs to be changed in the future when event source hopefuly provides events with both telescope data
                 if i == 0:
                     tel = event.trigger.tels_with_trigger[0]
-                    calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
                     calibration_file = str(calibrator_r0_r1.calibration_file_path(tel))
                     window_corr_factors, window_file = get_window_corr_factors(
                         telescope=tel, config=config
@@ -360,12 +351,8 @@ def main():
             # and simulation histogram is not saved. Here we repace it with an array of zeros.
             if source.is_simulation:
                 event = correct_true_image(event)
-                # Now include PDE correction based on the PDE drop set in MC
-                if config['NsbCalibrator']['mc_correction_for_PDE']:
-                    event = correct_MC_for_PDE_drop(event,
-                        simtel_config_qe=used_qe,
-                        pde_corr_factors=pde_corr_factors
-                        )
+                # PDE drop correction (R0R1Calibrator.mc_pde_correction)
+                calibrator_r0_r1(event)
 
             # This function flags the bad pixel according to the cfg file, and just for sure also kills the waveforms.
             # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
@@ -512,21 +499,8 @@ def main():
                     else:
                         logging.warning('Telescope %d not recognized, survived charge fraction not logged.', tel_id)
 
-            ## Correct (or not) the Voltage drop effect : Global correction on the intensity
-            ## apply (or not) some absolute correction on the intensity
-
-            if not source.is_simulation:
-                I0 = event.dl1.tel[tel].parameters.hillas.intensity
-                # VN: to be consistent during the cleaning I had to move all gain drop corrections into calibration
-                I_corr = I0*config['NsbCalibrator']["intensity_correction"][tel_string]
-                event.dl1.tel[tel].parameters.hillas.intensity = I_corr
-            else:
-                for tel in event.trigger.tels_with_trigger:
-                    tel_string = get_tel_string(tel, mc=True)
-                    I0 = event.dl1.tel[tel].parameters.hillas.intensity
-                    I_corr = I0*config['NsbCalibrator']["intensity_correction"][tel_string]
-                    event.dl1.tel[tel].parameters.hillas.intensity = I_corr
-
+            # NOTE: the scaling of the Hillas intensity (NsbCalibrator.intensity_correction)
+            # is applied at the DL1 -> DL2 step (sst1mpipe_dl1_dl2 --scale-intensities)
             writer(event)
 
             # Extracting WR timestamps with high numerical precision

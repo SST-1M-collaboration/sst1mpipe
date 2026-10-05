@@ -3,7 +3,6 @@
 
 from .calib import (
     R0R1Calibrator,
-    correct_MC_for_PDE_drop,
     get_window_corr_factors,
     saturated_charge_correction,
     window_transmittance_correction,

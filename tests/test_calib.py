@@ -2,7 +2,11 @@ from importlib.resources import files
 
 import numpy as np
 import pytest
+import json
+
 from ctapipe.calib import CameraCalibrator
+from ctapipe.containers import ArrayEventContainer, R1CameraContainer, SimulatedEventContainer
+from ctapipe.instrument import SubarrayDescription
 from traitlets.config import Config
 
 from sst1mpipe.calib import R0R1Calibrator, saturated_charge_correction
@@ -13,6 +17,7 @@ from sst1mpipe.utils import get_subarray
 
 FILE_TEL_1 = files('sst1mpipe.resources.zfits').joinpath('SST1M1_20260121_0001.fits.fz')
 DATA_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json')
+MC_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_mc_config.json')
 CONFIG = load_config(DATA_CONFIG_FILE, ismc=False)
 TEL_ID = 21
 CALIBRATION_FILE_TEL_2 = str(files('sst1mpipe.data').joinpath(DEFAULT_CALIBRATION_FILES[22]))
@@ -181,6 +186,7 @@ def test_translate_legacy_calibration_config(pixelwise, global_, expected):
             "apply_pixelwise_Vdrop_correction": pixelwise,
             "apply_global_Vdrop_correction": global_,
             "intensity_correction": {"tel_021": 1.0},
+            "mc_correction_for_PDE": False,
         },
     }
     config = translate_legacy_calibration_config(legacy)
@@ -192,6 +198,7 @@ def test_translate_legacy_calibration_config(pixelwise, global_, expected):
         "flag_bad_calibration_pixels": True,
         "flag_dead_pixels": False,
         "voltage_drop_correction": expected,
+        "mc_pde_correction": False,
     }
     calibrator_r0_r1 = R0R1Calibrator(subarray=get_subarray(), config=Config(config))
     assert calibrator_r0_r1.voltage_drop_correction.tel[21] == expected
@@ -215,3 +222,114 @@ def test_default_config_settings():
         assert calibrator_r0_r1.flag_dead_pixels.tel[tel_id]
         assert calibrator_r0_r1.dead_pixel_std_threshold.tel[tel_id] == 2.5
         assert calibrator_r0_r1.calibration_file_path(tel_id).name == DEFAULT_CALIBRATION_FILES[tel_id]
+
+
+# PDE drop correction of the simulations
+PDE_FILES = ["qe_SST1M_5477_ave_TEL1_NSB251.0", "qe_SST1M_5477_ave_TEL2_NSB300.0", "qe_dummy"]
+PDE_DROP_FACTORS = {1: 0.9393873691700036, 2: 0.9819055121768047}  # mc_pde_correction_factors.json
+
+
+@pytest.fixture(scope="module")
+def mc_subarray():
+    """SST-1M subarray with the telescope ids of the simulations (1, 2)"""
+    subarray = get_subarray()
+    return SubarrayDescription(
+        "SST1M_MC",
+        tel_positions={1: subarray.positions[21], 2: subarray.positions[22]},
+        tel_descriptions={1: subarray.tel[21], 2: subarray.tel[22]},
+        reference_location=subarray.reference_location,
+    )
+
+
+def simulated_event(tel_ids=(1, 2)):
+    event = ArrayEventContainer()
+    event.simulation = SimulatedEventContainer()
+    for tel_id in tel_ids:
+        event.r1.tel[tel_id] = R1CameraContainer(waveform=np.ones((1, 1296, 50), dtype=np.float32))
+    return event
+
+
+def mc_calibrator(mc_subarray, simulated_pde_files=PDE_FILES, **settings):
+    return R0R1Calibrator(
+        subarray=mc_subarray, config=Config({"R0R1Calibrator": settings}),
+        simulated_pde_files=simulated_pde_files,
+    )
+
+
+def test_mc_pde_correction(mc_subarray):
+
+    event = simulated_event()
+    calibrator_r0_r1 = mc_calibrator(mc_subarray)
+    calibrator_r0_r1(event)
+
+    for tel_id, factor in PDE_DROP_FACTORS.items():
+        assert calibrator_r0_r1.pde_drop_factor(tel_id) == factor
+        np.testing.assert_allclose(event.r1.tel[tel_id].waveform, 1 / factor, rtol=1e-6)
+    # the R0 data of the simulations are not used
+    assert len(event.r0.tel) == 0
+
+
+def test_mc_pde_correction_single_telescope(mc_subarray):
+
+    event = simulated_event()
+    mc_calibrator(mc_subarray)(event, 2)
+
+    np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
+    np.testing.assert_allclose(event.r1.tel[2].waveform, 1 / PDE_DROP_FACTORS[2], rtol=1e-6)
+
+
+def test_mc_pde_correction_disabled(mc_subarray):
+
+    event = simulated_event()
+    # PDE files are not needed if the correction is disabled
+    calibrator_r0_r1 = mc_calibrator(
+        mc_subarray, simulated_pde_files=None, mc_pde_correction=[["type", "*", True], ["id", 1, False]],
+    )
+    calibrator_r0_r1(event, 1)
+    np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
+
+    with pytest.raises(ValueError, match="simulated_pde_files"):
+        calibrator_r0_r1(event, 2)
+
+
+def test_mc_pde_correction_unknown_pde_file(mc_subarray):
+
+    calibrator_r0_r1 = mc_calibrator(mc_subarray, simulated_pde_files=["qe_unknown"])
+
+    with pytest.raises(ValueError, match="No PDE drop correction factor of telescope 1"):
+        calibrator_r0_r1(simulated_event(tel_ids=[1]))
+
+
+def test_mc_pde_correction_file(mc_subarray, tmp_path):
+
+    path = tmp_path / "pde_factors.json"
+    path.write_text(json.dumps({"mc_correction_for_PDE": {"tel_001": {"qe_custom": 0.5}}}))
+    event = simulated_event(tel_ids=[1])
+    mc_calibrator(mc_subarray, simulated_pde_files=["qe_custom"], mc_pde_correction_file=str(path))(event)
+
+    np.testing.assert_array_equal(event.r1.tel[1].waveform, 2)
+
+
+def test_mc_config_settings(mc_subarray):
+
+    config = load_config(MC_CONFIG_FILE, ismc=True)
+    calibrator_r0_r1 = R0R1Calibrator(subarray=mc_subarray, config=config, simulated_pde_files=PDE_FILES)
+
+    assert "mc_correction_for_PDE" not in config["NsbCalibrator"]
+    assert "intensity_correction" in config["NsbCalibrator"]  # used by sst1mpipe_dl1_dl2
+    assert calibrator_r0_r1.mc_pde_correction.tel[1] and calibrator_r0_r1.mc_pde_correction.tel[2]
+    assert calibrator_r0_r1.pde_drop_factor(1) == PDE_DROP_FACTORS[1]
+
+
+def test_data_events_are_not_pde_corrected(event):
+
+    # observed data: R0 -> R1 calibration, no PDE drop correction (the PDE files are not needed)
+    event.r1.tel.clear()
+    calibrator(voltage_drop_correction="none", flag_bad_calibration_pixels=False)(
+        with_pedestal_std(event, None), TEL_ID,
+    )
+    r0 = event.r0.tel[TEL_ID]
+    dc_to_pe, _ = calibrator().calibration_parameters(TEL_ID)
+    np.testing.assert_allclose(
+        event.r1.tel[TEL_ID].waveform[0], (r0.waveform[0] - r0.pedestal[:, np.newaxis]) / dc_to_pe[:, np.newaxis],
+    )

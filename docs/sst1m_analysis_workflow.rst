@@ -111,7 +111,11 @@ See ``--help`` for possible inputs. Some of them, which might not be obvious:
   * ``voltage_drop_correction`` - ``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB
   * ``flag_bad_calibration_pixels``, ``flag_dead_pixels`` and ``dead_pixel_std_threshold`` - pixels set to 0 and interpolated
 
-  Config files with the former ``telescope_calibration`` and ``NsbCalibrator.apply_*_Vdrop_correction`` settings are still read (translated with a warning).
+  * ``mc_pde_correction`` and ``mc_pde_correction_file`` - MC only: correction of the simulated R1 waveforms for the PDE drop due to the NSB, with the factor of the PDE file used in the simulation (default factors in ``mc_pde_correction_factors.json``)
+
+  Config files with the former ``telescope_calibration``, ``NsbCalibrator.apply_*_Vdrop_correction`` and ``NsbCalibrator.mc_correction_for_PDE`` settings are still read (translated with a warning).
+
+* ``NsbCalibrator.intensity_correction`` - global scale of the Hillas intensity per telescope. It is not applied at this step, but in ``sst1mpipe_dl1_dl2`` with ``--scale-intensities``
 
 * ``window_transmittance`` - files with for camera window transmittance correction (measured in the lab and can be kept default)
 

@@ -19,7 +19,9 @@
     "voltage_drop_correction": "global",
     "flag_bad_calibration_pixels": true,
     "flag_dead_pixels": true,
-    "dead_pixel_std_threshold": 2.5
+    "dead_pixel_std_threshold": 2.5,
+    "mc_pde_correction": true,
+    "mc_pde_correction_file": null
   },
 
   "CameraCalibrator": {

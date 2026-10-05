@@ -63,13 +63,17 @@
         "invalid_pixel_handler_type": "NeighborAverage"
     },
 
+    "R0R1Calibrator": {
+      "mc_pde_correction": true,
+      "mc_pde_correction_file": null
+    },
+
     "NsbCalibrator": {
       "intensity_correction": {
         "tel_001": 1.0,
         "tel_002": 1.0
-      },
-      "mc_correction_for_PDE": true
-  },
+      }
+    },
 
     "ImageProcessor": {
       "image_cleaner_type": "NSBImageCleaner",
