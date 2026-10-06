@@ -160,6 +160,7 @@ class muon_finder:
         else :
             data_stream = SST1MEventSource(
                 input_url   = self.filename,
+                config      = DEFAULT_CONFIG,
                 max_events  = self.max_evt,
                 )
 
@@ -200,8 +201,8 @@ class muon_finder:
 
 
                     print("night : "+night_datestr)
-                # NOTE: the waveforms of the wrongly connected modules (data/inverted_module_list.json)
-                # are swapped by SST1MEventSource
+                # NOTE: the pixels of the wrongly connected modules are swapped by SST1MEventSource
+                # (swapped_modules of the config)
                 r0data = event.r0.tel[tel]
 
                 if r0data._camera_event_type.value==8:

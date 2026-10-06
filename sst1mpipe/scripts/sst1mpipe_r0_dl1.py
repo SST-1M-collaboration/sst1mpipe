@@ -54,7 +54,6 @@ from sst1mpipe.io import (
 from sst1mpipe.utils import (
     correct_true_image,
     energy_min_cut,
-    get_swaped_modules,
     get_tel_string,
     remove_bad_pixels,
 )
@@ -201,7 +200,7 @@ def main():
     if (not ismc) and force_pointing and (pointing_ra is not None) and (pointing_dec is not None):
         # pointing given by the user, used instead of the TARGET field of the file
         source_kwargs = dict(pointing_ra=pointing_ra, pointing_dec=pointing_dec)
-    source = EventSource(input_url=input_file, max_events=max_events, allowed_tels=config.get("allowed_tels"), **source_kwargs)
+    source = EventSource(input_url=input_file, config=config, max_events=max_events, allowed_tels=config.get("allowed_tels"), **source_kwargs)
     logging.info("Event source: %s", source.__class__.__name__)
 
     # R0 -> R1 calibration of the data, PDE drop correction of the simulated R1
@@ -313,7 +312,8 @@ def main():
                         telescope=tel, config=config
                         )
                     tel_string = get_tel_string(tel, mc=False)
-                    swaped_modules_list = get_swaped_modules(event)
+                    # pixels of the wrongly connected modules, swapped by SST1MEventSource (swapped_modules)
+                    swaped_modules_list = source.swapped_pixels(tel, event.r0.tel[tel].local_camera_clock)
                     if adaptive_cleaning:
                         dl1_pedestal_monitor.fill_monitoring(event, tel)
                         nsb_level = np.mean(event.mon.tel[tel].pedestal.charge_mean)
@@ -327,8 +327,7 @@ def main():
 
                 ### REAL START OF THE LOOP
 
-                # NOTE: the waveforms of the wrongly connected modules (data/inverted_module_list.json)
-                # are swapped by SST1MEventSource
+                # NOTE: the pixels of the wrongly connected modules are swapped by SST1MEventSource
 
                 r0_pedestal_monitor.fill_monitoring(event, tel)
                 calibrator_r0_r1(event, tel)

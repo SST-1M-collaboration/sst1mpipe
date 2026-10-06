@@ -17,7 +17,7 @@ from sst1mpipe.calib import (
     window_transmittance_correction,
 )
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.utils import get_subarray, get_swaped_modules
+from sst1mpipe.utils import get_subarray
 
 MON_EVT_TYPE = 8
 MASKED_VALUE = -100
@@ -177,7 +177,7 @@ def load_first_pedestals(r0_monitor, dl1_monitor, input_file, config, max_events
     pedestals_in_file: bool
         False if fake pedestals were used
     """
-    source = SST1MEventSource(input_url=input_file, max_events=max_events)
+    source = SST1MEventSource(input_url=input_file, config=config, max_events=max_events)
     source._subarray = get_subarray()
     tel = None
 
@@ -210,7 +210,7 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
     for event in source:
 
         if swapped_modules is None:
-            swapped_modules = get_swaped_modules(event)
+            swapped_modules = source.swapped_pixels(tel, event.r0.tel[tel].local_camera_clock)
 
         if event.r0.tel[tel]._camera_event_type.value != MON_EVT_TYPE:
             continue
@@ -240,7 +240,7 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
     config = deepcopy(config)
     config["ImageProcessor"]["image_cleaner_type"] = "TailcutsImageCleaner"
 
-    source = SST1MEventSource(input_url=input_file, max_events=max_events)
+    source = SST1MEventSource(input_url=input_file, config=config, max_events=max_events)
     source._subarray = get_subarray()
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
     image_processor = ImageProcessor(subarray=source.subarray, config=config)
@@ -271,7 +271,7 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
     for event in source:
 
         if swapped_modules is None:
-            swapped_modules = get_swaped_modules(event)
+            swapped_modules = source.swapped_pixels(tel, event.r0.tel[tel].local_camera_clock)
 
         r0_monitor.fill_monitoring(event, tel)
         cleaning_mask = clean(event)

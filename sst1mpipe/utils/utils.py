@@ -6,7 +6,6 @@ Licensed under the 3-clause BSD style license.
 import logging
 import os
 from datetime import datetime
-import json
 
 import astropy.constants as c
 import astropy.units as u
@@ -14,7 +13,6 @@ import ctaplot
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
 import pandas as pd
 from importlib.resources import files
 import tables
@@ -28,7 +26,6 @@ from astropy.coordinates import (
     get_sun,
 )
 from astropy.io import fits
-import astropy.io.ascii as aio
 from astropy.time import Time
 from astroquery.simbad import Simbad
 from ctapipe.coordinates import CameraFrame
@@ -39,9 +36,6 @@ from gammapy.data import DataStore
 
 from sst1mpipe.io.sst1m_event_source import parse_target_field, camera_clock_to_time
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-MAPPING_FILE_PATH = BASE_DIR / "data" / "digicam_pixels_mapping_V5T.txt"
-INVERTED_MODULE_LIST_PATH = BASE_DIR / "data" / "inverted_module_list.json"
 
 def get_target(file, force_pointing=False):
     """
@@ -801,53 +795,6 @@ def correct_true_image(event):
     return event
 
 
-
-
-def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingfilepath=MAPPING_FILE_PATH):
-    """
-
-    get module list for wrongly mapped pixels
-    Pixel numbering is based on
-    data/inverted_module_list.json
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    Returns
-    -------
-    mask_list:
-        list of mask used to swap waveforms
-
-    """
-    pix_maps = aio.read(mappingfilepath)
-
-    mask_list = []
-    tel = event.trigger.tels_with_trigger[0]
-    with open(inv_list_path, encoding="utf-8") as f:
-        inv_list = json.load(f)
-    for key in inv_list.keys():
-        if inv_list[key]['ntel'] == tel:
-            localtime = event.r0.tel[tel].local_camera_clock/1e9
-            time = Time(localtime, format='unix_tai')
-            time_min = Time(inv_list[key]['date_sart'], format='isot', scale='utc')
-            time_max = Time(inv_list[key]['date_stop'], format='isot', scale='utc')
-
-            if (time > time_min) and (time < time_max):
-                module_1 = inv_list[key]['module_1']
-                module_2 = inv_list[key]['module_2']
-
-                mask1 = np.zeros(1296, dtype=bool)
-                mask1[pix_maps[(pix_maps["module"]==module_1)]['pixel_sw_id']] = True
-
-                mask2 = np.zeros(1296, dtype=bool)
-                mask2[pix_maps[(pix_maps["module"]==module_2)]['pixel_sw_id']] = True
-
-                mask_list.append([mask1,mask2])
-                logging.info('Data on tel ' + str(tel) + f' SWAPPING wrongly connected modules {module_1} and {module_2}')
-
-    return mask_list
 
 
 def remove_bad_pixels(event, config=None):

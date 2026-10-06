@@ -49,7 +49,6 @@ from .utils import (
     get_moon_params,
     get_moon_phase,
     get_pointing_radec,
-    get_swaped_modules,
     get_sources_in_dir,
     get_stereo_method,
     get_subarray,
