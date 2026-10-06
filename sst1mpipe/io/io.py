@@ -139,7 +139,8 @@ def translate_legacy_calibration_config(config):
     """
     Translates the R0 -> R1 calibration settings of the configuration files written
     before `sst1mpipe.calib.R0R1Calibrator` (``telescope_calibration``,
-    ``NsbCalibrator.apply_*_Vdrop_correction``) into its ``R0R1Calibrator`` section.
+    ``NsbCalibrator.apply_*_Vdrop_correction``, ``analysis.bad_pixels``) into its
+    ``R0R1Calibrator`` section.
     ``NsbCalibrator.mc_correction_for_PDE`` can not be translated: if true, the PDE drop
     factors must be set in ``R0R1Calibrator.pde_drop_factor`` (a ValueError is raised).
     Nothing is done if the configuration has a ``R0R1Calibrator`` section.
@@ -152,6 +153,27 @@ def translate_legacy_calibration_config(config):
     -------
     config: dict
     """
+    legacy_bad_pixels = config.get("analysis", {}).pop("bad_pixels", None)
+    config = _translate_legacy_r0_r1_settings(config)
+
+    bad_pixels = [
+        ["id", int(key[len("tel_"):]), list(pixels)]
+        for key, pixels in (legacy_bad_pixels or {}).items() if len(pixels) > 0
+    ]
+    if len(bad_pixels) > 0:
+        calibrator = config.setdefault("R0R1Calibrator", {})
+        if "bad_pixels" in calibrator:
+            logging.warning("Legacy analysis.bad_pixels are ignored, R0R1Calibrator.bad_pixels is used.")
+        else:
+            logging.warning(
+                "Legacy analysis.bad_pixels are translated into R0R1Calibrator.bad_pixels,"
+                " please update the config file."
+            )
+            calibrator["bad_pixels"] = [["type", "*", []]] + bad_pixels
+    return config
+
+
+def _translate_legacy_r0_r1_settings(config):
     legacy_calibration = config.pop("telescope_calibration", None)
     nsb_calibrator = config.get("NsbCalibrator", {})
     pixelwise = nsb_calibrator.pop("apply_pixelwise_Vdrop_correction", None)

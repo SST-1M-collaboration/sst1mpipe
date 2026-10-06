@@ -31,6 +31,9 @@
       "flag_bad_calibration_pixels": true,
       "flag_dead_pixels": true,
       "dead_pixel_std_threshold": 2.5,
+      "bad_pixels": [
+        ["type", "*", []]
+      ],
       "pde_drop_factor": [
         ["type", "*", null],
         ["id", 21, null],
@@ -83,10 +86,6 @@
       "stereo_reco_weights": "camera_frame_hillas_intensity",
       "observation_time_h": 50,
       "off_regions": 5,
-      "bad_pixels": {
-        "tel_021": [],
-        "tel_022": []
-      },
       "ped_time_window": 10
     },
 

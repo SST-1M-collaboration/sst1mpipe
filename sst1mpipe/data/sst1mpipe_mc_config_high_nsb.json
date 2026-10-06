@@ -39,11 +39,7 @@
       "gamma_to_proton_training_ratio": 1.0,
       "stereo_reco_weights": "camera_frame_hillas_intensity",
       "observation_time_h": 50,
-      "off_regions": 5,
-      "bad_pixels": {
-        "tel_001": [],
-        "tel_002": []
-      }
+      "off_regions": 5
     },
 
     "event_selection": {
@@ -64,6 +60,9 @@
     },
 
     "R0R1Calibrator": {
+      "bad_pixels": [
+        ["type", "*", []]
+      ],
       "pde_drop_factor": [
         ["type", "*", null],
         ["id", 1, 0.9393873691700036],

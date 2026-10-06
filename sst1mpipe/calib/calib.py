@@ -11,6 +11,8 @@ from ctapipe.core.traits import (
     CaselessStrEnum,
     Float,
     FloatTelescopeParameter,
+    Int,
+    List,
     Path,
     TelescopeParameter,
 )
@@ -240,8 +242,8 @@ class R0R1Calibrator(TelescopeComponent):
     3. voltage drop correction (``voltage_drop_correction``), from the std of the ADC
        samples of the pedestal events in ``event.mon.tel[tel_id].r0``
        (see `sst1mpipe.utils.monitoring_pedestals.R0PedestalMonitor`)
-    4. bad pixels: pixels with bad calibration parameters (``flag_bad_calibration_pixels``)
-       and dead pixels (``flag_dead_pixels``) are set to 0 in the R1 waveforms and
+    4. bad pixels: pixels with bad calibration parameters (``flag_bad_calibration_pixels``),
+       dead pixels (``flag_dead_pixels``) and the ``bad_pixels`` are set to 0 in the R1 waveforms and
        flagged in ``event.mon.tel[tel_id].pixel_status``, so that their charge is
        interpolated by the ``invalid_pixel_handler`` of `~ctapipe.calib.CameraCalibrator`.
 
@@ -249,7 +251,8 @@ class R0R1Calibrator(TelescopeComponent):
     if ``event.mon.tel[tel_id].r0`` is not filled.
 
     For the simulated events (``event.simulation`` filled), the R1 waveforms are given by the
-    event source. They are only corrected for the PDE drop due to the NSB.
+    event source. They are only corrected for the PDE drop due to the NSB, and the
+    ``bad_pixels`` are set to 0 and flagged (also in the true image).
 
     PDE drop correction (``pde_drop_factor``): the R1 waveforms are divided by this factor.
     The simulations use PDE files which include the drop for a given NSB level, while the
@@ -297,6 +300,15 @@ class R0R1Calibrator(TelescopeComponent):
     dead_pixel_std_threshold = FloatTelescopeParameter(
         default_value=2.5,
         help="Std of the ADC samples of the pedestal events (in ADC) below which a pixel is dead",
+    ).tag(config=True)
+
+    bad_pixels = TelescopeParameter(
+        trait=List(Int()),
+        default_value=[("type", "*", [])],
+        help=(
+            "Ids of the pixels always set to 0 and flagged (e.g. broken pixels), for the"
+            " observed and simulated events, e.g. [[\"type\", \"*\", []], [\"id\", 22, [3, 1201]]]"
+        ),
     ).tag(config=True)
 
     pde_drop_factor = TelescopeParameter(
@@ -357,7 +369,7 @@ class R0R1Calibrator(TelescopeComponent):
             return VAR_to_Idrop(np.median(pedestal_std**2), tel_id)
         return VAR_to_Idrop(pedestal_std**2, tel_id)
 
-    def bad_pixels(self, tel_id, pedestal_std):
+    def bad_pixel_mask(self, tel_id, pedestal_std):
         """Mask of the pixels set to 0 and flagged"""
         dc_to_pe, mask_bad_calibration = self.calibration_parameters(tel_id)
         mask_bad = np.zeros(dc_to_pe.shape, dtype=bool)
@@ -366,7 +378,15 @@ class R0R1Calibrator(TelescopeComponent):
             mask_bad |= mask_bad_calibration
         if self.flag_dead_pixels.tel[tel_id] and pedestal_std is not None:
             mask_bad |= pedestal_std[0, :] < self.dead_pixel_std_threshold.tel[tel_id]
+        mask_bad[self.static_bad_pixels(tel_id)] = True
         return mask_bad
+
+    def static_bad_pixels(self, tel_id):
+        """Ids of the ``bad_pixels`` of the telescope ``tel_id``"""
+        try:
+            return np.asarray(self.bad_pixels.tel[tel_id], dtype=int)
+        except KeyError:
+            return np.array([], dtype=int)
 
     def pde_drop(self, tel_id):
         """PDE drop factor by which the R1 waveforms are divided, None if not corrected"""
@@ -383,7 +403,7 @@ class R0R1Calibrator(TelescopeComponent):
         if event.simulation is not None:
             tel_ids = list(event.r1.tel.keys()) if tel_id is None else [tel_id]
             for tel in tel_ids:
-                self._correct_simulated_pde_drop(event, tel)
+                self._calibrate_simulated_telescope(event, tel)
             return event
 
         tel_ids = list(event.r0.tel.keys()) if tel_id is None else [tel_id]
@@ -391,10 +411,29 @@ class R0R1Calibrator(TelescopeComponent):
             self._calibrate_telescope(event, tel)
         return event
 
-    def _correct_simulated_pde_drop(self, event, tel_id):
+    def _calibrate_simulated_telescope(self, event, tel_id):
+        r1 = event.r1.tel[tel_id]
         pde_drop = self.pde_drop(tel_id)
         if pde_drop is not None:
-            event.r1.tel[tel_id].waveform = event.r1.tel[tel_id].waveform / pde_drop
+            r1.waveform = r1.waveform / pde_drop
+
+        bad_pixels = self.static_bad_pixels(tel_id)
+        if len(bad_pixels) > 0:
+            mask_bad = np.zeros(r1.waveform.shape[1], dtype=bool)
+            mask_bad[bad_pixels] = True
+            r1.waveform[:, mask_bad] = 0
+            if event.simulation.tel[tel_id].true_image is not None:
+                event.simulation.tel[tel_id].true_image[mask_bad] = 0
+            self._flag_pixels(event, tel_id, mask_bad)
+            self.n_bad_pixels[tel_id] = int(mask_bad.sum())
+
+    @staticmethod
+    def _flag_pixels(event, tel_id, mask_bad):
+        """Flag the pixels, so that their charge is interpolated by the CameraCalibrator"""
+        pixel_status = event.mon.tel[tel_id].pixel_status
+        pixel_status.hardware_failing_pixels = mask_bad[np.newaxis]
+        pixel_status.flatfield_failing_pixels = mask_bad[np.newaxis]
+        pixel_status.pedestal_failing_pixels = mask_bad[np.newaxis]
 
     def _calibrate_telescope(self, event, tel_id):
         r0 = event.r0.tel[tel_id]
@@ -409,14 +448,11 @@ class R0R1Calibrator(TelescopeComponent):
             waveform /= pde_drop
 
         # the R0 waveforms are kept: they are used afterwards by the R0 pedestal monitor
-        mask_bad = self.bad_pixels(tel_id, pedestal_std)
+        mask_bad = self.bad_pixel_mask(tel_id, pedestal_std)
         waveform[:, mask_bad] = 0
         self.n_bad_pixels[tel_id] = int(mask_bad.sum())
 
-        pixel_status = event.mon.tel[tel_id].pixel_status
-        pixel_status.hardware_failing_pixels = mask_bad[np.newaxis]
-        pixel_status.flatfield_failing_pixels = mask_bad[np.newaxis]
-        pixel_status.pedestal_failing_pixels = mask_bad[np.newaxis]
+        self._flag_pixels(event, tel_id, mask_bad)
 
         n_pixels = waveform.shape[1]
         event.r1.tel[tel_id] = R1CameraContainer(

@@ -797,47 +797,6 @@ def correct_true_image(event):
 
 
 
-def remove_bad_pixels(event, config=None):
-    """
-    Fills bad pixel waveforms with zeros and
-    flags them in proper containers. Charges in
-    these pixels are then interpolated using method
-    set in cfg: invalid_pixel_handler_type
-    Default is NeighborAverage, but can be turned
-    off with 'null'
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-    config: dict
-
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    """
-
-    if "bad_pixels" in config["analysis"]:
-        for tel in event.trigger.tels_with_trigger:
-            tel_name = "tel_"+str(tel).zfill(3)
-            if tel_name in config["analysis"]["bad_pixels"]:
-                if len(config["analysis"]["bad_pixels"][tel_name]):
-
-                    mask_bad = np.zeros(1296)
-                    mask_bad[config["analysis"]["bad_pixels"][tel_name]] = 1
-                    mask_bad = mask_bad.astype(bool)
-
-                    event.r1.tel[tel].waveform[:, mask_bad] = 0
-                    event.simulation.tel[tel].true_image[mask_bad] = 0
-                    event.mon.tel[tel].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
-                    event.mon.tel[tel].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
-                    event.mon.tel[tel].pixel_status['pedestal_failing_pixels'] = np.array([mask_bad])
-
-    return event
-
-
 def check_output_dl1(file):
     """
     Checks if simulated shower distributions

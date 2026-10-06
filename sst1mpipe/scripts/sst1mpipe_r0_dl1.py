@@ -55,7 +55,6 @@ from sst1mpipe.utils import (
     correct_true_image,
     energy_min_cut,
     get_tel_string,
-    remove_bad_pixels,
 )
 from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor, load_first_pedestals
 
@@ -345,10 +344,8 @@ def main():
                 # PDE drop correction (R0R1Calibrator.pde_drop_factor)
                 calibrator_r0_r1(event)
 
-            # This function flags the bad pixel according to the cfg file, and just for sure also kills the waveforms.
-            # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
-            # Default is NeighborAverage, but can be turned off with 'null'
-            event = remove_bad_pixels(event, config=config)
+            # NOTE: the bad pixels (R0R1Calibrator.bad_pixels) are set to 0 and flagged by the R0R1Calibrator.
+            # Their charges are interpolated with the CameraCalibrator.invalid_pixel_handler_type (NeighborAverage)
 
             if (not source.is_simulation) and (not reclean) and pedestals_in_file:
                 # in the current setup this value is common for the whole file but keep it like this for the future

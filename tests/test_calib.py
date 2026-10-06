@@ -5,7 +5,12 @@ import pytest
 import json
 
 from ctapipe.calib import CameraCalibrator
-from ctapipe.containers import ArrayEventContainer, R1CameraContainer, SimulatedEventContainer
+from ctapipe.containers import (
+    ArrayEventContainer,
+    R1CameraContainer,
+    SimulatedCameraContainer,
+    SimulatedEventContainer,
+)
 from ctapipe.instrument import SubarrayDescription
 from traitlets.config import Config
 
@@ -335,3 +340,82 @@ def test_pde_drop_correction_of_data(event):
         pdes.append(event.r1.tel[TEL_ID].waveform.copy())
 
     np.testing.assert_allclose(pdes[1], pdes[0] / 0.5)
+
+
+# bad pixels of the config
+BAD_PIXELS = [3, 100, 1201]
+
+
+def test_static_bad_pixels_of_data(event):
+
+    calibrator_r0_r1 = calibrator(
+        flag_bad_calibration_pixels=False, flag_dead_pixels=False,
+        bad_pixels=[["type", "*", []], ["id", TEL_ID, BAD_PIXELS]],
+    )
+    calibrator_r0_r1(with_pedestal_std(event, None), TEL_ID)
+
+    flagged = event.mon.tel[TEL_ID].pixel_status.hardware_failing_pixels[0]
+    assert np.flatnonzero(flagged).tolist() == BAD_PIXELS
+    assert calibrator_r0_r1.n_bad_pixels[TEL_ID] == len(BAD_PIXELS)
+    assert np.all(event.r1.tel[TEL_ID].waveform[:, BAD_PIXELS] == 0)
+    assert np.all(event.r1.tel[TEL_ID].waveform[:, ~flagged].any(axis=-1))
+
+
+def test_static_bad_pixels_added_to_the_other_bad_pixels(event):
+
+    flags = dict(flag_dead_pixels=False, voltage_drop_correction="none")
+    calibrator(**flags)(with_pedestal_std(event, None), TEL_ID)
+    bad_calibration = event.mon.tel[TEL_ID].pixel_status.hardware_failing_pixels[0].copy()
+
+    calibrator(**flags, bad_pixels=[["id", TEL_ID, BAD_PIXELS]])(event, TEL_ID)
+    flagged = event.mon.tel[TEL_ID].pixel_status.hardware_failing_pixels[0]
+
+    assert bad_calibration.any()
+    np.testing.assert_array_equal(np.flatnonzero(flagged), np.union1d(np.flatnonzero(bad_calibration), BAD_PIXELS))
+
+
+def test_static_bad_pixels_of_simulations(mc_subarray):
+
+    event = simulated_event()
+    for tel_id in (1, 2):
+        event.simulation.tel[tel_id] = SimulatedCameraContainer(true_image=np.ones(1296, dtype=np.int32))
+    status = event.mon.tel[2].pixel_status.hardware_failing_pixels
+    calibrator_r0_r1 = mc_calibrator(mc_subarray, bad_pixels=[["type", "*", []], ["id", 1, BAD_PIXELS]])
+    calibrator_r0_r1(event)
+
+    flagged = event.mon.tel[1].pixel_status.hardware_failing_pixels[0]
+    assert np.flatnonzero(flagged).tolist() == BAD_PIXELS
+    assert np.all(event.r1.tel[1].waveform[:, BAD_PIXELS] == 0)
+    assert np.all(event.simulation.tel[1].true_image[BAD_PIXELS] == 0)
+    assert event.simulation.tel[1].true_image.sum() == 1296 - len(BAD_PIXELS)
+    # no bad pixels in tel 2: not modified
+    np.testing.assert_array_equal(event.r1.tel[2].waveform, 1)
+    assert event.mon.tel[2].pixel_status.hardware_failing_pixels is status
+
+
+@pytest.mark.parametrize("calibrator_settings, expected", [
+    ({}, [["type", "*", []], ["id", 22, [5, 7]]]),
+    # the R0R1Calibrator section is used
+    ({"R0R1Calibrator": {"bad_pixels": [["id", 21, [1]]]}}, [["id", 21, [1]]]),
+])
+def test_translate_legacy_bad_pixels(calibrator_settings, expected):
+
+    legacy = {
+        "analysis": {"bad_pixels": {"tel_021": [], "tel_022": [5, 7]}, "off_regions": 5},
+        "telescope_calibration": {"tel_021": None, "tel_022": None, "bad_calib_px_interpolation": True},
+        **calibrator_settings,
+    }
+    config = translate_legacy_calibration_config(legacy)
+
+    assert config["analysis"] == {"off_regions": 5}
+    assert config["R0R1Calibrator"]["bad_pixels"] == expected
+    if not calibrator_settings:
+        # the other legacy settings are translated too
+        assert config["R0R1Calibrator"]["flag_bad_calibration_pixels"]
+
+
+def test_translate_legacy_empty_bad_pixels():
+
+    config = translate_legacy_calibration_config({"analysis": {"bad_pixels": {"tel_021": [], "tel_022": []}}})
+
+    assert config == {"analysis": {}}
