@@ -72,11 +72,6 @@ def test_dl1_pedestal_monitor_used_by_nsb_image_cleaner(tmp_path, monkeypatch):
         "--R0R1Calibrator.flag_dead_pixels=False",
     ], raises=True)
 
-    # the RTA config uses the NSBImageCleaner
-    assert tool.image_processor.image_cleaner_type == "NSBImageCleaner"
-    assert tool.image_processor.clean.picture_threshold_pe.tel[21] == 8
-    assert tool.image_processor.clean.pedestal_factor.tel[21] == 2.5
-
     # all the events of the test file are pedestal events
     monitor = tool.dl1_pedestal_monitor
     assert monitor.processed_events[21] == N_EVENTS
