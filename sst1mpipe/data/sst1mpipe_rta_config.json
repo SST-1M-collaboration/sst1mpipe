@@ -43,7 +43,7 @@
   },
 
   "ImageProcessor": {
-    "image_cleaner_type": "TailcutsImageCleaner",
+    "image_cleaner_type": "NSBImageCleaner",
     "use_telescope_frame": false,
     "TailcutsImageCleaner": {
         "picture_threshold_pe": [
@@ -56,6 +56,23 @@
           ["type", "*", 2]
         ]
       },
+    "NSBImageCleaner": {
+        "picture_threshold_pe": [
+          ["type", "*", 8]
+        ],
+        "boundary_threshold_pe": [
+          ["type", "*", 4]
+        ],
+        "min_picture_neighbors": [
+          ["type", "*", 2]
+        ],
+        "keep_isolated_pixels": false,
+        "time_limit": 8,
+        "time_num_neighbors": 1,
+        "largest_island_only": false,
+        "pedestal_factor": 2.5,
+        "bright_cleaning_threshold": null
+    },
     "DBSCANImageCleaner": {
       "epsilon_r": [
         ["type", "*", 38.0]

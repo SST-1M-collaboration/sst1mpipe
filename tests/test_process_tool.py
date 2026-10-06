@@ -66,12 +66,16 @@ def test_dl1_pedestal_monitor_used_by_nsb_image_cleaner(tmp_path, monkeypatch):
         f"--config={RTA_CONFIG}",
         f"--max-events={N_EVENTS}",
         "--ProcessorTool.progress_bar=False",
-        "--ImageProcessor.image_cleaner_type=NSBImageCleaner",
         "--DL1PedestalMonitor.n_events=20",
         # in the dark run of the test file all the pixels are dead (pedestal std < 2.5 ADC):
         # their image is 0, so they are kept to have a pedestal std
         "--R0R1Calibrator.flag_dead_pixels=False",
     ], raises=True)
+
+    # the RTA config uses the NSBImageCleaner
+    assert tool.image_processor.image_cleaner_type == "NSBImageCleaner"
+    assert tool.image_processor.clean.picture_threshold_pe.tel[21] == 8
+    assert tool.image_processor.clean.pedestal_factor.tel[21] == 2.5
 
     # all the events of the test file are pedestal events
     monitor = tool.dl1_pedestal_monitor
