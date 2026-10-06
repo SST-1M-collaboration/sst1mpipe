@@ -3,7 +3,5 @@
 
 from .calib import (
     R0R1Calibrator,
-    get_window_corr_factors,
     saturated_charge_correction,
-    window_transmittance_correction,
 )

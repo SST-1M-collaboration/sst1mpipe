@@ -27,6 +27,9 @@
       "calibration_file": [
         ["type", "*", null]
       ],
+      "window_transmittance_file": [
+        ["type", "*", null]
+      ],
       "voltage_drop_correction": "global",
       "flag_bad_calibration_pixels": true,
       "flag_dead_pixels": true,
@@ -39,11 +42,6 @@
         ["id", 21, null],
         ["id", 22, null]
       ]
-    },
-
-    "window_transmittance": {
-      "tel_021": null,
-      "tel_022": null
     },
 
     "telescope_equivalent_focal_length": {

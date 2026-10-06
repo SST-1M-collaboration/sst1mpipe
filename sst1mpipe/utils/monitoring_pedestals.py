@@ -12,9 +12,7 @@ from ctapipe.image import ImageProcessor
 
 from sst1mpipe.calib import (
     R0R1Calibrator,
-    get_window_corr_factors,
     saturated_charge_correction,
-    window_transmittance_correction,
 )
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import get_subarray
@@ -204,13 +202,8 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
 
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
     calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
-    window_corr_factors, _ = get_window_corr_factors(telescope=tel, config=config)
-    swapped_modules = None
 
     for event in source:
-
-        if swapped_modules is None:
-            swapped_modules = source.swapped_pixels(tel, event.r0.tel[tel].local_camera_clock)
 
         if event.r0.tel[tel]._camera_event_type.value != MON_EVT_TYPE:
             continue
@@ -222,12 +215,6 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
 
         # Integration correction of saturated pixels
         saturated_charge_correction(event)
-        event = window_transmittance_correction(
-            event,
-            window_corr_factors=window_corr_factors,
-            telescope=tel,
-            swapped_modules=swapped_modules
-            )
 
         dl1_monitor.add_event(event, tel)
         if dl1_monitor.n_buffered(tel) >= dl1_monitor.n_events.tel[tel]:
@@ -266,24 +253,13 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
         return tel
 
     # to treat images we need to estimate gain drop from pedestals, so calibrate the events once more
-    window_corr_factors, _ = get_window_corr_factors(telescope=tel, config=config)
-    swapped_modules = None
     for event in source:
-
-        if swapped_modules is None:
-            swapped_modules = source.swapped_pixels(tel, event.r0.tel[tel].local_camera_clock)
 
         r0_monitor.fill_monitoring(event, tel)
         cleaning_mask = clean(event)
         if sum(cleaning_mask) < 20:
             # Integration correction of saturated pixels - done only here because the fake pedestals must match in both loops
             saturated_charge_correction(event)
-            event = window_transmittance_correction(
-                event,
-                window_corr_factors=window_corr_factors,
-                telescope=tel,
-                swapped_modules=swapped_modules
-                )
             dl1_monitor.add_event(event, tel)
             if dl1_monitor.n_buffered(tel) >= dl1_monitor.n_events.tel[tel]:
                 break

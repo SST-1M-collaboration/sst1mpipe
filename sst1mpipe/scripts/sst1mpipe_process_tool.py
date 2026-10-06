@@ -173,16 +173,16 @@ class ProcessorTool(Tool):
         pointing_manual = getattr(source, "pointing_manual", False)
         self.log.info("Target: %s, wobble: %s, pointing: %s (manual: %s)", target, wobble, pointing, pointing_manual)
 
-        calibration_files = None
+        calibration_files, window_files = None, None
         if self.r0_pedestal_monitor is not None:  # observed data
-            calibration_files = ",".join(
-                str(self.r0_r1_calibrator.calibration_file_path(tel_id))
-                for tel_id, n in summary["n_triggered"].items() if n > 0
-            )
+            tel_ids = [tel_id for tel_id, n in summary["n_triggered"].items() if n > 0]
+            calibration_files = ",".join(str(self.r0_r1_calibrator.calibration_file_path(t)) for t in tel_ids)
+            window_files = ",".join(str(self.r0_r1_calibrator.window_transmittance_file_path(t)) for t in tel_ids)
 
         n_triggered = list(summary["n_triggered"].values()) + [0, 0]
         write_dl1_info(output_path, dict(
             calib_file=calibration_files,
+            window_file=window_files,
             target=target,
             wobble=wobble,
             ra=None if pointing is None else pointing.ra.deg,

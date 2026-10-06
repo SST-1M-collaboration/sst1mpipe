@@ -21,6 +21,18 @@ from sst1mpipe.utils import VAR_to_Idrop
 
 
 
+# Transmittance correction factors of the camera windows, measured in the lab
+DEFAULT_WINDOW_FILES = {
+    21: 'corr_factor_1st_wdw.txt',
+    22: 'corr_factor_2nd_wdw.txt',
+}
+
+
+def read_window_transmittance(window_file):
+    """Correction factor of the window transmittance of each pixel (file with pixel_id, correction_factor)"""
+    return np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
+
+
 def get_default_window(telescope=None):
     """
     Provides default window transmissivity file,
@@ -31,7 +43,7 @@ def get_default_window(telescope=None):
     ----------
     telescope: int
         Telescope number as in
-        event.trigger.tels_with_trigger
+        event.trigger.tels_with_trigger (1, 2 for the simulations)
 
     Returns
     -------
@@ -39,99 +51,9 @@ def get_default_window(telescope=None):
     window_file: string
 
     """
-
-    if (telescope == 21) or (telescope == 1):
-        default_window_file_tel1 = 'corr_factor_1st_wdw.txt'
-        logging.info('Window file used: ' + default_window_file_tel1)
-        window_file = files('sst1mpipe.data').joinpath(default_window_file_tel1)
-    elif (telescope == 22) or (telescope == 2):
-        default_window_file_tel2 = 'corr_factor_2nd_wdw.txt'
-        logging.info('Window file used: ' + default_window_file_tel2)
-        window_file = files('sst1mpipe.data').joinpath(default_window_file_tel2)
-    else:
-        logging.error(f'Telescope {telescope} not known')
-    window_corr = np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
-    return window_corr, window_file
-
-
-def get_window_corr_factors(telescope=None, config=None):
-    """
-    Finds and reads the window transmissivity file.
-
-    Parameters
-    ----------
-    telescope: int
-        Telescope number as in
-        event.trigger.tels_with_trigger
-    config: dict
-
-    Returns
-    -------
-    window_corr: numpy.ndarray
-    window_file: string
-
-    """
-
-    if "window_transmittance" in config:
-        if config["window_transmittance"]["tel_" + str(telescope).zfill(3)]:
-            window_file = config["window_transmittance"]["tel_" + str(telescope).zfill(3)]
-            window_corr = np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
-            logging.info("Window File for Tel %s: %s", telescope, window_file)
-        else:
-            logging.info("NO WINDOW TRANSMITTANCE FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT WINDOW USED.", telescope)
-            window_corr, window_file = get_default_window(telescope=telescope)
-    else:
-        logging.info("NO WINDOW TRANSMITTANCE FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT WINDOW USED.", telescope)
-        window_corr, window_file = get_default_window(telescope=telescope)
-
-    return window_corr, window_file
-
-
-def window_transmittance_correction(
-        event, window_corr_factors=None,
-        telescope=None,
-        swapped_modules=None
-        ):
-    """
-    Applies window transmittance correction
-    on the integrated waveforms (images)
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-    window_corr_factors: numpy.ndarray
-    telescope: int
-        Telescope number as in
-        event.trigger.tels_with_trigger
-    swapped_modules: list
-        list of masks
-
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    """
-
-    if swapped_modules is None:
-        swapped_modules = []
-
-    for mask_1,mask_2 in swapped_modules:
-
-        # module 1
-        window_corr_1 = window_corr_factors[mask_1]
-
-        # module 2
-        window_corr_2 = window_corr_factors[mask_2]
-
-        window_corr_factors[mask_1] = window_corr_2
-        window_corr_factors[mask_2] = window_corr_1
-
-    image_corrected = event.dl1.tel[telescope].image / window_corr_factors
-    event.dl1.tel[telescope].image = image_corrected.astype(np.float32)
-
-    return event
+    window_file = files('sst1mpipe.data').joinpath(DEFAULT_WINDOW_FILES[{1: 21, 2: 22}.get(telescope, telescope)])
+    logging.info('Window file used: %s', window_file)
+    return read_window_transmittance(window_file), window_file
 
 
 def saturated_charge_correction(event):
@@ -242,12 +164,14 @@ class R0R1Calibrator(TelescopeComponent):
     3. voltage drop correction (``voltage_drop_correction``), from the std of the ADC
        samples of the pedestal events in ``event.mon.tel[tel_id].r0``
        (see `sst1mpipe.utils.monitoring_pedestals.R0PedestalMonitor`)
-    4. bad pixels: pixels with bad calibration parameters (``flag_bad_calibration_pixels``),
+    4. window transmittance correction: division by the correction factor of each pixel
+       of ``window_transmittance_file``
+    5. bad pixels: pixels with bad calibration parameters (``flag_bad_calibration_pixels``),
        dead pixels (``flag_dead_pixels``) and the ``bad_pixels`` are set to 0 in the R1 waveforms and
        flagged in ``event.mon.tel[tel_id].pixel_status``, so that their charge is
        interpolated by the ``invalid_pixel_handler`` of `~ctapipe.calib.CameraCalibrator`.
 
-    The steps using the pedestal statistics (3 and the dead pixels of 4) are not applied
+    The steps using the pedestal statistics (3 and the dead pixels of 5) are not applied
     if ``event.mon.tel[tel_id].r0`` is not filled.
 
     For the simulated events (``event.simulation`` filled), the R1 waveforms are given by the
@@ -272,6 +196,17 @@ class R0R1Calibrator(TelescopeComponent):
         help=(
             "HDF5 file with the calibration parameters (dc_to_pe, calib_flag) from the"
             " dark runs. If None, the default calibration file of the telescope is used."
+        ),
+    ).tag(config=True)
+
+    window_transmittance_file = TelescopeParameter(
+        trait=Path(exists=True, directory_ok=False, allow_none=True),
+        default_value=None,
+        allow_none=True,
+        help=(
+            "File with the transmittance correction factor of the camera window of each pixel"
+            " (pixel_id, correction_factor), measured in the lab: the charges are divided by it."
+            " If None, the default file of the telescope (21, 22) is used."
         ),
     ).tag(config=True)
 
@@ -325,6 +260,7 @@ class R0R1Calibrator(TelescopeComponent):
     def __init__(self, subarray, config=None, parent=None, **kwargs):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
         self._calibration = {}
+        self._window_transmittance = {}
         self.n_bad_pixels = {}
 
     def calibration_file_path(self, tel_id):
@@ -338,6 +274,26 @@ class R0R1Calibrator(TelescopeComponent):
         if tel_id not in DEFAULT_CALIBRATION_FILES:
             raise ValueError(f"No default calibration file for telescope {tel_id}, set calibration_file")
         return files('sst1mpipe.data').joinpath(DEFAULT_CALIBRATION_FILES[tel_id])
+
+    def window_transmittance_file_path(self, tel_id):
+        """Window transmittance file used for the telescope ``tel_id``"""
+        try:
+            path = self.window_transmittance_file.tel[tel_id]
+        except KeyError:
+            path = None
+        if path is not None:
+            return path
+        if tel_id not in DEFAULT_WINDOW_FILES:
+            raise ValueError(f"No default window transmittance file for telescope {tel_id}, set window_transmittance_file")
+        return files('sst1mpipe.data').joinpath(DEFAULT_WINDOW_FILES[tel_id])
+
+    def window_transmittance(self, tel_id):
+        """Correction factor of the window transmittance of each pixel of the telescope ``tel_id``"""
+        if tel_id not in self._window_transmittance:
+            path = self.window_transmittance_file_path(tel_id)
+            self._window_transmittance[tel_id] = read_window_transmittance(path)
+            self.log.info("Telescope %d: window transmittance file %s", tel_id, path)
+        return self._window_transmittance[tel_id]
 
     def calibration_parameters(self, tel_id):
         """
@@ -443,6 +399,7 @@ class R0R1Calibrator(TelescopeComponent):
         voltage_drop = np.asarray(self.voltage_drop(tel_id, pedestal_std))
         waveform = (r0.waveform - r0.pedestal[:, np.newaxis]) / dc_to_pe[:, np.newaxis]
         waveform /= voltage_drop[..., np.newaxis]
+        waveform /= self.window_transmittance(tel_id)[:, np.newaxis]
         pde_drop = self.pde_drop(tel_id)
         if pde_drop is not None:
             waveform /= pde_drop

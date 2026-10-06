@@ -36,9 +36,7 @@ from ctapipe.reco import ShowerProcessor
 import sst1mpipe
 from sst1mpipe.calib import (
     R0R1Calibrator,
-    get_window_corr_factors,
     saturated_charge_correction,
-    window_transmittance_correction,
 )
 from sst1mpipe.io import (
     check_outdir,
@@ -307,12 +305,8 @@ def main():
                 if i == 0:
                     tel = event.trigger.tels_with_trigger[0]
                     calibration_file = str(calibrator_r0_r1.calibration_file_path(tel))
-                    window_corr_factors, window_file = get_window_corr_factors(
-                        telescope=tel, config=config
-                        )
+                    window_file = str(calibrator_r0_r1.window_transmittance_file_path(tel))
                     tel_string = get_tel_string(tel, mc=False)
-                    # pixels of the wrongly connected modules, swapped by SST1MEventSource (swapped_modules)
-                    swaped_modules_list = source.swapped_pixels(tel, event.r0.tel[tel].local_camera_clock)
                     if adaptive_cleaning:
                         dl1_pedestal_monitor.fill_monitoring(event, tel)
                         nsb_level = np.mean(event.mon.tel[tel].pedestal.charge_mean)
@@ -368,14 +362,8 @@ def main():
             if not source.is_simulation:
 
                 # Integration correction of saturated pixels
+                # (the window transmittance correction is applied by the R0R1Calibrator)
                 n_saturated += saturated_charge_correction(event)
-
-                event = window_transmittance_correction(
-                    event,
-                    window_corr_factors=window_corr_factors,
-                    telescope=tel,
-                    swapped_modules=swaped_modules_list
-                    )
 
             if adaptive_cleaning:
                 # NSBImageCleaner reads the std of the pedestal images (in p.e.) from event.mon.tel[tel].pedestal

@@ -15,7 +15,7 @@ from ctapipe.instrument import SubarrayDescription
 from traitlets.config import Config
 
 from sst1mpipe.calib import R0R1Calibrator, saturated_charge_correction
-from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES
+from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES, DEFAULT_WINDOW_FILES
 from sst1mpipe.io import load_config, translate_legacy_calibration_config
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import get_subarray
@@ -84,7 +84,8 @@ def test_pedestal_subtraction_and_dc_to_pe(event):
 
     r0 = event.r0.tel[TEL_ID]
     dc_to_pe, _ = calibrator_r0_r1.calibration_parameters(TEL_ID)
-    expected = (r0.waveform[0] - r0.pedestal[:, np.newaxis]) / dc_to_pe[:, np.newaxis]
+    window = calibrator_r0_r1.window_transmittance(TEL_ID)
+    expected = (r0.waveform[0] - r0.pedestal[:, np.newaxis]) / dc_to_pe[:, np.newaxis] / window[:, np.newaxis]
     np.testing.assert_allclose(event.r1.tel[TEL_ID].waveform[0], expected)
     assert calibrator_r0_r1.n_bad_pixels[TEL_ID] == 0
 
@@ -419,3 +420,55 @@ def test_translate_legacy_empty_bad_pixels():
     config = translate_legacy_calibration_config({"analysis": {"bad_pixels": {"tel_021": [], "tel_022": []}}})
 
     assert config == {"analysis": {}}
+
+
+# window transmittance correction
+@pytest.fixture
+def window_file_of_ones(tmp_path):
+    path = tmp_path / "window.txt"
+    np.savetxt(path, np.column_stack([np.arange(1296), np.ones(1296)]), header="pixel_id\t correction_factor", comments="")
+    return str(path)
+
+
+def test_window_transmittance_correction(event, window_file_of_ones):
+
+    waveforms = {}
+    for name, settings in [("default", {}), ("ones", {"window_transmittance_file": window_file_of_ones})]:
+        event.r1.tel.clear()
+        calibrator(voltage_drop_correction="none", flag_bad_calibration_pixels=False, **settings)(
+            with_pedestal_std(event, None), TEL_ID,
+        )
+        waveforms[name] = event.r1.tel[TEL_ID].waveform.copy()
+
+    factors = np.loadtxt(files('sst1mpipe.data').joinpath(DEFAULT_WINDOW_FILES[TEL_ID]), skiprows=1, usecols=1)
+    assert len(factors) == 1296 and not np.allclose(factors, 1)
+    np.testing.assert_allclose(waveforms["default"], waveforms["ones"] / factors[:, np.newaxis])
+
+
+def test_window_transmittance_file_per_telescope(window_file_of_ones):
+
+    default = calibrator()
+    assert default.window_transmittance_file_path(21).name == DEFAULT_WINDOW_FILES[21]
+    assert default.window_transmittance_file_path(22).name == DEFAULT_WINDOW_FILES[22]
+
+    custom = calibrator(window_transmittance_file=[["type", "*", None], ["id", 22, window_file_of_ones]])
+    assert custom.window_transmittance_file_path(21).name == DEFAULT_WINDOW_FILES[21]
+    np.testing.assert_array_equal(custom.window_transmittance(22), 1)
+
+
+def test_window_transmittance_not_applied_to_simulations(mc_subarray):
+
+    event = simulated_event(tel_ids=[1])
+    mc_calibrator(mc_subarray)(event)
+
+    np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
+
+
+def test_translate_legacy_window_transmittance(window_file_of_ones):
+
+    config = translate_legacy_calibration_config(
+        {"window_transmittance": {"tel_021": None, "tel_022": window_file_of_ones}}
+    )
+
+    assert config == {"R0R1Calibrator": {"window_transmittance_file": [["type", "*", None], ["id", 22, window_file_of_ones]]}}
+    assert translate_legacy_calibration_config({"window_transmittance": {"tel_021": None, "tel_022": None}}) == {}
