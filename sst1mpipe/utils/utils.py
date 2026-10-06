@@ -31,13 +31,10 @@ from ctapipe.coordinates import CameraFrame
 from ctapipe.image import camera_to_shower_coordinates
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
-from ctapipe.time import time_to_ctao_high_res
 from gammapy.data import DataStore
 
 from sst1mpipe.io.sst1m_event_source import parse_target_field, camera_clock_to_time
 from sst1mpipe.resources import SUBARRAY_FILE
-
-S_TO_NS = np.int64(1_000_000_000)
 
 
 def get_target(file, force_pointing=False):
@@ -130,52 +127,29 @@ def get_stereo_method(config):
         return stereo_method
 
 
-def time_to_ns(time):
+def get_wr_timestamp(data):
     """
-    Converts an astropy Time to an integer number of nanoseconds
-    since 1970-01-01T00:00:00 TAI, without loss of precision, i.e.
-    the camera clock (local_camera_clock) for the SST-1M events.
+    Reads WR timestamps stored in two columns in the DL1
+    table in seconds, and converts them in nanoseconds
+    with high numerical precission.
 
     Parameters
     ----------
-    time: astropy.time.Time
-
-    Returns
-    -------
-    numpy.int64 or numpy.ndarray of numpy.int64
-
-    """
-
-    high_res = time_to_ctao_high_res(time)
-    seconds = high_res[..., 0].astype(np.int64)
-    quarter_nanoseconds = high_res[..., 1].astype(np.int64)
-    return seconds * S_TO_NS + quarter_nanoseconds // 4
-
-
-def get_timestamp_ns(data):
-    """
-    Reads the timestamps of the events stored in the DL1
-    table (time_ns column, with nanosecond precision).
-    DL1 files produced before have the White Rabbit timestamps
-    stored in two columns (time_wr_full_seconds, time_wr_frac_seconds).
-
-    Parameters
-    ----------
-    data: pandas.DataFrame or astropy.table.Table
+    data: pandas.DataFrame
         DL1 table
 
     Returns
     -------
-    numpy.ndarray of numpy.int64
-        Timestamps in nanoseconds (TAI)
+    numpy.int64
+        Precise timestamp in nanoseconds
 
     """
 
-    if 'time_ns' in data.keys():
-        return np.array(data['time_ns']).astype(np.int64)
+    S_TO_NS = np.int64(1e9)
     t1 = np.array(data['time_wr_full_seconds']).astype(np.int64) * S_TO_NS
     t2 = np.array(data['time_wr_frac_seconds']).astype(np.float64) * S_TO_NS
-    return t1 + t2.astype(np.int64)
+    t = t1 + t2.astype(np.int64)
+    return t
 
 
 def get_tel_string(tel, mc=True):

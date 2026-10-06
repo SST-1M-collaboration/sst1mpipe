@@ -91,6 +91,13 @@ def parse_args():
                     )
 
     parser.add_argument(
+                    '--precise-timestamps',
+                    action='store_true',
+                    help='Store WR timestamps in the output DL1 table. Needs some extra processing time to go through the event source again.',
+                    dest='precise_timestamps'
+                    )
+
+    parser.add_argument(
                     '--pointing-ra', '-r', type=float,
                     dest='ra',
                     help='Pointing RA (deg)',
@@ -140,6 +147,7 @@ def main():
     force_pointing = args.force_pointing
     pixel_charges = args.pixel_charges
     reclean = args.reclean
+    precise_timestamps = args.precise_timestamps
 
     # simtel or SST-1M zfits file, from the file content (the right EventSource is chosen by ctapipe)
     ismc = SimTelEventSource.is_compatible(input_file)
@@ -280,6 +288,10 @@ def main():
         else:
             final_histogram_tel1 = np.zeros(BINS)
             final_histogram_tel2 = np.zeros(BINS)
+
+    if not source.is_simulation and precise_timestamps:
+        full_seconds = []
+        fractional_seconds = []
 
     with DataWriter(
         source, output_path=output_file,
@@ -471,9 +483,21 @@ def main():
             # is applied at the DL1 -> DL2 step (sst1mpipe_dl1_dl2 --scale-intensities)
             writer(event)
 
+            # Extracting WR timestamps with high numerical precision
+            if not source.is_simulation and precise_timestamps:
+                localtime = event.r0.tel[tel].local_camera_clock.astype(np.uint64)
+                S_TO_NS = np.uint64(1e9)
+                full_seconds.append(localtime // S_TO_NS)
+                fractional_seconds.append((localtime % S_TO_NS) / S_TO_NS)
+
 
         if max_events is None and source.is_simulation:
             writer.write_simulation_histograms(source)
+
+    if not source.is_simulation and precise_timestamps:
+        wr_timestamps = np.column_stack((full_seconds, fractional_seconds))
+    else:
+        wr_timestamps=None
 
     # Write additional params in the DL1 file
     # - these are not defined in the ctapipe containers, but are necessary for (mono) reconstruction
@@ -484,11 +508,13 @@ def main():
     if (not source.is_simulation) and ((reclean and (len(dl1_charges) > 0)) or pedestals_in_file):
         write_extra_parameters(
                 output_file,
-                config=config, ismc=ismc, meanQ=ped_mean_charge
+                config=config, ismc=ismc, meanQ=ped_mean_charge,
+                wr_timestamps=wr_timestamps
                 )
     else:
         write_extra_parameters(
-                output_file, config=config, ismc=ismc
+                output_file, config=config,
+                ismc=ismc, wr_timestamps=wr_timestamps
                 )
 
     if source.is_simulation:
@@ -499,6 +525,16 @@ def main():
                 "tel_002": survived_charge_fraction[2]
                 }
             )
+
+    # Write WR timestamps with high numerical precision
+    # OBSOLETE - this function is extremely slow, there nos no reason why
+    # not to extract WR timestamps in the main event loop, which makes the
+    # it much faster
+    #if not source.is_simulation and precise_timestamps:
+    #    write_wr_timestamps(output_file,
+    #                        event_source=SST1MEventSource([input_file],
+    #                        max_events=max_events)
+    #                        )
 
     # Write pointing information in the main DL1 table and in two monitoring tables
     # It is important, as we do not do it per event anymore (it was very slow)

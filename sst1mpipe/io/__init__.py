@@ -2,8 +2,7 @@
 
 
 from .io import (
-    add_pointing_dl1_stereo,
-    add_time_ns,
+    add_wr_dl1_stereo,
     check_outdir,
     compute_dl1_summary,
     get_dl1_info,
@@ -38,4 +37,5 @@ from .io import (
     write_photon_list,
     write_pixel_charges_table,
     write_r1_dl1_cfg,
+    write_wr_timestamps,
 )
