@@ -3,9 +3,11 @@ from importlib.resources import files
 import numpy as np
 import pytest
 import json
+from copy import deepcopy
 
 from ctapipe.calib import CameraCalibrator
 from ctapipe.containers import (
+    PixelStatus,
     ArrayEventContainer,
     R1CameraContainer,
     SimulatedCameraContainer,
@@ -14,7 +16,7 @@ from ctapipe.containers import (
 from ctapipe.instrument import SubarrayDescription
 from traitlets.config import Config
 
-from sst1mpipe.calib import R0R1Calibrator, saturated_charge_correction
+from sst1mpipe.calib import R0R1Calibrator, SaturationCorrector
 from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES, DEFAULT_WINDOW_FILES
 from sst1mpipe.io import load_config, translate_legacy_calibration_config
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
@@ -66,7 +68,8 @@ def test_r0_r1_dl1_calibration():
 
         r1_dl1_calibrator(event)
         assert event.dl1.tel[TEL_ID].image.shape == (n_pixels, )
-        assert isinstance(saturated_charge_correction(event), bool)
+        # no saturated pixels in the dark run of the test file
+        assert not SaturationCorrector(subarray=source.subarray, config=CONFIG)(event, TEL_ID)
 
 
 def test_all_telescopes_with_r0_data_are_calibrated(event):
@@ -472,3 +475,102 @@ def test_translate_legacy_window_transmittance(window_file_of_ones):
 
     assert config == {"R0R1Calibrator": {"window_transmittance_file": [["type", "*", None], ["id", 22, window_file_of_ones]]}}
     assert translate_legacy_calibration_config({"window_transmittance": {"tel_021": None, "tel_022": None}}) == {}
+
+
+# saturation correction
+def old_saturated_charge_correction(event):
+    """saturated_charge_correction before the SaturationCorrector, as reference"""
+    saturated_threshold, width_level, width_threshold, integration_level = 3000, 2500, 5, 0.2
+    telescope = event.trigger.tels_with_trigger[0]
+    r0data = event.r0.tel[telescope]
+    waveforms = (r0data.waveform[0].T - r0data.pedestal)
+    mask_saturated = np.max(waveforms, axis=0) > saturated_threshold
+    saturated = False
+    if sum(mask_saturated) > 0:
+        image_new = event.dl1.tel[telescope].image
+        peaktime_new = event.dl1.tel[telescope].peak_time
+        for k, w in enumerate(waveforms.T):
+            if mask_saturated[k]:
+                mask_width = w > width_level
+                n_samples = mask_width.shape[0]
+                max_adc = max(w)
+                mask_integration = w >= integration_level * max_adc
+                integration_start = np.arange(0, n_samples)[mask_integration][0]
+                index_max = np.arange(0, n_samples)[w == max_adc][0]
+                int_stop = np.arange(0, n_samples)[(w < integration_level * max_adc) & (np.arange(0, n_samples) > index_max)]
+                integration_stop = int_stop[0] if len(int_stop) > 0 else n_samples - 1
+                width = sum(mask_width)
+                peak_sample = width / 2 + np.arange(0, n_samples)[mask_width][0]
+                if width > width_threshold:
+                    image_new[k] = sum(event.r1.tel[telescope].waveform[0, k][integration_start:integration_stop + 1])
+                    peaktime_new[k] = peak_sample * 4
+                    saturated = True
+        if saturated:
+            event.dl1.tel[telescope].image = image_new
+            event.dl1.tel[telescope].peak_time = peaktime_new
+    return saturated
+
+
+# saturated pixels: broad pulses (corrected), and one narrow pulse above the threshold (not corrected)
+BROAD_PULSES = {10: (12, 22), 500: (5, 15), 1000: (35, 49)}
+NARROW_PULSE = 700
+
+
+@pytest.fixture
+def saturated_event(event):
+    """Event of the test file with saturated pulses added to the ADC samples, calibrated up to DL1"""
+    event = deepcopy(event)
+    waveform = event.r0.tel[TEL_ID].waveform
+    pedestal = event.r0.tel[TEL_ID].pedestal
+    for pixel, (start, stop) in BROAD_PULSES.items():
+        waveform[0, pixel, start - 2:start] = pedestal[pixel] + 1200
+        waveform[0, pixel, start:stop] = pedestal[pixel] + 3600
+        waveform[0, pixel, stop:stop + 3] = pedestal[pixel] + 300
+    waveform[0, NARROW_PULSE, 20:23] = pedestal[NARROW_PULSE] + 3600
+
+    calibrator(voltage_drop_correction="none", flag_dead_pixels=False)(with_pedestal_std(event, None), TEL_ID)
+    CameraCalibrator(subarray=get_subarray(), config=CONFIG)(event)
+    return event
+
+
+def test_saturation_corrector_as_before(saturated_event):
+
+    reference = deepcopy(saturated_event)
+    assert old_saturated_charge_correction(reference)
+
+    corrector = SaturationCorrector(subarray=get_subarray())
+    image_before = saturated_event.dl1.tel[TEL_ID].image.copy()
+    assert corrector(saturated_event, TEL_ID)
+
+    dl1 = saturated_event.dl1.tel[TEL_ID]
+    np.testing.assert_array_equal(dl1.image, reference.dl1.tel[TEL_ID].image)
+    np.testing.assert_array_equal(dl1.peak_time, reference.dl1.tel[TEL_ID].peak_time)
+    corrected = np.flatnonzero(dl1.image != image_before)
+    assert set(corrected) <= set(BROAD_PULSES)
+    assert corrector.n_saturated_events == {TEL_ID: 1}
+
+    # the corrected pixels are flagged as saturated
+    saturated = (saturated_event.r1.tel[TEL_ID].pixel_status & PixelStatus.SATURATED) > 0
+    assert np.flatnonzero(saturated).tolist() == sorted(BROAD_PULSES)
+
+
+def test_saturation_corrector_peak_time(saturated_event):
+
+    SaturationCorrector(subarray=get_subarray())(saturated_event, TEL_ID)
+
+    # middle of the samples above the width level, 4 ns per sample
+    for pixel, (start, stop) in BROAD_PULSES.items():
+        assert saturated_event.dl1.tel[TEL_ID].peak_time[pixel] == ((stop - start) / 2 + start) * 4
+
+
+def test_saturation_corrector_settings(saturated_event):
+
+    corrector = SaturationCorrector(
+        subarray=get_subarray(), config=Config({"SaturationCorrector": {"width_threshold": 20}}),
+    )
+    image_before = saturated_event.dl1.tel[TEL_ID].image.copy()
+
+    # all the pulses are narrower than 20 samples
+    assert not corrector(saturated_event, TEL_ID)
+    np.testing.assert_array_equal(saturated_event.dl1.tel[TEL_ID].image, image_before)
+    assert corrector.n_saturated_events == {}

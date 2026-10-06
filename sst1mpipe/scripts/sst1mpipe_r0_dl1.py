@@ -36,7 +36,7 @@ from ctapipe.reco import ShowerProcessor
 import sst1mpipe
 from sst1mpipe.calib import (
     R0R1Calibrator,
-    saturated_charge_correction,
+    SaturationCorrector,
 )
 from sst1mpipe.io import (
     check_outdir,
@@ -247,6 +247,7 @@ def main():
         pedestals_in_file = False
 
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
+    saturation_corrector = SaturationCorrector(subarray=source.subarray, config=config)
     image_processor   = ImageProcessor(subarray=source.subarray, config=config)
 
     cleaner = config['ImageProcessor']['image_cleaner_type']
@@ -363,7 +364,7 @@ def main():
 
                 # Integration correction of saturated pixels
                 # (the window transmittance correction is applied by the R0R1Calibrator)
-                n_saturated += saturated_charge_correction(event)
+                n_saturated += saturation_corrector(event, tel)
 
             if adaptive_cleaning:
                 # NSBImageCleaner reads the std of the pedestal images (in p.e.) from event.mon.tel[tel].pedestal

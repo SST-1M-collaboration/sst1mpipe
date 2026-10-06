@@ -1,5 +1,6 @@
 import logging
 
+import astropy.units as u
 import numpy as np
 import pandas as pd
 from importlib.resources import files
@@ -12,6 +13,7 @@ from ctapipe.core.traits import (
     Float,
     FloatTelescopeParameter,
     Int,
+    IntTelescopeParameter,
     List,
     Path,
     TelescopeParameter,
@@ -56,83 +58,99 @@ def get_default_window(telescope=None):
     return read_window_transmittance(window_file), window_file
 
 
-def saturated_charge_correction(event):
+class SaturationCorrector(TelescopeComponent):
     r"""
-    Finds saturated waveforms and applies different peak integration on
-    them, as the standard one does not perform well in such cases. This
-    method integrates the peak above 20\% of the amplitude.
-    Peak time for saturated events is also corrected as the middle of
-    the integration window.
+    Correction of the charges and peak times of the saturated pixels of the observed data,
+    applied after the image extraction (`~ctapipe.calib.CameraCalibrator`).
 
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
+    A pixel is saturated if the maximum of its ADC samples (``event.r0``, pedestal subtracted)
+    is above ``saturation_threshold`` with more than ``width_threshold`` samples above
+    ``width_level``. The standard integration window does not perform well for these
+    pulses: their charge is the sum of the R1 waveform (p.e.) from the first sample above
+    ``integration_level`` times the maximum, to the first sample below it after the maximum
+    (or the end of the readout window). Their peak time is the middle of the samples above
+    ``width_level``.
 
-    Returns
-    -------
-    saturated: bool
-        True if the charges of saturated pixels were corrected
-
+    The corrected pixels are flagged with `~ctapipe.containers.PixelStatus.SATURATED` in the
+    pixel status of R1.
     """
 
-    saturated_threshold = 3000
-    width_level = 2500
-    width_threshold = 5
-    integration_level = 0.2
+    saturation_threshold = FloatTelescopeParameter(
+        default_value=3000.0,
+        help="ADC (pedestal subtracted) above which the maximum of a saturated pulse is",
+    ).tag(config=True)
 
-    telescope = event.trigger.tels_with_trigger[0]
-    r0data = event.r0.tel[telescope]
-    waveforms = (r0data.waveform[0].T - r0data.pedestal)
+    width_level = FloatTelescopeParameter(
+        default_value=2500.0,
+        help="ADC (pedestal subtracted) level used to compute the width of the saturated pulses",
+    ).tag(config=True)
 
-    # saturated pixels
-    mask_saturated = np.max(waveforms, axis=0) > saturated_threshold
-    saturated = False
+    width_threshold = IntTelescopeParameter(
+        default_value=5,
+        help="Minimum number of samples above width_level of a saturated pulse",
+    ).tag(config=True)
 
-    if sum(mask_saturated) > 0:
+    integration_level = FloatTelescopeParameter(
+        default_value=0.2,
+        help="Fraction of the maximum defining the integration window of the saturated pulses",
+    ).tag(config=True)
 
-        image_new = event.dl1.tel[telescope].image
-        peaktime_new = event.dl1.tel[telescope].peak_time
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
+        super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
+        self.n_saturated_events = {}
 
-        # iterate over baseline subtracted waveforms and correct integration of those peaking above
-        # saturation threshold and with larger width
-        for k, w in enumerate(waveforms.T):
+    def __call__(self, event, tel_id=None):
+        """
+        Correct the saturated pixels of the telescope ``tel_id``, or of all the telescopes
+        with R0 data. Returns True if saturated pixels were corrected.
+        """
+        tel_ids = list(event.r0.tel.keys()) if tel_id is None else [tel_id]
+        saturated = False
+        for tel in tel_ids:
+            if self._correct_telescope(event, tel).any():
+                self.n_saturated_events[tel] = self.n_saturated_events.get(tel, 0) + 1
+                saturated = True
+        return saturated
 
-            if mask_saturated[k]:
-                mask_width = w > width_level
+    def _correct_telescope(self, event, tel_id):
+        r0 = event.r0.tel[tel_id]
+        waveforms = r0.waveform[0] - r0.pedestal[:, np.newaxis]
+        corrected = np.zeros(len(waveforms), dtype=bool)
 
-                n_samples = mask_width.shape[0]
+        candidates = np.flatnonzero(waveforms.max(axis=1) > self.saturation_threshold.tel[tel_id])
+        if len(candidates) == 0:
+            return corrected
 
-                max_adc = max(w)
-                mask_integration = w >= integration_level * max_adc
-                integration_start = np.arange(0, n_samples)[mask_integration][0]
+        width_level = self.width_level.tel[tel_id]
+        width_threshold = self.width_threshold.tel[tel_id]
+        integration_level = self.integration_level.tel[tel_id]
+        sample_time = (1 / self.subarray.tel[tel_id].camera.readout.sampling_rate).to_value(u.ns)
 
-                # This is needed to avoid secondary peaks (it looks for first drop below 20 percent after maximum)
-                # We also select the first one, if there is a plato in the small peak in the wavefrom, which sometimes happen
-                index_max = np.arange(0, n_samples)[w == max_adc][0]
-                int_stop = np.arange(0, n_samples)[(w < integration_level * max_adc) & (np.arange(0, n_samples) > index_max)]
-                # If it does not find where to stop it means the waveform extends over the readout window
-                if len(int_stop) > 0:
-                    integration_stop = int_stop[0]
-                else:
-                    integration_stop = n_samples-1
+        dl1 = event.dl1.tel[tel_id]
+        r1_waveform = event.r1.tel[tel_id].waveform[0]
+        for pixel in candidates:
+            w = waveforms[pixel]
+            above_width_level = np.flatnonzero(w > width_level)
+            if len(above_width_level) <= width_threshold:
+                continue
 
-                width = sum(mask_width)
-                peak_sample = width/2 + np.arange(0, n_samples)[mask_width][0]
-                peak_time = peak_sample * 4
+            max_adc = w.max()
+            index_max = np.argmax(w)
+            integration_start = np.flatnonzero(w >= integration_level * max_adc)[0]
+            # first drop below the level after the maximum, to avoid secondary peaks.
+            # If there is none, the pulse extends over the readout window
+            after_max = np.flatnonzero((w < integration_level * max_adc) & (np.arange(len(w)) > index_max))
+            integration_stop = after_max[0] if len(after_max) > 0 else len(w) - 1
 
-                if width > width_threshold:
+            dl1.image[pixel] = r1_waveform[pixel, integration_start:integration_stop + 1].sum()
+            dl1.peak_time[pixel] = (len(above_width_level) / 2 + above_width_level[0]) * sample_time
+            corrected[pixel] = True
 
-                    # Peak integration correction
-                    image_new[k] = sum(event.r1.tel[telescope].waveform[0, k][integration_start:integration_stop+1])
-                    peaktime_new[k] = peak_time
-                    saturated = True
-
-        if saturated:
-            event.dl1.tel[telescope].image = image_new
-            event.dl1.tel[telescope].peak_time = peaktime_new
-
-    return saturated
+        if corrected.any():
+            pixel_status = event.r1.tel[tel_id].pixel_status
+            if pixel_status is not None:
+                pixel_status[corrected] |= PixelStatus.SATURATED
+        return corrected
 
 
 # Calibration parameters averaged from all darks taken between
