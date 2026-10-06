@@ -2,6 +2,9 @@ import json
 from importlib.resources import files
 
 import numpy as np
+import pytest
+from traitlets import TraitError
+from traitlets.config import Config
 
 from sst1mpipe.trigger import fixed_point
 from sst1mpipe.trigger.emulator import (
@@ -12,26 +15,12 @@ from sst1mpipe.trigger.emulator import (
     readout_to_patch_order,
     score_quantizer,
 )
+from sst1mpipe.utils import get_subarray
 
 
-def trigger_config(quantize_step):
-    """The TDSCAN wPow2 trigger, in fixed point (Q14, as the HLS core) or floating point (None)."""
-    return {
-        "enabled": True,
-        "filter_events": False,
-        "filter_by": "tdscan",
-        "restrict_cleaning_to_tdscan_mask": False,
-        "patch7": {"threshold": 222},
-        "tdscan": {
-            "score_quantizer_edges": [16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128],
-            "eps_t": 2,
-            "ring_weights": [[0.5, -0.0078125], [-0.5, -0.03125], [-0.5, -0.125], [0.5, 0.0625], [0.5, 0.25]],
-            "quantize_step": quantize_step,
-            "overflow_mode": "AP_SAT",
-            "quantization_mode": "AP_TRN",
-            "threshold": 8.109374,
-        },
-    }
+def emulator(quantize_step=None):
+    """The TDSCAN wPow2 trigger, in fixed point (e.g. Q14, as the HLS core) or floating point (None)."""
+    return TriggerEmulator(subarray=get_subarray(), config=Config({"TriggerEmulator": {"quantize_step": quantize_step}}))
 
 
 Q14 = {
@@ -47,7 +36,32 @@ Q14 = {
 def test_example_configs_are_valid():
     for name in ("sst1mpipe_trigger_emulator_mc.json", "sst1mpipe_trigger_emulator_data.json"):
         with files("sst1mpipe.data").joinpath(name).open() as f:
-            TriggerEmulator(json.load(f)["TriggerEmulator"])
+            TriggerEmulator(subarray=get_subarray(), config=Config(json.load(f)))
+
+
+def test_disabled_unless_enabled():
+    assert not TriggerEmulator(subarray=get_subarray(), config=Config({})).enabled
+    assert not TriggerEmulator(subarray=get_subarray(), config=Config({"TriggerEmulator": {"patch7_threshold": 300}})).enabled
+
+
+def test_invalid_config_is_refused():
+    invalid = (
+        {"patch7": {"threshold": 350}},                        # old nested format
+        {"eps_t": 1},                                          # 5 rows of ring_weights for 3 taps
+        {"ring_weights": [[0.5, 0.1, 0.2]] * 5},               # rows must be [centre, neighbours]
+        {"quantize_step": {"input": "UQ4.0"}},                 # incomplete fixed-point formats
+        {"score_quantizer_edges": [16.0, 8.0]},                # edges not increasing
+    )
+    for section in invalid:
+        with pytest.raises((ValueError, TraitError)):
+            TriggerEmulator(subarray=get_subarray(), config=Config({"TriggerEmulator": section}))
+
+
+def test_thresholds_per_telescope():
+    with files("sst1mpipe.data").joinpath("sst1mpipe_trigger_emulator_data.json").open() as f:
+        emu = TriggerEmulator(subarray=get_subarray(), config=Config(json.load(f)))
+    assert emu.patch7_threshold.tel[21] == 225
+    assert emu.patch7_threshold.tel[22] == 350
 
 
 def test_fixed_point_formats():
@@ -85,8 +99,10 @@ def test_trigger_geometry():
     triplets, clusters, neighbors = read_trigger_geometry()
     assert sorted(triplets.ravel().tolist()) == list(range(1296))
     for patch, cluster in enumerate(clusters):
-        assert cluster[0] == patch
+        assert patch in cluster
         assert len(cluster) <= 7
+        # TDSCAN neighbourhoods are the patch7 clusters, with the patch itself in column 3.
+        assert set(neighbors[patch][neighbors[patch] >= 0]) == set(cluster)
     assert np.array_equal(neighbors[:, 3], np.arange(432))
 
 
@@ -100,12 +116,12 @@ def test_readout_order():
 
 
 def test_tdscan_single_impulse():
-    emulator = TriggerEmulator(trigger_config(Q14))
+    emu = emulator(Q14)
     codes = np.zeros((432, 50), dtype=int)
     patch, sample = 200, 20
     codes[patch, sample] = 1
 
-    scores = emulator.tdscan(codes)
+    scores = emu.tdscan(codes)
 
     # Only one tap sees the impulse at each output sample: the score is the
     # centre weight of that tap (+-0.5, SQ1.7 code +-64) requantized to SQ5.2:
@@ -114,19 +130,19 @@ def test_tdscan_single_impulse():
     assert np.count_nonzero(scores[patch]) == 5
 
     # A neighbour sees the ring-1 weights: floor(code / 32) of -1, -4, -16, 8, 32.
-    neighbor = emulator.tdscan.neighbors[patch, 0]
+    neighbor = emu.tdscan.neighbors[patch, 0]
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0, -0.25, -0.25, -0.25]
 
 
 def test_tdscan_single_impulse_floating_point():
-    emulator = TriggerEmulator(trigger_config(None))
+    emu = emulator(None)
     codes = np.zeros((432, 50), dtype=int)
     patch, sample = 200, 20
     codes[patch, sample] = 1
 
-    scores = emulator.tdscan(codes)
+    scores = emu.tdscan(codes)
 
     # Without quantization the scores are the weights themselves, tap 4 first.
     assert scores[patch, 18:23].tolist() == [0.5, 0.5, -0.5, -0.5, 0.5]
-    neighbor = emulator.tdscan.neighbors[patch, 0]
+    neighbor = emu.tdscan.neighbors[patch, 0]
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0625, -0.125, -0.03125, -0.0078125]

@@ -261,11 +261,11 @@ def main():
 
     # Software emulation of the camera trigger (patch7 and TDSCAN), see sst1mpipe/trigger.
     # Enabled by a TriggerEmulator config section, examples in sst1mpipe/data/sst1mpipe_trigger_emulator_*.json
-    trigger_emulator = None
-    if "TriggerEmulator" in config and config["TriggerEmulator"]["enabled"]:
-        trigger_emulator = TriggerEmulator(config["TriggerEmulator"])
-        if config["TriggerEmulator"]["restrict_cleaning_to_tdscan_mask"]:
-            trigger_emulator.restrict_cleaning(image_processor)
+    trigger_emulator = TriggerEmulator(subarray=source.subarray, config=config)
+    if not trigger_emulator.enabled:
+        trigger_emulator = None
+    elif trigger_emulator.restrict_cleaning_to_tdscan_mask:
+        trigger_emulator.restrict_cleaning(image_processor)
 
     if pixel_charges:
         BINS = 1000

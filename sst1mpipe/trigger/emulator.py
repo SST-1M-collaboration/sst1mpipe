@@ -20,10 +20,11 @@ To enable it, copy the ``TriggerEmulator`` section of
 ``sst1mpipe/data/sst1mpipe_trigger_emulator_mc.json`` (simulations) or
 ``sst1mpipe_trigger_emulator_data.json`` (real data) into the config given to
 ``sst1mpipe_r0_dl1 --config``. Without this section the script is unchanged.
+Thresholds are telescope parameters, e.g. ``[["type", "*", 350], ["id", 21, 225]]``.
 
 Usage in ``sst1mpipe_r0_dl1``::
 
-    emulator = TriggerEmulator(config["TriggerEmulator"])
+    emulator = TriggerEmulator(subarray=source.subarray, config=config)
     for event in source:
         emulator.process(event, event.trigger.tels_with_trigger, is_simulation, is_pedestal)  # before bad pixel removal
         ...
@@ -34,14 +35,16 @@ Usage in ``sst1mpipe_r0_dl1``::
 """
 import logging
 from collections import Counter
-from importlib.resources import files
 
 import numpy as np
 import tables
 from astropy.table import Table
+from ctapipe.core import TelescopeComponent
+from ctapipe.core.traits import Bool, CaselessStrEnum, Dict, Float, FloatTelescopeParameter, Int, List
 from ctapipe.io import read_table
 
 from sst1mpipe.constants import PATCH_ID_INPUT_SORT_IDS
+from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.io.containers import SST1MArrayEventContainer
 from sst1mpipe.trigger import fixed_point
 from sst1mpipe.utils import get_telescopes
@@ -54,34 +57,29 @@ N_PIXELS = 1296
 # ---------------------------------------------------------------------------
 
 def read_trigger_geometry():
-    """Read the patch tables shipped in ``sst1mpipe/data``.
+    """Patch tables of the trigger, from the DigiCam camera object (camera_config.cfg).
 
-    All tables use the patch order of ``sst1m_trigger_patches.csv``.
+    Patches are in patch_sw_id order, pixels in pixel_sw_id order.
 
     Returns
     -------
     triplets: (432, 3) array
         The 3 pixels of each patch.
     clusters: list of 432 arrays
-        The 7 patches of the patch7 cluster centred on each patch.
+        The patches of the patch7 cluster centred on each patch (7, fewer at the edge).
     neighbors: (432, 7) array
-        The hexagonal neighbours of each patch used by TDSCAN, -1 when the
-        patch is at the camera edge.
+        The same clusters as TDSCAN neighbourhoods: the patch itself in
+        column 3, its neighbours in the other columns, -1 when missing at the
+        camera edge.
     """
-    data = files("sst1mpipe.data")
+    triplets = np.array([np.nonzero(row)[0] for row in DigiCam.patch_matrix.toarray()])
+    clusters = [np.nonzero(row)[0] for row in DigiCam.cluster_7_matrix.toarray()]
 
-    # Each line: the 3 pixels of the patch, then the 3 pixels of each neighbour patch.
-    rows = []
-    with data.joinpath("sst1m_trigger_patches.csv").open() as f:
-        for line in f:
-            if line.strip():
-                rows.append(np.array(line.split(","), dtype=int).reshape(-1, 3))
-    triplets = np.array([row[0] for row in rows])
-    patch_of_triplet = {tuple(triplet): patch for patch, triplet in enumerate(triplets)}
-    clusters = [np.array([patch_of_triplet[tuple(t)] for t in row]) for row in rows]
-
-    with data.joinpath("sst1m_trigger_neighbors_eps1.csv").open() as f:
-        neighbors = np.loadtxt(f, delimiter=",", skiprows=1, dtype=int)
+    neighbors = np.full((len(clusters), 7), -1)
+    for patch, cluster in enumerate(clusters):
+        others = [p for p in cluster if p != patch]
+        neighbors[patch, 3] = patch
+        neighbors[patch, [0, 1, 2, 4, 5, 6][:len(others)]] = others
 
     return triplets, clusters, neighbors
 
@@ -101,7 +99,8 @@ def readout_to_patch_order(sector_order):
     (module_fw_id) then by patch in the module (patch_in_mod_fw), as given by
     the official camera_config.cfg.
     """
-    with files("sst1mpipe.resources").joinpath("camera_config.cfg").open() as f:
+    # module_fw_id and patch_in_mod_fw are not kept by the DigiCam object: read its config file.
+    with open(DigiCam.config_file) as f:
         rows = [line.split() for line in f if line.strip() and not line.startswith("#")]
     sector, module, patch_in_module = {}, {}, {}
     for row in rows:
@@ -170,6 +169,10 @@ class TDSCAN:
 
     # Ring of each of the 7 neighbour slots of the neighbour table (0 = the patch itself, in slot 3).
     RINGS = np.array([1, 1, 1, 0, 1, 1, 1])
+    QUANTIZE_STEP_KEYS = (
+        "input", "ring_weights", "convolution_accumulator", "convolution_rescale_shift",
+        "temporal_accumulator", "temporal_rescale_shift",
+    )
 
     def __init__(self, neighbors, eps_t, ring_weights, quantize_step, overflow_mode, quantization_mode):
         if neighbors.shape[1] != 7 or not np.array_equal(neighbors[:, 3], np.arange(len(neighbors))):
@@ -178,13 +181,23 @@ class TDSCAN:
         # Missing neighbours (-1, camera edge) point to an extra all-zero patch, added after the last one.
         self.neighbors_padded = np.where(neighbors < 0, len(neighbors), neighbors)
         self.eps_t = eps_t
+        ring_weights = np.array(ring_weights, dtype=float)
+        if ring_weights.shape != (2 * eps_t + 1, 2):
+            raise ValueError(
+                f"ring_weights must have 2 * eps_t + 1 = {2 * eps_t + 1} rows of [centre, neighbours], "
+                f"got shape {ring_weights.shape}"
+            )
         # Weight of each (tap, neighbour slot).
-        weights = np.array(ring_weights, dtype=float)[:, self.RINGS]
+        weights = ring_weights[:, self.RINGS]
 
         self.fixed_point = quantize_step is not None
         if not self.fixed_point:
             self.weights = weights
             return
+
+        missing = set(self.QUANTIZE_STEP_KEYS) - set(quantize_step)
+        if missing:
+            raise ValueError(f"quantize_step is missing {sorted(missing)}, expected all of {list(self.QUANTIZE_STEP_KEYS)}")
 
         self.overflow = overflow_mode
         self.quantization = quantization_mode
@@ -241,38 +254,59 @@ class TDSCAN:
 # Emulator used by sst1mpipe_r0_dl1
 # ---------------------------------------------------------------------------
 
-class TriggerEmulator:
+class TriggerEmulator(TelescopeComponent):
     """Runs patch7 and TDSCAN on every telescope event and records the results.
 
-    ``config`` is the ``TriggerEmulator`` section of the sst1mpipe config.
+    Configured by the ``TriggerEmulator`` section of the sst1mpipe config. The
+    defaults are the TDSCAN trigger of the simulation study (50 kHz of medium NSB).
     """
 
-    def __init__(self, config):
+    enabled = Bool(False, help="Emulate the trigger in sst1mpipe_r0_dl1").tag(config=True)
+    filter_events = Bool(False, help="Write only the events where the filter_by trigger fired").tag(config=True)
+    filter_by = CaselessStrEnum(["tdscan", "patch7"], default_value="tdscan", help="Trigger used by filter_events").tag(config=True)
+    restrict_cleaning_to_tdscan_mask = Bool(
+        False, help="Keep only the cleaned pixels where TDSCAN fired"
+    ).tag(config=True)
+
+    patch7_threshold = FloatTelescopeParameter(
+        default_value=222.0, help="patch7 fires when a 7-patch cluster sum is above this value"
+    ).tag(config=True)
+    tdscan_threshold = FloatTelescopeParameter(
+        default_value=8.109374, help="TDSCAN fires when a filtered score is above this value"
+    ).tag(config=True)
+    score_quantizer_edges = List(
+        Float(), default_value=[16.0, 24.0, 32.0, 40.0, 48.0, 56.0, 64.0, 72.0, 80.0, 88.0, 96.0, 104.0, 112.0, 120.0, 128.0],
+        help="Strictly increasing edges: the code of a sample is the number of edges it reaches",
+    ).tag(config=True)
+    eps_t = Int(2, help="TDSCAN temporal half-width, the kernel spans 2 * eps_t + 1 samples").tag(config=True)
+    ring_weights = List(
+        List(Float()),
+        default_value=[[0.5, -0.0078125], [-0.5, -0.03125], [-0.5, -0.125], [0.5, 0.0625], [0.5, 0.25]],
+        help="TDSCAN weights, one row per time tap, [centre, neighbours]",
+    ).tag(config=True)
+    quantize_step = Dict(
+        default_value=None, allow_none=True,
+        help="Fixed-point formats of the HLS core (see sst1mpipe_trigger_emulator_data.json), null for floating point",
+    ).tag(config=True)
+    overflow_mode = CaselessStrEnum(["AP_SAT", "AP_WRAP"], default_value="AP_SAT", help="Fixed point only").tag(config=True)
+    quantization_mode = CaselessStrEnum(["AP_TRN", "AP_RND"], default_value="AP_TRN", help="Fixed point only").tag(config=True)
+
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
+        super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
         self.triplets, self.clusters, neighbors = read_trigger_geometry()
         self.readout_to_patch = {tel: readout_to_patch_order(order) for tel, order in READOUT_SECTOR_ORDER.items()}
 
-        self.patch7_threshold = config["patch7"]["threshold"]
-        tdscan = config["tdscan"]
-        self.score_edges = np.array(tdscan["score_quantizer_edges"], dtype=float)
+        self.score_edges = np.array(self.score_quantizer_edges, dtype=float)
         if np.any(np.diff(self.score_edges) <= 0):
-            raise ValueError("TriggerEmulator.tdscan.score_quantizer_edges must be strictly increasing")
-        # No quantize_step (or null): floating-point TDSCAN, the overflow and
-        # quantization modes are then not used.
-        quantize_step = tdscan.get("quantize_step")
+            raise ValueError("TriggerEmulator.score_quantizer_edges must be strictly increasing")
         self.tdscan = TDSCAN(
             neighbors,
-            eps_t=tdscan["eps_t"],
-            ring_weights=tdscan["ring_weights"],
-            quantize_step=quantize_step,
-            overflow_mode=tdscan["overflow_mode"] if quantize_step else None,
-            quantization_mode=tdscan["quantization_mode"] if quantize_step else None,
+            eps_t=self.eps_t,
+            ring_weights=self.ring_weights,
+            quantize_step=self.quantize_step,
+            overflow_mode=self.overflow_mode,
+            quantization_mode=self.quantization_mode,
         )
-        self.tdscan_threshold = tdscan["threshold"]
-
-        self.filter_events = config["filter_events"]
-        self.filter_by = config["filter_by"]
-        if self.filter_by not in ("tdscan", "patch7"):
-            raise ValueError(f"TriggerEmulator.filter_by must be 'tdscan' or 'patch7', got {self.filter_by!r}")
 
         self.results = {}  # (obs_id, event_id, tel_id) -> results, for the events that can be written
         self.current = {}  # tel_id -> results of the event being processed
@@ -280,7 +314,7 @@ class TriggerEmulator:
         self.counts = {}   # tel_id -> event counters, logged at the end
 
     def triplet_traces(self, event, tel_id, is_simulation):
-        """FADC output (432, T), in the patch order of sst1m_trigger_patches.csv."""
+        """FADC output (432, T), in patch_sw_id order."""
         if is_simulation:
             waveform = event.r0.tel[tel_id].waveform[0]
             baseline = event.mon.tel[tel_id].calibration.pedestal_per_sample[0]
@@ -290,14 +324,15 @@ class TriggerEmulator:
         traces = np.asarray(event.sst1m.r0.tel[tel_id].trigger_input_traces)
         return traces[self.readout_to_patch[tel_id]]
 
-    def run(self, traces):
-        """patch7 and TDSCAN on one set of triplet traces (432, T).
+    def run(self, traces, tel_id):
+        """patch7 and TDSCAN on one set of triplet traces (432, T), with the thresholds of telescope ``tel_id``.
 
         Returns the summary and the TDSCAN binary output (432, T).
         """
         cluster_sums = patch7(traces, self.clusters)
         scores = self.tdscan(score_quantizer(traces, self.score_edges))
-        tdscan_output = scores > self.tdscan_threshold
+        tdscan_output = scores > self.tdscan_threshold.tel[tel_id]
+        patch7_threshold = self.patch7_threshold.tel[tel_id]
 
         fired_patches = tdscan_output.any(axis=1)
         pixel_mask = np.zeros(N_PIXELS, dtype=bool)
@@ -305,7 +340,7 @@ class TriggerEmulator:
 
         summary = {
             "patch7_max": int(cluster_sums.max()),
-            "patch7": bool(cluster_sums.max() > self.patch7_threshold),
+            "patch7": bool(cluster_sums.max() > patch7_threshold),
             "tdscan_max": float(scores.max()),
             "tdscan": bool(fired_patches.any()),
             "tdscan_pixel_mask": pixel_mask,
@@ -325,7 +360,7 @@ class TriggerEmulator:
         self.current = {}
         self.current_is_pedestal = is_pedestal
         for tel_id in tel_ids:
-            result, tdscan_output = self.run(self.triplet_traces(event, tel_id, is_simulation))
+            result, tdscan_output = self.run(self.triplet_traces(event, tel_id, is_simulation), tel_id)
             self.current[tel_id] = result
             event.sst1m.r0.tel[tel_id].trigger_output_tdscan = tdscan_output
 
