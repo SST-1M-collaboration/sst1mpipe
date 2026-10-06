@@ -71,19 +71,19 @@ Config files for MC, for the simulations at low and high NSB (they differ by the
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/data/sst1mpipe_mc_config_low_nsb.json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_low_nsb.json
        :code: json
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/data/sst1mpipe_mc_config_high_nsb.json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_high_nsb.json
        :code: json
 
 Default config file for data:
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/data/sst1mpipe_data_config.json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_data_config.json
        :code: json
 
 

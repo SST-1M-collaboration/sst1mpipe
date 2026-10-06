@@ -1,4 +1,3 @@
-from importlib.resources import files
 
 import numpy as np
 import pytest
@@ -21,12 +20,20 @@ from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES, DEFAULT_WINDOW_FILE
 from sst1mpipe.io import load_config, translate_legacy_calibration_config
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import get_subarray
+from sst1mpipe.resources import (
+    CALIBRATION_DIR,
+    CONFIG_DIR,
+    DATA_CONFIG_FILE,
+    MC_CONFIG_FILES,
+    PDE_CORRECTION_FACTORS_FILE,
+    TEST_DATA_DIR,
+    WINDOW_DIR,
+)
 
-FILE_TEL_1 = files('sst1mpipe.resources.zfits').joinpath('SST1M1_20260121_0001.fits.fz')
-DATA_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json')
+FILE_TEL_1 = (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260121_0001.fits.fz')
 CONFIG = load_config(DATA_CONFIG_FILE, ismc=False)
 TEL_ID = 21
-CALIBRATION_FILE_TEL_2 = str(files('sst1mpipe.data').joinpath(DEFAULT_CALIBRATION_FILES[22]))
+CALIBRATION_FILE_TEL_2 = str((CALIBRATION_DIR / DEFAULT_CALIBRATION_FILES[22]))
 
 
 @pytest.fixture(scope="module")
@@ -238,9 +245,6 @@ def test_default_config_settings():
 
 
 # PDE drop correction of the simulations
-MC_CONFIG_FILES = {
-    nsb: files('sst1mpipe.data').joinpath(f'sst1mpipe_mc_config_{nsb}_nsb.json') for nsb in ("low", "high")
-}
 # PDE files of the low and high NSB simulations, see mc_pde_correction_factors.json
 PDE_FILES = {
     "low": {1: "qe_SST1M_5477_ave_TEL1_NSB136.0", 2: "qe_SST1M_5477_ave_TEL2_NSB177.0"},
@@ -307,7 +311,7 @@ def test_no_pde_drop_correction(mc_subarray, settings):
 @pytest.mark.parametrize("nsb", ["low", "high"])
 def test_mc_configs_pde_drop_factors(mc_subarray, nsb):
 
-    with open(files('sst1mpipe.data').joinpath('mc_pde_correction_factors.json')) as f:
+    with open(PDE_CORRECTION_FACTORS_FILE) as f:
         factors = json.load(f)["mc_correction_for_PDE"]
     config = load_config(MC_CONFIG_FILES[nsb], ismc=True)
     calibrator_r0_r1 = R0R1Calibrator(subarray=mc_subarray, config=config)
@@ -323,7 +327,7 @@ def test_default_mc_config_is_low_nsb():
     # one MC config per NSB level, the low NSB one is used when no config is given
     assert load_config(None, ismc=True) == load_config(MC_CONFIG_FILES["low"])
     assert load_config(None, ismc=True) != load_config(MC_CONFIG_FILES["high"])
-    assert not files('sst1mpipe.data').joinpath('sst1mpipe_mc_config.json').is_file()
+    assert not (CONFIG_DIR / 'sst1mpipe_mc_config.json').is_file()
 
 
 @pytest.mark.parametrize("config_file", [DATA_CONFIG_FILE, *MC_CONFIG_FILES.values()])
@@ -443,7 +447,7 @@ def test_window_transmittance_correction(event, window_file_of_ones):
         )
         waveforms[name] = event.r1.tel[TEL_ID].waveform.copy()
 
-    factors = np.loadtxt(files('sst1mpipe.data').joinpath(DEFAULT_WINDOW_FILES[TEL_ID]), skiprows=1, usecols=1)
+    factors = np.loadtxt((WINDOW_DIR / DEFAULT_WINDOW_FILES[TEL_ID]), skiprows=1, usecols=1)
     assert len(factors) == 1296 and not np.allclose(factors, 1)
     np.testing.assert_allclose(waveforms["default"], waveforms["ones"] / factors[:, np.newaxis])
 

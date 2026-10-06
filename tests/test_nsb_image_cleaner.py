@@ -1,4 +1,3 @@
-from importlib.resources import files
 
 import numpy as np
 import pytest
@@ -8,8 +7,9 @@ from ctapipe.image.cleaning import NSBImageCleaner
 from ctapipe.instrument import SubarrayDescription
 
 from sst1mpipe.io import load_config
+from sst1mpipe.resources import SUBARRAY_FILE
 
-SUBARRAY = SubarrayDescription.from_hdf(files("sst1mpipe.data").joinpath("sst1m_array.h5"))
+SUBARRAY = SubarrayDescription.from_hdf(SUBARRAY_FILE)
 TEL_ID = 21
 GEOMETRY = SUBARRAY.tel[TEL_ID].camera.geometry
 

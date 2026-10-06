@@ -14,7 +14,6 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from importlib.resources import files
 import tables
 from astropy.coordinates import (
     AltAz,
@@ -35,6 +34,7 @@ from ctapipe.io import read_table
 from gammapy.data import DataStore
 
 from sst1mpipe.io.sst1m_event_source import parse_target_field, camera_clock_to_time
+from sst1mpipe.resources import SUBARRAY_FILE
 
 
 def get_target(file, force_pointing=False):
@@ -1617,9 +1617,7 @@ def get_pointing_radec(input_file):
 
 def get_subarray():
 
-    subarray_file = files('sst1mpipe.data').joinpath(
-                                'sst1m_array.h5'
-                            )
+    subarray_file = SUBARRAY_FILE
 
     subarray = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
     return subarray

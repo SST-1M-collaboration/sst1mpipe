@@ -1,7 +1,6 @@
 
 import logging
 import os
-from importlib.resources import files
 import re
 import warnings
 from itertools import islice
@@ -33,6 +32,7 @@ from sst1mpipe.constants import (
     REFERENCE_LOCATION,
     SUBARRAY_DESCRIPTION
 )
+from sst1mpipe.resources import PIXEL_MAPPING_FILE
 from sst1mpipe.io.containers import (
     CameraEventType,
     SST1MArrayEventContainer,
@@ -113,9 +113,6 @@ def file_has_swat_event_ids(path, n_events=N_EVENTS_SWAT_ID_CHECK):
     """
     with File(str(path)) as f:
         return any(event.arrayEvtNum != 0 for event in islice(f.Events, n_events))
-
-
-PIXEL_MAPPING_FILE = files("sst1mpipe.data").joinpath("digicam_pixels_mapping_V5T.txt")
 
 
 def parse_swapped_modules(swapped_modules, pixel_mapping_file=PIXEL_MAPPING_FILE):

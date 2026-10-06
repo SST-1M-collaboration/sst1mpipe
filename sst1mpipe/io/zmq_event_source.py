@@ -3,7 +3,6 @@ from typing import Dict
 import numpy as np
 import zmq
 from astropy.time import Time
-from importlib.resources import files
 
 
 from ctapipe.io import EventSource
@@ -14,6 +13,7 @@ from protozfits import DL0v1_Telescope_pb2, CoreMessages_pb2, any_array_to_numpy
 from ctapipe.core.traits import Unicode, Path, Undefined
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer
+from sst1mpipe.resources import SUBARRAY_FILE
 
 def ctao_high_res_to_time(seconds, quarter_nanoseconds): # TODO import from ctapipe==0.24
     """Convert CTAO high resolution timestamp to astropy Time."""
@@ -72,7 +72,7 @@ class ZMQEventSource(EventSource):
                         help="TCP and port address for the input ZMQ stream. Example `tcp://192.168.1.1:1986` ").tag(config=True)
 
     subarray_file = Path(help="Path to the file containing the subarray-description.",
-                         default_value=files('sst1mpipe.data').joinpath('sst1m_array.h5')).tag(config=True)
+                         default_value=SUBARRAY_FILE).tag(config=True)
 
     def __init__(self, input_url=Undefined, config=None, parent=None, **kwargs):
 

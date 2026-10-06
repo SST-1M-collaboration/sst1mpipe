@@ -31,9 +31,12 @@ where = ["."]
 
 [tool.setuptools.package-data]
 sst1mpipe = [
-  "data/*",
-  "resources/*",
-  "resources/zfits/*"
+  "resources/config/*",
+  "resources/calibration/*",
+  "resources/calibration/window/*",
+  "resources/calibration/dark_runs/*",
+  "resources/instrument/*",
+  "resources/test_data/zfits/*"
 ]
 
 [project.scripts]

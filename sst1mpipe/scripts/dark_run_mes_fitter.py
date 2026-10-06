@@ -60,9 +60,9 @@ import scipy.stats as scst
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.visualization import CameraDisplay
 from iminuit import Minuit
-from importlib.resources import files
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.resources import SUBARRAY_FILE
 
 #from iminuit.cost import LeastSquares
 
@@ -131,9 +131,7 @@ class mes_fitter:
         self.dark_baselines = dark_baselines
 
 
-        subarray_file = files('sst1mpipe,data').joinpath(
-            'sst1m_array.h5'
-                                                    )
+        subarray_file = SUBARRAY_FILE
 
         subarray = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
 

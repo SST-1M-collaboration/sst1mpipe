@@ -3,7 +3,6 @@ import logging
 import astropy.units as u
 import numpy as np
 import pandas as pd
-from importlib.resources import files
 
 from ctapipe.containers import PixelStatus, R1CameraContainer
 from ctapipe.core import TelescopeComponent
@@ -20,6 +19,7 @@ from ctapipe.core.traits import (
 )
 
 from sst1mpipe.utils import VAR_to_Idrop
+from sst1mpipe.resources import CALIBRATION_DIR, WINDOW_DIR
 
 
 
@@ -53,7 +53,7 @@ def get_default_window(telescope=None):
     window_file: string
 
     """
-    window_file = files('sst1mpipe.data').joinpath(DEFAULT_WINDOW_FILES[{1: 21, 2: 22}.get(telescope, telescope)])
+    window_file = (WINDOW_DIR / DEFAULT_WINDOW_FILES[{1: 21, 2: 22}.get(telescope, telescope)])
     logging.info('Window file used: %s', window_file)
     return read_window_transmittance(window_file), window_file
 
@@ -298,7 +298,7 @@ class R0R1Calibrator(TelescopeComponent):
             return path
         if tel_id not in DEFAULT_CALIBRATION_FILES:
             raise ValueError(f"No default calibration file for telescope {tel_id}, set calibration_file")
-        return files('sst1mpipe.data').joinpath(DEFAULT_CALIBRATION_FILES[tel_id])
+        return (CALIBRATION_DIR / DEFAULT_CALIBRATION_FILES[tel_id])
 
     def window_transmittance_file_path(self, tel_id):
         """Window transmittance file used for the telescope ``tel_id``"""
@@ -310,7 +310,7 @@ class R0R1Calibrator(TelescopeComponent):
             return path
         if tel_id not in DEFAULT_WINDOW_FILES:
             raise ValueError(f"No default window transmittance file for telescope {tel_id}, set window_transmittance_file")
-        return files('sst1mpipe.data').joinpath(DEFAULT_WINDOW_FILES[tel_id])
+        return (WINDOW_DIR / DEFAULT_WINDOW_FILES[tel_id])
 
     def window_transmittance(self, tel_id):
         """Correction factor of the window transmittance of each pixel of the telescope ``tel_id``"""

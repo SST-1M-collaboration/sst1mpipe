@@ -1,4 +1,3 @@
-from importlib.resources import files
 
 import numpy as np
 import pytest
@@ -9,9 +8,10 @@ from ctapipe.io import read_table
 from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES
 from sst1mpipe.io import get_dl1_info
 from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
+from sst1mpipe.resources import RTA_CONFIG_FILE, TEST_DATA_DIR
 
-FILE_TEL_1 = files('sst1mpipe.resources.zfits').joinpath('SST1M1_20260121_0001.fits.fz')
-RTA_CONFIG = files('sst1mpipe.data').joinpath('sst1mpipe_rta_config.json')
+FILE_TEL_1 = (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260121_0001.fits.fz')
+RTA_CONFIG = RTA_CONFIG_FILE
 N_EVENTS = 150
 
 

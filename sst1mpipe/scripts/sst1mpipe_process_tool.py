@@ -39,7 +39,7 @@ class ProcessorTool(Tool):
     description = __doc__
     examples = ("sst1mpipe-process -i mysim.simtel.gz -o events.dl1.h5",
                 "sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 "
-                "--config sst1mpipe/data/sst1mpipe_rta_config.json --log-level INFO")
+                "--config sst1mpipe/resources/config/sst1mpipe_rta_config.json --log-level INFO")
 
     progress_bar = Bool(
         help="show progress bar during processing", default_value=False

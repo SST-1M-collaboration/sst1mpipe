@@ -4,7 +4,6 @@ import logging
 from types import SimpleNamespace
 
 import pytest
-from importlib.resources import files
 
 from ctapipe.io import EventSource
 
@@ -23,9 +22,10 @@ from sst1mpipe.io.sst1m_event_source import (
 )
 from sst1mpipe.io import load_config
 from sst1mpipe.io.containers import CameraEventType, SST1MArrayEventContainer, SST1MR0CameraContainer
+from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR
 
-FILE_TEL_1 = files('sst1mpipe.resources.zfits').joinpath('SST1M1_20260121_0001.fits.fz')
-FILE_TEL_2 = files('sst1mpipe.resources.zfits').joinpath('SST1M2_20260121_0001.fits.fz')
+FILE_TEL_1 = (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260121_0001.fits.fz')
+FILE_TEL_2 = (TEST_DATA_DIR / "zfits").joinpath('SST1M2_20260121_0001.fits.fz')
 
 MAX_ITERATIONS = 5
 
@@ -76,8 +76,8 @@ def test_event_source_finds_sst1m_files():
 
 def test_is_compatible_rejects_other_files():
 
-    assert not SST1MEventSource.is_compatible(files('sst1mpipe.data').joinpath('sst1m_array.h5'))
-    assert not SST1MEventSource.is_compatible(files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json'))
+    assert not SST1MEventSource.is_compatible(SUBARRAY_FILE)
+    assert not SST1MEventSource.is_compatible(DATA_CONFIG_FILE)
 
 
 @pytest.mark.parametrize("input_url", [
@@ -393,7 +393,7 @@ def test_no_swapped_modules_by_default():
 
 def test_swapped_modules_of_data_config():
 
-    config = load_config(files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json'))
+    config = load_config(DATA_CONFIG_FILE)
     source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1, config=config)
 
     assert [entry["modules"] for entry in source.swapped_modules] == [[59, 88], [8, 9]]

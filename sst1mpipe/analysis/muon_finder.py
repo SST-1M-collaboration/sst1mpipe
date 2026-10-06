@@ -7,7 +7,6 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from importlib.resources import files
 from ctapipe.image import tailcuts_clean
 from ctapipe.image.cleaning import number_of_islands
 from ctapipe.image.muon import ring_completeness
@@ -23,8 +22,9 @@ from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import get_subarray
 from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor, load_first_pedestals
 from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
+from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE
 
-DEFAULT_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json')
+DEFAULT_CONFIG_FILE = DATA_CONFIG_FILE
 
 DEFAULT_CONFIG = load_config(DEFAULT_CONFIG_FILE, ismc=False)
 def get_res_dict(ismc=False):
@@ -108,9 +108,7 @@ class muon_finder:
 
 
 
-        subarray_file = files('sst1mpipe.data').joinpath(
-                                'sst1m_array.h5'
-                            )
+        subarray_file = SUBARRAY_FILE
 
         subarray  = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
         self.geom = subarray.camera_types[0].geometry
