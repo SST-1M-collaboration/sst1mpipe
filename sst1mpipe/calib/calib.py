@@ -58,41 +58,30 @@ def get_default_window(telescope=None):
     return read_window_transmittance(window_file), window_file
 
 
-class SaturationCorrector(TelescopeComponent):
+class ImageSaturationCorrector(TelescopeComponent):
     r"""
-    Correction of the charges and peak times of the saturated pixels of the observed data,
-    applied after the image extraction (`~ctapipe.calib.CameraCalibrator`).
+    Correction of the charges and peak times of the saturated pixels, applied after the
+    image extraction (`~ctapipe.calib.CameraCalibrator`).
 
-    A pixel is saturated if the maximum of its ADC samples (``event.r0``, pedestal subtracted)
-    is above ``saturation_threshold`` with more than ``width_threshold`` samples above
-    ``width_level``. The standard integration window does not perform well for these
-    pulses: their charge is the sum of the R1 waveform (p.e.) from the first sample above
-    ``integration_level`` times the maximum, to the first sample below it after the maximum
-    (or the end of the readout window). Their peak time is the middle of the samples above
-    ``width_level``.
-
-    The corrected pixels are flagged with `~ctapipe.containers.PixelStatus.SATURATED` in the
-    pixel status of R1.
+    The saturated pixels are the pixels flagged with `~ctapipe.containers.PixelStatus.SATURATED`
+    in the pixel status of R1 (by the `R0R1Calibrator`). The standard integration window does
+    not perform well for these pulses: their charge is the sum of the R1 waveform (p.e.) from the
+    first sample above ``integration_level`` times the maximum, to the first sample below it after
+    the maximum (or the end of the readout window). Their peak time is the middle of the ADC
+    samples (``event.r0``, pedestal subtracted) above ``peak_time_level``.
     """
-
-    saturation_threshold = FloatTelescopeParameter(
-        default_value=3000.0,
-        help="ADC (pedestal subtracted) above which the maximum of a saturated pulse is",
-    ).tag(config=True)
-
-    width_level = FloatTelescopeParameter(
-        default_value=2500.0,
-        help="ADC (pedestal subtracted) level used to compute the width of the saturated pulses",
-    ).tag(config=True)
-
-    width_threshold = IntTelescopeParameter(
-        default_value=5,
-        help="Minimum number of samples above width_level of a saturated pulse",
-    ).tag(config=True)
 
     integration_level = FloatTelescopeParameter(
         default_value=0.2,
         help="Fraction of the maximum defining the integration window of the saturated pulses",
+    ).tag(config=True)
+
+    peak_time_level = FloatTelescopeParameter(
+        default_value=2500.0,
+        help=(
+            "ADC (pedestal subtracted): the peak time of a saturated pulse is the middle"
+            " of its R0 samples above this level"
+        ),
     ).tag(config=True)
 
     def __init__(self, subarray, config=None, parent=None, **kwargs):
@@ -102,55 +91,52 @@ class SaturationCorrector(TelescopeComponent):
     def __call__(self, event, tel_id=None):
         """
         Correct the saturated pixels of the telescope ``tel_id``, or of all the telescopes
-        with R0 data. Returns True if saturated pixels were corrected.
+        with DL1 data. Returns True if saturated pixels were corrected.
         """
-        tel_ids = list(event.r0.tel.keys()) if tel_id is None else [tel_id]
+        tel_ids = list(event.dl1.tel.keys()) if tel_id is None else [tel_id]
         saturated = False
         for tel in tel_ids:
-            if self._correct_telescope(event, tel).any():
+            if self._correct_telescope(event, tel):
                 self.n_saturated_events[tel] = self.n_saturated_events.get(tel, 0) + 1
                 saturated = True
         return saturated
 
+    @staticmethod
+    def saturated_pixels(event, tel_id):
+        """Pixels flagged as saturated in the pixel status of R1"""
+        pixel_status = event.r1.tel[tel_id].pixel_status
+        if pixel_status is None:
+            return np.array([], dtype=int)
+        return np.flatnonzero(pixel_status & PixelStatus.SATURATED)
+
     def _correct_telescope(self, event, tel_id):
-        r0 = event.r0.tel[tel_id]
-        waveforms = r0.waveform[0] - r0.pedestal[:, np.newaxis]
-        corrected = np.zeros(len(waveforms), dtype=bool)
+        saturated = self.saturated_pixels(event, tel_id)
+        if len(saturated) == 0:
+            return False
 
-        candidates = np.flatnonzero(waveforms.max(axis=1) > self.saturation_threshold.tel[tel_id])
-        if len(candidates) == 0:
-            return corrected
-
-        width_level = self.width_level.tel[tel_id]
-        width_threshold = self.width_threshold.tel[tel_id]
         integration_level = self.integration_level.tel[tel_id]
+        peak_time_level = self.peak_time_level.tel[tel_id]
         sample_time = (1 / self.subarray.tel[tel_id].camera.readout.sampling_rate).to_value(u.ns)
 
         dl1 = event.dl1.tel[tel_id]
+        r0 = event.r0.tel[tel_id]
         r1_waveform = event.r1.tel[tel_id].waveform[0]
-        for pixel in candidates:
-            w = waveforms[pixel]
-            above_width_level = np.flatnonzero(w > width_level)
-            if len(above_width_level) <= width_threshold:
-                continue
-
-            max_adc = w.max()
+        for pixel in saturated:
+            # the R1 waveform is proportional to the ADC samples of the pixel: same window
+            w = r1_waveform[pixel]
+            max_charge = w.max()
             index_max = np.argmax(w)
-            integration_start = np.flatnonzero(w >= integration_level * max_adc)[0]
+            integration_start = np.flatnonzero(w >= integration_level * max_charge)[0]
             # first drop below the level after the maximum, to avoid secondary peaks.
             # If there is none, the pulse extends over the readout window
-            after_max = np.flatnonzero((w < integration_level * max_adc) & (np.arange(len(w)) > index_max))
+            after_max = np.flatnonzero((w < integration_level * max_charge) & (np.arange(len(w)) > index_max))
             integration_stop = after_max[0] if len(after_max) > 0 else len(w) - 1
+            dl1.image[pixel] = w[integration_start:integration_stop + 1].sum()
 
-            dl1.image[pixel] = r1_waveform[pixel, integration_start:integration_stop + 1].sum()
-            dl1.peak_time[pixel] = (len(above_width_level) / 2 + above_width_level[0]) * sample_time
-            corrected[pixel] = True
-
-        if corrected.any():
-            pixel_status = event.r1.tel[tel_id].pixel_status
-            if pixel_status is not None:
-                pixel_status[corrected] |= PixelStatus.SATURATED
-        return corrected
+            adc = r0.waveform[0, pixel] - r0.pedestal[pixel]
+            above_level = np.flatnonzero(adc > peak_time_level)
+            dl1.peak_time[pixel] = (len(above_level) / 2 + above_level[0]) * sample_time
+        return True
 
 
 # Calibration parameters averaged from all darks taken between
@@ -188,6 +174,12 @@ class R0R1Calibrator(TelescopeComponent):
        dead pixels (``flag_dead_pixels``) and the ``bad_pixels`` are set to 0 in the R1 waveforms and
        flagged in ``event.mon.tel[tel_id].pixel_status``, so that their charge is
        interpolated by the ``invalid_pixel_handler`` of `~ctapipe.calib.CameraCalibrator`.
+
+    6. saturated pixels: the pixels whose maximum ADC sample (pedestal subtracted) is above
+       ``saturation_threshold``, with more than ``saturation_width_threshold`` samples above
+       ``saturation_width_level``, are flagged with `~ctapipe.containers.PixelStatus.SATURATED`
+       in the pixel status of R1. Their charge is corrected after the image extraction by the
+       `ImageSaturationCorrector`.
 
     The steps using the pedestal statistics (3 and the dead pixels of 5) are not applied
     if ``event.mon.tel[tel_id].r0`` is not filled.
@@ -253,6 +245,21 @@ class R0R1Calibrator(TelescopeComponent):
     dead_pixel_std_threshold = FloatTelescopeParameter(
         default_value=2.5,
         help="Std of the ADC samples of the pedestal events (in ADC) below which a pixel is dead",
+    ).tag(config=True)
+
+    saturation_threshold = FloatTelescopeParameter(
+        default_value=3000.0,
+        help="ADC (pedestal subtracted) above which the maximum of a saturated pulse is",
+    ).tag(config=True)
+
+    saturation_width_level = FloatTelescopeParameter(
+        default_value=2500.0,
+        help="ADC (pedestal subtracted) level used to compute the width of the saturated pulses",
+    ).tag(config=True)
+
+    saturation_width_threshold = IntTelescopeParameter(
+        default_value=5,
+        help="Minimum number of samples above saturation_width_level of a saturated pulse",
     ).tag(config=True)
 
     bad_pixels = TelescopeParameter(
@@ -430,10 +437,21 @@ class R0R1Calibrator(TelescopeComponent):
         self._flag_pixels(event, tel_id, mask_bad)
 
         n_pixels = waveform.shape[1]
+        pixel_status = np.full(n_pixels, PixelStatus.HIGH_GAIN_STORED, dtype=np.uint8)
+        pixel_status[self.saturated_pixel_mask(tel_id, r0)] |= PixelStatus.SATURATED
         event.r1.tel[tel_id] = R1CameraContainer(
             event_type=event.trigger.event_type,
             event_time=event.trigger.tel[tel_id].time,
             waveform=waveform,
             selected_gain_channel=np.zeros(n_pixels, dtype=np.int8),
-            pixel_status=np.full(n_pixels, PixelStatus.HIGH_GAIN_STORED, dtype=np.uint8),
+            pixel_status=pixel_status,
+        )
+
+    def saturated_pixel_mask(self, tel_id, r0):
+        """Mask of the saturated pixels, from the ADC samples (pedestal subtracted)"""
+        adc = r0.waveform[0] - r0.pedestal[:, np.newaxis]
+        n_above_width_level = (adc > self.saturation_width_level.tel[tel_id]).sum(axis=1)
+        return (
+            (adc.max(axis=1) > self.saturation_threshold.tel[tel_id])
+            & (n_above_width_level > self.saturation_width_threshold.tel[tel_id])
         )

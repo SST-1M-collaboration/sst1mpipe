@@ -23,11 +23,9 @@
       ]
     },
 
-    "SaturationCorrector": {
-      "saturation_threshold": 3000,
-      "width_level": 2500,
-      "width_threshold": 5,
-      "integration_level": 0.2
+    "ImageSaturationCorrector": {
+      "integration_level": 0.2,
+      "peak_time_level": 2500
     },
 
     "R0R1Calibrator": {
@@ -41,6 +39,9 @@
       "flag_bad_calibration_pixels": true,
       "flag_dead_pixels": true,
       "dead_pixel_std_threshold": 2.5,
+      "saturation_threshold": 3000,
+      "saturation_width_level": 2500,
+      "saturation_width_threshold": 5,
       "bad_pixels": [
         ["type", "*", []]
       ],

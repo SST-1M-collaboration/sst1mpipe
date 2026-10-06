@@ -3,5 +3,5 @@
 
 from .calib import (
     R0R1Calibrator,
-    SaturationCorrector,
+    ImageSaturationCorrector,
 )

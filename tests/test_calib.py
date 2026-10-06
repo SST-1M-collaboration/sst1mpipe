@@ -16,7 +16,7 @@ from ctapipe.containers import (
 from ctapipe.instrument import SubarrayDescription
 from traitlets.config import Config
 
-from sst1mpipe.calib import R0R1Calibrator, SaturationCorrector
+from sst1mpipe.calib import ImageSaturationCorrector, R0R1Calibrator
 from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES, DEFAULT_WINDOW_FILES
 from sst1mpipe.io import load_config, translate_legacy_calibration_config
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
@@ -69,7 +69,7 @@ def test_r0_r1_dl1_calibration():
         r1_dl1_calibrator(event)
         assert event.dl1.tel[TEL_ID].image.shape == (n_pixels, )
         # no saturated pixels in the dark run of the test file
-        assert not SaturationCorrector(subarray=source.subarray, config=CONFIG)(event, TEL_ID)
+        assert not ImageSaturationCorrector(subarray=source.subarray, config=CONFIG)(event, TEL_ID)
 
 
 def test_all_telescopes_with_r0_data_are_calibrated(event):
@@ -479,7 +479,7 @@ def test_translate_legacy_window_transmittance(window_file_of_ones):
 
 # saturation correction
 def old_saturated_charge_correction(event):
-    """saturated_charge_correction before the SaturationCorrector, as reference"""
+    """saturated_charge_correction before the ImageSaturationCorrector, as reference"""
     saturated_threshold, width_level, width_threshold, integration_level = 3000, 2500, 5, 0.2
     telescope = event.trigger.tels_with_trigger[0]
     r0data = event.r0.tel[telescope]
@@ -516,8 +516,7 @@ BROAD_PULSES = {10: (12, 22), 500: (5, 15), 1000: (35, 49)}
 NARROW_PULSE = 700
 
 
-@pytest.fixture
-def saturated_event(event):
+def add_saturated_pulses(event, **calibrator_settings):
     """Event of the test file with saturated pulses added to the ADC samples, calibrated up to DL1"""
     event = deepcopy(event)
     waveform = event.r0.tel[TEL_ID].waveform
@@ -528,49 +527,62 @@ def saturated_event(event):
         waveform[0, pixel, stop:stop + 3] = pedestal[pixel] + 300
     waveform[0, NARROW_PULSE, 20:23] = pedestal[NARROW_PULSE] + 3600
 
-    calibrator(voltage_drop_correction="none", flag_dead_pixels=False)(with_pedestal_std(event, None), TEL_ID)
+    calibrator(voltage_drop_correction="none", flag_dead_pixels=False, **calibrator_settings)(
+        with_pedestal_std(event, None), TEL_ID,
+    )
     CameraCalibrator(subarray=get_subarray(), config=CONFIG)(event)
     return event
 
 
-def test_saturation_corrector_as_before(saturated_event):
+@pytest.fixture
+def saturated_event(event):
+    return add_saturated_pulses(event)
+
+
+def flagged_saturated(event):
+    return np.flatnonzero(event.r1.tel[TEL_ID].pixel_status & PixelStatus.SATURATED).tolist()
+
+
+def test_saturated_pixels_flagged_in_r1(saturated_event):
+
+    # broad pulses, not the narrow one
+    assert flagged_saturated(saturated_event) == sorted(BROAD_PULSES)
+    assert np.all(saturated_event.r1.tel[TEL_ID].pixel_status & PixelStatus.HIGH_GAIN_STORED)
+
+
+def test_image_saturation_corrector_as_before(saturated_event):
 
     reference = deepcopy(saturated_event)
     assert old_saturated_charge_correction(reference)
 
-    corrector = SaturationCorrector(subarray=get_subarray())
+    corrector = ImageSaturationCorrector(subarray=get_subarray())
     image_before = saturated_event.dl1.tel[TEL_ID].image.copy()
     assert corrector(saturated_event, TEL_ID)
 
     dl1 = saturated_event.dl1.tel[TEL_ID]
     np.testing.assert_array_equal(dl1.image, reference.dl1.tel[TEL_ID].image)
     np.testing.assert_array_equal(dl1.peak_time, reference.dl1.tel[TEL_ID].peak_time)
-    corrected = np.flatnonzero(dl1.image != image_before)
-    assert set(corrected) <= set(BROAD_PULSES)
+    assert set(np.flatnonzero(dl1.image != image_before)) <= set(BROAD_PULSES)
     assert corrector.n_saturated_events == {TEL_ID: 1}
 
-    # the corrected pixels are flagged as saturated
-    saturated = (saturated_event.r1.tel[TEL_ID].pixel_status & PixelStatus.SATURATED) > 0
-    assert np.flatnonzero(saturated).tolist() == sorted(BROAD_PULSES)
 
+def test_image_saturation_corrector_peak_time(saturated_event):
 
-def test_saturation_corrector_peak_time(saturated_event):
-
-    SaturationCorrector(subarray=get_subarray())(saturated_event, TEL_ID)
+    ImageSaturationCorrector(subarray=get_subarray())(saturated_event, TEL_ID)
 
     # middle of the samples above the width level, 4 ns per sample
     for pixel, (start, stop) in BROAD_PULSES.items():
         assert saturated_event.dl1.tel[TEL_ID].peak_time[pixel] == ((stop - start) / 2 + start) * 4
 
 
-def test_saturation_corrector_settings(saturated_event):
+def test_saturation_settings(event):
 
-    corrector = SaturationCorrector(
-        subarray=get_subarray(), config=Config({"SaturationCorrector": {"width_threshold": 20}}),
-    )
+    # all the pulses are narrower than 20 samples: no pixel flagged, nothing corrected
+    saturated_event = add_saturated_pulses(event, saturation_width_threshold=20)
     image_before = saturated_event.dl1.tel[TEL_ID].image.copy()
+    corrector = ImageSaturationCorrector(subarray=get_subarray())
 
-    # all the pulses are narrower than 20 samples
+    assert flagged_saturated(saturated_event) == []
     assert not corrector(saturated_event, TEL_ID)
     np.testing.assert_array_equal(saturated_event.dl1.tel[TEL_ID].image, image_before)
     assert corrector.n_saturated_events == {}

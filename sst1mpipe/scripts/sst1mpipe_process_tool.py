@@ -8,7 +8,7 @@ from ctapipe.core.traits import Bool, flag
 from ctapipe.image import ImageProcessor
 from ctapipe.io import EventSource, DataWriter, SimTelEventSource
 
-from sst1mpipe.calib import R0R1Calibrator, SaturationCorrector
+from sst1mpipe.calib import R0R1Calibrator, ImageSaturationCorrector
 from sst1mpipe.io import compute_dl1_summary, write_dl1_info
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor
@@ -30,7 +30,7 @@ class ProcessorTool(Tool):
     In the same way, the statistics of the calibrated images of the pedestal events are
     computed by the DL1PedestalMonitor, for the NSBImageCleaner which raises the picture
     threshold of the pixels with a high pedestal std.
-    The charges and peak times of the saturated pixels are corrected by the SaturationCorrector.
+    The charges and peak times of the saturated pixels are corrected by the ImageSaturationCorrector.
     For the simulations (SimTelEventSource), the R1 waveforms are corrected for the
     PDE drop by the R0R1Calibrator (pde_drop_factor).
     """
@@ -71,7 +71,7 @@ class ProcessorTool(Tool):
 
     classes = [
         DBSCANImageCleaner, TimeDBSCANImageCleaner, R0R1Calibrator, R0PedestalMonitor, DL1PedestalMonitor,
-        SaturationCorrector,
+        ImageSaturationCorrector,
     ]
 
     def setup(self):
@@ -86,11 +86,11 @@ class ProcessorTool(Tool):
         self.r0_pedestal_monitor = None
         self.dl1_pedestal_monitor = None
         self.r0_r1_calibrator = None
-        self.saturation_corrector = None
+        self.image_saturation_corrector = None
         subarray = self.event_source.subarray
         if isinstance(self.event_source, SST1MEventSource):
             self.r0_pedestal_monitor = R0PedestalMonitor(parent=self, subarray=subarray)
-            self.saturation_corrector = SaturationCorrector(parent=self, subarray=subarray)
+            self.image_saturation_corrector = ImageSaturationCorrector(parent=self, subarray=subarray)
             self.dl1_pedestal_monitor = DL1PedestalMonitor(parent=self, subarray=subarray)
             self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
         elif isinstance(self.event_source, SimTelEventSource):
@@ -119,8 +119,8 @@ class ProcessorTool(Tool):
             if self.r0_r1_calibrator is not None:
                 self.calibrate_r0_r1(event)
             self.camera_calibrator(event)
-            if self.saturation_corrector is not None:
-                self.saturation_corrector(event)
+            if self.image_saturation_corrector is not None:
+                self.image_saturation_corrector(event)
             if self.dl1_pedestal_monitor is not None:
                 self.fill_dl1_pedestal_monitoring(event)
             self.image_processor(event)
@@ -195,8 +195,8 @@ class ProcessorTool(Tool):
             dec=None if pointing is None else pointing.dec.deg,
             manual_coords=pointing_manual,
             n_saturated=(
-                None if self.saturation_corrector is None
-                else sum(self.saturation_corrector.n_saturated_events.values())
+                None if self.image_saturation_corrector is None
+                else sum(self.image_saturation_corrector.n_saturated_events.values())
             ),
             n_pedestal=summary["n_pedestal"],
             n_survived_pedestals=summary["n_survived_pedestals"],
