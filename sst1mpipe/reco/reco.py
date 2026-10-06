@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from astropy.table import QTable
 from astropy.time import Time
+from ctapipe.core import Provenance
 from ctapipe.io import DataWriter, HDF5EventSource
 from ctapipe.reco import ShowerProcessor
 from ctaplot.ana import angular_separation_altaz, logbin_mean
@@ -1270,6 +1271,8 @@ def make_dl1_stereo(
         t_t1_all = get_wr_timestamp(dl1_data_tel1)
         t_t2 = get_wr_timestamp(dl1_data_tel2)
 
+    # the DataWriter writes the provenance of the current activity in the output file
+    Provenance().start_activity("sst1mpipe_dl1_stereo")
     with DataWriter(source,
                     output_path=output_path,
                     overwrite        = True,

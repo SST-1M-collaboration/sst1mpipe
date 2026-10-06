@@ -30,6 +30,7 @@ import astropy.units as u
 import numpy as np
 from ctapipe.calib import CameraCalibrator
 from ctapipe.image import ImageProcessor
+from ctapipe.core import Provenance
 from ctapipe.io import DataWriter, EventSource, SimTelEventSource
 from ctapipe.reco import ShowerProcessor
 
@@ -290,6 +291,8 @@ def main():
         full_seconds = []
         fractional_seconds = []
 
+    # the DataWriter writes the provenance of the current activity in the output file
+    Provenance().start_activity("sst1mpipe_r0_dl1")
     with DataWriter(
         source, output_path=output_file,
         overwrite        = True,
