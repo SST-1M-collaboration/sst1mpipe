@@ -11,6 +11,7 @@ from sst1mpipe.trigger.emulator import (
     READOUT_SECTOR_ORDER,
     TriggerEmulator,
     fadc,
+    module_swap_order,
     read_trigger_geometry,
     readout_to_patch_order,
     score_quantizer,
@@ -50,6 +51,7 @@ def test_invalid_config_is_refused():
         {"eps_t": 1},                                          # 5 rows of ring_weights for 3 taps
         {"ring_weights": [[0.5, 0.1, 0.2]] * 5},               # rows must be [centre, neighbours]
         {"quantize_step": {"input": "UQ4.0"}},                 # incomplete fixed-point formats
+        {"quantize_step": {**Q14, "convolution_rescale_shift": 3.5}},  # shifts are whole bit counts
         {"score_quantizer_edges": [16.0, 8.0]},                # edges not increasing
     )
     for section in invalid:
@@ -68,6 +70,7 @@ def test_fixed_point_formats():
     fmt = fixed_point.parse("SQ5.2")
     assert (fmt.bits, fmt.min_code, fmt.max_code) == (7, -64, 63)
     assert fixed_point.parse("UQ4.0").max_code == 15
+    assert fixed_point.parse("sq5.2") == fmt
 
     # Truncation is a floor, also for negative values; saturation clips to the range.
     weights = fixed_point.to_codes([0.5, -0.0078, 5.0], fixed_point.parse("SQ1.7"), "AP_SAT", "AP_TRN")
@@ -115,6 +118,31 @@ def test_readout_order():
     assert not np.array_equal(tel2, np.arange(432))
 
 
+def test_module_swap_moves_trigger_traces_with_pixels():
+    from astropy.io import ascii
+
+    from sst1mpipe.utils.utils import MAPPING_FILE_PATH
+
+    # Telescope 2, 2023-09-01 to 2024-07-18: modules 59 and 88 connected in each other's place.
+    pix_maps = ascii.read(MAPPING_FILE_PATH)
+    masks = []
+    for module in (59, 88):
+        mask = np.zeros(1296, dtype=bool)
+        mask[pix_maps[pix_maps["module"] == module]["pixel_sw_id"]] = True
+        masks.append(mask)
+    triplets = read_trigger_geometry()[0]
+    order = module_swap_order(triplets, [masks])
+
+    rng = np.random.default_rng(0)
+    waveform, baseline = rng.integers(0, 100, (1296, 50)), np.full(1296, 50.0)
+    corrected = waveform.copy()  # what swap_modules_r0wf does to the pixels
+    corrected[masks[0]], corrected[masks[1]] = waveform[masks[1]], waveform[masks[0]]
+
+    assert np.array_equal(fadc(waveform, baseline, triplets)[order], fadc(corrected, baseline, triplets))
+    assert np.count_nonzero(order != np.arange(432)) == 8
+    assert np.array_equal(module_swap_order(triplets, []), np.arange(432))
+
+
 def test_tdscan_single_impulse():
     emu = emulator(Q14)
     codes = np.zeros((432, 50), dtype=int)
@@ -146,3 +174,35 @@ def test_tdscan_single_impulse_floating_point():
     assert scores[patch, 18:23].tolist() == [0.5, 0.5, -0.5, -0.5, 0.5]
     neighbor = emu.tdscan.neighbors[patch, 0]
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0625, -0.125, -0.03125, -0.0078125]
+
+
+def test_as_sst1m_event_gives_each_event_its_own_r0():
+    from ctapipe.containers import ArrayEventContainer
+
+    from sst1mpipe.trigger import as_sst1m_event
+
+    first, second = as_sst1m_event(ArrayEventContainer()), as_sst1m_event(ArrayEventContainer())
+    first.sst1m.r0.tel[1].trigger_output_tdscan = np.ones((432, 50), dtype=bool)
+    assert 1 not in second.sst1m.r0.tel
+
+
+def test_missing_trigger_traces_are_refused():
+    from sst1mpipe.io.containers import SST1MArrayEventContainer
+
+    event = SST1MArrayEventContainer()
+    event.sst1m.r0.tel[22].trigger_input_traces = np.zeros((432, 50)) * np.nan   # what the reader stores
+    with pytest.raises(ValueError, match="no trigger_input_traces"):
+        emulator().triplet_traces(event, 22, is_simulation=False)
+
+
+def test_duplicate_event_is_refused():
+    from sst1mpipe.io.containers import SST1MArrayEventContainer
+
+    emu = emulator()
+    traces = np.zeros((432, 50), dtype=np.int64)
+    emu.triplet_traces = lambda event, tel_id, is_simulation: traces
+    event = SST1MArrayEventContainer()
+    event.index.obs_id, event.index.event_id = 1, 7
+    emu.process(event, [22], is_simulation=False, is_pedestal=False)
+    with pytest.raises(ValueError, match="seen twice"):
+        emu.process(event, [22], is_simulation=False, is_pedestal=False)

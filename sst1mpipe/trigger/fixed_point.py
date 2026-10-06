@@ -31,10 +31,10 @@ class Format:
 
 def parse(text):
     """``"SQ5.2"`` -> Format(signed=True, int_bits=5, frac_bits=2)."""
-    match = re.fullmatch(r"([SU])Q(\d+)\.(\d+)", text)
+    match = re.fullmatch(r"([SU])Q(\d+)\.(\d+)", text, flags=re.IGNORECASE)
     if match is None:
         raise ValueError(f"Fixed-point format {text!r} must look like SQ5.2 or UQ4.0")
-    return Format(signed=match.group(1) == "S", int_bits=int(match.group(2)), frac_bits=int(match.group(3)))
+    return Format(signed=match.group(1).upper() == "S", int_bits=int(match.group(2)), frac_bits=int(match.group(3)))
 
 
 def fit(codes, fmt, overflow_mode):

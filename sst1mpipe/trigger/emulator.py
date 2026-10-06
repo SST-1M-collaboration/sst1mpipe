@@ -12,7 +12,8 @@ traces (the FADC output, one trace per patch of 3 pixels):
 
 Where the triplet traces come from:
 
-* real data: ``trigger_input_traces``, computed by the FPGA itself;
+* real data: ``trigger_input_traces``, computed by the FPGA itself, with the
+  module swaps of ``inverted_module_list.json`` undone as for the pixels;
 * simulation: the raw waveform minus the simulated pedestal, with the FADC of
   the gateware (signed pixels, upper clip only, triplet sum clipped to 0-255).
 
@@ -39,15 +40,16 @@ from collections import Counter
 import numpy as np
 import tables
 from astropy.table import Table
+from ctapipe.containers import Map
 from ctapipe.core import TelescopeComponent
 from ctapipe.core.traits import Bool, CaselessStrEnum, Dict, Float, FloatTelescopeParameter, Int, List
 from ctapipe.io import read_table
 
 from sst1mpipe.constants import PATCH_ID_INPUT_SORT_IDS
 from sst1mpipe.instrument.camera import DigiCam
-from sst1mpipe.io.containers import SST1MArrayEventContainer
+from sst1mpipe.io.containers import R0CameraContainer, R0Container, SST1MArrayEventContainer, SST1MContainer
 from sst1mpipe.trigger import fixed_point
-from sst1mpipe.utils import get_telescopes
+from sst1mpipe.utils import get_swaped_modules, get_telescopes
 
 N_PIXELS = 1296
 
@@ -122,11 +124,36 @@ def readout_to_patch_order(sector_order):
 # Trigger stages
 # ---------------------------------------------------------------------------
 
+def module_swap_order(triplets, swapped_modules):
+    """Patch order that undoes the module swaps of ``inverted_module_list.json``.
+
+    For some periods two modules were connected in each other's place. sst1mpipe
+    moves their pixels back (``swap_modules_r0wf``), but the FPGA trigger traces
+    stay as recorded: ``traces[order]`` puts each patch back on its pixels.
+    ``swapped_modules`` is the list of pixel mask pairs of ``get_swaped_modules``.
+    """
+    # Same moves as swap_modules_r0wf: corrected pixel p shows recorded pixel pixel_order[p].
+    pixel_order = np.arange(N_PIXELS)
+    for mask_1, mask_2 in swapped_modules:
+        pixels_1, pixels_2 = np.flatnonzero(mask_1), np.flatnonzero(mask_2)
+        pixel_order[pixels_1], pixel_order[pixels_2] = pixel_order[pixels_2], pixel_order[pixels_1]
+
+    patch_of_pixel = np.empty(N_PIXELS, dtype=int)
+    patch_of_pixel[triplets.ravel()] = np.repeat(np.arange(len(triplets)), triplets.shape[1])
+    source_patches = patch_of_pixel[pixel_order[triplets]]  # (n_patches, 3), one patch per row if whole modules move
+    if np.any(source_patches != source_patches[:, :1]):
+        raise ValueError("Swapped modules split a trigger patch, the trigger traces cannot follow the pixels")
+    return source_patches[:, 0]
+
+
 def as_sst1m_event(event):
     """Copy a simulated ctapipe array event into an SST1M one (shared fields, no data copy)."""
     sst1m_event = SST1MArrayEventContainer()
     for name in event.keys():
         setattr(sst1m_event, name, event[name])
+    # Container defaults are shared between instances: give each event its own R0 telescope map,
+    # so a telescope does not keep the trigger output of a previous event.
+    sst1m_event.sst1m = SST1MContainer(r0=R0Container(tel=Map(R0CameraContainer)))
     return sst1m_event
 
 
@@ -205,8 +232,11 @@ class TDSCAN:
         weight_format = fixed_point.parse(quantize_step["ring_weights"])
         self.conv_format = fixed_point.parse(quantize_step["convolution_accumulator"])
         self.score_format = fixed_point.parse(quantize_step["temporal_accumulator"])
-        self.conv_shift = quantize_step["convolution_rescale_shift"]
-        self.score_shift = quantize_step["temporal_rescale_shift"]
+        for key in ("convolution_rescale_shift", "temporal_rescale_shift"):
+            if quantize_step[key] < 0 or quantize_step[key] != int(quantize_step[key]):
+                raise ValueError(f"quantize_step {key} must be an integer >= 0, got {quantize_step[key]}")
+        self.conv_shift = int(quantize_step["convolution_rescale_shift"])
+        self.score_shift = int(quantize_step["temporal_rescale_shift"])
 
         # Full-precision registers before each requantization: a sum of n terms
         # needs ceil(log2(n)) more integer bits (7 neighbours -> +3, 5 taps -> +3).
@@ -258,7 +288,9 @@ class TriggerEmulator(TelescopeComponent):
     """Runs patch7 and TDSCAN on every telescope event and records the results.
 
     Configured by the ``TriggerEmulator`` section of the sst1mpipe config. The
-    defaults are the TDSCAN trigger of the simulation study (50 kHz of medium NSB).
+    default thresholds give 7 kHz (the camera readout limit) on the simulated
+    medium NSB. On real data the NSB changes from night to night, so the
+    thresholds have to be set for the analysed runs.
     """
 
     enabled = Bool(False, help="Emulate the trigger in sst1mpipe_r0_dl1").tag(config=True)
@@ -269,10 +301,10 @@ class TriggerEmulator(TelescopeComponent):
     ).tag(config=True)
 
     patch7_threshold = FloatTelescopeParameter(
-        default_value=222.0, help="patch7 fires when a 7-patch cluster sum is above this value"
+        default_value=242.0, help="patch7 fires when a 7-patch cluster sum is above this value"
     ).tag(config=True)
     tdscan_threshold = FloatTelescopeParameter(
-        default_value=8.109374, help="TDSCAN fires when a filtered score is above this value"
+        default_value=9.03125, help="TDSCAN fires when a filtered score is above this value"
     ).tag(config=True)
     score_quantizer_edges = List(
         Float(), default_value=[16.0, 24.0, 32.0, 40.0, 48.0, 56.0, 64.0, 72.0, 80.0, 88.0, 96.0, 104.0, 112.0, 120.0, 128.0],
@@ -295,6 +327,7 @@ class TriggerEmulator(TelescopeComponent):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
         self.triplets, self.clusters, neighbors = read_trigger_geometry()
         self.readout_to_patch = {tel: readout_to_patch_order(order) for tel, order in READOUT_SECTOR_ORDER.items()}
+        self.module_swaps = {}  # tel_id -> patch order undoing the module swaps, set on the first event as sst1mpipe does
 
         self.score_edges = np.array(self.score_quantizer_edges, dtype=float)
         if np.any(np.diff(self.score_edges) <= 0):
@@ -322,7 +355,14 @@ class TriggerEmulator(TelescopeComponent):
         if tel_id not in self.readout_to_patch:
             raise ValueError(f"No trigger readout order known for telescope {tel_id}, see READOUT_SECTOR_ORDER")
         traces = np.asarray(event.sst1m.r0.tel[tel_id].trigger_input_traces)
-        return traces[self.readout_to_patch[tel_id]]
+        if not np.all(np.isfinite(traces)):
+            raise ValueError(
+                f"Telescope {tel_id}: no trigger_input_traces in this file (the reader filled them with NaN), "
+                "the trigger cannot be emulated on it"
+            )
+        if tel_id not in self.module_swaps:
+            self.module_swaps[tel_id] = module_swap_order(self.triplets, get_swaped_modules(event))
+        return traces[self.readout_to_patch[tel_id]][self.module_swaps[tel_id]]
 
     def run(self, traces, tel_id):
         """patch7 and TDSCAN on one set of triplet traces (432, T), with the thresholds of telescope ``tel_id``.
@@ -371,7 +411,10 @@ class TriggerEmulator(TelescopeComponent):
             counts[kind + "_patch7"] += result["patch7"]
 
             if not is_pedestal:
-                self.results[(event.index.obs_id, event.index.event_id, tel_id)] = result
+                key = (event.index.obs_id, event.index.event_id, tel_id)
+                if key in self.results:
+                    raise ValueError(f"Event (obs_id, event_id, tel_id) = {key} seen twice: trigger results would be mixed up")
+                self.results[key] = result
 
     def keep(self, event, tel_ids):
         """Apply the event filter. Returns False if no telescope fired.

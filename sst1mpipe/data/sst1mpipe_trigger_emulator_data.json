@@ -5,7 +5,7 @@
     "filter_by": "tdscan",
     "restrict_cleaning_to_tdscan_mask": false,
     "patch7_threshold": [["type", "*", 350], ["id", 21, 225]],
-    "tdscan_threshold": 8.0,
+    "tdscan_threshold": 8.75,
     "score_quantizer_edges": [16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128],
     "eps_t": 2,
     "ring_weights": [[0.5, -0.0078125], [-0.5, -0.03125], [-0.5, -0.125], [0.5, 0.0625], [0.5, 0.25]],
