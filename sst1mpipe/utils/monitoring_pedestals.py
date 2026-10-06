@@ -12,7 +12,7 @@ from ctapipe.image import ImageProcessor
 
 from sst1mpipe.calib import (
     R0R1Calibrator,
-    saturated_charge_correction,
+    SaturationCorrector,
 )
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import get_subarray
@@ -202,6 +202,7 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
 
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
     calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
+    saturation_corrector = SaturationCorrector(subarray=source.subarray, config=config)
 
     for event in source:
 
@@ -214,7 +215,7 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
         r1_dl1_calibrator(event)
 
         # Integration correction of saturated pixels
-        saturated_charge_correction(event)
+        saturation_corrector(event, tel)
 
         dl1_monitor.add_event(event, tel)
         if dl1_monitor.n_buffered(tel) >= dl1_monitor.n_events.tel[tel]:
@@ -232,6 +233,7 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=config)
     image_processor = ImageProcessor(subarray=source.subarray, config=config)
     calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=config)
+    saturation_corrector = SaturationCorrector(subarray=source.subarray, config=config)
     tel = None
 
     def clean(event):
@@ -259,7 +261,7 @@ def _load_first_fake_pedestals(r0_monitor, dl1_monitor, input_file, config, max_
         cleaning_mask = clean(event)
         if sum(cleaning_mask) < 20:
             # Integration correction of saturated pixels - done only here because the fake pedestals must match in both loops
-            saturated_charge_correction(event)
+            saturation_corrector(event, tel)
             dl1_monitor.add_event(event, tel)
             if dl1_monitor.n_buffered(tel) >= dl1_monitor.n_events.tel[tel]:
                 break

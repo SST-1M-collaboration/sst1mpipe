@@ -3,5 +3,5 @@
 
 from .calib import (
     R0R1Calibrator,
-    saturated_charge_correction,
+    SaturationCorrector,
 )

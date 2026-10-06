@@ -44,6 +44,8 @@ def test_process_r0_file(tmp_path, voltage_drop_correction):
     assert info["calib_file"][0].endswith(DEFAULT_CALIBRATION_FILES[21])
     assert info["n_pedestal"][0] == N_EVENTS
     assert info["n_triggered_tel1"][0] == N_EVENTS
+    # no saturated pixels in the dark run of the test file
+    assert info["n_saturated"][0] == 0
 
 
 def test_dl1_pedestal_monitor_used_by_nsb_image_cleaner(tmp_path, monkeypatch):

@@ -23,6 +23,13 @@
       ]
     },
 
+    "SaturationCorrector": {
+      "saturation_threshold": 3000,
+      "width_level": 2500,
+      "width_threshold": 5,
+      "integration_level": 0.2
+    },
+
     "R0R1Calibrator": {
       "calibration_file": [
         ["type", "*", null]
