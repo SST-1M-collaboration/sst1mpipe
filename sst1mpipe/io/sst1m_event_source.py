@@ -18,6 +18,7 @@ from ctapipe.containers import (
     PointingMode,
     SchedulingBlockContainer,
 )
+from ctapipe.core import Provenance
 from ctapipe.core.traits import Bool, Dict, Float, List, UseEnum
 from ctapipe.instrument import FocalLengthKind
 from ctapipe.io import (
@@ -239,6 +240,9 @@ class SST1MEventSource(EventSource):
         self._input_urls = [self.input_url] if input_urls is None else [
             EventSource.input_url.validate(self, url) for url in input_urls
         ]
+        # input files of the current provenance activity (zfits files have no reference metadata)
+        for path in self.filelist:
+            Provenance().add_input_file(path, role="R0/Event", add_meta=False)
 
         # obs_id from the date and run number of the file name
         date_run = parse_file_name(self.filelist[0])

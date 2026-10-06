@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from ctapipe.core import Provenance
 from ctapipe.io import EventSource
 
 import astropy.units as u
@@ -434,3 +435,17 @@ def test_swapped_modules_period():
     assert len(source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0])) == 1
     assert source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0] - day) == []
     assert source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0] + day) == []
+
+
+def test_input_files_in_provenance():
+
+    provenance = Provenance()
+    provenance.start_activity("test_input_files_in_provenance")
+    try:
+        SST1MEventSource(input_url=[FILE_TEL_1, FILE_TEL_2], max_events=1)
+        inputs = provenance.current_activity.input
+    finally:
+        provenance.finish_activity()
+
+    assert [entry["url"] for entry in inputs] == [str(FILE_TEL_1), str(FILE_TEL_2)]
+    assert all(entry["role"] == "R0/Event" for entry in inputs)

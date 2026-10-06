@@ -198,6 +198,8 @@ def main():
     if (not ismc) and force_pointing and (pointing_ra is not None) and (pointing_dec is not None):
         # pointing given by the user, used instead of the TARGET field of the file
         source_kwargs = dict(pointing_ra=pointing_ra, pointing_dec=pointing_dec)
+    # provenance of the processing (input files registered by the event source), written by the DataWriter
+    Provenance().start_activity("sst1mpipe_r0_dl1")
     source = EventSource(input_url=input_file, config=config, max_events=max_events, allowed_tels=config.get("allowed_tels"), **source_kwargs)
     logging.info("Event source: %s", source.__class__.__name__)
 
@@ -291,8 +293,6 @@ def main():
         full_seconds = []
         fractional_seconds = []
 
-    # the DataWriter writes the provenance of the current activity in the output file
-    Provenance().start_activity("sst1mpipe_r0_dl1")
     with DataWriter(
         source, output_path=output_file,
         overwrite        = True,
