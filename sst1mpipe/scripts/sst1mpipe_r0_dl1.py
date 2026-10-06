@@ -53,6 +53,7 @@ from sst1mpipe.io import (
     write_pixel_charges_table,
 )
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.trigger import TriggerEmulator, as_sst1m_event
 from sst1mpipe.utils import (
     add_event_id,
     add_pointing_to_events,
@@ -258,6 +259,14 @@ def main():
 
     shower_processor  = ShowerProcessor(subarray=source.subarray, config=config)
 
+    # Software emulation of the camera trigger (patch7 and TDSCAN), see sst1mpipe/trigger.
+    # Enabled by a TriggerEmulator config section, examples in sst1mpipe/data/sst1mpipe_trigger_emulator_*.json
+    trigger_emulator = TriggerEmulator(subarray=source.subarray, config=config)
+    if not trigger_emulator.enabled:
+        trigger_emulator = None
+    elif trigger_emulator.restrict_cleaning_to_tdscan_mask:
+        trigger_emulator.restrict_cleaning(image_processor)
+
     if pixel_charges:
         BINS = 1000
         N_events= 0
@@ -289,6 +298,9 @@ def main():
 
     ) as writer:
         for i, event in enumerate(source):
+
+            if source.is_simulation and trigger_emulator is not None:
+                event = as_sst1m_event(event)  # room for the R0 trigger output, see sst1mpipe/trigger
 
             if not source.is_simulation:
 
@@ -361,6 +373,11 @@ def main():
                         simtel_config_qe=used_qe,
                         pde_corr_factors=pde_corr_factors
                         )
+
+            # The trigger sees the raw waveforms, so it is emulated before the bad pixel removal
+            is_pedestal = (not source.is_simulation) and event_type == 8
+            if trigger_emulator is not None:
+                trigger_emulator.process(event, event.trigger.tels_with_trigger, source.is_simulation, is_pedestal)
 
             # This function flags the bad pixel according to the cfg file, and just for sure also kills the waveforms.
             # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
@@ -484,6 +501,11 @@ def main():
             # We would like to store in DL1 also some additional parameters needed for disp reconstruction and few more additional features
             # It cannot be done at this level, because: AttributeError: 'CameraHillasParametersContainer' object has no attribute 'disp'
 
+            # Keep only the events the emulated trigger fired on (pedestal events are always kept)
+            if trigger_emulator is not None and not is_pedestal:
+                if not trigger_emulator.keep(event, list(event.trigger.tels_with_trigger)):
+                    continue
+
             shower_processor(event) # dl1b->dl2 (reconstruction of stereo parameters, also energy/direction/classification in the future versions of ctapipe)
 
             # Counting all triggered events
@@ -590,6 +612,10 @@ def main():
         # evaluation. We cannot recalculate N of simulated events at this point for each individual dl1 file, because it would
         # lead to an error of the order of 10%.
         energy_min_cut(processing_info.output_file, config=config)
+
+    if trigger_emulator is not None:
+        trigger_emulator.log_counts()
+        trigger_emulator.write(processing_info.output_file)
 
     # write all processing monitoring information
     write_dl1_info(processing_info)

@@ -1,0 +1,23 @@
+{
+  "TriggerEmulator": {
+    "enabled": true,
+    "filter_events": false,
+    "filter_by": "tdscan",
+    "restrict_cleaning_to_tdscan_mask": false,
+    "patch7_threshold": [["type", "*", 350], ["id", 21, 225]],
+    "tdscan_threshold": 8.75,
+    "score_quantizer_edges": [16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128],
+    "eps_t": 2,
+    "ring_weights": [[0.5, -0.0078125], [-0.5, -0.03125], [-0.5, -0.125], [0.5, 0.0625], [0.5, 0.25]],
+    "quantize_step": {
+      "input": "UQ4.0",
+      "ring_weights": "SQ1.7",
+      "convolution_accumulator": "SQ5.2",
+      "convolution_rescale_shift": 3,
+      "temporal_accumulator": "SQ5.2",
+      "temporal_rescale_shift": 3
+    },
+    "overflow_mode": "AP_SAT",
+    "quantization_mode": "AP_TRN"
+  }
+}
