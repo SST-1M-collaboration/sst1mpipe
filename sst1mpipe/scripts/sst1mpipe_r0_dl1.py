@@ -57,7 +57,6 @@ from sst1mpipe.utils import (
     get_swaped_modules,
     get_tel_string,
     remove_bad_pixels,
-    swap_modules_r0wf,
 )
 from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor, load_first_pedestals
 
@@ -328,11 +327,8 @@ def main():
 
                 ### REAL START OF THE LOOP
 
-                # Here we swap  wrongly connected modules
-                #  swapped modules and corresponding dates
-                # are stored in /data/inverted_module_list.json
-                for mask_1, mask_2 in swaped_modules_list:
-                    event = swap_modules_r0wf(event,mask_1, mask_2, tel=tel)
+                # NOTE: the waveforms of the wrongly connected modules (data/inverted_module_list.json)
+                # are swapped by SST1MEventSource
 
                 r0_pedestal_monitor.fill_monitoring(event, tel)
                 calibrator_r0_r1(event, tel)

@@ -850,41 +850,6 @@ def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingf
     return mask_list
 
 
-def swap_modules_r0wf(event,mask1,mask2,tel=None):
-
-    """
-    Swaps pixel R0 waveforms between any two masks
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    mask1 : int
-    mask1 : int
-    tel   : int
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    """
-
-
-    waveform_1 = event.r0.tel[tel].waveform[0][mask1,:]
-    bs_1 = event.r0.tel[tel].pedestal[mask1]
-
-    waveform_2 = event.r0.tel[tel].waveform[0][mask2,:]
-    bs_2 = event.r0.tel[tel].pedestal[mask2]
-
-    event.r0.tel[tel].waveform[0][mask1] = waveform_2
-    event.r0.tel[tel].waveform[0][mask2] = waveform_1
-
-    event.r0.tel[tel].pedestal[mask1] = bs_2
-    event.r0.tel[tel].pedestal[mask2] = bs_1
-
-    return event
-
 def remove_bad_pixels(event, config=None):
     """
     Fills bad pixel waveforms with zeros and

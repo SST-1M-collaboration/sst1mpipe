@@ -1,6 +1,8 @@
 
+import json
 import logging
 import os
+from importlib.resources import files
 import re
 import warnings
 from itertools import islice
@@ -8,6 +10,7 @@ from itertools import islice
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import AltAz, SkyCoord
+import astropy.io.ascii as aio
 from astropy.io import fits
 from astropy.time import Time
 from ctapipe.containers import (
@@ -17,7 +20,7 @@ from ctapipe.containers import (
     PointingMode,
     SchedulingBlockContainer,
 )
-from ctapipe.core.traits import Bool, Float, UseEnum
+from ctapipe.core.traits import Bool, Float, Path, UseEnum
 from ctapipe.instrument import FocalLengthKind
 from ctapipe.io import (
     EventSource,
@@ -113,6 +116,41 @@ def file_has_swat_event_ids(path, n_events=N_EVENTS_SWAT_ID_CHECK):
         return any(event.arrayEvtNum != 0 for event in islice(f.Events, n_events))
 
 
+def load_swapped_modules(inverted_module_list_file, pixel_mapping_file):
+    """
+    Wrongly connected modules of the cameras, whose pixels must be swapped.
+
+    Parameters
+    ----------
+    inverted_module_list_file: path
+        JSON file with, for each entry, the telescope (``ntel``), the period
+        (``date_sart``, ``date_stop``, UTC) and the two modules (``module_1``, ``module_2``)
+    pixel_mapping_file: path
+        DigiCam pixel mapping, with the module of each pixel (``pixel_sw_id``)
+
+    Returns
+    -------
+    dict:
+        tel_id -> list of (start, stop, pixels_1, pixels_2): period (unix TAI, s) and
+        pixel ids of the two modules
+    """
+    with open(inverted_module_list_file, encoding="utf-8") as f:
+        entries = json.load(f)
+    mapping = aio.read(pixel_mapping_file)
+
+    def module_pixels(module):
+        return np.sort(np.asarray(mapping[mapping["module"] == module]["pixel_sw_id"]))
+
+    swapped_modules = {}
+    for entry in entries.values():
+        start = Time(entry["date_sart"], format="isot", scale="utc").unix_tai
+        stop = Time(entry["date_stop"], format="isot", scale="utc").unix_tai
+        swapped_modules.setdefault(entry["ntel"], []).append(
+            (start, stop, module_pixels(entry["module_1"]), module_pixels(entry["module_2"]))
+        )
+    return swapped_modules
+
+
 class SST1MEventSource(EventSource):
     """
     https://github.com/cta-observatory/ctapipe_io_lst/blob/0f8b8cd39403f51dc8b1b0e1eb5a6045ea5deb15/src/ctapipe_io_lst/__init__.py#L13
@@ -174,6 +212,21 @@ class SST1MEventSource(EventSource):
         FocalLengthKind,
         default_value=FocalLengthKind.EQUIVALENT,
         help="Which focal length to use for the camera frame transformations.",
+    ).tag(config=True)
+
+    swap_modules = Bool(
+        default_value=True,
+        help=(
+            "Swap the waveforms and pedestals of the pixels of the wrongly connected modules"
+            " listed in inverted_module_list_file, during the given periods"
+        ),
+    ).tag(config=True)
+
+    inverted_module_list_file = Path(
+        default_value=files("sst1mpipe.data").joinpath("inverted_module_list.json"),
+        exists=True,
+        directory_ok=False,
+        help="List of the wrongly connected modules of each telescope, and of their periods",
     ).tag(config=True)
 
     def __init__(self, input_url=None, config=None, parent=None, **kwargs):
@@ -243,6 +296,12 @@ class SST1MEventSource(EventSource):
 
         self._swat_event_ids_available = self.check_swat_event_ids_available(self.filelist)
 
+        self._swapped_modules = {}
+        if self.swap_modules:
+            self._swapped_modules = load_swapped_modules(
+                self.inverted_module_list_file, files("sst1mpipe.data").joinpath("digicam_pixels_mapping_V5T.txt"),
+            )
+
     @property
     def filelist(self):
         """All the files read by the source"""
@@ -277,6 +336,24 @@ class SST1MEventSource(EventSource):
             locations = self.subarray.tel_coords.to_earth_location()
             self._tel_locations[tel_id] = locations[self.subarray.tel_index_array[tel_id]]
         return self._tel_locations[tel_id]
+
+    def swapped_modules(self, tel_id, local_camera_clock):
+        """
+        Pixel ids of the wrongly connected modules (pairs) of the telescope ``tel_id``
+        at the time ``local_camera_clock`` (ns, TAI)
+        """
+        time = local_camera_clock / 1e9
+        return [
+            (pixels_1, pixels_2)
+            for start, stop, pixels_1, pixels_2 in self._swapped_modules.get(tel_id, [])
+            if start < time < stop
+        ]
+
+    def _swap_modules(self, r0, tel_id):
+        """Swap the waveforms and pedestals of the pixels of the wrongly connected modules"""
+        for pixels_1, pixels_2 in self.swapped_modules(tel_id, r0.local_camera_clock):
+            r0.waveform[:, pixels_1], r0.waveform[:, pixels_2] = r0.waveform[:, pixels_2], r0.waveform[:, pixels_1]
+            r0.pedestal[pixels_1], r0.pedestal[pixels_2] = r0.pedestal[pixels_2], r0.pedestal[pixels_1]
 
     def _fill_trigger_and_pointing(self, array_event, tel_id, local_camera_clock):
         time = camera_clock_to_time(local_camera_clock)
@@ -426,6 +503,7 @@ class SST1MEventSource(EventSource):
                     np.int64(event.local_time_sec * 1E9) +
                     np.int64(event.local_time_nanosec)
                 )
+                self._swap_modules(r0, tel_id)
                 if event.trig is not None:
                     r0.gps_time = (
                         np.int64(event.trig.timeSec * 1E9) +

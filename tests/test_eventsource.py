@@ -1,3 +1,4 @@
+import json
 import os.path
 
 import logging
@@ -368,3 +369,67 @@ def test_only_r0_trigger_and_pointing_are_filled():
         assert len(event.dl0.tel) == 0
         assert len(event.dl1.tel) == 0
         assert "sst1m" not in event.fields
+
+
+def read_r0(**kwargs):
+    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=3, **kwargs)
+    return [
+        (event.r0.tel[TEL_1_ID].waveform.copy(), event.r0.tel[TEL_1_ID].pedestal.copy()) for event in source
+    ], source
+
+
+@pytest.fixture
+def inverted_module_list(tmp_path):
+    """Modules 8 and 9 of tel 21 wrongly connected during the run of the test file"""
+    path = tmp_path / "inverted_module_list.json"
+    path.write_text(json.dumps({"entry": {
+        "ntel": TEL_1_ID,
+        "date_sart": "2026-01-21T00:00:00.000",
+        "date_stop": "2026-01-22T00:00:00.000",
+        "module_1": 8,
+        "module_2": 9,
+    }}))
+    return path
+
+
+def test_no_swapped_modules_in_test_file():
+
+    swapped, source = read_r0()
+    not_swapped, _ = read_r0(swap_modules=False)
+
+    # no wrongly connected modules of tel 21 at the date of the test file in the default list
+    assert source.swapped_modules(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0]) == []
+    for (waveform, pedestal), (waveform_ref, pedestal_ref) in zip(swapped, not_swapped, strict=True):
+        np.testing.assert_array_equal(waveform, waveform_ref)
+        np.testing.assert_array_equal(pedestal, pedestal_ref)
+
+
+def test_swap_modules(inverted_module_list):
+
+    swapped, source = read_r0(inverted_module_list_file=inverted_module_list)
+    not_swapped, _ = read_r0(swap_modules=False, inverted_module_list_file=inverted_module_list)
+
+    [(pixels_1, pixels_2)] = source.swapped_modules(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0])
+    assert len(pixels_1) == len(pixels_2) == 12
+    others = np.setdiff1d(np.arange(1296), np.concatenate([pixels_1, pixels_2]))
+    # the telescope 22 is not affected
+    assert source.swapped_modules(22, LOCAL_CAMERA_CLOCK_1[0]) == []
+
+    for (waveform, pedestal), (waveform_ref, pedestal_ref) in zip(swapped, not_swapped, strict=True):
+        np.testing.assert_array_equal(waveform[:, pixels_1], waveform_ref[:, pixels_2])
+        np.testing.assert_array_equal(waveform[:, pixels_2], waveform_ref[:, pixels_1])
+        np.testing.assert_array_equal(waveform[:, others], waveform_ref[:, others])
+        np.testing.assert_array_equal(pedestal[pixels_1], pedestal_ref[pixels_2])
+        np.testing.assert_array_equal(pedestal[pixels_2], pedestal_ref[pixels_1])
+        np.testing.assert_array_equal(pedestal[others], pedestal_ref[others])
+        assert not np.array_equal(waveform, waveform_ref)
+
+
+def test_swapped_modules_period(inverted_module_list):
+
+    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1, inverted_module_list_file=inverted_module_list)
+    day = 24 * 3600 * 10**9
+
+    assert len(source.swapped_modules(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0])) == 1
+    assert source.swapped_modules(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0] - day) == []
+    assert source.swapped_modules(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0] + day) == []

@@ -27,34 +27,6 @@ from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
 DEFAULT_CONFIG_FILE = files('sst1mpipe.data').joinpath('sst1mpipe_data_config.json')
 
 DEFAULT_CONFIG = load_config(DEFAULT_CONFIG_FILE, ismc=False)
-def swap_r0_modules_59_88(event, tel=None):
-
-    # module 59
-    mask59 = np.zeros(1296, dtype=bool)
-    mask59[1029] = True
-    mask59[1098:1102+1] = True
-    mask59[1133:1134+1] = True
-    mask59[1064:1067+1] = True
-    waveform_59 = event.r0.tel[tel].waveform[0][mask59, :]
-    bls59 = event.r0.tel[tel].pedestal[mask59]
-
-    # module 88
-    mask88 = np.zeros(1296, dtype=bool)
-    mask88[1103] = True
-    mask88[1165:1169+1] = True
-    mask88[1194:1195+1] = True
-    mask88[1135:1138+1] = True
-    waveform_88 = event.r0.tel[tel].waveform[0][mask88, :]
-    bls88 = event.r0.tel[tel].pedestal[mask88]
-
-    event.r0.tel[tel].waveform[0][mask59] = waveform_88
-    event.r0.tel[tel].waveform[0][mask88] = waveform_59
-
-    event.r0.tel[tel].pedestal[mask59] = bls88
-    event.r0.tel[tel].pedestal[mask88] = bls59
-
-    return event
-
 def get_res_dict(ismc=False):
     result_dict  = dict({ 'toa'       : [],
                           'x'         : [],
@@ -228,9 +200,8 @@ class muon_finder:
 
 
                     print("night : "+night_datestr)
-                if (tel==22) and (start_date<datetime.datetime(2024,7,18)):
-                    event = swap_r0_modules_59_88(event, tel=tel)
-                    #pass
+                # NOTE: the waveforms of the wrongly connected modules (data/inverted_module_list.json)
+                # are swapped by SST1MEventSource
                 r0data = event.r0.tel[tel]
 
                 if r0data._camera_event_type.value==8:
