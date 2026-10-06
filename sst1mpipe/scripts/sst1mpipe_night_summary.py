@@ -49,7 +49,7 @@ from sst1mpipe.io import (
     load_dl2_sst1m,
     load_source_catalog,
 )
-from sst1mpipe.utils import get_moon_params, get_sources_in_dir, get_wr_timestamp
+from sst1mpipe.utils import get_moon_params, get_sources_in_dir, get_timestamp_ns
 from sst1mpipe.utils.NSB_tools import plot_average_nsb_VS_time
 
 
@@ -445,9 +445,9 @@ def main():
                             h22, xedges, yedges = np.histogram2d(dl1_stereo_2['camera_frame_hillas_x'].dropna(), dl1_stereo_2['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
                             h11_tot += h11
                             h22_tot += h22
-                            # WR timestamps
-                            t_t1 = get_wr_timestamp(dl1_stereo_1)
-                            t_t2 = get_wr_timestamp(dl1_stereo_2)
+                            # ns timestamps
+                            t_t1 = get_timestamp_ns(dl1_stereo_1)
+                            t_t2 = get_timestamp_ns(dl1_stereo_2)
                             dt = t_t1 - t_t2
                             t_diff_all.append(dt)
                             times_all.append(dl1_stereo_1.local_time.to_numpy())
@@ -464,9 +464,9 @@ def main():
                         h22, xedges, yedges = np.histogram2d(dl1_stereo_2['camera_frame_hillas_x'].dropna(), dl1_stereo_2['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
                         h11_tot += h11
                         h22_tot += h22
-                        # WR timestamps
-                        t_t1 = get_wr_timestamp(dl1_stereo_1)
-                        t_t2 = get_wr_timestamp(dl1_stereo_2)
+                        # ns timestamps
+                        t_t1 = get_timestamp_ns(dl1_stereo_1)
+                        t_t2 = get_timestamp_ns(dl1_stereo_2)
                         dt = t_t1 - t_t2
                         t_diff_all.append(dt)
                         times_all.append(dl1_stereo_1.local_time.to_numpy())
