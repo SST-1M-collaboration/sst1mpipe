@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from ctapipe.containers import MonitoringCameraContainer, PedestalContainer
 from ctapipe.image import ImageProcessor
+from astropy.time import Time
 
 from sst1mpipe.io import load_config
 from sst1mpipe.io.containers import SST1MArrayEventContainer
@@ -23,7 +24,7 @@ def make_event(rng, time_s, tel_id=TEL_ID, image_std=1.0):
     event = SST1MArrayEventContainer()
     r0 = event.r0.tel[tel_id]
     r0.waveform = rng.normal(300, 5, (N_PIXELS, N_SAMPLES))
-    r0.event_time = int(time_s * 1e9)
+    r0.event_time = Time(time_s, format='unix_tai')
     event.dl1.tel[tel_id].image = rng.normal(0, image_std, N_PIXELS)
     return event
 
@@ -92,9 +93,9 @@ def test_call_adds_event_and_fills_container():
     container = event.mon.tel[TEL_ID].pedestal
     images = np.array(images[-3:])
     assert container.n_events == 3
-    assert container.sample_time.to_value("s") == 13
-    assert container.sample_time_min.to_value("s") == 12
-    assert container.sample_time_max.to_value("s") == 14
+    np.testing.assert_allclose(container.sample_time.to_value("unix_tai"), 13, rtol=0, atol=1e-9)
+    np.testing.assert_allclose(container.sample_time_min.to_value("unix_tai"), 12, rtol=0, atol=1e-9)
+    np.testing.assert_allclose(container.sample_time_max.to_value("unix_tai"), 14, rtol=0, atol=1e-9)
     np.testing.assert_allclose(container.charge_mean, images.mean(axis=0))
     np.testing.assert_allclose(container.charge_median, np.median(images, axis=0))
     np.testing.assert_allclose(container.charge_std, images.std(axis=0))

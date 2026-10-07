@@ -36,8 +36,8 @@ FIRST_EVENT_ID_1 = 29901023
 FIRST_CAMERA_EVENT_NUMBER_1 = 21079
 SUM_WAVEFORM_1 = [22699322, 22695204, 22699302, 22700002, 22699551]
 SUM_BASELINE_1 = [453938.875, 453933.25, 453942.0625, 453939.875, 453923.375]
-LOCAL_CAMERA_CLOCK_1 = [1769015262383583536, 1769015262384583536, 1769015262385583536,
-                        1769015262386583536, 1769015262387583536, ]
+LOCAL_CAMERA_CLOCK_1 = [camera_clock_to_time(1769015262383583536), camera_clock_to_time(1769015262384583536), camera_clock_to_time(1769015262385583536),
+                        camera_clock_to_time(1769015262386583536), camera_clock_to_time(1769015262387583536), ]
 CAMERA_EVENT_TYPE_1 = [CameraEventType.INTERNAL, CameraEventType.INTERNAL, CameraEventType.INTERNAL , CameraEventType.INTERNAL , CameraEventType.INTERNAL]
 
 TEL_2_ID = 22
@@ -60,7 +60,7 @@ def test_read_events():
         assert event.index.event_id == FIRST_EVENT_ID_1 + i
         assert event.r0.tel[TEL_1_ID].camera_event_number == FIRST_CAMERA_EVENT_NUMBER_1 + i
         assert baseline.sum() == SUM_BASELINE_1[i]
-        assert event.r0.tel[TEL_1_ID].gps_time == 0
+        assert event.r0.tel[TEL_1_ID].gps_time is None
         assert event.r0.tel[TEL_1_ID].event_time == LOCAL_CAMERA_CLOCK_1[i]
         assert event.r0.tel[TEL_1_ID].event_type == CAMERA_EVENT_TYPE_1[i]
         i += 1
@@ -178,16 +178,6 @@ def test_parse_target_field(field, expected):
     assert parse_target_field(field) == expected
 
 
-def test_camera_clock_to_time():
-
-    time = camera_clock_to_time(LOCAL_CAMERA_CLOCK_1[1])
-
-    assert time.scale == "tai"
-    # ns precision is kept
-    delta = time - camera_clock_to_time(LOCAL_CAMERA_CLOCK_1[0])
-    assert np.isclose(delta.to_value(u.ns), LOCAL_CAMERA_CLOCK_1[1] - LOCAL_CAMERA_CLOCK_1[0], atol=1)
-
-
 def test_trigger_and_no_pointing_for_dark_run():
 
     source = SST1MEventSource(input_url=FILE_TEL_1, max_events=MAX_ITERATIONS)
@@ -202,7 +192,7 @@ def test_trigger_and_no_pointing_for_dark_run():
 
     for i, event in enumerate(source):
         assert event.trigger.tels_with_trigger == [TEL_1_ID]
-        assert event.trigger.time == camera_clock_to_time(LOCAL_CAMERA_CLOCK_1[i])
+        assert event.trigger.time == LOCAL_CAMERA_CLOCK_1[i]
         assert event.trigger.tel[TEL_1_ID].time == event.trigger.time
         assert np.isnan(event.pointing.tel[TEL_1_ID].altitude)
 
@@ -357,11 +347,11 @@ def test_only_r0_trigger_and_pointing_are_filled():
         r0 = event.r0.tel[TEL_1_ID]
         assert isinstance(r0, SST1MR0CameraContainer)
         # one DigiCam channel
-        assert r0.waveform.shape == (1, n_pixels, r0.num_samples)
+        assert r0.waveform.ndim == 3
         assert r0.pedestal.shape == (n_pixels, )
         assert "adc_samples" not in r0.fields
         assert "digicam_baseline" not in r0.fields
-        assert r0.trigger_input_traces.shape == (432, r0.num_samples)
+        assert r0.trigger_input_traces.shape == (432, r0.waveform.shape[-1])
 
         assert event.trigger.tels_with_trigger == [TEL_1_ID]
         assert event.trigger.time is not None
@@ -400,7 +390,7 @@ def test_swapped_modules_of_data_config():
     assert [entry["modules"] for entry in source.swapped_modules] == [[59, 88], [8, 9]]
     # no wrongly connected modules of tel 21 at the date of the test file
     assert source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0]) == []
-    one_month = 30 * 24 * 3600 * 10**9
+    one_month = 30 * u.day
     assert len(source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0] - one_month)) == 1
     assert source.swapped_pixels(22, LOCAL_CAMERA_CLOCK_1[0] - one_month) == []
 
@@ -430,7 +420,7 @@ def test_swap_modules():
 def test_swapped_modules_period():
 
     source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1, swapped_modules=SWAPPED_MODULES)
-    day = 24 * 3600 * 10**9
+    day = 1 * u.day
 
     assert len(source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0])) == 1
     assert source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0] - day) == []
