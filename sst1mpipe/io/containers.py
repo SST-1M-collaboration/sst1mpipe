@@ -83,6 +83,7 @@ class SST1MR0CameraContainer(R0CameraContainer):
     trigger_input_offline = Field(None, "trigger patch traces computed offline (n_patches, n_samples)")
     trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples)")
     trigger_output_patch19 = Field(None, "trigger 19 patch cluster traces (n_clusters, n_samples)")
+    trigger_output_muon = Field(None, "trigger muon cluster traces (n_clusters, n_samples)")
     trigger_input_7 = Field(None, "trigger input CLUSTER7")
     trigger_input_19 = Field(None, "trigger input CLUSTER19")
     num_samples = Field(None, "number of time samples")
