@@ -504,6 +504,9 @@ class SST1MEventSource(EventSource):
                     "trigger_output_patch19", n_samples,
                 )
 
+                r0.trigger_output_muon = self._read_trigger_traces(event.trigger_output_muon, self._prepare_trigger_output,
+                                                                   "trigger_output_muon", n_samples,)
+
                 self._fill_trigger_and_pointing(array_event, tel_id, local_time)
                 # internal triggers are the pedestal events
                 array_event.trigger.event_type = (
