@@ -38,6 +38,7 @@ from sst1mpipe.io.containers import (
     CameraEventType,
     SST1MArrayEventContainer,
 )
+from time import camera_clock_to_time
 
 logger = logging.getLogger(__name__)
 
@@ -93,18 +94,6 @@ def parse_file_name(file_name):
     """
     match = re.match(r'SST1M\d*_(\d+)_(\d+)', os.path.basename(str(file_name)))
     return match.groups() if match else None
-
-
-def camera_clock_to_time(local_camera_clock):
-    """
-    Convert the camera clock (ns, TAI scale) to an astropy Time with ns precision, see
-    https://github.com/cta-observatory/ctapipe_io_nectarcam/issues/24
-    """
-    localtime = np.uint64(local_camera_clock)
-    S_TO_NS = np.uint64(1e9)
-    full_seconds = localtime // S_TO_NS
-    fractional_seconds = (localtime % S_TO_NS) / S_TO_NS
-    return Time(full_seconds, fractional_seconds, format='unix_tai')
 
 
 def file_has_swat_event_ids(path, n_events=N_EVENTS_SWAT_ID_CHECK):
@@ -499,7 +488,7 @@ class SST1MEventSource(EventSource):
                 r0.pedestal = unsorted_baseline[sort_ids] / 16
                 r0.camera_event_number = event.eventNumber
                 r0.pixel_flags = event.pixels_flags[sort_ids]
-                r0.local_camera_clock = local_camera_clock
+                r0.local_camera_clock = Time()
                 if event.trig is not None:
                     r0.gps_time = (
                         np.int64(event.trig.timeSec * 1E9) +

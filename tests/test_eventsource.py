@@ -16,11 +16,11 @@ from ctapipe.containers import CoordinateFrameType, PointingMode
 import sst1mpipe.io.sst1m_event_source as sst1m_event_source
 from sst1mpipe.io.sst1m_event_source import (
     SST1MEventSource,
-    camera_clock_to_time,
     file_has_swat_event_ids,
     parse_file_name,
     parse_target_field,
 )
+from time import camera_clock_to_time
 from sst1mpipe.io import load_config
 from sst1mpipe.io.containers import CameraEventType, SST1MArrayEventContainer, SST1MR0CameraContainer
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR
