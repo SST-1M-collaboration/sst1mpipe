@@ -400,8 +400,6 @@ class SST1MEventSource(EventSource):
 
     @property
     def datalevels(self):
-        # if self.r0_r1_calibrator.calibration_path is not None:
-        #     return (DataLevel.R0, DataLevel.R1)
         return (DataLevel.R0, )
 
     @property
@@ -457,9 +455,7 @@ class SST1MEventSource(EventSource):
             for array_event in self.get_array_event(input_path):
                 array_event.count = count
                 array_event.index.obs_id = self.run_id
-                if array_event.index.event_id <= 0:
-                    # no event id in the file, use the run number and the event count
-                    array_event.index.event_id = int(str(self.run_number) + str(count).zfill(6))
+
                 yield array_event
                 count += 1
 
