@@ -1,3 +1,4 @@
+import shutil
 from itertools import islice
 
 import numpy as np
@@ -8,6 +9,7 @@ from ctapipe.io import read_table
 from ctapipe.time import time_to_ctao_high_res
 from protozfits import File
 
+from sst1mpipe.io import load_dl1_sst1m, read_trigger_time_ns
 from sst1mpipe.resources import RTA_CONFIG_FILE, TEST_DATA_DIR
 from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 
@@ -82,3 +84,39 @@ def test_white_rabbit_time_read_from_dl1(dl1_file):
     # absolute times: converted back to integers (seconds, quarter of ns) by ctapipe
     high_res = time_to_ctao_high_res(time).astype(np.int64)
     np.testing.assert_array_equal(high_res[:, 0] * S_TO_NS + high_res[:, 1] // 4, time_ns)
+
+
+def test_read_trigger_time_ns(dl1_file):
+    """the trigger times read from the DL1 file are the White Rabbit times of the zfits file"""
+    tel_id, output = dl1_file
+    event_id, seconds, nanoseconds = read_zfits_times(FILES[tel_id], N_EVENTS)
+
+    trigger_time = read_trigger_time_ns(output, f"tel_{tel_id:03d}")
+    assert trigger_time["time_ns"].dtype == np.int64
+    np.testing.assert_array_equal(trigger_time["event_id"], event_id)
+    np.testing.assert_array_equal(trigger_time["time_ns"], seconds * S_TO_NS + nanoseconds)
+    # no event of the other telescope
+    assert len(read_trigger_time_ns(output, "tel_021" if tel_id == 22 else "tel_022")) == 0
+
+
+def test_load_dl1_sst1m_time_ns(dl1_file, tmp_path):
+    """load_dl1_sst1m adds the trigger time (ns) of each event to the DL1 table"""
+    tel_id, output = dl1_file
+    tel = f"tel_{tel_id:03d}"
+    event_id, seconds, nanoseconds = read_zfits_times(FILES[tel_id], N_EVENTS)
+    clock = dict(zip(event_id, seconds * S_TO_NS + nanoseconds, strict=True))
+
+    # parameters table in another order than the trigger table, with the pointing
+    # columns written by write_extra_parameters
+    dl1 = tmp_path / "events.dl1.h5"
+    shutil.copy(output, dl1)
+    params = read_table(dl1, f"/dl1/event/telescope/parameters/{tel}")
+    params = params[np.random.default_rng(0).permutation(len(params))]
+    params["true_az_tel"] = 0.0
+    params["true_alt_tel"] = 70.0
+    params.write(dl1, path=f"/dl1/event/telescope/parameters/{tel}", overwrite=True, append=True)
+
+    data = load_dl1_sst1m(str(dl1), tel=tel, table="pandas")
+    np.testing.assert_array_equal(data["event_id"], params["event_id"])
+    assert data["time_ns"].dtype == np.int64
+    assert list(data["time_ns"]) == [clock[e] for e in data["event_id"]]

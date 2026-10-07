@@ -70,7 +70,7 @@ def r0_dl1_1file(arg):
 
         cmd = f'sst1mpipe_r0_dl1 --input-file {arg.input_file} \
                --config {arg.config_file} \
-               --output-dir {arg.out_dir} --precise-timestamps'
+               --output-dir {arg.out_dir}'
         logging.info(cmd)
         os.system(cmd)
 

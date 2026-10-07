@@ -14,6 +14,7 @@ from astropy.io import fits
 from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
 from astropy.table import QTable, Table, join
 from astropy.time import Time
+from ctapipe.time import time_to_ctao_high_res
 from ctapipe.containers import EventType
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
@@ -26,7 +27,6 @@ from sst1mpipe.io.containers import DL1_info, DL2_info
 from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
     add_disp,
-    add_event_id,
     add_features,
     add_log_true_energy,
     add_miss,
@@ -37,7 +37,6 @@ from sst1mpipe.utils.utils import (
     get_finite,
     get_location,
     get_pointing_radec,
-    get_tel_string,
     get_telescopes,
     stereo_var_cuts,
 )
@@ -397,7 +396,7 @@ def write_charge_fraction(file, survived_charge=None):
 
 
 def write_extra_parameters(
-        file, config=None, ismc=True, meanQ=None, wr_timestamps=None):
+        file, config=None, ismc=True, meanQ=None):
     """
     Opens the output DL1 file and adds some extra parameters
     to the DL1 table.
@@ -410,8 +409,6 @@ def write_extra_parameters(
     ismc: bool
     meanQ: numpy.ndarray
         Mean charge from pedestal events
-    wr_timestamps: numpy.array
-        White Rabbit timestamps, where first colums is fulle seconds, and second is fraction seconds
 
     Returns
     -------
@@ -441,11 +438,6 @@ def write_extra_parameters(
 
         else:
 
-            # write WR timestamps
-            if wr_timestamps is not None:
-                params['time_wr_full_seconds'] = wr_timestamps[:, 0]
-                params['time_wr_frac_seconds'] = wr_timestamps[:, 1]
-
             params["equivalent_focal_length"] = float(config['telescope_equivalent_focal_length'][tel])
 
             # Adding date
@@ -474,13 +466,13 @@ def write_extra_parameters(
 
 
 
-def add_wr_dl1_stereo(file, dl1_data_tabs=None):
+def add_pointing_dl1_stereo(file, dl1_data_tabs=None):
     """
     Opens the DL1 stereo file after coincident event matching and
-    adds two columns with high precision WR timestamps, which are
+    adds the telescope pointing (true_az_tel, true_alt_tel), which is
     stored in mono DL1 tables of both telescopes. This is neccessary
     because we use ctapipe DataWriter to store DL1 stereo file, but
-    ctapipe containers ignore WR.
+    ctapipe containers ignore these columns.
 
     Parameters
     ----------
@@ -497,7 +489,7 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=None):
     if dl1_data_tabs is None:
         dl1_data_tabs = []
 
-    logging.info('Adding WR timestamps back into the DL1 stereo file...')
+    logging.info('Adding pointing back into the DL1 stereo file...')
     telescopes = get_telescopes(file)
 
     if len(telescopes) == len(dl1_data_tabs):
@@ -506,8 +498,6 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=None):
 
             params = read_table(file, "/dl1/event/telescope/parameters/" + tel)
             merged = params.copy()
-            merged['time_wr_full_seconds'] = np.zeros(len(merged)).astype(np.int64)
-            merged['time_wr_frac_seconds'] = np.zeros(len(merged)).astype(np.float64)
             merged['true_az_tel'] = np.zeros(len(merged)).astype(np.float64)
             merged['true_alt_tel'] = np.zeros(len(merged)).astype(np.float64)
 
@@ -519,78 +509,62 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=None):
             # we cannot merge based on obs_id/event_id, because tel1/tel2 data has the same ids in the output file, but not in the input ones!
             # We also cannot merge based on only one parameter, because it turned out that the probability od having e.g. two events with the
             # very same (float64) intensity in data from a signle night is quite high
-            params_tel_small = params_tel[['camera_frame_hillas_intensity', 'camera_frame_hillas_r', 'camera_frame_hillas_skewness', 'time_wr_full_seconds', 'time_wr_frac_seconds', 'true_az_tel', 'true_alt_tel']]
+            params_tel_small = params_tel[['camera_frame_hillas_intensity', 'camera_frame_hillas_r', 'camera_frame_hillas_skewness', 'true_az_tel', 'true_alt_tel']]
 
             for i, (intensity, r, skew) in enumerate(zip(np.array(params['camera_frame_hillas_intensity']), np.array(params['camera_frame_hillas_r']), np.array(params['camera_frame_hillas_skewness']), strict=True)):
                 mask = (intensity == params_tel_small['camera_frame_hillas_intensity']) & (r == params_tel_small['camera_frame_hillas_r']) & (skew == params_tel_small['camera_frame_hillas_skewness'])
 
                 if sum(mask) == 1:
-                    merged[i]['time_wr_full_seconds'] = params_tel_small[mask]['time_wr_full_seconds']
-                    merged[i]['time_wr_frac_seconds'] = params_tel_small[mask]['time_wr_frac_seconds']
                     merged[i]['true_az_tel'] = params_tel_small[mask]['true_az_tel']
                     merged[i]['true_alt_tel'] = params_tel_small[mask]['true_alt_tel']
 
             merged.write(file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
-            logging.info('WR timestamps added to ' + tel + ' param table.')
+            logging.info('Pointing added to ' + tel + ' param table.')
 
     else:
         logging.error('Different number of telescopes in the output file than number of provided DL1 tabs.')
 
 
-def write_wr_timestamps(file, event_source=None):
+def read_trigger_time_ns(input_file, tel):
     """
-    Writes WR timestamps with high numerical precision as two
-    additional columns in the output DL1 table: time_wr_full_seconds,
-    time_wr_frac_seconds. This is neccessary because the timestamp with
-    sufficient numerical precision can be extracted from event source only.
-    It is stored automaticaly in  dl1/event/subarray/trigger, from where
-    it can be read by ctapipe.io.read_table, but with low precision.
-    Therefore, if we want to have the timestamp in dl1, we need to read
-    it again from event source and store it in the existing dl1 file
+    Reads the trigger times of the telescope from the DL1 file
+    (/dl1/event/telescope/trigger), in ns since 1970-01-01 TAI,
+    i.e. the White Rabbit timestamps of the SST-1M data. The integers
+    stored by ctapipe (seconds, quarter of ns) are read directly,
+    without loss of precision.
 
     Parameters
     ----------
-    file: string
+    input_file: string
         Path
-    event_source:
-        sst1mpipe.io.sst1m_event_source.SST1MEventSource
+    tel: string
+        Either \'tel_00{1,2}\' (MC) or \'tel_02{1,2}\' (data)
 
     Returns
     -------
+    astropy.table.Table
+        obs_id, event_id, time_ns (numpy.int64)
 
     """
 
-    logging.info('Adding WR timestamps in DL1 table..')
+    with tables.open_file(input_file) as h5:
+        trigger = h5.get_node('/dl1/event/telescope/trigger').read()
+    trigger = trigger[trigger['tel_id'] == int(tel.split('_')[-1])]
 
-    for i, event in enumerate(event_source):
+    if trigger['time'].ndim == 2:
+        time = trigger['time'].astype(np.int64)
+    else:
+        # files written with ctapipe < 0.24, where the time is stored as a single float
+        logging.warning('Trigger times of %s stored without ns precision in %s.', tel, input_file)
+        trigger_table = read_table(input_file, '/dl1/event/telescope/trigger')
+        trigger_table = trigger_table[trigger_table['tel_id'] == int(tel.split('_')[-1])]
+        time = time_to_ctao_high_res(trigger_table['time']).astype(np.int64)
 
-        if i == 0:
-            tel = event.trigger.tels_with_trigger[0]
-            tel_string = get_tel_string(tel, mc=False)
-            params = read_table(file, "/dl1/event/telescope/parameters/" + tel_string)
-            time_wr_full_seconds_all = np.zeros(len(params)).astype(np.int64)
-            time_wr_fractional_seconds_all = np.zeros(len(params)).astype(np.float64)
-
-        event = add_event_id(event, filename=file, event_number=i)
-
-        ev_mask = params['event_id'] == event.index.event_id
-
-        if sum(ev_mask) == 1:
-
-            localtime = event.r0.tel[tel].event_time.astype(np.uint64)
-
-            S_TO_NS = np.uint64(1e9)
-            full_seconds = localtime // S_TO_NS
-            fractional_seconds = (localtime % S_TO_NS) / S_TO_NS
-
-            time_wr_full_seconds_all[ev_mask] = full_seconds
-            time_wr_fractional_seconds_all[ev_mask] = fractional_seconds
-
-    params['time_wr_full_seconds'] = time_wr_full_seconds_all
-    params['time_wr_frac_seconds'] = time_wr_fractional_seconds_all
-
-    params.write(file, path='/dl1/event/telescope/parameters/'+tel_string, overwrite=True, append=True) #, serialize_meta=True)
-    logging.info('WR timestamps added to ' + tel_string + ' param table.')
+    return Table({
+        'obs_id': trigger['obs_id'],
+        'event_id': trigger['event_id'],
+        'time_ns': time[:, 0] * 1_000_000_000 + time[:, 1] // 4,
+    })
 
 
 def write_assumed_pointing(
@@ -821,6 +795,7 @@ def load_dl1_sst1m(
     Returns
     -------
     data: pandas.DataFrame or astropy.table.Table
+        with the trigger time in ns (TAI) in the column time_ns
 
     """
 
@@ -844,6 +819,13 @@ def load_dl1_sst1m(
         except Exception:
             logging.error('Adding pointing information failed! Length of params and pointing tables probably dont match. Broken file.')
             exit()
+
+    # trigger time with ns precision, for the matching of the stereo events
+    trigger_time = read_trigger_time_ns(input_file, tel)
+    events['_row'] = np.arange(len(events))
+    events = join(events, trigger_time, keys=['obs_id', 'event_id'], join_type='left')
+    events.sort('_row')
+    events.remove_column('_row')
 
     if stereo:
         stereo_impact = read_table(input_file, "/dl2/event/telescope/impact/HillasReconstructor/" + tel)

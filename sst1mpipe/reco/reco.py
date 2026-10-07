@@ -37,7 +37,6 @@ from sst1mpipe.utils import (
     get_horizon_frame,
     get_stereo_method,
     get_telescopes,
-    get_wr_timestamp,
     mix_gamma_proton,
     remove_stereo,
 )
@@ -1268,8 +1267,8 @@ def make_dl1_stereo(
 
     if stereo_method == "WhiteRabbitClosest":
         dl1_data_tel1 = load_dl1_sst1m(dl1_file_tel1, tel='tel_021', table='pandas')
-        t_t1_all = get_wr_timestamp(dl1_data_tel1)
-        t_t2 = get_wr_timestamp(dl1_data_tel2)
+        t_t1_all = dl1_data_tel1['time_ns'].to_numpy()
+        t_t2 = dl1_data_tel2['time_ns'].to_numpy()
 
     # the DataWriter writes the provenance of the current activity in the output file
     Provenance().start_activity("sst1mpipe_dl1_stereo")
@@ -1298,7 +1297,7 @@ def make_dl1_stereo(
 
             elif stereo_method == "WhiteRabbitClosest":
 
-                # Read ns timestamps from dl1 tab in tel1 file, which are not provided by HDF5EventSource()
+                # ns trigger times of the tel1 events (time_ns, read from the DL1 trigger table by load_dl1_sst1m)
                 event_tel1_mask = dl1_data_tel1['event_id'] == evt.index.event_id
 
                 t_t1 = t_t1_all[event_tel1_mask]

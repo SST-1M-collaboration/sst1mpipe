@@ -2,7 +2,7 @@
 
 
 from .io import (
-    add_wr_dl1_stereo,
+    add_pointing_dl1_stereo,
     check_outdir,
     compute_dl1_summary,
     get_dl1_info,
@@ -14,6 +14,7 @@ from .io import (
     load_r0_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
+    read_trigger_time_ns,
     load_drive_data,
     load_extra_table,
     load_more_dl1_tables_mono,
@@ -37,5 +38,4 @@ from .io import (
     write_photon_list,
     write_pixel_charges_table,
     write_r1_dl1_cfg,
-    write_wr_timestamps,
 )

@@ -128,31 +128,6 @@ def get_stereo_method(config):
         return stereo_method
 
 
-def get_wr_timestamp(data):
-    """
-    Reads WR timestamps stored in two columns in the DL1
-    table in seconds, and converts them in nanoseconds
-    with high numerical precission.
-
-    Parameters
-    ----------
-    data: pandas.DataFrame
-        DL1 table
-
-    Returns
-    -------
-    numpy.int64
-        Precise timestamp in nanoseconds
-
-    """
-
-    S_TO_NS = np.int64(1e9)
-    t1 = np.array(data['time_wr_full_seconds']).astype(np.int64) * S_TO_NS
-    t2 = np.array(data['time_wr_frac_seconds']).astype(np.float64) * S_TO_NS
-    t = t1 + t2.astype(np.int64)
-    return t
-
-
 def get_tel_string(tel, mc=True):
     """
     Makes string with telescope designation understandable
