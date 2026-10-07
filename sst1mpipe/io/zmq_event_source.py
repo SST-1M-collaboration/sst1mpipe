@@ -2,7 +2,6 @@ from typing import Dict
 
 import numpy as np
 import zmq
-from astropy.time import Time
 
 
 from ctapipe.io import EventSource

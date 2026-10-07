@@ -38,7 +38,7 @@ from sst1mpipe.io.containers import (
     CameraEventType,
     SST1MArrayEventContainer,
 )
-from sst1mpipe.time import camera_clock_to_time, local_time_to_time
+from sst1mpipe.time import local_time_to_time
 
 logger = logging.getLogger(__name__)
 
