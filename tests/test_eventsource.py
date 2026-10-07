@@ -20,7 +20,7 @@ from sst1mpipe.io.sst1m_event_source import (
     parse_file_name,
     parse_target_field,
 )
-from time import camera_clock_to_time
+from sst1mpipe.time import camera_clock_to_time
 from sst1mpipe.io import load_config
 from sst1mpipe.io.containers import CameraEventType, SST1MArrayEventContainer, SST1MR0CameraContainer
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR

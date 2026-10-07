@@ -38,7 +38,7 @@ from sst1mpipe.io.containers import (
     CameraEventType,
     SST1MArrayEventContainer,
 )
-from time import camera_clock_to_time
+from sst1mpipe.time import camera_clock_to_time, local_time_to_time
 
 logger = logging.getLogger(__name__)
 
@@ -132,8 +132,8 @@ def parse_swapped_modules(swapped_modules, pixel_mapping_file=PIXEL_MAPPING_FILE
 
     pixel_swaps = {}
     for entry in swapped_modules:
-        start = Time(entry["start"], format="isot", scale="utc").unix_tai
-        stop = Time(entry["stop"], format="isot", scale="utc").unix_tai
+        start = Time(entry["start"], format="isot", scale="utc")
+        stop = Time(entry["stop"], format="isot", scale="utc")
         module_1, module_2 = entry["modules"]
         pixel_swaps.setdefault(entry["tel_id"], []).append(
             (start, stop, module_pixels(module_1), module_pixels(module_2))
@@ -322,30 +322,28 @@ class SST1MEventSource(EventSource):
             self._tel_locations[tel_id] = locations[self.subarray.tel_index_array[tel_id]]
         return self._tel_locations[tel_id]
 
-    def swapped_pixels(self, tel_id, local_camera_clock):
+    def swapped_pixels(self, tel_id, time):
         """
         Pixel ids of the wrongly connected modules (pairs) of the telescope ``tel_id``
         at the time ``local_camera_clock`` (ns, TAI), see ``swapped_modules``
         """
-        time = local_camera_clock / 1e9
         return [
             (pixels_1, pixels_2)
             for start, stop, pixels_1, pixels_2 in self._pixel_swaps.get(tel_id, [])
             if start < time < stop
         ]
 
-    def _pixel_order(self, tel_id, pixel_ids, local_camera_clock):
+    def _pixel_order(self, tel_id, pixel_ids, time):
         """
         Order of the pixels of the event in the camera: by pixel id, with the
         pixels of the wrongly connected modules swapped
         """
         order = np.argsort(pixel_ids)
-        for pixels_1, pixels_2 in self.swapped_pixels(tel_id, local_camera_clock):
+        for pixels_1, pixels_2 in self.swapped_pixels(tel_id, time):
             order[pixels_1], order[pixels_2] = order[pixels_2], order[pixels_1]
         return order
 
-    def _fill_trigger_and_pointing(self, array_event, tel_id, local_camera_clock):
-        time = camera_clock_to_time(local_camera_clock)
+    def _fill_trigger_and_pointing(self, array_event, tel_id, time):
         array_event.trigger.time = time
         array_event.trigger.tel[tel_id].time = time
         array_event.trigger.tels_with_trigger = [tel_id]
@@ -466,11 +464,9 @@ class SST1MEventSource(EventSource):
                 tel_id = event.telescopeID
                 pixel_ids = event.hiGain.waveforms.pixelsIndices
                 n_pixels = len(pixel_ids)
-                local_camera_clock = (
-                    np.int64(event.local_time_sec * 1E9) +
-                    np.int64(event.local_time_nanosec)
-                )
-                sort_ids = self._pixel_order(tel_id, pixel_ids, local_camera_clock)
+                local_time = local_time_to_time(event.local_time_sec, event.local_time_nanosec)
+
+                sort_ids = self._pixel_order(tel_id, pixel_ids, local_time)
                 samples = event.hiGain.waveforms.samples.reshape(n_pixels, -1)
                 n_samples = samples.shape[1]
 
@@ -488,14 +484,11 @@ class SST1MEventSource(EventSource):
                 r0.pedestal = unsorted_baseline[sort_ids] / 16
                 r0.camera_event_number = event.eventNumber
                 r0.pixel_flags = event.pixels_flags[sort_ids]
-                r0.local_camera_clock = Time()
+                r0.local_camera_clock = local_time
                 if event.trig is not None:
-                    r0.gps_time = (
-                        np.int64(event.trig.timeSec * 1E9) +
-                        np.int64(event.trig.timeNanoSec)
-                    )
-                else:
-                    r0.gps_time = np.int64(0)
+                    trigger_time = local_time_to_time(event.trig.timeSec, event.trig.timeNanoSec)
+                    r0.gps_time = trigger_time
+
                 r0.camera_event_type = event.event_type
                 r0.array_event_type = event.eventType
                 r0.trigger_input_traces = self._read_trigger_traces(
@@ -511,7 +504,7 @@ class SST1MEventSource(EventSource):
                     "trigger_output_patch19", n_samples,
                 )
 
-                self._fill_trigger_and_pointing(array_event, tel_id, r0.local_camera_clock)
+                self._fill_trigger_and_pointing(array_event, tel_id, local_time)
                 # internal triggers are the pedestal events
                 array_event.trigger.event_type = (
                     EventType.SKY_PEDESTAL if r0.camera_event_type == CameraEventType.INTERNAL
