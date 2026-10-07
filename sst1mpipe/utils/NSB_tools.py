@@ -185,7 +185,7 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
                     tel = event.trigger.tels_with_trigger[0]
                     r0data = event.r0.tel[tel]
 
-                    if r0data._camera_event_type.value==event_type:
+                    if r0data._event_type.value==event_type:
                         for pix in range(1296):
                             raw_baselines[pix].append(r0data.waveform[0][pix,:50])
         raw_baselines  = np.array(raw_baselines)

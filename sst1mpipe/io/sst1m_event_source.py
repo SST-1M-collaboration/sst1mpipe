@@ -480,17 +480,15 @@ class SST1MEventSource(EventSource):
                 array_event.r0.tel.clear()
                 r0 = array_event.r0.tel[tel_id]
                 r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
-                r0.num_samples = n_samples
                 r0.pedestal = unsorted_baseline[sort_ids] / 16
                 r0.camera_event_number = event.eventNumber
                 r0.pixel_flags = event.pixels_flags[sort_ids]
-                r0.local_camera_clock = local_time
+                r0.event_time = local_time
                 if event.trig is not None:
                     trigger_time = local_time_to_time(event.trig.timeSec, event.trig.timeNanoSec)
                     r0.gps_time = trigger_time
 
-                r0.camera_event_type = event.event_type
-                r0.array_event_type = event.eventType
+                r0.event_type = event.event_type
                 r0.trigger_input_traces = self._read_trigger_traces(
                     event.trigger_input_traces, self._prepare_trigger_input,
                     "trigger_input_traces", n_samples,
@@ -510,7 +508,7 @@ class SST1MEventSource(EventSource):
                 self._fill_trigger_and_pointing(array_event, tel_id, local_time)
                 # internal triggers are the pedestal events
                 array_event.trigger.event_type = (
-                    EventType.SKY_PEDESTAL if r0.camera_event_type == CameraEventType.INTERNAL
+                    EventType.SKY_PEDESTAL if r0.event_type == CameraEventType.INTERNAL
                     else EventType.SUBARRAY
                 )
                 yield array_event

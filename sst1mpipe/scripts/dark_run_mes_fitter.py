@@ -196,7 +196,7 @@ class mes_fitter:
                 r0data = event.r0.tel[tel]
 
 
-                if r0data._camera_event_type.value==8:
+                if r0data._event_type.value==8:
                     tot_evts +=1
 
                     if self.dark_baselines is None:

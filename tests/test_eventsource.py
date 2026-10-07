@@ -61,8 +61,8 @@ def test_read_events():
         assert event.r0.tel[TEL_1_ID].camera_event_number == FIRST_CAMERA_EVENT_NUMBER_1 + i
         assert baseline.sum() == SUM_BASELINE_1[i]
         assert event.r0.tel[TEL_1_ID].gps_time == 0
-        assert event.r0.tel[TEL_1_ID].local_camera_clock == LOCAL_CAMERA_CLOCK_1[i]
-        assert event.r0.tel[TEL_1_ID].camera_event_type == CAMERA_EVENT_TYPE_1[i]
+        assert event.r0.tel[TEL_1_ID].event_time == LOCAL_CAMERA_CLOCK_1[i]
+        assert event.r0.tel[TEL_1_ID].event_type == CAMERA_EVENT_TYPE_1[i]
         i += 1
     assert i == MAX_ITERATIONS
 

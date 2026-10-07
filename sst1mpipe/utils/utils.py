@@ -309,7 +309,7 @@ def add_trigger_time(event, telescope=None):
 
 
     # We assume tai scale
-    event.trigger.time = camera_clock_to_time(event.r0.tel[telescope].local_camera_clock)
+    event.trigger.time = camera_clock_to_time(event.r0.tel[telescope].event_time)
     event.trigger.tel[telescope].time = event.trigger.time
 
     return event

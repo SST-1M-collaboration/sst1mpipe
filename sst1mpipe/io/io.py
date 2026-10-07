@@ -577,7 +577,7 @@ def write_wr_timestamps(file, event_source=None):
 
         if sum(ev_mask) == 1:
 
-            localtime = event.r0.tel[tel].local_camera_clock.astype(np.uint64)
+            localtime = event.r0.tel[tel].event_time.astype(np.uint64)
 
             S_TO_NS = np.uint64(1e9)
             full_seconds = localtime // S_TO_NS

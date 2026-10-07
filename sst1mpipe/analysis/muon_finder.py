@@ -188,7 +188,7 @@ class muon_finder:
 
                 tel = event.trigger.tels_with_trigger[0]
                 if ii==0:
-                    T0 = event.r0.tel[tel].local_camera_clock/1e9
+                    T0 = event.r0.tel[tel].event_time / 1e9
                     start_date = datetime.datetime.fromtimestamp(T0)
                     # datestr = "{}/{}/{} at {}h{}".format(start_date.day,
                     #                                      start_date.month,
@@ -203,7 +203,7 @@ class muon_finder:
                 # (swapped_modules of the config)
                 r0data = event.r0.tel[tel]
 
-                if r0data._camera_event_type.value==8:
+                if r0data._event_type.value==8:
                     r0_pedestal_monitor(event, tel)
 
                     mbs   = r0data.waveform[0].mean(axis=1)
@@ -368,7 +368,7 @@ class muon_finder:
                         self.mu_data['mbs'].append(np.median(self.mbs))
                         self.mu_data['bsstd'].append(np.median(self.bsstd))
                         self.mu_data['event_id'].append(event.index.event_id)
-                        self.mu_data['toa'].append(r0data.local_camera_clock/1e9)
+                        self.mu_data['toa'].append(r0data.event_time / 1e9)
 
                     #self.mbs   = []
                     #self.bsstd = []

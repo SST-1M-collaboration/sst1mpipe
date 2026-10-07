@@ -329,7 +329,7 @@ def main():
                 r0_pedestal_monitor.fill_monitoring(event, tel)
                 calibrator_r0_r1(event, tel)
 
-                event_type = event.r0.tel[tel]._camera_event_type.value
+                event_type = event.r0.tel[tel]._event_type.value
 
                 # NOTE: event.index, event.trigger and event.pointing are filled by SST1MEventSource
 
@@ -421,7 +421,7 @@ def main():
             # Extraction of pixel charge distribution for MC-data tuning
             if pixel_charges:
                 if not source.is_simulation:
-                    event_type = event.r0.tel[tel]._camera_event_type.value
+                    event_type = event.r0.tel[tel]._event_type.value
                     if ped_time_start is None:
                         ped_time_start = event.trigger.time
                     if event_type == 8:
@@ -485,7 +485,7 @@ def main():
 
             # Extracting WR timestamps with high numerical precision
             if not source.is_simulation and precise_timestamps:
-                localtime = event.r0.tel[tel].local_camera_clock.astype(np.uint64)
+                localtime = event.r0.tel[tel].event_time.astype(np.uint64)
                 S_TO_NS = np.uint64(1e9)
                 full_seconds.append(localtime // S_TO_NS)
                 fractional_seconds.append((localtime % S_TO_NS) / S_TO_NS)

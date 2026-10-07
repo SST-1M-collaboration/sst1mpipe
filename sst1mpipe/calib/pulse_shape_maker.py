@@ -172,7 +172,7 @@ class shape_maker:
                     r0data = event.r0.tel[tel]
 
                 if ii==0 and not self.isMC:
-                    self.T0 = r0data.local_camera_clock/1e9
+                    self.T0 = r0data.event_time / 1e9
                     self.start_date = datetime.datetime.fromtimestamp(self.T0)
 
 
@@ -187,7 +187,7 @@ class shape_maker:
                     wfs = (r0data.waveform[0].T - mcdata.pedestal/50.+self.bshift).T
 
                 else:
-                    if r0data._camera_event_type.value==8:
+                    if r0data._event_type.value==8:
                         if self.dark_baselines is None:
                             Qsum = (r0data.waveform[0].T[20:35]+self.bshift - r0data.pedestal).sum(axis=0)
                             wfs = (r0data.waveform[0].T+self.bshift - r0data.pedestal).T

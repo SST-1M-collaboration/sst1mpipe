@@ -23,7 +23,7 @@ def make_event(rng, time_s, tel_id=TEL_ID, image_std=1.0):
     event = SST1MArrayEventContainer()
     r0 = event.r0.tel[tel_id]
     r0.waveform = rng.normal(300, 5, (N_PIXELS, N_SAMPLES))
-    r0.local_camera_clock = int(time_s * 1e9)
+    r0.event_time = int(time_s * 1e9)
     event.dl1.tel[tel_id].image = rng.normal(0, image_std, N_PIXELS)
     return event
 

@@ -79,7 +79,7 @@ class SlidingWindowMonitor(TelescopeComponent):
             self._values[tel_id] = deque(maxlen=self.n_events.tel[tel_id])
             self.processed_events[tel_id] = 0
 
-        self._timestamps[tel_id].append(event.r0.tel[tel_id].local_camera_clock / 1e9)
+        self._timestamps[tel_id].append(event.r0.tel[tel_id].event_time / 1e9)
         self._values[tel_id].append(values)
         self.processed_events[tel_id] += 1
         self._statistics.pop(tel_id, None)
@@ -181,7 +181,7 @@ def load_first_pedestals(r0_monitor, dl1_monitor, input_file, config, max_events
 
     for event in source:
         tel = event.trigger.tels_with_trigger[0]
-        if event.r0.tel[tel]._camera_event_type.value == MON_EVT_TYPE:
+        if event.r0.tel[tel]._event_type.value == MON_EVT_TYPE:
             r0_monitor.add_event(event, tel)
         if r0_monitor.n_buffered(tel) >= r0_monitor.n_events.tel[tel]:
             break
@@ -206,7 +206,7 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
 
     for event in source:
 
-        if event.r0.tel[tel]._camera_event_type.value != MON_EVT_TYPE:
+        if event.r0.tel[tel]._event_type.value != MON_EVT_TYPE:
             continue
 
         # here we apply gain drop correction

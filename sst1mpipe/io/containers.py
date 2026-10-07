@@ -66,35 +66,24 @@ class SST1MR0CameraContainer(R0CameraContainer):
     """
 
     pixel_flags = Field(None, "numpy array containing pixel flags (n_pixels)")
-    adc_sums = Field(None, "numpy array containing integrated ADC data (n_channels, n_pixels)")
-    baseline = Field(None, "baseline computed using clocked triggers (n_pixels)")
     pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels)")
-    standard_deviation = Field(None, "baseline standard deviation computed using clocked triggers (n_pixels)")
-    dark_baseline = Field(None, "baseline computed in dark condition, lid closed (n_pixels)")
-    hv_off_baseline = Field(None, "baseline computed without bias voltage (n_pixels)")
-    camera_event_id = Field(None, "unique event identification provided by DigiCam")
     camera_event_number = Field(None, "event number within the first trigger of operation")
-    local_camera_clock = Field(None, "timestamp from the internal DigiCam clock (ns, TAI)")
+    event_time = Field(None, "timestamp from the internal DigiCam clock (ns, TAI)")
     gps_time = Field(None, "timestamp from a precise external clock (ns)")
     white_rabbit_time = Field(None, "precise White Rabbit based timestamp")
-    _camera_event_type = Field(None, "camera event type")
-    array_event_type = Field(None, "array event type")
+    _event_type = Field(None, "camera event type")
     trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples)")
-    trigger_input_offline = Field(None, "trigger patch traces computed offline (n_patches, n_samples)")
     trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples)")
     trigger_output_patch19 = Field(None, "trigger 19 patch cluster traces (n_clusters, n_samples)")
     trigger_output_muon = Field(None, "trigger muon cluster traces (n_clusters, n_samples)")
-    trigger_input_7 = Field(None, "trigger input CLUSTER7")
-    trigger_input_19 = Field(None, "trigger input CLUSTER19")
-    num_samples = Field(None, "number of time samples")
 
     @property
-    def camera_event_type(self):
-        return self._camera_event_type
+    def event_type(self):
+        return self._event_type
 
-    @camera_event_type.setter
-    def camera_event_type(self, value):
-        self._camera_event_type = CameraEventType(value)
+    @event_type.setter
+    def event_type(self, value):
+        self._event_type = CameraEventType(value)
 
 
 class SST1MR0Container(R0Container):
