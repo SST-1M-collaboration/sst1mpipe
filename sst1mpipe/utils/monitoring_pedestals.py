@@ -3,6 +3,7 @@ from abc import abstractmethod
 from collections import deque
 from copy import deepcopy
 
+import astropy.units as u
 from astropy.time import Time
 import numpy as np
 from ctapipe.calib import CameraCalibrator
@@ -100,9 +101,10 @@ class SlidingWindowMonitor(TelescopeComponent):
         timestamps = self._timestamps[tel_id]
         container = self._container(event, tel_id)
         container.n_events = len(timestamps)
-        container.sample_time = Time(timestamps).mean()
-        container.sample_time_min = timestamps[0]
-        container.sample_time_max = timestamps[-1]
+        # the ctapipe PedestalContainer stores the times as Quantity [s] (unix TAI)
+        container.sample_time = Time(timestamps).mean().unix_tai * u.s
+        container.sample_time_min = timestamps[0].unix_tai * u.s
+        container.sample_time_max = timestamps[-1].unix_tai * u.s
         container.charge_mean = charge_mean
         container.charge_median = charge_median
         container.charge_std = charge_std

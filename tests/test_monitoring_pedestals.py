@@ -1,7 +1,9 @@
+import astropy.units as u
 import numpy as np
 import pytest
 from ctapipe.containers import MonitoringCameraContainer, PedestalContainer
 from ctapipe.image import ImageProcessor
+from ctapipe.io import HDF5TableWriter, read_table
 from astropy.time import Time
 
 from sst1mpipe.io import load_config
@@ -93,9 +95,9 @@ def test_call_adds_event_and_fills_container():
     container = event.mon.tel[TEL_ID].pedestal
     images = np.array(images[-3:])
     assert container.n_events == 3
-    np.testing.assert_allclose(container.sample_time.to_value("unix_tai"), 13, rtol=0, atol=1e-9)
-    np.testing.assert_allclose(container.sample_time_min.to_value("unix_tai"), 12, rtol=0, atol=1e-9)
-    np.testing.assert_allclose(container.sample_time_max.to_value("unix_tai"), 14, rtol=0, atol=1e-9)
+    np.testing.assert_allclose(container.sample_time.to_value(u.s), 13, rtol=0, atol=1e-9)
+    np.testing.assert_allclose(container.sample_time_min.to_value(u.s), 12, rtol=0, atol=1e-9)
+    np.testing.assert_allclose(container.sample_time_max.to_value(u.s), 14, rtol=0, atol=1e-9)
     np.testing.assert_allclose(container.charge_mean, images.mean(axis=0))
     np.testing.assert_allclose(container.charge_median, np.median(images, axis=0))
     np.testing.assert_allclose(container.charge_std, images.std(axis=0))
@@ -126,6 +128,29 @@ def test_statistics_only_computed_for_new_events():
 # ---------------------------------------------------------------------------
 # R0PedestalMonitor and DL1PedestalMonitor
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("monitor_class", [R0PedestalMonitor, DL1PedestalMonitor])
+def test_monitoring_tables_can_be_written(monitor_class, tmp_path):
+    """the containers filled by the monitors are written by ctapipe (as in sst1mpipe_r0_dl1)"""
+    rng = np.random.default_rng(3)
+    monitor = monitor_class(subarray=SUBARRAY, n_events=3)
+    path = tmp_path / "monitoring.h5"
+    start = 1_769_015_262  # 2026-01-21, unix TAI
+
+    with HDF5TableWriter(path) as writer:
+        for i in range(5):
+            event = make_event(rng, time_s=start + i)
+            monitor(event, TEL_ID)
+            container = monitor._container(event, TEL_ID)
+            writer.write("pedestal", containers=[container])
+
+    table = read_table(path, "/pedestal")
+    assert len(table) == 5
+    # sliding window of 3 events: the 3 last events for the last row
+    np.testing.assert_allclose(table["sample_time"].quantity.to_value(u.s)[-1], start + 3, rtol=0, atol=1e-6)
+    np.testing.assert_allclose(table["sample_time_min"].quantity.to_value(u.s), start + np.array([0, 0, 0, 1, 2]), rtol=0, atol=1e-6)
+    np.testing.assert_allclose(table["sample_time_max"].quantity.to_value(u.s), start + np.arange(5), rtol=0, atol=1e-6)
 
 
 def test_monitoring_containers_are_ctapipe_compatible():
