@@ -37,6 +37,7 @@ sst1mpipe = [
   "resources/calibration/dark_runs/*",
   "resources/instrument/*",
   "resources/test_data/zfits/*"
+  "resources/test_data/simtel/*"
 ]
 
 [project.scripts]
