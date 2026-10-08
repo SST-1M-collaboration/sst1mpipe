@@ -1,3 +1,4 @@
+import logging
 import os.path
 
 from types import SimpleNamespace
@@ -401,3 +402,41 @@ def test_input_files_in_provenance():
 
     assert [entry["url"] for entry in inputs] == [str(FILE_TEL_1)]
     assert all(entry["role"] == "R0/Event" for entry in inputs)
+
+
+def test_warning_no_pointing_in_file(caplog):
+
+    with caplog.at_level(logging.WARNING):
+        SST1MEventSource(input_url=FILE_TEL_1, max_events=1)
+
+    assert "No pointing in the TARGET field ('dark')" in caplog.text
+    assert "not reconstructed" in caplog.text
+
+
+def test_warning_pointing_given_by_user_and_in_file(monkeypatch, caplog):
+    """the pointing of the file and the one given by the user are reported, with their separation"""
+    header = {"TARGET": "Crab_W1_83.63_22.01", "DATE": "2026-01-21T17:07:07", "DATEEND": "2026-01-21T17:07:19"}
+    monkeypatch.setattr(sst1m_event_source.fits, "getheader", lambda *args, **kwargs: header)
+
+    with caplog.at_level(logging.WARNING):
+        source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1, pointing_ra=84.63, pointing_dec=22.01)
+
+    assert source.pointing.ra.deg == pytest.approx(84.63)
+    assert "Pointing given by the user (RA 84.6300 deg, Dec 22.0100 deg)" in caplog.text
+    assert "pointing of the file (RA 83.6300 deg, Dec 22.0100 deg)" in caplog.text
+    # 1 deg in RA at Dec 22 deg
+    assert f"separation {np.cos(np.deg2rad(22.01)):.4f} deg" in caplog.text
+
+
+def test_no_warning_pointing_in_file(monkeypatch, caplog):
+
+    header = {"TARGET": "Crab_W1_83.63_22.01"}
+    monkeypatch.setattr(sst1m_event_source.fits, "getheader", lambda *args, **kwargs: header)
+
+    with caplog.at_level(logging.WARNING):
+        source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1)
+
+    assert source.pointing.ra.deg == pytest.approx(83.63)
+    assert source.scheduling_blocks[OBS_ID_1].sb_type == SchedulingBlockType.OBSERVATION
+    assert source.scheduling_blocks[OBS_ID_1].observing_mode == ObservingMode.WOBBLE
+    assert "pointing" not in caplog.text.lower()

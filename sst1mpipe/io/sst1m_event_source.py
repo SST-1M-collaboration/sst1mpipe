@@ -292,12 +292,26 @@ class SST1MEventSource(EventSource):
         # Target and pointing from the TARGET field of the file, unless the pointing is given by the user
         header = fits.getheader(self.input_url, 'Events')
         self._target, self._wobble, ra, dec = parse_target_field(header.get('TARGET'))
-        self._pointing_manual = (self.pointing_ra is not None) and (self.pointing_dec is not None)
-        if self._pointing_manual:
-            ra, dec = self.pointing_ra, self.pointing_dec
-        self._pointing = None
+        file_pointing = None
         if (ra is not None) and (dec is not None):
-            self._pointing = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame='icrs')
+            file_pointing = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame='icrs')
+        self._pointing_manual = (self.pointing_ra is not None) and (self.pointing_dec is not None)
+        self._pointing = file_pointing
+        if self._pointing_manual:
+            self._pointing = SkyCoord(ra=self.pointing_ra * u.deg, dec=self.pointing_dec * u.deg, frame='icrs')
+            if file_pointing is not None:
+                self.log.warning(
+                    "Pointing given by the user (RA %.4f deg, Dec %.4f deg) used instead of the pointing"
+                    " of the file (RA %.4f deg, Dec %.4f deg): separation %.4f deg",
+                    self._pointing.ra.deg, self._pointing.dec.deg,
+                    file_pointing.ra.deg, file_pointing.dec.deg,
+                    self._pointing.separation(file_pointing).deg,
+                )
+        elif file_pointing is None:
+            self.log.warning(
+                "No pointing in the TARGET field (%r) of %s: the altitude and azimuth of the"
+                " telescope pointing are not reconstructed", header.get('TARGET'), self.input_url,
+            )
         self._tel_locations = {}
         self._altaz_cache = {}
 

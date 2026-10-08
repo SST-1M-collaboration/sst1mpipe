@@ -2,9 +2,9 @@ import os
 
 from tqdm import tqdm
 from ctapipe.calib import CameraCalibrator
-from ctapipe.containers import EventType
+from ctapipe.containers import EventType, SchedulingBlockType
 from ctapipe.core import Tool
-from ctapipe.core.traits import Bool, flag
+from ctapipe.core.traits import Bool, List, UseEnum, flag
 from ctapipe.image import ImageProcessor
 from ctapipe.io import EventSource, DataWriter, SimTelEventSource
 
@@ -33,6 +33,8 @@ class ProcessorTool(Tool):
     The charges and peak times of the saturated pixels are corrected by the ImageSaturationCorrector.
     For the simulations (SimTelEventSource), the R1 waveforms are corrected for the
     PDE drop by the R0R1Calibrator (pde_drop_factor).
+    Only the events of the runs with an allowed scheduling block type (allowed_sb_types)
+    are processed, e.g. the observations but not the transitions between two wobbles.
     """
 
     name = 'sst1mpipe-process'
@@ -51,6 +53,17 @@ class ProcessorTool(Tool):
             " to the name of the output file, e.g. events_W1.dl1.h5"
         ),
         default_value=True,
+    ).tag(config=True)
+
+    allowed_sb_types = List(
+        UseEnum(SchedulingBlockType),
+        default_value=[SchedulingBlockType.OBSERVATION],
+        help=(
+            "Scheduling block types of the runs whose events are processed, e.g. OBSERVATION,"
+            " CALIBRATION (dark runs), ENGINEERING, UNKNOWN (transitions between two wobbles)."
+            " The events of the other runs are skipped. The events without scheduling block"
+            " (e.g. of a ZMQ stream) are processed."
+        ),
     ).tag(config=True)
 
     aliases = {
@@ -100,6 +113,8 @@ class ProcessorTool(Tool):
         # the writer is closed in finish(), to read back the output file. If the processing
         # fails before, it is closed when the tool exits.
         self.writer = DataWriter(event_source=self.event_source, parent=self)
+        self._sb_types = {}
+        self.n_skipped_events = 0
         self._writer_closed = False
         self._exit_stack.callback(self._close_writer)
 
@@ -116,6 +131,9 @@ class ProcessorTool(Tool):
             total=self.event_source.max_events,
             disable=not self.progress_bar,
         ):
+            if not self.is_allowed(event):
+                self.n_skipped_events += 1
+                continue
             if self.r0_r1_calibrator is not None:
                 self.calibrate_r0_r1(event)
             self.camera_calibrator(event)
@@ -127,6 +145,26 @@ class ProcessorTool(Tool):
             if self.dl1_pedestal_monitor is not None:
                 self.add_dl1_pedestal(event)
             self.writer(event)
+
+    def scheduling_block_type(self, obs_id):
+        """Type of the scheduling block of the observation block, None if unknown"""
+        if obs_id not in self._sb_types:
+            observation_block = self.event_source.observation_blocks.get(obs_id)
+            scheduling_block = None
+            if observation_block is not None:
+                scheduling_block = self.event_source.scheduling_blocks.get(int(observation_block.sb_id))
+            self._sb_types[obs_id] = None if scheduling_block is None else scheduling_block.sb_type
+            if self._sb_types[obs_id] is not None and self._sb_types[obs_id] not in self.allowed_sb_types:
+                self.log.warning(
+                    "Events of obs_id %d skipped: scheduling block of type %s, allowed types: %s",
+                    obs_id, self._sb_types[obs_id].name, [t.name for t in self.allowed_sb_types],
+                )
+        return self._sb_types[obs_id]
+
+    def is_allowed(self, event):
+        """True if the event belongs to a run with an allowed scheduling block type (or without one)"""
+        sb_type = self.scheduling_block_type(event.index.obs_id)
+        return sb_type is None or sb_type in self.allowed_sb_types
 
     def calibrate_r0_r1(self, event):
         """R0 -> R1 calibration, with the pedestal statistics of the sliding window"""
@@ -158,6 +196,8 @@ class ProcessorTool(Tool):
 
         self._close_writer()
         output_path = self.writer.output_path
+        if self.n_skipped_events > 0:
+            self.log.warning("%d events skipped (scheduling block type not allowed)", self.n_skipped_events)
 
         # processing summary, computed from the content of the output file
         summary = compute_dl1_summary(output_path)

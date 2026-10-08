@@ -26,6 +26,8 @@ def test_process_r0_file(tmp_path, voltage_drop_correction):
         f"--config={RTA_CONFIG}",
         f"--max-events={N_EVENTS}",
         "--ProcessorTool.progress_bar=False",
+        # the test file is a dark run
+        "--ProcessorTool.allowed_sb_types=CALIBRATION",
         f"--R0R1Calibrator.voltage_drop_correction={voltage_drop_correction}",
         "--R0PedestalMonitor.n_events=10",
     ], raises=True)
@@ -68,6 +70,8 @@ def test_dl1_pedestal_monitor_used_by_nsb_image_cleaner(tmp_path, monkeypatch):
         f"--config={RTA_CONFIG}",
         f"--max-events={N_EVENTS}",
         "--ProcessorTool.progress_bar=False",
+        # the test file is a dark run
+        "--ProcessorTool.allowed_sb_types=CALIBRATION",
         "--DL1PedestalMonitor.n_events=20",
         # in the dark run of the test file all the pixels are dead (pedestal std < 2.5 ADC):
         # their image is 0, so they are kept to have a pedestal std

@@ -1313,7 +1313,8 @@ def write_dl1_info(dl1_file, info):
             '/dl1',
             'info',
             DL1_info,
-            "DL1 production info"
+            "DL1 production info",
+            createparents=True,
         )
         row = table.row
         row['sst1mpipe_version'] = sst1mpipe.__version__
@@ -1343,6 +1344,16 @@ def compute_dl1_summary(dl1_file):
         surviving the cleaning (finite hillas intensity) in any telescope
     """
     subarray = SubarrayDescription.from_hdf(dl1_file)
+    with tables.open_file(dl1_file) as f:
+        has_events = "/dl1/event/subarray/trigger" in f
+    if not has_events:
+        # no event written, e.g. all the events of the run are skipped
+        return dict(
+            n_events=0,
+            n_triggered={int(tel_id): 0 for tel_id in subarray.tel_ids},
+            n_pedestal=0,
+            n_survived_pedestals=0,
+        )
     trigger = read_table(dl1_file, "/dl1/event/subarray/trigger")
 
     tels_with_trigger = np.asarray(trigger["tels_with_trigger"], dtype=bool).reshape(len(trigger), -1)

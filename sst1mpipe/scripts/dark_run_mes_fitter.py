@@ -48,7 +48,6 @@ Created on Wed Mar 23 16:36:22 2022
 import argparse
 import multiprocessing as mp
 import os
-from itertools import chain, islice
 
 # from ctapipe.instrument import CameraGeometry
 # from ctapipe.image import hillas_parameters, tailcuts_clean
@@ -58,6 +57,7 @@ import pandas as pd
 import scipy
 import scipy.special as scsp
 import scipy.stats as scst
+from ctapipe.containers import EventType, SchedulingBlockType
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.visualization import CameraDisplay
 from iminuit import Minuit
@@ -66,6 +66,49 @@ from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.resources import SUBARRAY_FILE
 
 #from iminuit.cost import LeastSquares
+
+
+def read_dark_run_events(file_list, max_events=None):
+    """
+    Events of the dark runs, the files being read one after the other.
+
+    The files of runs which are not dark runs (scheduling block of the CALIBRATION
+    type, i.e. a dark target) are skipped. In the dark runs, only the pedestal events
+    (internal triggers) are used, the number of other events is reported.
+
+    Parameters
+    ----------
+    file_list: list of str
+        SST-1M raw data files
+    max_events: int or None
+        Maximum number of events read in total
+
+    Yields
+    ------
+    event: sst1mpipe.io.containers.SST1MArrayEventContainer
+    """
+    n_events = 0
+    for path in file_list:
+        source = SST1MEventSource(input_url=path)
+        sb_type = source.scheduling_blocks[source.run_id].sb_type
+        if sb_type != SchedulingBlockType.CALIBRATION:
+            print(f"Warning : {path} is not a dark run (target {source.target!r},"
+                  f" scheduling block {sb_type.name}), file skipped")
+            continue
+
+        n_not_pedestal = 0
+        for event in source:
+            if max_events is not None and n_events >= max_events:
+                break
+            if event.trigger.event_type != EventType.SKY_PEDESTAL:
+                n_not_pedestal += 1
+                continue
+            n_events += 1
+            yield event
+        if n_not_pedestal > 0:
+            print(f"Warning : {n_not_pedestal} events of the dark run {path} are not pedestal events, not used")
+        if max_events is not None and n_events >= max_events:
+            return
 
 
 class mes_fitter:
@@ -187,55 +230,51 @@ class mes_fitter:
         tot_evts = 0
         print("starting. reading data. Loading histograms.")
 
-        # the files are read one after the other, max_evt events in total
-        data_stream = islice(
-            chain.from_iterable(SST1MEventSource(input_url=path) for path in self.file_list),
-            self.max_evt,
-            )
+        # pedestal events of the dark runs, the files are read one after the other
+        data_stream = read_dark_run_events(self.file_list, max_events=self.max_evt)
 
         for ii,event in enumerate(data_stream):
                 tel = event.trigger.tels_with_trigger[0]
                 r0data = event.r0.tel[tel]
 
 
-                if r0data._event_type.value==8:
-                    tot_evts +=1
+                tot_evts +=1
 
-                    if self.dark_baselines is None:
-                        wfs = (r0data.waveform[0].T - r0data.pedestal).T
+                if self.dark_baselines is None:
+                    wfs = (r0data.waveform[0].T - r0data.pedestal).T
 
-                        #sums = convolve1d(
-                        #    wfs[:,:],
-                        #    np.ones(self.peak_search_window_width), axis=1, mode="nearest"
-                        #    )
-                        #w_start = np.argmax(sums[:, self.peak_search_window_width//2:-(self.peak_search_window_width//2)],
-                        #                    axis=1)
+                    #sums = convolve1d(
+                    #    wfs[:,:],
+                    #    np.ones(self.peak_search_window_width), axis=1, mode="nearest"
+                    #    )
+                    #w_start = np.argmax(sums[:, self.peak_search_window_width//2:-(self.peak_search_window_width//2)],
+                    #                    axis=1)
 
-                        sums = np.array([np.convolve(wf,
-                                                     np.ones(self.peak_search_window_width),
-                                                     mode="full")
-                                        for wf in wfs])
-                        w_start = np.argmax(sums[:, self.peak_search_window_width-1:-self.peak_search_window_width+1],
-                                            axis=1)
-
+                    sums = np.array([np.convolve(wf,
+                                                 np.ones(self.peak_search_window_width),
+                                                 mode="full")
+                                    for wf in wfs])
+                    w_start = np.argmax(sums[:, self.peak_search_window_width-1:-self.peak_search_window_width+1],
+                                        axis=1)
 
 
-                        Qsum = np.array([wfs[ii,w_start[ii]:w_start[ii]+self.peak_search_window_width].sum() for ii in self.pixels])
 
-                        Qmax = (r0data.waveform[0].T       - r0data.pedestal).max(axis=0)
-                        #Qsum_out = np.array([wfs[ii,:w_start[ii]].sum()+ \
-                        #                     wfs[ii,w_start[ii]+self.peak_search_window_width:].sum() for ii in self.pixels])
-                    else:
-                        #Qsum = (r0data.waveform[0].T[-15:] - self.dark_baselines ).sum(axis=0)
-                        #Qmax = (r0data.waveform[0].T       - self.dark_baselines ).max(axis=0)
-                        pass
+                    Qsum = np.array([wfs[ii,w_start[ii]:w_start[ii]+self.peak_search_window_width].sum() for ii in self.pixels])
 
-                    i_to_fill_adcsum = np.searchsorted(centers_adcsum[1:-1], Qsum)
-                    i_to_fill_adcmax = np.searchsorted(centers_adcmax[1:-1], Qmax)
+                    Qmax = (r0data.waveform[0].T       - r0data.pedestal).max(axis=0)
+                    #Qsum_out = np.array([wfs[ii,:w_start[ii]].sum()+ \
+                    #                     wfs[ii,w_start[ii]+self.peak_search_window_width:].sum() for ii in self.pixels])
+                else:
+                    #Qsum = (r0data.waveform[0].T[-15:] - self.dark_baselines ).sum(axis=0)
+                    #Qmax = (r0data.waveform[0].T       - self.dark_baselines ).max(axis=0)
+                    pass
 
-                    for pix in self.pixels:
-                        Qsum_hist[pix][i_to_fill_adcsum[pix]] = Qsum_hist[pix][i_to_fill_adcsum[pix]] +1
-                        Qmax_hist[pix][i_to_fill_adcmax[pix]] = Qmax_hist[pix][i_to_fill_adcmax[pix]] +1
+                i_to_fill_adcsum = np.searchsorted(centers_adcsum[1:-1], Qsum)
+                i_to_fill_adcmax = np.searchsorted(centers_adcmax[1:-1], Qmax)
+
+                for pix in self.pixels:
+                    Qsum_hist[pix][i_to_fill_adcsum[pix]] = Qsum_hist[pix][i_to_fill_adcsum[pix]] +1
+                    Qmax_hist[pix][i_to_fill_adcmax[pix]] = Qmax_hist[pix][i_to_fill_adcmax[pix]] +1
 
 
 

@@ -3,6 +3,7 @@ from collections import Counter
 import astropy.units as u
 import numpy as np
 import pytest
+import tables
 from astropy.time import Time
 from ctapipe.containers import CoordinateFrameType, EventType, ObservingMode, PointingMode, SchedulingBlockType
 from ctapipe.core import Provenance
@@ -11,8 +12,10 @@ from ctapipe.io import DataWriter, EventSource, read_table
 
 from sst1mpipe.io import get_dl1_info
 from sst1mpipe.io.containers import CameraEventType
+import sst1mpipe.io.sst1m_event_source as sst1m_event_source
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.resources import RTA_CONFIG_FILE, TEST_DATA_DIR
+from sst1mpipe.scripts.dark_run_mes_fitter import read_dark_run_events
 from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 
 N_PIXELS = 1296
@@ -151,6 +154,8 @@ def test_process_zfits_file(zfits_file, tmp_path):
         f"--input={zfits_file['path']}",
         f"--output={output}",
         f"--config={RTA_CONFIG_FILE}",
+        # runs of the transition between two wobbles
+        "--ProcessorTool.allowed_sb_types=UNKNOWN",
     ], raises=True)
 
     n_events = zfits_file["n_showers"] + zfits_file["n_pedestals"]
@@ -234,3 +239,71 @@ def test_blocks_written_in_the_output(zfits_file, tmp_path):
     # written in TAI by ctapipe
     written_start = observation_blocks["actual_start_time"][0]
     assert abs((written_start - Time(zfits_file["date"], scale="utc")).to_value(u.s)) < 1e-3
+
+
+# ---------------------------------------------------------------------------
+# runs which are not processed
+# ---------------------------------------------------------------------------
+
+
+def test_process_skips_transition_runs(zfits_file, tmp_path):
+    """only the runs of the allowed scheduling block types (OBSERVATION by default) are processed"""
+    output = tmp_path / "events.dl1.h5"
+    tool = ProcessorTool()
+    run_tool(tool, argv=[
+        f"--input={zfits_file['path']}",
+        f"--output={output}",
+        f"--config={RTA_CONFIG_FILE}",
+    ], raises=True)
+
+    n_events = zfits_file["n_showers"] + zfits_file["n_pedestals"]
+    assert tool.n_skipped_events == n_events
+    with tables.open_file(output) as h5:
+        assert "/dl1/event" not in h5
+    # the blocks and the production info are written
+    scheduling_blocks = read_table(output, "/configuration/observation/scheduling_block")
+    assert list(scheduling_blocks["sb_type"]) == [SchedulingBlockType.UNKNOWN.value]
+    info = get_dl1_info(output)
+    assert info["target"][0] == "Transition"
+    assert info[f"n_triggered_tel{zfits_file['tel_id'] - 20}"][0] == 0
+
+
+def test_allowed_sb_types_list(tmp_path):
+    tool = ProcessorTool()
+    run_tool(tool, argv=[
+        f"--input={TEST_DATA_DIR / 'zfits' / FILES[21]['name']}",
+        f"--output={tmp_path / 'events.dl1.h5'}",
+        f"--config={RTA_CONFIG_FILE}",
+        "--max-events=5",
+        "--ProcessorTool.allowed_sb_types", "OBSERVATION",
+        "--ProcessorTool.allowed_sb_types", "UNKNOWN",
+    ], raises=True)
+
+    assert tool.allowed_sb_types == [SchedulingBlockType.OBSERVATION, SchedulingBlockType.UNKNOWN]
+    assert tool.n_skipped_events == 0
+
+
+def test_dark_run_events(capsys):
+    """the dark run script only uses the pedestal events of the dark runs"""
+    transition_file = TEST_DATA_DIR / "zfits" / FILES[21]["name"]
+    dark_file = TEST_DATA_DIR / "zfits" / "SST1M1_20260121_0001.fits.fz"
+
+    events = list(read_dark_run_events([transition_file, dark_file], max_events=20))
+
+    assert len(events) == 20
+    assert {event.index.obs_id for event in events} == {202601210001}
+    assert {event.trigger.event_type for event in events} == {EventType.SKY_PEDESTAL}
+    assert "is not a dark run" in capsys.readouterr().out
+
+
+def test_dark_run_events_not_pedestal(monkeypatch, capsys):
+    """the events of a dark run which are not pedestal events are not used"""
+    # the run with Cherenkov events taken as a dark run
+    monkeypatch.setattr(sst1m_event_source, "scheduling_block_type", lambda target: SchedulingBlockType.CALIBRATION)
+    path = TEST_DATA_DIR / "zfits" / FILES[21]["name"]
+
+    events = list(read_dark_run_events([path]))
+
+    assert len(events) == FILES[21]["n_pedestals"]
+    assert {event.trigger.event_type for event in events} == {EventType.SKY_PEDESTAL}
+    assert f"{FILES[21]['n_showers']} events of the dark run" in capsys.readouterr().out

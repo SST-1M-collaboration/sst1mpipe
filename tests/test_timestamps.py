@@ -43,6 +43,8 @@ def dl1_file(request, tmp_path_factory):
         f"--config={RTA_CONFIG_FILE}",
         f"--max-events={N_EVENTS}",
         "--ProcessorTool.wobble_in_output_name=False",
+        # the test files are dark runs
+        "--ProcessorTool.allowed_sb_types=CALIBRATION",
     ], raises=True)
     return tel_id, output
 
