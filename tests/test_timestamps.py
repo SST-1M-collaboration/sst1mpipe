@@ -16,8 +16,10 @@ from sst1mpipe.utils import get_trigger_time_ns
 
 N_EVENTS = 50
 S_TO_NS = 1_000_000_000
+# observation of Mrk 421 by both telescopes (35 events for tel 22)
 FILES = {
-    21: (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260121_0001.fits.fz'),
+    21: (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260120_1179.fits.fz'),
+    22: (TEST_DATA_DIR / "zfits").joinpath('SST1M2_20260120_1102.fits.fz'),
 }
 
 
@@ -42,8 +44,6 @@ def dl1_file(request, tmp_path_factory):
         f"--config={RTA_CONFIG_FILE}",
         f"--max-events={N_EVENTS}",
         "--ProcessorTool.wobble_in_output_name=False",
-        # the test files are dark runs
-        "--ProcessorTool.allowed_sb_types=CALIBRATION",
     ], raises=True)
     return tel_id, output
 

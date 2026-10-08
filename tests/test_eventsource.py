@@ -107,6 +107,7 @@ def test_count_single_file():
     ("Crab,W2,83.63,22.01", ("Crab", "W2", 83.63, 22.01)),
     ("CrabW3_83.63_22.01", ("CrabW3", "W3", 83.63, 22.01)),
     ("Crab_83.63_22.01", ("Crab", "UNDEF", 83.63, 22.01)),
+    ("MRK421_W1,166.994800,38.105300", ("MRK421", "W1", 166.9948, 38.1053)),
     ("Crab_W1_ra_dec", ("Crab", "W1", None, None)),
     ("Crab_W1_1_2_3", ("Crab", "W1", None, None)),
     ("dark", ("dark", None, None, None)),
@@ -493,3 +494,42 @@ def test_no_digicam_config(monkeypatch):
 
     monkeypatch.setattr(sst1m_event_source, "File", FileWithoutConfig)
     assert sst1m_event_source.read_digicam_config("file.fits.fz") is None
+
+
+@pytest.mark.parametrize("input_file, tel_id", [
+    (TEST_DATA_DIR / "zfits" / "SST1M1_20260120_1179.fits.fz", 21),
+    (TEST_DATA_DIR / "zfits" / "SST1M2_20260120_1102.fits.fz", 22),
+])
+def test_observation_run(input_file, tel_id, caplog):
+    """observation of Mrk 421: blocks and pointing from the TARGET field of the file"""
+    with caplog.at_level(logging.WARNING):
+        source = SST1MEventSource(input_url=input_file, max_events=20)
+    assert "pointing" not in caplog.text.lower()
+
+    obs_id = source.run_id
+    scheduling_block = source.scheduling_blocks[obs_id]
+    observation_block = source.observation_blocks[obs_id]
+    assert (source.target, source.wobble) == ("MRK421", "W1")
+    assert not source.pointing_manual
+    assert scheduling_block.sb_type == SchedulingBlockType.OBSERVATION
+    assert scheduling_block.observing_mode == ObservingMode.WOBBLE
+    assert scheduling_block.pointing_mode == PointingMode.TRACK
+    assert scheduling_block.producer_id == f"SST1M-{tel_id}"
+    assert (observation_block.target, observation_block.wobble) == ("MRK421", "W1")
+    assert observation_block.subarray_pointing_lon.to_value(u.deg) == pytest.approx(166.9948)
+    assert observation_block.subarray_pointing_lat.to_value(u.deg) == pytest.approx(38.1053)
+    assert observation_block.subarray_pointing_frame == CoordinateFrameType.ICRS
+    assert source.swat_event_ids_available
+
+    # alt/az of the pointing of the telescope, recomputed every second
+    location = source.subarray.tel_coords.to_earth_location()[source.subarray.tel_index_array[tel_id]]
+    target = SkyCoord(ra=166.9948 * u.deg, dec=38.1053 * u.deg, frame="icrs")
+    n_events = 0
+    for event in source:
+        expected = target.transform_to(AltAz(obstime=event.trigger.time, location=location))
+        pointing = event.pointing.tel[tel_id]
+        filled = SkyCoord(az=pointing.azimuth, alt=pointing.altitude, frame=expected)
+        assert filled.separation(expected) < 1 * u.arcmin
+        assert 74 < pointing.altitude.to_value(u.deg) < 75
+        n_events += 1
+    assert n_events == 20

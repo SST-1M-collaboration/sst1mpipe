@@ -53,8 +53,9 @@ def parse_target_field(field):
     """
     Parse the TARGET field of the header of the ``Events`` table, expected as
     ``target[_,]wobble[_,]ra[_,]dec`` or ``target[_,]ra[_,]dec`` with ra, dec in deg,
-    e.g. ``Crab_W1_83.63_22.01``. Files without pointing (e.g. ``dark`` or
-    ``transition``) only contain the target.
+    e.g. ``Crab_W1_83.63_22.01`` or ``MRK421_W1,166.9948,38.1053`` (the wobble can be
+    separated from the target by ``_`` when the other entries are separated by ``,``).
+    Files without pointing (e.g. ``dark`` or ``transition``) only contain the target.
 
     Parameters
     ----------
@@ -80,6 +81,9 @@ def parse_target_field(field):
     target = entries[0]
     match = re.search(r'W\d+', field)
     wobble = match.group(0) if match else 'UNDEF'
+    # target_wobble,ra,dec
+    if delimiter == ',' and target.endswith(f'_{wobble}'):
+        target = target[:-len(wobble) - 1]
 
     if len(entries) not in (3, 4):
         return target, wobble, None, None
