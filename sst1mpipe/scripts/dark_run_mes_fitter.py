@@ -48,6 +48,7 @@ Created on Wed Mar 23 16:36:22 2022
 import argparse
 import multiprocessing as mp
 import os
+from itertools import chain, islice
 
 # from ctapipe.instrument import CameraGeometry
 # from ctapipe.image import hillas_parameters, tailcuts_clean
@@ -186,9 +187,10 @@ class mes_fitter:
         tot_evts = 0
         print("starting. reading data. Loading histograms.")
 
-        data_stream = SST1MEventSource(
-            input_url=self.file_list,
-            max_events=self.max_evt
+        # the files are read one after the other, max_evt events in total
+        data_stream = islice(
+            chain.from_iterable(SST1MEventSource(input_url=path) for path in self.file_list),
+            self.max_evt,
             )
 
         for ii,event in enumerate(data_stream):

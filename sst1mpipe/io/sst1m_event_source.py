@@ -3,7 +3,6 @@ import logging
 import os
 import re
 import warnings
-from dataclasses import dataclass
 from itertools import islice
 
 import numpy as np
@@ -15,8 +14,10 @@ from astropy.time import Time
 from ctapipe.containers import (
     CoordinateFrameType,
     EventType,
+    ObservingMode,
     PointingMode,
     SchedulingBlockContainer,
+    SchedulingBlockType,
 )
 from ctapipe.core import Provenance
 from ctapipe.core.traits import Bool, Dict, Float, List, UseEnum
@@ -88,15 +89,35 @@ def parse_target_field(field):
     return target, wobble, ra, dec
 
 
-@dataclass
-class RunFile:
-    """A raw data file of the source: its run (obs_id), target and pointing"""
+# targets of the TARGET field which are not observations of a source, compared in lower case
+# (with the typos found in the files)
+TRANSITION_TARGETS = ("transition",)
+CALIBRATION_TARGETS = ("dark", "drak", "bias")
+ENGINEERING_TARGETS = ("wrtest",)
+UNKNOWN_TARGETS = ("", "unknown", "none")
 
-    path: str
-    obs_id: int
-    target: str | None
-    wobble: str | None
-    pointing: SkyCoord | None
+
+def scheduling_block_type(target):
+    """
+    Type of the scheduling block of a run, from its target (TARGET field of the file):
+    UNKNOWN for the transitions between two wobbles (and an unknown target), CALIBRATION
+    for the dark runs, ENGINEERING for the tests and OBSERVATION for the other targets.
+    """
+    name = (target or "").strip().lower()
+    if name in TRANSITION_TARGETS or name in UNKNOWN_TARGETS:
+        return SchedulingBlockType.UNKNOWN
+    if name in CALIBRATION_TARGETS:
+        return SchedulingBlockType.CALIBRATION
+    if name in ENGINEERING_TARGETS:
+        return SchedulingBlockType.ENGINEERING
+    return SchedulingBlockType.OBSERVATION
+
+
+def observing_mode(wobble):
+    """Observing mode of a run from its wobble (TARGET field of the file): WOBBLE for ``W<n>``"""
+    if wobble is not None and re.fullmatch(r"W\d+", wobble):
+        return ObservingMode.WOBBLE
+    return ObservingMode.UNKNOWN
 
 
 def parse_file_name(file_name):
@@ -106,6 +127,28 @@ def parse_file_name(file_name):
     """
     match = re.match(r'SST1M\d*_(\d+)_(\d+)', os.path.basename(str(file_name)))
     return match.groups() if match else None
+
+
+def tel_id_from_file_name(file_name):
+    """
+    Telescope of a SST-1M raw data file name ``SST1M<n>_<date>_<run>.fits.fz``,
+    e.g. ``SST1M1_20260121_0001.fits.fz`` -> 21. None if it does not match.
+    """
+    match = re.match(r'SST1M(\d)_', os.path.basename(str(file_name)))
+    return 20 + int(match.group(1)) if match else None
+
+
+def file_start_and_duration(header):
+    """
+    Start time and duration of a raw data file, from the DATE and DATEEND fields
+    (UTC) of the header of its ``Events`` table. None if they are missing.
+    """
+    try:
+        start = Time(header['DATE'], format='isot', scale='utc')
+        stop = Time(header['DATEEND'], format='isot', scale='utc')
+    except (KeyError, ValueError):
+        return None, None
+    return start, (stop - start).to(u.min)
 
 
 def file_has_swat_event_ids(path, n_events=N_EVENTS_SWAT_ID_CHECK):
@@ -228,117 +271,95 @@ class SST1MEventSource(EventSource):
     ).tag(config=True)
 
     def __init__(self, input_url=None, config=None, parent=None, **kwargs):
-        # LST/CTA uses differenct filename naming convention, how to work with the SST1M file naming convention?
-        # A list of files can also be given as input_url, they are read one after the other.
-        # ctapipe.io.EventSource only knows about the first one.
-        input_urls = None
+        # a single file (run) is read: the processing scripts loop over the files
         if isinstance(input_url, list | tuple):
-            input_urls = list(input_url)
-            input_url = input_urls[0]
-
+            raise TypeError(
+                "SST1MEventSource reads a single file, loop over the files to read several of them"
+            )
         super().__init__(input_url=input_url, config=config, parent=parent, **kwargs)
 
-        self._input_urls = [self.input_url] if input_urls is None else [
-            EventSource.input_url.validate(self, url) for url in input_urls
-        ]
-        # input files of the current provenance activity (zfits files have no reference metadata)
-        for path in self.filelist:
-            Provenance().add_input_file(path, role="R0/Event", add_meta=False)
+        # input file of the current provenance activity (zfits files have no reference metadata)
+        Provenance().add_input_file(str(self.input_url), role="R0/Event", add_meta=False)
 
-        # obs_id of the first file, from the date and run number of the file name
-        date_run = parse_file_name(self.filelist[0])
+        # obs_id from the date and run number of the file name
+        date_run = parse_file_name(self.input_url)
         self.run_number = int(date_run[1]) if date_run else 0
         self.run_id = int(''.join(date_run)) if date_run else 0
-        self.tel_id = 0
-
-        # LST reads camera_config from input files, is it needed such functionality for SST1M?
-        self.camera_config = None
-        self.run_start = Time(self.camera_config.date, format='unix') if self.camera_config is not None else None
+        self.tel_id = tel_id_from_file_name(self.input_url) or 0
 
         self._subarray = SUBARRAY_DESCRIPTION
 
-
-        # Target and pointing of each file, from its TARGET field, unless the pointing is given by the user
+        # Target and pointing from the TARGET field of the file, unless the pointing is given by the user
+        header = fits.getheader(self.input_url, 'Events')
+        self._target, self._wobble, ra, dec = parse_target_field(header.get('TARGET'))
         self._pointing_manual = (self.pointing_ra is not None) and (self.pointing_dec is not None)
-        self._files = [self._read_run_file(path) for path in self.filelist]
-        self._current_file = self._files[0]
+        if self._pointing_manual:
+            ra, dec = self.pointing_ra, self.pointing_dec
+        self._pointing = None
+        if (ra is not None) and (dec is not None):
+            self._pointing = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame='icrs')
         self._tel_locations = {}
         self._altaz_cache = {}
 
-        # one observation block per run (file)
-        self._scheduling_blocks = {}
-        self._observation_blocks = {}
-        for run_file in self._files:
-            if run_file.obs_id in self._observation_blocks:
-                continue
-            target_info = {}
-            pointing_mode = PointingMode.UNKNOWN
-            if run_file.pointing is not None:
-                target_info["subarray_pointing_lon"] = run_file.pointing.ra.to(u.deg)
-                target_info["subarray_pointing_lat"] = run_file.pointing.dec.to(u.deg)
-                target_info["subarray_pointing_frame"] = CoordinateFrameType.ICRS
-                pointing_mode = PointingMode.TRACK
+        self._scheduling_blocks, self._observation_blocks = self._make_blocks(header)
 
-            self._scheduling_blocks[run_file.obs_id] = SchedulingBlockContainer(
-                sb_id=np.uint64(run_file.obs_id),
-                producer_id=f"SST1M-{self.tel_id}",
-                pointing_mode=pointing_mode,
-            )
-            self._observation_blocks[run_file.obs_id] = SST1MObservationBlockContainer(
-                obs_id=np.uint64(run_file.obs_id),
-                sb_id=np.uint64(run_file.obs_id),
-                producer_id=f"SST1M-{self.tel_id}",
-                actual_start_time=self.run_start,
-                target=run_file.target or "",
-                wobble=run_file.wobble or "NONE",
-                **target_info
-            )
-
-        self._swat_event_ids_available = self.check_swat_event_ids_available(self.filelist)
+        self._swat_event_ids_available = file_has_swat_event_ids(self.input_url)
 
         self._pixel_swaps = parse_swapped_modules(self.swapped_modules)
 
-    @property
-    def filelist(self):
-        """All the files read by the source"""
-        return [str(url) for url in self._input_urls]
+    def _make_blocks(self, header):
+        """
+        The scheduling and observation blocks of the run, from the file name
+        (obs_id, telescope) and the header of the file (TARGET, DATE, DATEEND)
+        """
+        producer_id = f"SST1M-{self.tel_id}"
+        pointing_info = {}
+        pointing_mode = PointingMode.UNKNOWN
+        if self._pointing is not None:
+            pointing_info["subarray_pointing_lon"] = self._pointing.ra.to(u.deg)
+            pointing_info["subarray_pointing_lat"] = self._pointing.dec.to(u.deg)
+            pointing_info["subarray_pointing_frame"] = CoordinateFrameType.ICRS
+            pointing_mode = PointingMode.TRACK
+        start, duration = file_start_and_duration(header)
+        if start is not None:
+            pointing_info["actual_start_time"] = start
+            pointing_info["actual_duration"] = duration
+
+        scheduling_block = SchedulingBlockContainer(
+            sb_id=np.uint64(self.run_id),
+            sb_type=scheduling_block_type(self._target),
+            producer_id=producer_id,
+            observing_mode=observing_mode(self._wobble),
+            pointing_mode=pointing_mode,
+        )
+        observation_block = SST1MObservationBlockContainer(
+            obs_id=np.uint64(self.run_id),
+            sb_id=np.uint64(self.run_id),
+            producer_id=producer_id,
+            target=self._target or "",
+            wobble=self._wobble or "NONE",
+            **pointing_info
+        )
+        return {self.run_id: scheduling_block}, {self.run_id: observation_block}
 
     @property
     def subarray(self):
         return self._subarray
 
-    def _read_run_file(self, path):
-        """obs_id, target, wobble and pointing of a raw data file"""
-        date_run = parse_file_name(path)
-        obs_id = int(''.join(date_run)) if date_run else 0
-        header = fits.getheader(path, 'Events')
-        target, wobble, ra, dec = parse_target_field(header.get('TARGET'))
-        if self._pointing_manual:
-            ra, dec = self.pointing_ra, self.pointing_dec
-        pointing = None
-        if (ra is not None) and (dec is not None):
-            pointing = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame='icrs')
-        return RunFile(path=str(path), obs_id=obs_id, target=target, wobble=wobble, pointing=pointing)
-
-    @property
-    def run_files(self):
-        """The files of the source, with the obs_id, target, wobble and pointing of each run"""
-        return list(self._files)
-
     @property
     def target(self):
-        """Target name from the TARGET field of the first file, see ``run_files`` for each file"""
-        return self._files[0].target
+        """Target name from the TARGET field of the file"""
+        return self._target
 
     @property
     def wobble(self):
-        """Wobble from the TARGET field of the first file (``W<n>``, ``UNDEF`` or None)"""
-        return self._files[0].wobble
+        """Wobble from the TARGET field of the file (``W<n>``, ``UNDEF`` or None)"""
+        return self._wobble
 
     @property
     def pointing(self):
-        """Pointing direction (ICRS) of the first file, None if unknown"""
-        return self._files[0].pointing
+        """Pointing direction (ICRS) of the run, None if unknown"""
+        return self._pointing
 
     @property
     def pointing_manual(self):
@@ -377,7 +398,7 @@ class SST1MEventSource(EventSource):
         array_event.trigger.tel[tel_id].time = time
         array_event.trigger.tels_with_trigger = [tel_id]
 
-        pointing_icrs = self._current_file.pointing
+        pointing_icrs = self._pointing
         if not self.pointing_information or pointing_icrs is None:
             return
 
@@ -423,61 +444,11 @@ class SST1MEventSource(EventSource):
     def swat_event_ids_available(self):
         return self._swat_event_ids_available
 
-    @staticmethod
-    def check_swat_event_ids_available(filelist, n_events=N_EVENTS_SWAT_ID_CHECK):
-        """
-        Determine if the files contain the array event ids (``arrayEvtNum``)
-        written by SWAT.
-
-        If SWAT did not write them, ``arrayEvtNum`` is always 0. Otherwise it can
-        be 0 at most once, if SWAT was just restarted. The ids are thus considered
-        available in a file if any of its first ``n_events`` events has a non zero
-        ``arrayEvtNum``.
-
-        Parameters
-        ----------
-        filelist: list of str or str
-            Files of the run
-        n_events: int
-            Number of events read at the beginning of each file
-
-        Returns
-        -------
-        bool:
-            True if all the files contain the SWAT ids. If only some of them do,
-            False is returned (with a warning) so that the event ids of the run
-            are consistent.
-        """
-        if isinstance(filelist, str | os.PathLike):
-            filelist = [filelist]
-
-        available = [file_has_swat_event_ids(path, n_events) for path in filelist]
-
-        if any(available) and not all(available):
-            logger.warning(
-                "SWAT event ids are available only in some of the files, they are not used: %s",
-                {str(path): has_ids for path, has_ids in zip(filelist, available, strict=True)},
-            )
-
-        return len(available) > 0 and all(available)
-
     def _generator(self):
-        """
-        Read the files one after the other.
-        NOTE: protozfits.MultiZFitsFiles merges interleaved files by event_id (LST),
-        SST-1M files are written one after the other and have no event_id field
-        """
-        count = 0
-        for run_file in self._files:
-            # the pointing of the run changes: the alt/az of the previous file are not used
-            self._current_file = run_file
-            self._altaz_cache.clear()
-            for array_event in self.get_array_event(run_file.path):
-                array_event.count = count
-                array_event.index.obs_id = run_file.obs_id
-
-                yield array_event
-                count += 1
+        for count, array_event in enumerate(self.get_array_event(str(self.input_url))):
+            array_event.count = count
+            array_event.index.obs_id = self.run_id
+            yield array_event
 
     def get_array_event(self, input_path):
         """
