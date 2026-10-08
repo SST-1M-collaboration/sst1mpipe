@@ -7,6 +7,7 @@ The PyTables descriptions are those of the tables written by sst1mpipe in the DL
 from enum import Flag
 from functools import partial
 
+import numpy as np
 from ctapipe.containers import (
     ArrayEventContainer,
     MonitoringCameraContainer,
@@ -36,6 +37,7 @@ __all__ = [
     "SST1MArrayEventContainer",
     "SST1MObservationBlockContainer",
     "DigicamConfigContainer",
+    "StreamCameraConfigContainer",
     "DL1_info",
     "DL2_info",
 ]
@@ -152,6 +154,34 @@ class DigicamConfigContainer(Container):
     operation_data = Field(-1, "Data of the operation of DigiCam")
     digicam_time_sec = Field(-1, "DigiCam time of the configuration, seconds")
     digicam_time_nanosec = Field(-1, "DigiCam time of the configuration, nanoseconds")
+
+
+class StreamCameraConfigContainer(Container):
+    """
+    Configuration of the camera of a telescope, sent in a ZMQ stream
+    (R1 ``CameraConfiguration`` or DL0 ``Telescope.CameraConfiguration`` message)
+    """
+
+    default_prefix = "camera_config"
+
+    data_level = Field("", "Data level of the stream, R1 or DL0")
+    tel_id = Field(-1, "Telescope id")
+    local_run_id = Field(-1, "Local run id of the camera")
+    config_time_s = Field(np.nan, "Time of the configuration (s)")
+    camera_config_id = Field(-1, "Id of the camera configuration")
+    pixel_id_map = Field(None, "Pixel id of each pixel of the data (n_pixels)")
+    module_id_map = Field(None, "Module id of each module of the data (n_modules)")
+    num_modules = Field(-1, "Number of modules")
+    num_pixels = Field(-1, "Number of pixels")
+    num_channels = Field(-1, "Number of gain channels")
+    num_samples_nominal = Field(-1, "Nominal number of samples of the waveforms")
+    num_samples_long = Field(-1, "Number of samples of the long waveforms")
+    num_samples_removed_start = Field(-1, "Number of samples removed at the start of the waveforms")
+    num_samples_removed_end = Field(-1, "Number of samples removed at the end of the waveforms")
+    sampling_frequency = Field(-1, "Sampling frequency (MHz), DL0 only")
+    data_model_version = Field("", "Version of the data model")
+    calibration_service_id = Field(-1, "Id of the calibration service")
+    calibration_algorithm_id = Field(-1, "Id of the calibration algorithm")
 
 
 class SST1MObservationBlockContainer(ObservationBlockContainer):
