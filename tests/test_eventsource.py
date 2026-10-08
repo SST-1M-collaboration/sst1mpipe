@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from ctapipe.core import Provenance
-from ctapipe.io import EventSource
+from ctapipe.io import EventSource, HDF5TableWriter, read_table
 
 import astropy.units as u
 import numpy as np
@@ -26,7 +26,7 @@ from sst1mpipe.io.sst1m_event_source import (
     tel_id_from_file_name,
 )
 from sst1mpipe.time import camera_clock_to_time
-from sst1mpipe.io.containers import CameraEventType, SST1MR0CameraContainer
+from sst1mpipe.io.containers import CameraEventType, DigicamConfigContainer, SST1MR0CameraContainer
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR
 
 FILE_TEL_1 = (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260121_0001.fits.fz')
@@ -440,3 +440,55 @@ def test_no_warning_pointing_in_file(monkeypatch, caplog):
     assert source.scheduling_blocks[OBS_ID_1].sb_type == SchedulingBlockType.OBSERVATION
     assert source.scheduling_blocks[OBS_ID_1].observing_mode == ObservingMode.WOBBLE
     assert "pointing" not in caplog.text.lower()
+
+
+@pytest.mark.parametrize("input_file, first_sn, digicam_time", [
+    (FILE_TEL_1, 2110003, (5122, 938643252)),
+    (TEST_DATA_DIR / "zfits" / "SST1M2_20260121_0585.fits.fz", 1120024, (6865, 247889788)),
+])
+def test_digicam_config(input_file, first_sn, digicam_time):
+    """configuration of the DigiCam boards, from the DigicamConfig table of the file"""
+    source = SST1MEventSource(input_url=input_file, max_events=1)
+    config = source.digicam_config
+
+    assert isinstance(config, DigicamConfigContainer)
+    # one entry per board slot, 0 for the empty slots
+    for name in ["protocol_vers", "sn", "hv", "gateware_rev", "gateware_vers", "gateware_code",
+                 "gateware_card_type", "firmware_rev", "firmware_vers", "firmware_code", "firmware_card_type"]:
+        assert getattr(config, name).shape == (39,)
+    assert config.sn.dtype == np.uint32
+    boards = config.sn > 0
+    assert boards.sum() == 34
+    assert config.sn[boards][0] == first_sn
+    assert np.all(config.protocol_vers[boards] == 1)
+    assert set(config.firmware_rev[boards]) == {39, 46, 48}
+    assert set(config.gateware_rev[boards]) == {23, 25}
+    assert (config.digicam_time_sec, config.digicam_time_nanosec) == digicam_time
+    assert (config.operation_id, config.operation_data) == (0, 0)
+
+
+def test_digicam_config_can_be_written(tmp_path):
+
+    config = SST1MEventSource(input_url=FILE_TEL_1, max_events=1).digicam_config
+    with HDF5TableWriter(tmp_path / "config.h5") as writer:
+        writer.write("digicam_config", config)
+
+    table = read_table(tmp_path / "config.h5", "/digicam_config")
+    np.testing.assert_array_equal(table["sn"][0], config.sn)
+    assert table["digicam_time_sec"][0] == config.digicam_time_sec
+
+
+def test_no_digicam_config(monkeypatch):
+
+    class FileWithoutConfig:
+        def __init__(self, path):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(sst1m_event_source, "File", FileWithoutConfig)
+    assert sst1m_event_source.read_digicam_config("file.fits.fz") is None

@@ -16,7 +16,7 @@ from ctapipe.containers import (
     R0CameraContainer,
     R0Container,
 )
-from ctapipe.core import Field, Map
+from ctapipe.core import Container, Field, Map
 
 from tables import (
     BoolCol,
@@ -35,6 +35,7 @@ __all__ = [
     "SST1MMonitoringContainer",
     "SST1MArrayEventContainer",
     "SST1MObservationBlockContainer",
+    "DigicamConfigContainer",
     "DL1_info",
     "DL2_info",
 ]
@@ -125,6 +126,32 @@ class SST1MMonitoringContainer(MonitoringContainer):
         default_factory=partial(Map, SST1MMonitoringCameraContainer),
         description="map of tel_id to SST1MMonitoringCameraContainer",
     )
+
+
+class DigicamConfigContainer(Container):
+    """
+    Configuration of the DigiCam boards of the camera (``DigicamConfig`` table of the
+    raw data file). The arrays have one entry per board slot (n_boards, 39), 0 for
+    the empty slots.
+    """
+
+    default_prefix = "digicam"
+
+    protocol_vers = Field(None, "Protocol version of each board (n_boards)")
+    sn = Field(None, "Serial number of each board (n_boards)")
+    hv = Field(None, "High voltage status of each board (n_boards)")
+    gateware_rev = Field(None, "Gateware revision of each board (n_boards)")
+    gateware_vers = Field(None, "Gateware version of each board (n_boards)")
+    gateware_code = Field(None, "Gateware code of each board (n_boards)")
+    gateware_card_type = Field(None, "Card type of the gateware of each board (n_boards)")
+    firmware_rev = Field(None, "Firmware revision of each board (n_boards)")
+    firmware_vers = Field(None, "Firmware version of each board (n_boards)")
+    firmware_code = Field(None, "Firmware code of each board (n_boards)")
+    firmware_card_type = Field(None, "Card type of the firmware of each board (n_boards)")
+    operation_id = Field(-1, "Id of the operation of DigiCam")
+    operation_data = Field(-1, "Data of the operation of DigiCam")
+    digicam_time_sec = Field(-1, "DigiCam time of the configuration, seconds")
+    digicam_time_nanosec = Field(-1, "DigiCam time of the configuration, nanoseconds")
 
 
 class SST1MObservationBlockContainer(ObservationBlockContainer):

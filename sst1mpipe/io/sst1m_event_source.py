@@ -36,6 +36,7 @@ from sst1mpipe.constants import (
 )
 from sst1mpipe.resources import PIXEL_MAPPING_FILE
 from sst1mpipe.io.containers import (
+    DigicamConfigContainer,
     SST1MObservationBlockContainer,
     CameraEventType,
     SST1MArrayEventContainer,
@@ -149,6 +150,34 @@ def file_start_and_duration(header):
     except (KeyError, ValueError):
         return None, None
     return start, (stop - start).to(u.min)
+
+
+DIGICAM_CONFIG_ARRAYS = (
+    "protocol_vers", "sn", "hv",
+    "gateware_rev", "gateware_vers", "gateware_code", "gateware_card_type",
+    "firmware_rev", "firmware_vers", "firmware_code", "firmware_card_type",
+)
+DIGICAM_CONFIG_VALUES = ("operation_id", "operation_data", "digicam_time_sec", "digicam_time_nanosec")
+
+
+def read_digicam_config(path):
+    """
+    Configuration of the DigiCam boards, from the ``DigicamConfig`` table of the file.
+    None if the file has no such table (or an empty one).
+    """
+    with File(str(path)) as f:
+        if not hasattr(f, "DigicamConfig"):
+            return None
+        rows = list(f.DigicamConfig)
+    if len(rows) == 0:
+        return None
+    if len(rows) > 1:
+        logger.warning("%d rows in the DigicamConfig table of %s, the first one is used", len(rows), path)
+    row = rows[0]
+    return DigicamConfigContainer(
+        **{name: np.asarray(getattr(row, name)) for name in DIGICAM_CONFIG_ARRAYS},
+        **{name: int(getattr(row, name)) for name in DIGICAM_CONFIG_VALUES},
+    )
 
 
 def file_has_swat_event_ids(path, n_events=N_EVENTS_SWAT_ID_CHECK):
@@ -318,6 +347,7 @@ class SST1MEventSource(EventSource):
         self._scheduling_blocks, self._observation_blocks = self._make_blocks(header)
 
         self._swat_event_ids_available = file_has_swat_event_ids(self.input_url)
+        self._digicam_config = read_digicam_config(self.input_url)
 
         self._pixel_swaps = parse_swapped_modules(self.swapped_modules)
 
@@ -374,6 +404,11 @@ class SST1MEventSource(EventSource):
     def pointing(self):
         """Pointing direction (ICRS) of the run, None if unknown"""
         return self._pointing
+
+    @property
+    def digicam_config(self):
+        """Configuration of the DigiCam boards (DigicamConfig table of the file), None if missing"""
+        return self._digicam_config
 
     @property
     def pointing_manual(self):
