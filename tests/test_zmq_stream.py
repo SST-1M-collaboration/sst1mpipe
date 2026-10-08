@@ -1,4 +1,5 @@
 from ctapipe.io import EventSource
+import pathlib
 import threading
 from itertools import islice
 
@@ -83,8 +84,21 @@ def test_zmq_event_source(n_events):
                          [  ["inproc://test", True],
                             ["tcp://192.168.1.1:1986", True],
                             ["tcp://[2a7d:91c4:8f21:3b7a:5e12:aa90:1c44:72ef]:8000", True],
+                            ["tcp://camserver:24593", True],
+                            ["tcp://*:24593", True],
+                            ["ipc:///tmp/sst1m_stream", True],
+                            ["epgm://eth0;239.192.1.1:5555", True],
+                            ["tcp://192.168.1.1", False],  # no port
+                            ["tcp://192.168.1.1:port", False],
+                            ["tcp://", False],
+                            ["inproc://", False],
+                            ["http://www.example.org/stream", False],
+                            ["file:///data/SST1M1_20260121_0001.fits.fz", False],
+                            ["udp://192.168.1.1:1986", False],
                             [ "not_a_valid_endpoint", False],
                             [ "/some/folder/on/linux", False],
+                            [pathlib.Path("/some/folder/on/linux"), False],
+                            [None, False],
                           ])
 def test_zmq_address(endpoint, valid):
 

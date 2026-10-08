@@ -53,6 +53,28 @@ class DataStream:
     waveform_offset: float = 0.0
 
 
+# transports of the ZMQ endpoints (libzmq)
+ZMQ_TRANSPORTS = ("tcp", "ipc", "inproc", "pgm", "epgm", "vmci")
+
+
+def is_zmq_endpoint(url):
+    """
+    True if ``url`` is a ZMQ endpoint ``<transport>://<address>``, e.g. ``tcp://192.168.1.1:1986``,
+    ``tcp://[2a7d::1]:8000``, ``ipc:///tmp/stream`` or ``inproc://name``. The address of a
+    ``tcp`` endpoint ends with a port (or ``*``). Paths and other URLs (``http://``,
+    ``file://``) are not endpoints.
+    """
+    if not isinstance(url, str):
+        return False
+    transport, separator, address = url.partition("://")
+    if separator == "" or transport not in ZMQ_TRANSPORTS or address == "":
+        return False
+    if transport == "tcp":
+        host, colon, port = address.rpartition(":")
+        return colon == ":" and host != "" and (port.isdigit() or port == "*")
+    return True
+
+
 def run_header_obs_id(run_header):
     """
     obs_id of a DigiCam run header (``DataModel.CameraRunHeader``): its ``run_id`` if set,
@@ -168,22 +190,12 @@ class ZMQEventSource(EventSource):
         self._run_obs_ids = {}
 
     @staticmethod
-    def is_compatible(file_path: str) -> bool:
-
-        context = zmq.Context()
-        socket = context.socket(zmq.PULL)
-
-        try:
-            socket.connect(file_path)
-            return True
-        except zmq.ZMQError:
-            return False
-        finally:
-            try:
-                socket.close(linger=0)
-            except Exception:
-                pass
-            context.term()
+    def is_compatible(file_path) -> bool:
+        """
+        True for a ZMQ endpoint ``<transport>://<address>`` (see `is_zmq_endpoint`),
+        without opening a connection
+        """
+        return is_zmq_endpoint(file_path)
 
     @property
     def is_stream(self):
