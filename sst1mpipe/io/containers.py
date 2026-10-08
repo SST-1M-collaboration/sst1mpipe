@@ -7,15 +7,17 @@ The PyTables descriptions are those of the tables written by sst1mpipe in the DL
 from enum import Flag
 from functools import partial
 
+import numpy as np
 from ctapipe.containers import (
     ArrayEventContainer,
     MonitoringCameraContainer,
     MonitoringContainer,
+    ObservationBlockContainer,
     PedestalContainer,
     R0CameraContainer,
     R0Container,
 )
-from ctapipe.core import Field, Map
+from ctapipe.core import Container, Field, Map
 
 from tables import (
     BoolCol,
@@ -33,6 +35,9 @@ __all__ = [
     "SST1MMonitoringCameraContainer",
     "SST1MMonitoringContainer",
     "SST1MArrayEventContainer",
+    "SST1MObservationBlockContainer",
+    "DigicamConfigContainer",
+    "StreamCameraConfigContainer",
     "DL1_info",
     "DL2_info",
 ]
@@ -122,6 +127,76 @@ class SST1MMonitoringContainer(MonitoringContainer):
     tel = Field(
         default_factory=partial(Map, SST1MMonitoringCameraContainer),
         description="map of tel_id to SST1MMonitoringCameraContainer",
+    )
+
+
+class DigicamConfigContainer(Container):
+    """
+    Configuration of the DigiCam boards of the camera (``DigicamConfig`` table of the
+    raw data file). The arrays have one entry per board slot (n_boards, 39), 0 for
+    the empty slots.
+    """
+
+    default_prefix = "digicam"
+
+    protocol_vers = Field(None, "Protocol version of each board (n_boards)")
+    sn = Field(None, "Serial number of each board (n_boards)")
+    hv = Field(None, "High voltage status of each board (n_boards)")
+    gateware_rev = Field(None, "Gateware revision of each board (n_boards)")
+    gateware_vers = Field(None, "Gateware version of each board (n_boards)")
+    gateware_code = Field(None, "Gateware code of each board (n_boards)")
+    gateware_card_type = Field(None, "Card type of the gateware of each board (n_boards)")
+    firmware_rev = Field(None, "Firmware revision of each board (n_boards)")
+    firmware_vers = Field(None, "Firmware version of each board (n_boards)")
+    firmware_code = Field(None, "Firmware code of each board (n_boards)")
+    firmware_card_type = Field(None, "Card type of the firmware of each board (n_boards)")
+    operation_id = Field(-1, "Id of the operation of DigiCam")
+    operation_data = Field(-1, "Data of the operation of DigiCam")
+    digicam_time_sec = Field(-1, "DigiCam time of the configuration, seconds")
+    digicam_time_nanosec = Field(-1, "DigiCam time of the configuration, nanoseconds")
+
+
+class StreamCameraConfigContainer(Container):
+    """
+    Configuration of the camera of a telescope, sent in a ZMQ stream
+    (R1 ``CameraConfiguration`` or DL0 ``Telescope.CameraConfiguration`` message)
+    """
+
+    default_prefix = "camera_config"
+
+    data_level = Field("", "Data level of the stream, R1 or DL0")
+    tel_id = Field(-1, "Telescope id")
+    local_run_id = Field(-1, "Local run id of the camera")
+    config_time_s = Field(np.nan, "Time of the configuration (s)")
+    camera_config_id = Field(-1, "Id of the camera configuration")
+    pixel_id_map = Field(None, "Pixel id of each pixel of the data (n_pixels)")
+    module_id_map = Field(None, "Module id of each module of the data (n_modules)")
+    num_modules = Field(-1, "Number of modules")
+    num_pixels = Field(-1, "Number of pixels")
+    num_channels = Field(-1, "Number of gain channels")
+    num_samples_nominal = Field(-1, "Nominal number of samples of the waveforms")
+    num_samples_long = Field(-1, "Number of samples of the long waveforms")
+    num_samples_removed_start = Field(-1, "Number of samples removed at the start of the waveforms")
+    num_samples_removed_end = Field(-1, "Number of samples removed at the end of the waveforms")
+    sampling_frequency = Field(-1, "Sampling frequency (MHz), DL0 only")
+    data_model_version = Field("", "Version of the data model")
+    calibration_service_id = Field(-1, "Id of the calibration service")
+    calibration_algorithm_id = Field(-1, "Id of the calibration algorithm")
+
+
+class SST1MObservationBlockContainer(ObservationBlockContainer):
+    """
+    ctapipe observation block of a SST-1M run (one raw data file), with the target
+    of the TARGET field of the file header
+    """
+
+    default_prefix = ""
+
+    target = Field("", "Target of the run, e.g. Crab, Transition or dark (TARGET field of the file)", max_length=64)
+    wobble = Field(
+        "NONE",
+        "Wobble of the run, e.g. W1: UNDEF if the TARGET field has no wobble, NONE if it only has the target",
+        max_length=16,
     )
 
 

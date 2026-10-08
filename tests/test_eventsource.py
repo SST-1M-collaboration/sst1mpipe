@@ -1,27 +1,32 @@
+import logging
 import os.path
 
-import logging
 from types import SimpleNamespace
 
 import pytest
 
 from ctapipe.core import Provenance
-from ctapipe.io import EventSource
+from ctapipe.io import EventSource, HDF5TableWriter, read_table
 
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import AltAz, SkyCoord
-from ctapipe.containers import CoordinateFrameType, PointingMode
+from astropy.time import Time
+from ctapipe.containers import CoordinateFrameType, ObservingMode, PointingMode, SchedulingBlockType
 
 import sst1mpipe.io.sst1m_event_source as sst1m_event_source
 from sst1mpipe.io.sst1m_event_source import (
     SST1MEventSource,
     file_has_swat_event_ids,
+    file_start_and_duration,
+    observing_mode,
     parse_file_name,
     parse_target_field,
+    scheduling_block_type,
+    tel_id_from_file_name,
 )
 from sst1mpipe.time import camera_clock_to_time
-from sst1mpipe.io.containers import CameraEventType, SST1MArrayEventContainer, SST1MR0CameraContainer
+from sst1mpipe.io.containers import CameraEventType, DigicamConfigContainer, SST1MR0CameraContainer
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR
 
 FILE_TEL_1 = (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260121_0001.fits.fz')
@@ -80,41 +85,11 @@ def test_is_compatible_rejects_other_files():
     assert not SST1MEventSource.is_compatible(DATA_CONFIG_FILE)
 
 
-@pytest.mark.parametrize("input_url", [
-    [FILE_TEL_1, FILE_TEL_2],
-    (FILE_TEL_1, FILE_TEL_2),
-    [str(FILE_TEL_1), str(FILE_TEL_2)],
-])
-def test_input_url_list_of_files(input_url):
-
-    source = SST1MEventSource(input_url=input_url, max_events=MAX_ITERATIONS)
-
-    assert source.input_url == FILE_TEL_1
-    assert source.filelist == [str(FILE_TEL_1), str(FILE_TEL_2)]
-
-    # events are read starting with the first file
-    event_ids = [event.index.event_id for event in source]
-    assert event_ids == [FIRST_EVENT_ID_1 + i for i in range(MAX_ITERATIONS)]
-
-
-def test_input_url_list_of_one_file():
-
-    source = SST1MEventSource(input_url=[FILE_TEL_1])
-
-    assert source.input_url == FILE_TEL_1
-    assert source.filelist == [str(FILE_TEL_1)]
-
-
-def test_files_are_read_one_after_the_other():
-
-    n_events_file_1 = 11972
-    source = SST1MEventSource(input_url=[FILE_TEL_1, FILE_TEL_2])
-
-    for event in source:
-        if event.trigger.tels_with_trigger[0] == TEL_2_ID:
-            break
-
-    assert event.count == n_events_file_1
+@pytest.mark.parametrize("input_url", [[FILE_TEL_1, FILE_TEL_2], (FILE_TEL_1,), [str(FILE_TEL_1)]])
+def test_input_url_list_of_files_refused(input_url):
+    """a single file is read: the processing scripts loop over the files"""
+    with pytest.raises(TypeError, match="single file"):
+        SST1MEventSource(input_url=input_url)
 
 
 def test_count_single_file():
@@ -124,42 +99,6 @@ def test_count_single_file():
     # count starts at 0 at each iteration over the source
     for _ in range(2):
         assert [event.count for event in source] == list(range(MAX_ITERATIONS))
-
-
-@pytest.fixture
-def fake_files(monkeypatch):
-    """Replace the reading of a file by a few empty events, to test the loop over the files"""
-    n_events = {str(FILE_TEL_1): 3, str(FILE_TEL_2): 2}
-
-    def get_array_event(self, input_path):
-        for _ in range(n_events[input_path]):
-            event = SST1MArrayEventContainer()
-            event.count = -1  # must be overwritten by the source
-            event.meta["file"] = input_path
-            yield event
-
-    monkeypatch.setattr(SST1MEventSource, "get_array_event", get_array_event)
-    return n_events
-
-
-def test_count_continues_across_files(fake_files):
-
-    source = SST1MEventSource(input_url=[FILE_TEL_1, FILE_TEL_2])
-    events = [(event.count, event.meta["file"]) for event in source]
-
-    assert events == [
-        (0, str(FILE_TEL_1)), (1, str(FILE_TEL_1)), (2, str(FILE_TEL_1)),
-        (3, str(FILE_TEL_2)), (4, str(FILE_TEL_2)),
-    ]
-
-
-def test_max_events_across_files(fake_files):
-
-    source = SST1MEventSource(input_url=[FILE_TEL_1, FILE_TEL_2], max_events=4)
-    events = [(event.count, event.meta["file"]) for event in source]
-
-    assert [count for count, _ in events] == [0, 1, 2, 3]
-    assert events[-1][1] == str(FILE_TEL_2)
 
 
 @pytest.mark.parametrize("field, expected", [
@@ -223,6 +162,75 @@ def test_pointing_given_by_user(pointing_update_interval, tolerance):
         assert u.isclose(event.pointing.array_dec, dec * u.deg)
 
 
+@pytest.mark.parametrize("target, expected", [
+    ("Crab", SchedulingBlockType.OBSERVATION),
+    ("Transition", SchedulingBlockType.UNKNOWN),
+    ("TRANSITION", SchedulingBlockType.UNKNOWN),
+    ("UNKNOWN", SchedulingBlockType.UNKNOWN),
+    ("", SchedulingBlockType.UNKNOWN),
+    (None, SchedulingBlockType.UNKNOWN),
+    ("dark", SchedulingBlockType.CALIBRATION),
+    ("DARK", SchedulingBlockType.CALIBRATION),
+    ("drak", SchedulingBlockType.CALIBRATION),
+    ("BIAS", SchedulingBlockType.CALIBRATION),
+    ("WRtest", SchedulingBlockType.ENGINEERING),
+])
+def test_scheduling_block_type(target, expected):
+
+    assert scheduling_block_type(target) == expected
+
+
+@pytest.mark.parametrize("wobble, expected", [
+    ("W1", ObservingMode.WOBBLE),
+    ("W12", ObservingMode.WOBBLE),
+    ("UNDEF", ObservingMode.UNKNOWN),
+    (None, ObservingMode.UNKNOWN),
+])
+def test_observing_mode(wobble, expected):
+
+    assert observing_mode(wobble) == expected
+
+
+@pytest.mark.parametrize("file_name, expected", [
+    ("SST1M1_20260121_0001.fits.fz", 21),
+    ("/data/SST1M2_20251003_0123.fits.fz", 22),
+    ("events.fits.fz", None),
+])
+def test_tel_id_from_file_name(file_name, expected):
+
+    assert tel_id_from_file_name(file_name) == expected
+
+
+def test_file_start_and_duration():
+
+    start, duration = file_start_and_duration({"DATE": "2026-01-21T17:07:07", "DATEEND": "2026-01-21T17:07:19"})
+    assert start == Time("2026-01-21T17:07:07", scale="utc")
+    assert duration.to_value(u.s) == pytest.approx(12)
+    assert file_start_and_duration({"DATE": "2026-01-21T17:07:07"}) == (None, None)
+
+
+def test_blocks_of_dark_run():
+
+    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1)
+    scheduling_block = source.scheduling_blocks[OBS_ID_1]
+    observation_block = source.observation_blocks[OBS_ID_1]
+
+    assert scheduling_block.sb_id == OBS_ID_1
+    assert scheduling_block.sb_type == SchedulingBlockType.CALIBRATION
+    assert scheduling_block.producer_id == "SST1M-21"
+    assert scheduling_block.observing_mode == ObservingMode.UNKNOWN
+    assert scheduling_block.pointing_mode == PointingMode.UNKNOWN
+
+    assert observation_block.obs_id == OBS_ID_1
+    assert observation_block.sb_id == OBS_ID_1
+    assert observation_block.producer_id == "SST1M-21"
+    assert observation_block.target == "dark"
+    assert observation_block.wobble == "NONE"
+    # DATE and DATEEND of the header of the file
+    assert observation_block.actual_start_time == Time("2026-01-21T17:07:07", scale="utc")
+    assert observation_block.actual_duration.to_value(u.s) == pytest.approx(12)
+
+
 @pytest.mark.parametrize("file_name, expected", [
     ("SST1M1_20260121_0001.fits.fz", ("20260121", "0001")),
     ("/data/SST1M2_20251003_0123.fits.fz", ("20251003", "0123")),
@@ -249,13 +257,12 @@ def test_event_index():
 def test_swat_event_ids_in_files(input_file):
 
     assert file_has_swat_event_ids(input_file)
-    assert SST1MEventSource.check_swat_event_ids_available([input_file])
-    assert SST1MEventSource.check_swat_event_ids_available(input_file)
+    assert SST1MEventSource(input_url=input_file, max_events=1).swat_event_ids_available
 
 
 def test_swat_event_ids_used_as_event_id():
 
-    source = SST1MEventSource(input_url=[FILE_TEL_1, FILE_TEL_2], max_events=MAX_ITERATIONS)
+    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=MAX_ITERATIONS)
 
     assert source.swat_event_ids_available
     for i, event in enumerate(source):
@@ -304,36 +311,6 @@ def test_file_has_swat_event_ids_n_events(fake_array_event_numbers):
 
     assert not file_has_swat_event_ids("file.fits.fz", n_events=2)
     assert file_has_swat_event_ids("file.fits.fz", n_events=3)
-
-
-@pytest.mark.parametrize("numbers_1, numbers_2, expected", [
-    ([1, 2], [3, 4], True),
-    ([0, 0], [0, 0], False),
-    ([1, 2], [0, 0], False),  # mixing ids would give inconsistent event ids
-    ([0, 0], [3, 4], False),
-])
-def test_check_swat_event_ids_available_all_files(fake_array_event_numbers, numbers_1, numbers_2, expected):
-
-    fake_array_event_numbers.update({"file_1.fits.fz": numbers_1, "file_2.fits.fz": numbers_2})
-
-    available = SST1MEventSource.check_swat_event_ids_available(["file_1.fits.fz", "file_2.fits.fz"])
-
-    assert available is expected
-
-
-def test_check_swat_event_ids_warns_if_only_some_files(fake_array_event_numbers, caplog):
-
-    fake_array_event_numbers.update({"file_1.fits.fz": [1, 2], "file_2.fits.fz": [0, 0]})
-
-    with caplog.at_level(logging.WARNING):
-        assert not SST1MEventSource.check_swat_event_ids_available(["file_1.fits.fz", "file_2.fits.fz"])
-
-    assert "only in some of the files" in caplog.text
-
-
-def test_check_swat_event_ids_no_file():
-
-    assert not SST1MEventSource.check_swat_event_ids_available([])
 
 
 def test_only_r0_trigger_and_pointing_are_filled():
@@ -418,10 +395,100 @@ def test_input_files_in_provenance():
     provenance = Provenance()
     provenance.start_activity("test_input_files_in_provenance")
     try:
-        SST1MEventSource(input_url=[FILE_TEL_1, FILE_TEL_2], max_events=1)
+        SST1MEventSource(input_url=FILE_TEL_1, max_events=1)
         inputs = provenance.current_activity.input
     finally:
         provenance.finish_activity()
 
-    assert [entry["url"] for entry in inputs] == [str(FILE_TEL_1), str(FILE_TEL_2)]
+    assert [entry["url"] for entry in inputs] == [str(FILE_TEL_1)]
     assert all(entry["role"] == "R0/Event" for entry in inputs)
+
+
+def test_warning_no_pointing_in_file(caplog):
+
+    with caplog.at_level(logging.WARNING):
+        SST1MEventSource(input_url=FILE_TEL_1, max_events=1)
+
+    assert "No pointing in the TARGET field ('dark')" in caplog.text
+    assert "not reconstructed" in caplog.text
+
+
+def test_warning_pointing_given_by_user_and_in_file(monkeypatch, caplog):
+    """the pointing of the file and the one given by the user are reported, with their separation"""
+    header = {"TARGET": "Crab_W1_83.63_22.01", "DATE": "2026-01-21T17:07:07", "DATEEND": "2026-01-21T17:07:19"}
+    monkeypatch.setattr(sst1m_event_source.fits, "getheader", lambda *args, **kwargs: header)
+
+    with caplog.at_level(logging.WARNING):
+        source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1, pointing_ra=84.63, pointing_dec=22.01)
+
+    assert source.pointing.ra.deg == pytest.approx(84.63)
+    assert "Pointing given by the user (RA 84.6300 deg, Dec 22.0100 deg)" in caplog.text
+    assert "pointing of the file (RA 83.6300 deg, Dec 22.0100 deg)" in caplog.text
+    # 1 deg in RA at Dec 22 deg
+    assert f"separation {np.cos(np.deg2rad(22.01)):.4f} deg" in caplog.text
+
+
+def test_no_warning_pointing_in_file(monkeypatch, caplog):
+
+    header = {"TARGET": "Crab_W1_83.63_22.01"}
+    monkeypatch.setattr(sst1m_event_source.fits, "getheader", lambda *args, **kwargs: header)
+
+    with caplog.at_level(logging.WARNING):
+        source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1)
+
+    assert source.pointing.ra.deg == pytest.approx(83.63)
+    assert source.scheduling_blocks[OBS_ID_1].sb_type == SchedulingBlockType.OBSERVATION
+    assert source.scheduling_blocks[OBS_ID_1].observing_mode == ObservingMode.WOBBLE
+    assert "pointing" not in caplog.text.lower()
+
+
+@pytest.mark.parametrize("input_file, first_sn, digicam_time", [
+    (FILE_TEL_1, 2110003, (5122, 938643252)),
+    (TEST_DATA_DIR / "zfits" / "SST1M2_20260121_0585.fits.fz", 1120024, (6865, 247889788)),
+])
+def test_digicam_config(input_file, first_sn, digicam_time):
+    """configuration of the DigiCam boards, from the DigicamConfig table of the file"""
+    source = SST1MEventSource(input_url=input_file, max_events=1)
+    config = source.digicam_config
+
+    assert isinstance(config, DigicamConfigContainer)
+    # one entry per board slot, 0 for the empty slots
+    for name in ["protocol_vers", "sn", "hv", "gateware_rev", "gateware_vers", "gateware_code",
+                 "gateware_card_type", "firmware_rev", "firmware_vers", "firmware_code", "firmware_card_type"]:
+        assert getattr(config, name).shape == (39,)
+    assert config.sn.dtype == np.uint32
+    boards = config.sn > 0
+    assert boards.sum() == 34
+    assert config.sn[boards][0] == first_sn
+    assert np.all(config.protocol_vers[boards] == 1)
+    assert set(config.firmware_rev[boards]) == {39, 46, 48}
+    assert set(config.gateware_rev[boards]) == {23, 25}
+    assert (config.digicam_time_sec, config.digicam_time_nanosec) == digicam_time
+    assert (config.operation_id, config.operation_data) == (0, 0)
+
+
+def test_digicam_config_can_be_written(tmp_path):
+
+    config = SST1MEventSource(input_url=FILE_TEL_1, max_events=1).digicam_config
+    with HDF5TableWriter(tmp_path / "config.h5") as writer:
+        writer.write("digicam_config", config)
+
+    table = read_table(tmp_path / "config.h5", "/digicam_config")
+    np.testing.assert_array_equal(table["sn"][0], config.sn)
+    assert table["digicam_time_sec"][0] == config.digicam_time_sec
+
+
+def test_no_digicam_config(monkeypatch):
+
+    class FileWithoutConfig:
+        def __init__(self, path):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+    monkeypatch.setattr(sst1m_event_source, "File", FileWithoutConfig)
+    assert sst1m_event_source.read_digicam_config("file.fits.fz") is None

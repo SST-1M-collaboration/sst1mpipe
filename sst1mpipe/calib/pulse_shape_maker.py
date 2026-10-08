@@ -9,6 +9,7 @@ Created on Wed Mar 23 16:36:22 2022
 import argparse
 import datetime
 import os
+from itertools import chain, islice
 
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -153,9 +154,10 @@ class shape_maker:
                 )
             mask_low_el_noise = np.ones(self.n_pixels,dtype=bool)
         else:
-            data_stream = SST1MEventSource(
-                input_url=self.file_list,
-                max_events=self.max_evt
+            # the files are read one after the other, max_evt events in total
+            data_stream = islice(
+                chain.from_iterable(SST1MEventSource(input_url=path) for path in self.file_list),
+                self.max_evt,
                 )
             calib_param = get_default_calibration(self.tel+20)[0]
             mask_low_el_noise = np.array(calib_param['sigma_el']<5)
