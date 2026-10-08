@@ -1,11 +1,13 @@
 from collections import Counter
 
+import astropy.units as u
 import numpy as np
 import pytest
 from astropy.time import Time
-from ctapipe.containers import EventType
+from ctapipe.containers import CoordinateFrameType, EventType
+from ctapipe.core import Provenance
 from ctapipe.core import run_tool
-from ctapipe.io import EventSource, read_table
+from ctapipe.io import DataWriter, EventSource, read_table
 
 from sst1mpipe.io import get_dl1_info
 from sst1mpipe.io.containers import CameraEventType
@@ -163,3 +165,58 @@ def test_process_zfits_file(zfits_file, tmp_path):
     intensity = parameters["camera_frame_hillas_intensity"]
     assert np.isfinite(intensity[is_shower]).sum() > 0
     assert np.all(intensity[np.isfinite(intensity)] > 0)
+
+
+# ---------------------------------------------------------------------------
+# target of each run (file) of the source
+# ---------------------------------------------------------------------------
+
+TRANSITION_FILE = TEST_DATA_DIR / "zfits" / FILES[21]["name"]
+DARK_FILE = TEST_DATA_DIR / "zfits" / "SST1M1_20260121_0001.fits.fz"
+N_TRANSITION_EVENTS = FILES[21]["n_showers"] + FILES[21]["n_pedestals"]
+
+
+def test_target_of_each_run():
+    with SST1MEventSource([TRANSITION_FILE, DARK_FILE], max_events=N_TRANSITION_EVENTS + 10) as source:
+        run_files = source.run_files
+        observation_blocks = source.observation_blocks
+        obs_ids = Counter(event.index.obs_id for event in source)
+
+    assert [(f.obs_id, f.target, f.wobble, f.pointing) for f in run_files] == [
+        (202601210206, "Transition", None, None),
+        (202601210001, "dark", None, None),
+    ]
+    # one observation block per run, with its target
+    assert list(observation_blocks) == [202601210206, 202601210001]
+    assert [(ob.obs_id, ob.target, ob.wobble) for ob in observation_blocks.values()] == [
+        (202601210206, "Transition", "NONE"),
+        (202601210001, "dark", "NONE"),
+    ]
+    # the events have the obs_id of their run
+    assert obs_ids == {202601210206: N_TRANSITION_EVENTS, 202601210001: 10}
+
+
+def test_pointing_given_by_the_user_for_all_runs():
+    with SST1MEventSource(
+        [TRANSITION_FILE, DARK_FILE], max_events=1, pointing_ra=83.63, pointing_dec=22.01,
+    ) as source:
+        assert source.pointing_manual
+        for run_file in source.run_files:
+            assert run_file.pointing.ra.deg == pytest.approx(83.63)
+            assert run_file.pointing.dec.deg == pytest.approx(22.01)
+        for ob in source.observation_blocks.values():
+            assert ob.subarray_pointing_lon.to_value(u.deg) == pytest.approx(83.63)
+            assert ob.subarray_pointing_frame == CoordinateFrameType.ICRS
+
+
+def test_target_written_in_the_observation_blocks(tmp_path):
+    output = tmp_path / "events.dl1.h5"
+    Provenance().start_activity("test_target")
+    with SST1MEventSource([TRANSITION_FILE, DARK_FILE], max_events=1) as source:
+        with DataWriter(source, output_path=output, write_dl1_parameters=True):
+            pass
+
+    observation_blocks = read_table(output, "/configuration/observation/observation_block")
+    assert list(observation_blocks["obs_id"]) == [202601210206, 202601210001]
+    assert list(observation_blocks["target"]) == ["Transition", "dark"]
+    assert list(observation_blocks["wobble"]) == ["NONE", "NONE"]

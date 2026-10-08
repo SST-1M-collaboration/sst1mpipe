@@ -11,6 +11,7 @@ from ctapipe.containers import (
     ArrayEventContainer,
     MonitoringCameraContainer,
     MonitoringContainer,
+    ObservationBlockContainer,
     PedestalContainer,
     R0CameraContainer,
     R0Container,
@@ -33,6 +34,7 @@ __all__ = [
     "SST1MMonitoringCameraContainer",
     "SST1MMonitoringContainer",
     "SST1MArrayEventContainer",
+    "SST1MObservationBlockContainer",
     "DL1_info",
     "DL2_info",
 ]
@@ -122,6 +124,22 @@ class SST1MMonitoringContainer(MonitoringContainer):
     tel = Field(
         default_factory=partial(Map, SST1MMonitoringCameraContainer),
         description="map of tel_id to SST1MMonitoringCameraContainer",
+    )
+
+
+class SST1MObservationBlockContainer(ObservationBlockContainer):
+    """
+    ctapipe observation block of a SST-1M run (one raw data file), with the target
+    of the TARGET field of the file header
+    """
+
+    default_prefix = ""
+
+    target = Field("", "Target of the run, e.g. Crab, Transition or dark (TARGET field of the file)", max_length=64)
+    wobble = Field(
+        "NONE",
+        "Wobble of the run, e.g. W1: UNDEF if the TARGET field has no wobble, NONE if it only has the target",
+        max_length=16,
     )
 
 

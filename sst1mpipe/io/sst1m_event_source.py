@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import warnings
+from dataclasses import dataclass
 from itertools import islice
 
 import numpy as np
@@ -14,7 +15,6 @@ from astropy.time import Time
 from ctapipe.containers import (
     CoordinateFrameType,
     EventType,
-    ObservationBlockContainer,
     PointingMode,
     SchedulingBlockContainer,
 )
@@ -35,6 +35,7 @@ from sst1mpipe.constants import (
 )
 from sst1mpipe.resources import PIXEL_MAPPING_FILE
 from sst1mpipe.io.containers import (
+    SST1MObservationBlockContainer,
     CameraEventType,
     SST1MArrayEventContainer,
 )
@@ -85,6 +86,17 @@ def parse_target_field(field):
     except ValueError:
         return target, wobble, None, None
     return target, wobble, ra, dec
+
+
+@dataclass
+class RunFile:
+    """A raw data file of the source: its run (obs_id), target and pointing"""
+
+    path: str
+    obs_id: int
+    target: str | None
+    wobble: str | None
+    pointing: SkyCoord | None
 
 
 def parse_file_name(file_name):
@@ -233,7 +245,7 @@ class SST1MEventSource(EventSource):
         for path in self.filelist:
             Provenance().add_input_file(path, role="R0/Event", add_meta=False)
 
-        # obs_id from the date and run number of the file name
+        # obs_id of the first file, from the date and run number of the file name
         date_run = parse_file_name(self.filelist[0])
         self.run_number = int(date_run[1]) if date_run else 0
         self.run_id = int(''.join(date_run)) if date_run else 0
@@ -246,42 +258,41 @@ class SST1MEventSource(EventSource):
         self._subarray = SUBARRAY_DESCRIPTION
 
 
-        # Target and pointing from the TARGET field of the file, unless given by the user
-        header = fits.getheader(self.filelist[0], 'Events')
-        self._target, self._wobble, ra, dec = parse_target_field(header.get('TARGET'))
+        # Target and pointing of each file, from its TARGET field, unless the pointing is given by the user
         self._pointing_manual = (self.pointing_ra is not None) and (self.pointing_dec is not None)
-        if self._pointing_manual:
-            ra, dec = self.pointing_ra, self.pointing_dec
-
-        self._pointing = None
+        self._files = [self._read_run_file(path) for path in self.filelist]
+        self._current_file = self._files[0]
         self._tel_locations = {}
         self._altaz_cache = {}
-        target_info = {}
-        pointing_mode = PointingMode.UNKNOWN
-        if (ra is not None) and (dec is not None):
-            self._pointing = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame='icrs')
-            target_info["subarray_pointing_lon"] = ra * u.deg
-            target_info["subarray_pointing_lat"] = dec * u.deg
-            target_info["subarray_pointing_frame"] = CoordinateFrameType.ICRS
-            pointing_mode = PointingMode.TRACK
 
-        self._scheduling_blocks = {
-            self.run_id: SchedulingBlockContainer(
-                sb_id=np.uint64(self.run_id),
+        # one observation block per run (file)
+        self._scheduling_blocks = {}
+        self._observation_blocks = {}
+        for run_file in self._files:
+            if run_file.obs_id in self._observation_blocks:
+                continue
+            target_info = {}
+            pointing_mode = PointingMode.UNKNOWN
+            if run_file.pointing is not None:
+                target_info["subarray_pointing_lon"] = run_file.pointing.ra.to(u.deg)
+                target_info["subarray_pointing_lat"] = run_file.pointing.dec.to(u.deg)
+                target_info["subarray_pointing_frame"] = CoordinateFrameType.ICRS
+                pointing_mode = PointingMode.TRACK
+
+            self._scheduling_blocks[run_file.obs_id] = SchedulingBlockContainer(
+                sb_id=np.uint64(run_file.obs_id),
                 producer_id=f"SST1M-{self.tel_id}",
                 pointing_mode=pointing_mode,
             )
-        }
-
-        self._observation_blocks = {
-            self.run_id: ObservationBlockContainer(
-                obs_id=np.uint64(self.run_id),
-                sb_id=np.uint64(self.run_id),
+            self._observation_blocks[run_file.obs_id] = SST1MObservationBlockContainer(
+                obs_id=np.uint64(run_file.obs_id),
+                sb_id=np.uint64(run_file.obs_id),
                 producer_id=f"SST1M-{self.tel_id}",
                 actual_start_time=self.run_start,
+                target=run_file.target or "",
+                wobble=run_file.wobble or "NONE",
                 **target_info
             )
-        }
 
         self._swat_event_ids_available = self.check_swat_event_ids_available(self.filelist)
 
@@ -296,20 +307,38 @@ class SST1MEventSource(EventSource):
     def subarray(self):
         return self._subarray
 
+    def _read_run_file(self, path):
+        """obs_id, target, wobble and pointing of a raw data file"""
+        date_run = parse_file_name(path)
+        obs_id = int(''.join(date_run)) if date_run else 0
+        header = fits.getheader(path, 'Events')
+        target, wobble, ra, dec = parse_target_field(header.get('TARGET'))
+        if self._pointing_manual:
+            ra, dec = self.pointing_ra, self.pointing_dec
+        pointing = None
+        if (ra is not None) and (dec is not None):
+            pointing = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame='icrs')
+        return RunFile(path=str(path), obs_id=obs_id, target=target, wobble=wobble, pointing=pointing)
+
+    @property
+    def run_files(self):
+        """The files of the source, with the obs_id, target, wobble and pointing of each run"""
+        return list(self._files)
+
     @property
     def target(self):
-        """Target name from the TARGET field of the file"""
-        return self._target
+        """Target name from the TARGET field of the first file, see ``run_files`` for each file"""
+        return self._files[0].target
 
     @property
     def wobble(self):
-        """Wobble from the TARGET field of the file (``W<n>``, ``UNDEF`` or None)"""
-        return self._wobble
+        """Wobble from the TARGET field of the first file (``W<n>``, ``UNDEF`` or None)"""
+        return self._files[0].wobble
 
     @property
     def pointing(self):
-        """Pointing direction (ICRS) of the run, None if unknown"""
-        return self._pointing
+        """Pointing direction (ICRS) of the first file, None if unknown"""
+        return self._files[0].pointing
 
     @property
     def pointing_manual(self):
@@ -348,14 +377,15 @@ class SST1MEventSource(EventSource):
         array_event.trigger.tel[tel_id].time = time
         array_event.trigger.tels_with_trigger = [tel_id]
 
-        if not self.pointing_information or self._pointing is None:
+        pointing_icrs = self._current_file.pointing
+        if not self.pointing_information or pointing_icrs is None:
             return
 
         # the alt/az transformation is slow, it is only recomputed when the time changed enough
         cached = self._altaz_cache.get(tel_id)
         if cached is None or abs((time - cached[0]).to_value(u.s)) > self.pointing_update_interval:
             horizon_frame = AltAz(obstime=time, location=self._tel_location(tel_id))
-            altaz = self._pointing.transform_to(horizon_frame)
+            altaz = pointing_icrs.transform_to(horizon_frame)
             cached = (time, altaz.az.to(u.rad), altaz.alt.to(u.rad))
             self._altaz_cache[tel_id] = cached
         _, azimuth, altitude = cached
@@ -365,8 +395,8 @@ class SST1MEventSource(EventSource):
         pointing.tel[tel_id].altitude = altitude
         pointing.array_azimuth = azimuth
         pointing.array_altitude = altitude
-        pointing.array_ra = self._pointing.ra.to(u.rad)
-        pointing.array_dec = self._pointing.dec.to(u.rad)
+        pointing.array_ra = pointing_icrs.ra.to(u.rad)
+        pointing.array_dec = pointing_icrs.dec.to(u.rad)
 
     @property
     def is_simulation(self):
@@ -438,10 +468,13 @@ class SST1MEventSource(EventSource):
         SST-1M files are written one after the other and have no event_id field
         """
         count = 0
-        for input_path in self.filelist:
-            for array_event in self.get_array_event(input_path):
+        for run_file in self._files:
+            # the pointing of the run changes: the alt/az of the previous file are not used
+            self._current_file = run_file
+            self._altaz_cache.clear()
+            for array_event in self.get_array_event(run_file.path):
                 array_event.count = count
-                array_event.index.obs_id = self.run_id
+                array_event.index.obs_id = run_file.obs_id
 
                 yield array_event
                 count += 1
