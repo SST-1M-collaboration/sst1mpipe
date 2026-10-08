@@ -1,8 +1,10 @@
 """
-Event source of the R1 and DL0 telescope events sent in a ZMQ stream (CTAO protocol
-buffers, e.g. by the camera server for the real time analysis).
+Event source of the telescope events sent in a ZMQ stream (protocol buffers, e.g. by the
+camera server for the real time analysis): DigiCam R0 events (``DataModel.CameraEvent``,
+as in the zfits files) and CTAO R1 and DL0 events.
 """
 from dataclasses import dataclass
+from functools import partial
 
 import numpy as np
 import zmq
@@ -12,14 +14,22 @@ from ctapipe.containers import (
     SchedulingBlockContainer,
     SchedulingBlockType,
 )
-from ctapipe.core.traits import Path, Undefined, Unicode, UseEnum
+from ctapipe.core.traits import Dict, List, Path, Undefined, Unicode, UseEnum
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import EventSource
 from ctapipe.io.datalevels import DataLevel
 from ctapipe.time import ctao_high_res_to_time
-from protozfits import CoreMessages_pb2, DL0v1_Telescope_pb2, R1v1_pb2, any_array_to_numpy
+from protozfits import (
+    CoreMessages_pb2,
+    DL0v1_Telescope_pb2,
+    ProtoDataModel_pb2,
+    R1v1_pb2,
+    any_array_to_numpy,
+    make_namedtuple,
+)
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer, StreamCameraConfigContainer
+from sst1mpipe.io.sst1m_event_source import fill_r0_event, parse_swapped_modules, pixel_order
 from sst1mpipe.resources import SUBARRAY_FILE
 
 __all__ = ["ZMQEventSource", "DataStream"]
@@ -76,10 +86,13 @@ def camera_config_container(message, data_level):
 
 class ZMQEventSource(EventSource):
     """
-    Read the R1 or DL0 telescope events of a ZMQ stream (PULL socket).
+    Read the telescope events of a ZMQ stream (PULL socket).
 
     The messages of the stream (``CTAMessage``) are:
 
+    - the DigiCam camera events (``CAMERA_EVENT``, ``DataModel.CameraEvent`` as in the zfits
+      files), filling ``event.r0`` and the trigger as the `SST1MEventSource`. The event id is
+      the SWAT array event id if the first event has one, the camera event number otherwise.
     - the data stream of a telescope (``TELESCOPE_DATA_STREAM``, ``DL0_TELESCOPE_DATA_STREAM``):
       its scheduling and observation blocks and the encoding of the waveforms
       (``stored / waveform_scale - waveform_offset``)
@@ -109,6 +122,15 @@ class ZMQEventSource(EventSource):
         help="Type of the scheduling blocks of the stream, which is not sent in the stream",
     ).tag(config=True)
 
+    swapped_modules = List(
+        trait=Dict(),
+        default_value=[],
+        help=(
+            "Wrongly connected modules of the DigiCam camera events, see"
+            " SST1MEventSource.swapped_modules"
+        ),
+    ).tag(config=True)
+
     def __init__(self, input_url=Undefined, config=None, parent=None, **kwargs):
 
         super().__init__(input_url=input_url, config=config, parent=parent, **kwargs)
@@ -122,6 +144,8 @@ class ZMQEventSource(EventSource):
         self._data_streams = {}
         self._camera_configs = {}
         self._end_of_stream = False
+        self._pixel_order = partial(pixel_order, parse_swapped_modules(self.swapped_modules))
+        self._swat_event_ids = None
 
     @staticmethod
     def is_compatible(file_path: str) -> bool:
@@ -175,7 +199,7 @@ class ZMQEventSource(EventSource):
 
     @property
     def datalevels(self):
-        return (DataLevel.R1, DataLevel.DL0)
+        return (DataLevel.R0, DataLevel.R1, DataLevel.DL0)
 
     def _generator(self):
         count = 0
@@ -193,6 +217,8 @@ class ZMQEventSource(EventSource):
 
     def _read_payload(self, msg_type, payload):
         """Read a payload of a message: the event for an event payload, None otherwise"""
+        if msg_type == CoreMessages_pb2.CAMERA_EVENT:
+            return self._camera_event(payload)
         if msg_type == CoreMessages_pb2.R1_EVENT:
             return self._r1_event(payload)
         if msg_type == CoreMessages_pb2.DL0_TELESCOPE_EVENT:
@@ -255,6 +281,28 @@ class ZMQEventSource(EventSource):
         event.trigger.time = camera.event_time
         event.trigger.tel[tel_id].time = camera.event_time
         event.trigger.tels_with_trigger = [tel_id]
+
+    def _camera_event(self, payload):
+        """R0 event of a DigiCam camera event (DataModel.CameraEvent)"""
+        message = ProtoDataModel_pb2.CameraEvent()
+        message.ParseFromString(payload)
+        camera_event = make_namedtuple(message)
+
+        event = SST1MArrayEventContainer()
+        event.r0.meta = dict(is_simulation=False)
+        tel_id = fill_r0_event(event, camera_event, self._pixel_order)
+
+        # the event ids of the stream are the SWAT array event ids if the first event has one
+        if self._swat_event_ids is None:
+            self._swat_event_ids = camera_event.arrayEvtNum != 0
+            self.log.info(
+                "Event id of the camera events: %s",
+                "SWAT array event id" if self._swat_event_ids else "camera event number",
+            )
+        event.index.event_id = camera_event.arrayEvtNum if self._swat_event_ids else camera_event.eventNumber
+        data_stream = self._data_streams.get(tel_id)
+        event.index.obs_id = data_stream.obs_id if data_stream is not None else 0
+        return event
 
     def _r1_event(self, payload):
         message = R1v1_pb2.Event()

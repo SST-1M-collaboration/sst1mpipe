@@ -225,6 +225,110 @@ def parse_swapped_modules(swapped_modules, pixel_mapping_file=PIXEL_MAPPING_FILE
     return pixel_swaps
 
 
+def swapped_pixels(pixel_swaps, tel_id, time):
+    """
+    Pixel ids of the wrongly connected modules (pairs) of the telescope ``tel_id``
+    at the time ``time``, see `parse_swapped_modules`
+    """
+    return [
+        (pixels_1, pixels_2)
+        for start, stop, pixels_1, pixels_2 in pixel_swaps.get(tel_id, [])
+        if start < time < stop
+    ]
+
+
+def pixel_order(pixel_swaps, tel_id, pixel_ids, time):
+    """
+    Order of the pixels of a camera event: by pixel id, with the pixels of
+    the wrongly connected modules swapped, see `parse_swapped_modules`
+    """
+    order = np.argsort(pixel_ids)
+    for pixels_1, pixels_2 in swapped_pixels(pixel_swaps, tel_id, time):
+        order[pixels_1], order[pixels_2] = order[pixels_2], order[pixels_1]
+    return order
+
+
+def prepare_trigger_input(traces):
+    A, B = 3, 192
+    cut = 144
+    traces = traces.reshape(-1, A)
+    traces = traces.reshape(-1, A, B)
+    traces = traces[..., :cut]
+    traces = traces.reshape(traces.shape[0], -1)
+    traces = traces.T
+    return traces[PATCH_ID_INPUT_SORT_IDS]
+
+
+def prepare_trigger_output(traces):
+    A, B, C = 3, 18, 8
+    traces = np.unpackbits(traces.reshape(-1, A, B, 1), axis=-1)
+    traces = traces[..., ::-1]
+    traces = traces.reshape(-1, A * B * C).T
+    return traces[PATCH_ID_OUTPUT_SORT_IDS]
+
+
+def read_trigger_traces(traces, prepare, name, n_samples):
+    if len(traces) > 0:
+        return prepare(traces)
+    warnings.warn(f'{name} does not exist: --> nan', stacklevel=3)
+    return np.full((432, n_samples), np.nan)
+
+
+def fill_r0_event(array_event, camera_event, order=None):
+    """
+    Fill the R0 data of the telescope (``event.r0``) and the trigger (time, telescope,
+    event type) of ``array_event`` with a DigiCam camera event (``DataModel.CameraEvent``
+    protobuf message, converted by `protozfits.make_namedtuple` as in the zfits files).
+    The event index is not filled.
+
+    Parameters
+    ----------
+    array_event: SST1MArrayEventContainer
+    camera_event: protozfits CameraEvent
+    order: callable or None
+        ``order(tel_id, pixel_ids, time)``: order of the pixels in the camera,
+        e.g. with the wrongly connected modules swapped. By default by pixel id.
+
+    Returns
+    -------
+    int: telescope id
+    """
+    tel_id = camera_event.telescopeID
+    pixel_ids = camera_event.hiGain.waveforms.pixelsIndices
+    n_pixels = len(pixel_ids)
+    local_time = local_time_to_time(camera_event.local_time_sec, camera_event.local_time_nanosec)
+
+    sort_ids = np.argsort(pixel_ids) if order is None else order(tel_id, pixel_ids, local_time)
+    samples = camera_event.hiGain.waveforms.samples.reshape(n_pixels, -1)
+    n_samples = samples.shape[1]
+
+    r0 = array_event.r0.tel[tel_id]
+    r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
+    r0.pedestal = camera_event.hiGain.waveforms.baselines[sort_ids] / 16
+    r0.camera_event_number = camera_event.eventNumber
+    r0.pixel_flags = camera_event.pixels_flags[sort_ids]
+    r0.event_time = local_time
+    if camera_event.trig is not None:
+        r0.gps_time = local_time_to_time(camera_event.trig.timeSec, camera_event.trig.timeNanoSec)
+    r0.event_type = camera_event.event_type
+    for name, prepare in [
+        ("trigger_input_traces", prepare_trigger_input),
+        ("trigger_output_patch7", prepare_trigger_output),
+        ("trigger_output_patch19", prepare_trigger_output),
+        ("trigger_output_muon", prepare_trigger_output),
+    ]:
+        setattr(r0, name, read_trigger_traces(getattr(camera_event, name), prepare, name, n_samples))
+
+    array_event.trigger.time = local_time
+    array_event.trigger.tel[tel_id].time = local_time
+    array_event.trigger.tels_with_trigger = [tel_id]
+    # internal triggers are the pedestal events
+    array_event.trigger.event_type = (
+        EventType.SKY_PEDESTAL if r0.event_type == CameraEventType.INTERNAL else EventType.SUBARRAY
+    )
+    return tel_id
+
+
 class SST1MEventSource(EventSource):
     """
     https://github.com/cta-observatory/ctapipe_io_lst/blob/0f8b8cd39403f51dc8b1b0e1eb5a6045ea5deb15/src/ctapipe_io_lst/__init__.py#L13
@@ -426,27 +530,16 @@ class SST1MEventSource(EventSource):
         Pixel ids of the wrongly connected modules (pairs) of the telescope ``tel_id``
         at the time ``local_camera_clock`` (ns, TAI), see ``swapped_modules``
         """
-        return [
-            (pixels_1, pixels_2)
-            for start, stop, pixels_1, pixels_2 in self._pixel_swaps.get(tel_id, [])
-            if start < time < stop
-        ]
+        return swapped_pixels(self._pixel_swaps, tel_id, time)
 
     def _pixel_order(self, tel_id, pixel_ids, time):
         """
         Order of the pixels of the event in the camera: by pixel id, with the
         pixels of the wrongly connected modules swapped
         """
-        order = np.argsort(pixel_ids)
-        for pixels_1, pixels_2 in self.swapped_pixels(tel_id, time):
-            order[pixels_1], order[pixels_2] = order[pixels_2], order[pixels_1]
-        return order
+        return pixel_order(self._pixel_swaps, tel_id, pixel_ids, time)
 
-    def _fill_trigger_and_pointing(self, array_event, tel_id, time):
-        array_event.trigger.time = time
-        array_event.trigger.tel[tel_id].time = time
-        array_event.trigger.tels_with_trigger = [tel_id]
-
+    def _fill_pointing(self, array_event, tel_id, time):
         pointing_icrs = self._pointing
         if not self.pointing_information or pointing_icrs is None:
             return
@@ -514,84 +607,16 @@ class SST1MEventSource(EventSource):
                 else:
                     array_event.index.event_id = event.eventNumber
 
-                tel_id = event.telescopeID
-                pixel_ids = event.hiGain.waveforms.pixelsIndices
-                n_pixels = len(pixel_ids)
-                local_time = local_time_to_time(event.local_time_sec, event.local_time_nanosec)
-
-                sort_ids = self._pixel_order(tel_id, pixel_ids, local_time)
-                samples = event.hiGain.waveforms.samples.reshape(n_pixels, -1)
-                n_samples = samples.shape[1]
-
-                try:
-                    unsorted_baseline = event.hiGain.waveforms.baselines
-                except AttributeError as err:
-                    raise AttributeError("Could not read `hiGain.waveforms.baselines`"
-                        f"for event:{event_counter} (eventNumber {event.eventNumber})\n"
-                        f"of file:{input_path}\n") from err
-
                 array_event.r0.tel.clear()
-                r0 = array_event.r0.tel[tel_id]
-                r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
-                r0.pedestal = unsorted_baseline[sort_ids] / 16
-                r0.camera_event_number = event.eventNumber
-                r0.pixel_flags = event.pixels_flags[sort_ids]
-                r0.event_time = local_time
-                if event.trig is not None:
-                    trigger_time = local_time_to_time(event.trig.timeSec, event.trig.timeNanoSec)
-                    r0.gps_time = trigger_time
-
-                r0.event_type = event.event_type
-                r0.trigger_input_traces = self._read_trigger_traces(
-                    event.trigger_input_traces, self._prepare_trigger_input,
-                    "trigger_input_traces", n_samples,
-                )
-                r0.trigger_output_patch7 = self._read_trigger_traces(
-                    event.trigger_output_patch7, self._prepare_trigger_output,
-                    "trigger_output_patch7", n_samples,
-                )
-                r0.trigger_output_patch19 = self._read_trigger_traces(
-                    event.trigger_output_patch19, self._prepare_trigger_output,
-                    "trigger_output_patch19", n_samples,
-                )
-
-                r0.trigger_output_muon = self._read_trigger_traces(event.trigger_output_muon, self._prepare_trigger_output,
-                                                                   "trigger_output_muon", n_samples,)
-
-                self._fill_trigger_and_pointing(array_event, tel_id, local_time)
-                # internal triggers are the pedestal events
-                array_event.trigger.event_type = (
-                    EventType.SKY_PEDESTAL if r0.event_type == CameraEventType.INTERNAL
-                    else EventType.SUBARRAY
-                )
+                try:
+                    tel_id = fill_r0_event(array_event, event, self._pixel_order)
+                except AttributeError as err:
+                    raise AttributeError(
+                        f"Could not read the event {event_counter} (eventNumber {event.eventNumber})"
+                        f" of the file {input_path}"
+                    ) from err
+                self._fill_pointing(array_event, tel_id, array_event.trigger.time)
                 yield array_event
-
-    @staticmethod
-    def _read_trigger_traces(traces, prepare, name, n_samples):
-        if len(traces) > 0:
-            return prepare(traces)
-        warnings.warn(f'{name} does not exist: --> nan', stacklevel=3)
-        return np.full((432, n_samples), np.nan)
-
-    def _prepare_trigger_input(self, _a):
-        A, B = 3, 192
-        cut = 144
-        _a = _a.reshape(-1, A)
-        _a = _a.reshape(-1, A, B)
-        _a = _a[..., :cut]
-        _a = _a.reshape(_a.shape[0], -1)
-        _a = _a.T
-        _a = _a[PATCH_ID_INPUT_SORT_IDS]
-        return _a
-
-
-    def _prepare_trigger_output(self, _a):
-        A, B, C = 3, 18, 8
-
-        _a = np.unpackbits(_a.reshape(-1, A, B, 1), axis=-1)
-        _a = _a[..., ::-1]
-        _a = _a.reshape(-1, A * B * C).T
-        return _a[PATCH_ID_OUTPUT_SORT_IDS]
 
     @staticmethod
     def is_compatible(file_path):

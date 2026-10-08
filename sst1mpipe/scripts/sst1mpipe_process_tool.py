@@ -94,14 +94,15 @@ class ProcessorTool(Tool):
         else:
             self.event_source = self.enter_context(EventSource(parent=self))
         # R0 -> R1 calibration of the SST-1M raw data, PDE drop correction of the simulations.
-        # The other sources (ZMQ) provide calibrated R1 data
-        # The pedestal statistics are computed for the SST-1M raw data, from its pedestal events
+        # The pedestal statistics are computed for the SST-1M data, from its pedestal events
         self.r0_pedestal_monitor = None
         self.dl1_pedestal_monitor = None
         self.r0_r1_calibrator = None
         self.image_saturation_corrector = None
         subarray = self.event_source.subarray
-        if isinstance(self.event_source, SST1MEventSource):
+        # the SST-1M raw data (R0) of the files or of the ZMQ stream (DigiCam camera events);
+        # for the R1 events of a stream, the R0 -> R1 calibration does nothing
+        if isinstance(self.event_source, SST1MEventSource | ZMQEventSource):
             self.r0_pedestal_monitor = R0PedestalMonitor(parent=self, subarray=subarray)
             self.image_saturation_corrector = ImageSaturationCorrector(parent=self, subarray=subarray)
             self.dl1_pedestal_monitor = DL1PedestalMonitor(parent=self, subarray=subarray)
@@ -137,7 +138,8 @@ class ProcessorTool(Tool):
             if self.r0_r1_calibrator is not None:
                 self.calibrate_r0_r1(event)
             self.camera_calibrator(event)
-            if self.image_saturation_corrector is not None:
+            # the saturated pixels are corrected with the R0 waveforms
+            if self.image_saturation_corrector is not None and len(event.r0.tel) > 0:
                 self.image_saturation_corrector(event)
             if self.dl1_pedestal_monitor is not None:
                 self.fill_dl1_pedestal_monitoring(event)
