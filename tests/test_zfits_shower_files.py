@@ -286,12 +286,12 @@ def test_allowed_sb_types_list(tmp_path):
 def test_dark_run_events(capsys):
     """the dark run script only uses the pedestal events of the dark runs"""
     transition_file = TEST_DATA_DIR / "zfits" / FILES[21]["name"]
-    dark_file = TEST_DATA_DIR / "zfits" / "SST1M1_20260121_0001.fits.fz"
+    dark_file = TEST_DATA_DIR / "zfits" / "SST1M2_20260119_0007.fits.fz"
 
     events = list(read_dark_run_events([transition_file, dark_file], max_events=20))
 
     assert len(events) == 20
-    assert {event.index.obs_id for event in events} == {202601210001}
+    assert {event.index.obs_id for event in events} == {202601190007}
     assert {event.trigger.event_type for event in events} == {EventType.SKY_PEDESTAL}
     assert "is not a dark run" in capsys.readouterr().out
 

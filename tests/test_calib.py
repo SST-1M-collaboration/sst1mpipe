@@ -30,15 +30,16 @@ from sst1mpipe.resources import (
     WINDOW_DIR,
 )
 
-FILE_TEL_1 = (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260121_0001.fits.fz')
+# dark run of tel 22: pedestal events only
+DARK_FILE = (TEST_DATA_DIR / "zfits").joinpath('SST1M2_20260119_0007.fits.fz')
 CONFIG = load_config(DATA_CONFIG_FILE, ismc=False)
-TEL_ID = 21
+TEL_ID = 22
 CALIBRATION_FILE_TEL_2 = str((CALIBRATION_DIR / DEFAULT_CALIBRATION_FILES[22]))
 
 
 @pytest.fixture(scope="module")
 def event():
-    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1)
+    source = SST1MEventSource(input_url=DARK_FILE, max_events=1)
     return next(iter(source))
 
 
@@ -53,7 +54,7 @@ def with_pedestal_std(event, std):
 
 def test_r0_r1_dl1_calibration():
 
-    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=3)
+    source = SST1MEventSource(input_url=DARK_FILE, max_events=3)
     n_pixels = source.subarray.tel[TEL_ID].camera.readout.n_pixels
     calibrator_r0_r1 = R0R1Calibrator(subarray=source.subarray, config=CONFIG)
     r1_dl1_calibrator = CameraCalibrator(subarray=source.subarray, config=CONFIG)
