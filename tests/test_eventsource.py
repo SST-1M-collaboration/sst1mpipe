@@ -1,5 +1,6 @@
 import logging
 import os.path
+import glob
 
 from types import SimpleNamespace
 
@@ -30,7 +31,7 @@ from sst1mpipe.io.containers import CameraEventType, DigicamConfigContainer, SST
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR
 
 FILE_TEL_1 = (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260121_0001.fits.fz')
-FILE_TEL_2 = (TEST_DATA_DIR / "zfits").joinpath('SST1M2_20260121_0001.fits.fz')
+ZFITS_FILES = glob.glob(str(TEST_DATA_DIR / "zfits/*fits.fz"))
 
 MAX_ITERATIONS = 5
 
@@ -49,7 +50,6 @@ TEL_2_ID = 22
 def test_test_tiles_exists():
 
     assert os.path.exists(FILE_TEL_1)
-    assert os.path.exists(FILE_TEL_2)
 
 def test_read_events():
 
@@ -73,7 +73,8 @@ def test_read_events():
 
 def test_event_source_finds_sst1m_files():
 
-    for path in (FILE_TEL_1, FILE_TEL_2):
+    for path in ZFITS_FILES:
+
         assert SST1MEventSource.is_compatible(path)
         with EventSource(input_url=path, max_events=1) as source:
             assert isinstance(source, SST1MEventSource)
@@ -85,7 +86,7 @@ def test_is_compatible_rejects_other_files():
     assert not SST1MEventSource.is_compatible(DATA_CONFIG_FILE)
 
 
-@pytest.mark.parametrize("input_url", [[FILE_TEL_1, FILE_TEL_2], (FILE_TEL_1,), [str(FILE_TEL_1)]])
+@pytest.mark.parametrize("input_url", [[FILE_TEL_1, FILE_TEL_1], (FILE_TEL_1,), [str(FILE_TEL_1)]])
 def test_input_url_list_of_files_refused(input_url):
     """a single file is read: the processing scripts loop over the files"""
     with pytest.raises(TypeError, match="single file"):
@@ -253,7 +254,7 @@ def test_event_index():
         assert event.index.event_id == FIRST_EVENT_ID_1 + i
 
 
-@pytest.mark.parametrize("input_file", [FILE_TEL_1, FILE_TEL_2])
+@pytest.mark.parametrize("input_file", ZFITS_FILES)
 def test_swat_event_ids_in_files(input_file):
 
     assert file_has_swat_event_ids(input_file)

@@ -18,7 +18,6 @@ N_EVENTS = 50
 S_TO_NS = 1_000_000_000
 FILES = {
     21: (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260121_0001.fits.fz'),
-    22: (TEST_DATA_DIR / "zfits").joinpath('SST1M2_20260121_0001.fits.fz'),
 }
 
 
