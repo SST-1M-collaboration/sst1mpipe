@@ -11,11 +11,19 @@ from ctapipe.io import read_table
 from traitlets import traitlets
 
 
-from sst1mpipe.io.zmq_event_source import ZMQEventSource
+from sst1mpipe.io.zmq_event_source import ZMQEventSource, run_header_obs_id
 from sst1mpipe.constants import N_PIXELS, N_CHANNELS, SUBARRAY_DESCRIPTION
 from ctapipe.containers import EventType, SchedulingBlockType
 from ctapipe.io.datalevels import DataLevel
-from protozfits import DL0v1_Telescope_pb2, CoreMessages_pb2, File, R1v1_pb2, numpy_to_any_array
+from protozfits import (
+    CoreMessages_pb2,
+    DL0v1_Telescope_pb2,
+    File,
+    ProtoDataModel_pb2,
+    R1v1_pb2,
+    make_namedtuple,
+    numpy_to_any_array,
+)
 
 from sst1mpipe.io.containers import StreamCameraConfigContainer
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
@@ -434,3 +442,59 @@ def test_process_camera_event_stream(tmp_path):
     for column in ["camera_frame_hillas_intensity", "camera_frame_hillas_x", "camera_frame_hillas_width"]:
         np.testing.assert_array_equal(stream_parameters[column], file_parameters[column])
     assert np.isfinite(stream_parameters["camera_frame_hillas_intensity"]).sum() > 0
+
+
+# ---------------------------------------------------------------------------
+# DigiCam run header (DataModel.CameraRunHeader)
+# ---------------------------------------------------------------------------
+
+def camera_run_header(tel_id, run_number, date_mjd=0, run_id=0):
+    header = ProtoDataModel_pb2.CameraRunHeader()
+    header.telescopeID, header.runNumber, header.dateMJD, header.run_id = tel_id, run_number, date_mjd, run_id
+    return CoreMessages_pb2.CAMERA_RUN_HEADER, header
+
+
+@pytest.mark.parametrize("run_number, date_mjd, run_id, expected", [
+    (206, 61061, 0, 202601210206),  # MJD 61061: 2026-01-21
+    (206, 0, 0, 206),
+    (206, 61061, 123456, 123456),
+])
+def test_run_header_obs_id(run_number, date_mjd, run_id, expected):
+    _, header = camera_run_header(21, run_number, date_mjd, run_id)
+    assert run_header_obs_id(make_namedtuple(header)) == expected
+
+
+def test_camera_event_stream_run_header():
+    """the obs_id of the camera events is given by the run header of the telescope"""
+    endpoint = "inproc://test_camera_event_stream_run_header"
+    source = ZMQEventSource(endpoint)
+    send(source, [
+        cta_message(camera_run_header(ZFITS_TEL_ID, 206, date_mjd=61061)),
+        *camera_event_messages(ZFITS_FILE, n_events=3),
+        cta_message(END_OF_STREAM),
+    ], endpoint)
+
+    events = list(source)
+    # as for the zfits file SST1M1_20260121_0206
+    assert {event.index.obs_id for event in events} == {202601210206}
+    assert source.run_headers[ZFITS_TEL_ID].runNumber == 206
+    assert list(source.observation_blocks) == [202601210206]
+    assert source.scheduling_blocks[202601210206].sb_type == SchedulingBlockType.OBSERVATION
+    assert source.scheduling_blocks[202601210206].producer_id == "SST1M-21"
+    source.close()
+
+
+def test_data_stream_obs_id_before_run_header():
+    """the obs_id of the data stream of the telescope is used rather than the one of the run header"""
+    endpoint = "inproc://test_data_stream_obs_id_before_run_header"
+    source = ZMQEventSource(endpoint)
+    send(source, [
+        cta_message(camera_run_header(ZFITS_TEL_ID, 206, date_mjd=61061), r1_data_stream(ZFITS_TEL_ID)),
+        *camera_event_messages(ZFITS_FILE, n_events=2),
+        cta_message(END_OF_STREAM),
+    ], endpoint)
+
+    events = list(source)
+    assert {event.index.obs_id for event in events} == {OBS_ID}
+    assert set(source.observation_blocks) == {202601210206, OBS_ID}
+    source.close()

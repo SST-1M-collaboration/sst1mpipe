@@ -8,6 +8,7 @@ from functools import partial
 
 import numpy as np
 import zmq
+from astropy.time import Time
 from ctapipe.containers import (
     EventType,
     ObservationBlockContainer,
@@ -52,6 +53,20 @@ class DataStream:
     waveform_offset: float = 0.0
 
 
+def run_header_obs_id(run_header):
+    """
+    obs_id of a DigiCam run header (``DataModel.CameraRunHeader``): its ``run_id`` if set,
+    otherwise the date and the run number as for the files (``<YYYYMMDD><run:04d>``,
+    e.g. 202601210206) with the date of ``dateMJD``, or the run number without date.
+    """
+    if run_header.run_id:
+        return int(run_header.run_id)
+    if run_header.dateMJD:
+        date = Time(run_header.dateMJD, format="mjd", scale="utc").strftime("%Y%m%d")
+        return int(f"{date}{run_header.runNumber:04d}")
+    return int(run_header.runNumber)
+
+
 def event_type(value):
     """ctapipe EventType of the event type of a message, UNKNOWN if it is not a known type"""
     try:
@@ -93,6 +108,9 @@ class ZMQEventSource(EventSource):
     - the DigiCam camera events (``CAMERA_EVENT``, ``DataModel.CameraEvent`` as in the zfits
       files), filling ``event.r0`` and the trigger as the `SST1MEventSource`. The event id is
       the SWAT array event id if the first event has one, the camera event number otherwise.
+    - the DigiCam run header (``CAMERA_RUN_HEADER``, ``DataModel.CameraRunHeader``) of a
+      telescope, available in ``run_headers``, giving the obs_id of its camera events
+      (see `run_header_obs_id`) if there is no data stream message.
     - the data stream of a telescope (``TELESCOPE_DATA_STREAM``, ``DL0_TELESCOPE_DATA_STREAM``):
       its scheduling and observation blocks and the encoding of the waveforms
       (``stored / waveform_scale - waveform_offset``)
@@ -146,6 +164,8 @@ class ZMQEventSource(EventSource):
         self._end_of_stream = False
         self._pixel_order = partial(pixel_order, parse_swapped_modules(self.swapped_modules))
         self._swat_event_ids = None
+        self._run_headers = {}
+        self._run_obs_ids = {}
 
     @staticmethod
     def is_compatible(file_path: str) -> bool:
@@ -182,6 +202,11 @@ class ZMQEventSource(EventSource):
     def scheduling_blocks(self) -> dict[int, SchedulingBlockContainer]:
         """Scheduling blocks of the data streams received, by sb_id"""
         return self._scheduling_blocks
+
+    @property
+    def run_headers(self):
+        """DigiCam run headers received (protozfits CameraRunHeader), by telescope id"""
+        return self._run_headers
 
     @property
     def data_streams(self) -> dict[int, DataStream]:
@@ -239,12 +264,43 @@ class ZMQEventSource(EventSource):
             config = DL0v1_Telescope_pb2.CameraConfiguration()
             config.ParseFromString(payload)
             self._add_camera_config(config, "DL0")
+        elif msg_type == CoreMessages_pb2.CAMERA_RUN_HEADER:
+            self._add_run_header(payload)
         elif msg_type == CoreMessages_pb2.END_OF_STREAM:
             self.log.info("End of stream received")
             self._end_of_stream = True
         else:
             self.log.debug("Message of type %d ignored", msg_type)
         return None
+
+    def _add_run_header(self, payload):
+        message = ProtoDataModel_pb2.CameraRunHeader()
+        message.ParseFromString(payload)
+        run_header = make_namedtuple(message)
+        tel_id = run_header.telescopeID or run_header.telescope_id
+        obs_id = run_header_obs_id(run_header)
+        self._run_headers[tel_id] = run_header
+        self._run_obs_ids[tel_id] = obs_id
+        # blocks of the run, unless given by a data stream
+        if obs_id not in self._observation_blocks:
+            self._add_blocks(tel_id, sb_id=obs_id, obs_id=obs_id)
+        self.log.info("Run header of telescope %d: run %d, obs_id %d", tel_id, run_header.runNumber, obs_id)
+
+    def _add_blocks(self, tel_id, sb_id, obs_id):
+        producer_id = f"SST1M-{tel_id}"
+        self._scheduling_blocks[sb_id] = SchedulingBlockContainer(
+            sb_id=np.uint64(sb_id), sb_type=self.scheduling_block_type, producer_id=producer_id,
+        )
+        self._observation_blocks[obs_id] = ObservationBlockContainer(
+            obs_id=np.uint64(obs_id), sb_id=np.uint64(sb_id), producer_id=producer_id,
+        )
+
+    def _obs_id(self, tel_id, default=0):
+        """obs_id of the events of the telescope: of its data stream, else of its run header"""
+        data_stream = self._data_streams.get(tel_id)
+        if data_stream is not None:
+            return data_stream.obs_id
+        return self._run_obs_ids.get(tel_id, default)
 
     def _add_data_stream(self, stream, data_level):
         tel_id = stream.tel_id
@@ -253,13 +309,7 @@ class ZMQEventSource(EventSource):
             waveform_scale=stream.waveform_scale or 1.0, waveform_offset=stream.waveform_offset,
         )
         self._data_streams[tel_id] = data_stream
-        producer_id = f"SST1M-{tel_id}"
-        self._scheduling_blocks[stream.sb_id] = SchedulingBlockContainer(
-            sb_id=np.uint64(stream.sb_id), sb_type=self.scheduling_block_type, producer_id=producer_id,
-        )
-        self._observation_blocks[stream.obs_id] = ObservationBlockContainer(
-            obs_id=np.uint64(stream.obs_id), sb_id=np.uint64(stream.sb_id), producer_id=producer_id,
-        )
+        self._add_blocks(tel_id, sb_id=stream.sb_id, obs_id=stream.obs_id)
         self.log.info(
             "%s data stream of telescope %d: sb_id %d, obs_id %d, waveform scale %.2f, offset %.2f",
             data_level, tel_id, stream.sb_id, stream.obs_id, data_stream.waveform_scale, data_stream.waveform_offset,
@@ -300,8 +350,7 @@ class ZMQEventSource(EventSource):
                 "SWAT array event id" if self._swat_event_ids else "camera event number",
             )
         event.index.event_id = camera_event.arrayEvtNum if self._swat_event_ids else camera_event.eventNumber
-        data_stream = self._data_streams.get(tel_id)
-        event.index.obs_id = data_stream.obs_id if data_stream is not None else 0
+        event.index.obs_id = self._obs_id(tel_id)
         return event
 
     def _r1_event(self, payload):
@@ -348,7 +397,7 @@ class ZMQEventSource(EventSource):
         dl0.calibration_monitoring_id = message.calibration_monitoring_id
         dl0.selected_gain_channel = np.zeros(n_pixels, dtype=int)
 
-        obs_id = data_stream.obs_id if data_stream is not None else 0
+        obs_id = self._obs_id(tel_id)
         self._fill_index_and_trigger(event, tel_id, message.event_id, obs_id, dl0)
         return event
 
