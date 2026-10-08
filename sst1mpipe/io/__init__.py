@@ -14,7 +14,7 @@ from .io import (
     load_r0_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
-    read_trigger_time_ns,
+    read_trigger_time,
     load_drive_data,
     load_extra_table,
     load_more_dl1_tables_mono,

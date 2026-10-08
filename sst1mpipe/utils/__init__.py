@@ -57,6 +57,7 @@ from .utils import (
     get_target_pos,
     get_tel_string,
     get_telescopes,
+    get_trigger_time_ns,
     mc_correct_shower_reuse,
     mix_gamma_proton,
     polar_to_cartesian,

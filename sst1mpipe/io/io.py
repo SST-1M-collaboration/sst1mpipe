@@ -14,7 +14,6 @@ from astropy.io import fits
 from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
 from astropy.table import QTable, Table, join
 from astropy.time import Time
-from ctapipe.time import time_to_ctao_high_res
 from ctapipe.containers import EventType
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
@@ -35,7 +34,6 @@ from sst1mpipe.utils.utils import (
     add_true_impact,
     event_selection,
     get_finite,
-    get_location,
     get_pointing_radec,
     get_telescopes,
     stereo_var_cuts,
@@ -525,13 +523,11 @@ def add_pointing_dl1_stereo(file, dl1_data_tabs=None):
         logging.error('Different number of telescopes in the output file than number of provided DL1 tabs.')
 
 
-def read_trigger_time_ns(input_file, tel):
+def read_trigger_time(input_file, tel):
     """
     Reads the trigger times of the telescope from the DL1 file
-    (/dl1/event/telescope/trigger), in ns since 1970-01-01 TAI,
-    i.e. the White Rabbit timestamps of the SST-1M data. The integers
-    stored by ctapipe (seconds, quarter of ns) are read directly,
-    without loss of precision.
+    (/dl1/event/telescope/trigger), i.e. the White Rabbit timestamps
+    of the SST-1M data, stored with ns precision by ctapipe.
 
     Parameters
     ----------
@@ -543,76 +539,64 @@ def read_trigger_time_ns(input_file, tel):
     Returns
     -------
     astropy.table.Table
-        obs_id, event_id, time_ns (numpy.int64)
+        obs_id, event_id, trigger_time (astropy.time.Time, TAI)
 
     """
 
-    with tables.open_file(input_file) as h5:
-        trigger = h5.get_node('/dl1/event/telescope/trigger').read()
+    trigger = read_table(input_file, '/dl1/event/telescope/trigger')
     trigger = trigger[trigger['tel_id'] == int(tel.split('_')[-1])]
-
-    if trigger['time'].ndim == 2:
-        time = trigger['time'].astype(np.int64)
-    else:
-        # files written with ctapipe < 0.24, where the time is stored as a single float
-        logging.warning('Trigger times of %s stored without ns precision in %s.', tel, input_file)
-        trigger_table = read_table(input_file, '/dl1/event/telescope/trigger')
-        trigger_table = trigger_table[trigger_table['tel_id'] == int(tel.split('_')[-1])]
-        time = time_to_ctao_high_res(trigger_table['time']).astype(np.int64)
-
     return Table({
         'obs_id': trigger['obs_id'],
         'event_id': trigger['event_id'],
-        'time_ns': time[:, 0] * 1_000_000_000 + time[:, 1] // 4,
+        'trigger_time': trigger['time'],
     })
 
 
 def write_assumed_pointing(
-        dl1_file, ra=None, dec=None, config=None):
+        dl1_file, tel, ra=None, dec=None, location=None):
     """
     Writes pointing info (per event true_tel_az, true_tel_alt)
-    in the main DL1 table.
+    of the telescope in the main DL1 table.
 
     Parameters
     ----------
     dl1_file: string
         Path
+    tel: string
+        Telescope, e.g. \'tel_021\'
     ra: float
         Pointing RA in deg
     dec: float
         Pointing DEC in deg
-    config: dict
+    location: astropy.coordinates.EarthLocation
+        Location of the telescope
 
     Returns
     -------
 
     """
-    telescopes = get_telescopes(dl1_file)
 
     pointing_ra = float(ra) * u.deg
     pointing_dec = float(dec) * u.deg
     wobble_coords = SkyCoord(ra=pointing_ra, dec=pointing_dec, frame='icrs')
 
-    for tel in telescopes:
+    params = read_table(dl1_file, "/dl1/event/telescope/parameters/" + tel)
+    time = Time(params['local_time'], format='unix', scale='utc')
+    horizon_frame = AltAz(obstime=time, location=location)
+    try:
+        tel_pointing = wobble_coords.transform_to(horizon_frame)
+        params['true_az_tel'] = tel_pointing.az.to_value(u.deg)
+        params['true_alt_tel'] = tel_pointing.alt.to_value(u.deg)
+    except ValueError:
+        logging.info("Broken file %s", dl1_file)
+        params['true_az_tel'] = np.nan
+        params['true_alt_tel'] = np.nan
 
-        params = read_table(dl1_file, "/dl1/event/telescope/parameters/" + tel)
-        location = get_location(config=config, tel=tel)
-        time = Time(params['local_time'], format='unix', scale='utc')
-        horizon_frame = AltAz(obstime=time, location=location)
-        try:
-            tel_pointing = wobble_coords.transform_to(horizon_frame)
-            params['true_az_tel'] = tel_pointing.az.to_value(u.deg)
-            params['true_alt_tel'] = tel_pointing.alt.to_value(u.deg)
-        except ValueError:
-            logging.info("Broken file", dl1_file)
-            params['true_az_tel'] = np.nan
-            params['true_alt_tel'] = np.nan
-
-        # Only combination of both overwrite and append works like expected, i.e. overwrite only telescope parameters and the rest
-        # of the DL1 file remains the same
-        # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
-        # then cannot merge the files and raise error...
-        params.write(dl1_file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
+    # Only combination of both overwrite and append works like expected, i.e. overwrite only telescope parameters and the rest
+    # of the DL1 file remains the same
+    # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
+    # then cannot merge the files and raise error...
+    params.write(dl1_file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
 
 
 def write_r1_dl1_cfg(file, config=None):
@@ -795,7 +779,8 @@ def load_dl1_sst1m(
     Returns
     -------
     data: pandas.DataFrame or astropy.table.Table
-        with the trigger time in ns (TAI) in the column time_ns
+        with the trigger time (TAI) in the column trigger_time: astropy.time.Time,
+        or numpy.datetime64 (ns) for the pandas.DataFrame
 
     """
 
@@ -821,7 +806,7 @@ def load_dl1_sst1m(
             exit()
 
     # trigger time with ns precision, for the matching of the stereo events
-    trigger_time = read_trigger_time_ns(input_file, tel)
+    trigger_time = read_trigger_time(input_file, tel)
     events['_row'] = np.arange(len(events))
     events = join(events, trigger_time, keys=['obs_id', 'event_id'], join_type='left')
     events.sort('_row')

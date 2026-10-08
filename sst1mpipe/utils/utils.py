@@ -128,6 +128,30 @@ def get_stereo_method(config):
         return stereo_method
 
 
+def get_trigger_time_ns(data):
+    """
+    Trigger times of the DL1 table (trigger_time column, see
+    sst1mpipe.io.load_dl1_sst1m) as integers in ns, without
+    loss of precision, e.g. to match the stereo events.
+
+    Parameters
+    ----------
+    data: pandas.DataFrame or astropy.table.Table
+        DL1 table
+
+    Returns
+    -------
+    numpy.ndarray of numpy.int64
+        ns since 1970-01-01 (TAI)
+
+    """
+
+    time = data['trigger_time']
+    if isinstance(time, Time):
+        time = time.to_value('datetime64')
+    return np.asarray(time).astype('datetime64[ns]').astype(np.int64)
+
+
 def get_tel_string(tel, mc=True):
     """
     Makes string with telescope designation understandable

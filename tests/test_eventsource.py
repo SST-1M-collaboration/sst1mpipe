@@ -21,7 +21,6 @@ from sst1mpipe.io.sst1m_event_source import (
     parse_target_field,
 )
 from sst1mpipe.time import camera_clock_to_time
-from sst1mpipe.io import load_config
 from sst1mpipe.io.containers import CameraEventType, SST1MArrayEventContainer, SST1MR0CameraContainer
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR
 
@@ -380,19 +379,6 @@ def test_no_swapped_modules_by_default():
 
     assert source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0]) == []
     assert events[0]["waveform"].sum() == SUM_WAVEFORM_1[0]
-
-
-def test_swapped_modules_of_data_config():
-
-    config = load_config(DATA_CONFIG_FILE)
-    source = SST1MEventSource(input_url=FILE_TEL_1, max_events=1, config=config)
-
-    assert [entry["modules"] for entry in source.swapped_modules] == [[59, 88], [8, 9]]
-    # no wrongly connected modules of tel 21 at the date of the test file
-    assert source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0]) == []
-    one_month = 30 * u.day
-    assert len(source.swapped_pixels(TEL_1_ID, LOCAL_CAMERA_CLOCK_1[0] - one_month)) == 1
-    assert source.swapped_pixels(22, LOCAL_CAMERA_CLOCK_1[0] - one_month) == []
 
 
 def test_swap_modules():

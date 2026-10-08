@@ -49,7 +49,7 @@ from sst1mpipe.io import (
     load_dl2_sst1m,
     load_source_catalog,
 )
-from sst1mpipe.utils import get_moon_params, get_sources_in_dir
+from sst1mpipe.utils import get_moon_params, get_sources_in_dir, get_trigger_time_ns
 from sst1mpipe.utils.NSB_tools import plot_average_nsb_VS_time
 
 
@@ -446,8 +446,8 @@ def main():
                             h11_tot += h11
                             h22_tot += h22
                             # trigger times (ns)
-                            t_t1 = dl1_stereo_1['time_ns'].to_numpy()
-                            t_t2 = dl1_stereo_2['time_ns'].to_numpy()
+                            t_t1 = get_trigger_time_ns(dl1_stereo_1)
+                            t_t2 = get_trigger_time_ns(dl1_stereo_2)
                             dt = t_t1 - t_t2
                             t_diff_all.append(dt)
                             times_all.append(dl1_stereo_1.local_time.to_numpy())
@@ -465,8 +465,8 @@ def main():
                         h11_tot += h11
                         h22_tot += h22
                         # trigger times (ns)
-                        t_t1 = dl1_stereo_1['time_ns'].to_numpy()
-                        t_t2 = dl1_stereo_2['time_ns'].to_numpy()
+                        t_t1 = get_trigger_time_ns(dl1_stereo_1)
+                        t_t2 = get_trigger_time_ns(dl1_stereo_2)
                         dt = t_t1 - t_t2
                         t_diff_all.append(dt)
                         times_all.append(dl1_stereo_1.local_time.to_numpy())

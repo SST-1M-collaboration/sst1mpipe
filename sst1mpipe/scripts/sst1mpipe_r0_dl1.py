@@ -53,7 +53,9 @@ from sst1mpipe.io import (
 from sst1mpipe.utils import (
     correct_true_image,
     energy_min_cut,
+    get_location,
     get_tel_string,
+    get_telescopes,
 )
 from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor, load_first_pedestals
 
@@ -503,7 +505,11 @@ def main():
     # Write pointing information in the main DL1 table and in two monitoring tables
     # It is important, as we do not do it per event anymore (it was very slow)
     if not source.is_simulation:
-        write_assumed_pointing(output_file, ra=pointing_ra, dec=pointing_dec, config=config)
+        for tel_string in get_telescopes(output_file):
+            write_assumed_pointing(
+                output_file, tel_string, ra=pointing_ra, dec=pointing_dec,
+                location=get_location(config=config, tel=tel_string),
+            )
 
     # Logging all event counts
     tel1_id, tel2_id = (1, 2) if ismc else (21, 22)
