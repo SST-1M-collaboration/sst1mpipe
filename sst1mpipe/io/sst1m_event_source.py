@@ -327,9 +327,9 @@ def fill_r0_event(array_event, camera_event, order=None):
     array_event.trigger.tel[tel_id].time = local_time
     array_event.trigger.tels_with_trigger = [tel_id]
     # internal triggers are the pedestal events
-    array_event.trigger.event_type = (
-        EventType.SKY_PEDESTAL if r0.event_type == CameraEventType.INTERNAL else EventType.SUBARRAY
-    )
+    event_type = EventType.SKY_PEDESTAL if r0.event_type == CameraEventType.INTERNAL else EventType.SUBARRAY
+    array_event.trigger.event_type = event_type
+    array_event.trigger.tel[tel_id].event_type = event_type
     return tel_id
 
 
@@ -557,9 +557,9 @@ class SST1MEventSource(EventSource):
             self._altaz_cache[tel_id] = cached
         _, azimuth, altitude = cached
 
-        pointing = array_event.pointing
-        pointing.tel[tel_id].azimuth = azimuth
-        pointing.tel[tel_id].altitude = altitude
+        array_event.monitoring.tel[tel_id].pointing.azimuth = azimuth
+        array_event.monitoring.tel[tel_id].pointing.altitude = altitude
+        pointing = array_event.monitoring.pointing
         pointing.array_azimuth = azimuth
         pointing.array_altitude = altitude
         pointing.array_ra = pointing_icrs.ra.to(u.rad)

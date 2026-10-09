@@ -6,7 +6,7 @@ dependencies:
   - python==3.11
   - pip
   - coverage
-  - ctapipe==0.26.0 # 0.27 changes the monitoring data model (event.mon -> event.monitoring)
+  - ctapipe==0.28.0
   - click
   - gammapy==1.3 # required for compatibilities with astropy
   - h5py

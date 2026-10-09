@@ -48,7 +48,7 @@ def calibrator(**settings):
 
 
 def with_pedestal_std(event, std):
-    event.mon.tel[TEL_ID].r0.charge_std = std
+    event.monitoring.tel[TEL_ID].camera.pixel_statistics.pedestal_waveform.std = std
     return event
 
 
@@ -67,7 +67,7 @@ def test_r0_r1_dl1_calibration():
 
         # ctapipe shape: (n_channels, n_pixels, n_samples)
         assert r1.waveform.shape == r0_waveform.shape == (1, n_pixels, r0_waveform.shape[-1])
-        bad_pixels = event.mon.tel[TEL_ID].pixel_status.hardware_failing_pixels[0]
+        bad_pixels = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
         assert bad_pixels.any()
         assert calibrator_r0_r1.n_bad_pixels[TEL_ID] == bad_pixels.sum()
         assert np.all(r1.waveform[:, bad_pixels] == 0)
@@ -150,7 +150,7 @@ def test_bad_pixels(event, flag_bad_calibration, flag_dead, threshold, expected_
     calibrator_r0_r1(with_pedestal_std(event, pedestal_std), TEL_ID)
 
     _, mask_bad_calibration = calibrator_r0_r1.calibration_parameters(TEL_ID)
-    flagged = event.mon.tel[TEL_ID].pixel_status.hardware_failing_pixels[0]
+    flagged = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
     assert mask_bad_calibration.any() and not mask_bad_calibration[dead_pixel]
     assert np.all(flagged[mask_bad_calibration] == flag_bad_calibration)
     assert flagged[dead_pixel] == expected_dead
@@ -363,7 +363,7 @@ def test_static_bad_pixels_of_data(event):
     )
     calibrator_r0_r1(with_pedestal_std(event, None), TEL_ID)
 
-    flagged = event.mon.tel[TEL_ID].pixel_status.hardware_failing_pixels[0]
+    flagged = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
     assert np.flatnonzero(flagged).tolist() == BAD_PIXELS
     assert calibrator_r0_r1.n_bad_pixels[TEL_ID] == len(BAD_PIXELS)
     assert np.all(event.r1.tel[TEL_ID].waveform[:, BAD_PIXELS] == 0)
@@ -374,10 +374,10 @@ def test_static_bad_pixels_added_to_the_other_bad_pixels(event):
 
     flags = dict(flag_dead_pixels=False, voltage_drop_correction="none")
     calibrator(**flags)(with_pedestal_std(event, None), TEL_ID)
-    bad_calibration = event.mon.tel[TEL_ID].pixel_status.hardware_failing_pixels[0].copy()
+    bad_calibration = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0].copy()
 
     calibrator(**flags, bad_pixels=[["id", TEL_ID, BAD_PIXELS]])(event, TEL_ID)
-    flagged = event.mon.tel[TEL_ID].pixel_status.hardware_failing_pixels[0]
+    flagged = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
 
     assert bad_calibration.any()
     np.testing.assert_array_equal(np.flatnonzero(flagged), np.union1d(np.flatnonzero(bad_calibration), BAD_PIXELS))
@@ -388,18 +388,18 @@ def test_static_bad_pixels_of_simulations(mc_subarray):
     event = simulated_event()
     for tel_id in (1, 2):
         event.simulation.tel[tel_id] = SimulatedCameraContainer(true_image=np.ones(1296, dtype=np.int32))
-    status = event.mon.tel[2].pixel_status.hardware_failing_pixels
+    status = event.monitoring.tel[2].camera.coefficients.outlier_mask
     calibrator_r0_r1 = mc_calibrator(mc_subarray, bad_pixels=[["type", "*", []], ["id", 1, BAD_PIXELS]])
     calibrator_r0_r1(event)
 
-    flagged = event.mon.tel[1].pixel_status.hardware_failing_pixels[0]
+    flagged = event.monitoring.tel[1].camera.coefficients.outlier_mask[0]
     assert np.flatnonzero(flagged).tolist() == BAD_PIXELS
     assert np.all(event.r1.tel[1].waveform[:, BAD_PIXELS] == 0)
     assert np.all(event.simulation.tel[1].true_image[BAD_PIXELS] == 0)
     assert event.simulation.tel[1].true_image.sum() == 1296 - len(BAD_PIXELS)
     # no bad pixels in tel 2: not modified
     np.testing.assert_array_equal(event.r1.tel[2].waveform, 1)
-    assert event.mon.tel[2].pixel_status.hardware_failing_pixels is status
+    assert event.monitoring.tel[2].camera.coefficients.outlier_mask is status
 
 
 @pytest.mark.parametrize("calibrator_settings, expected", [

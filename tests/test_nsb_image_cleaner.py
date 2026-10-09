@@ -1,7 +1,7 @@
 
 import numpy as np
 import pytest
-from ctapipe.containers import MonitoringCameraContainer
+from ctapipe.containers import CameraMonitoringContainer
 from ctapipe.image import ImageProcessor, apply_time_delta_cleaning, tailcuts_clean
 from ctapipe.image.cleaning import NSBImageCleaner
 from ctapipe.instrument import SubarrayDescription
@@ -49,7 +49,7 @@ def test_without_pedestal_std_is_tailcuts_and_time_delta():
     expected = tailcuts_clean(GEOMETRY, image, picture_thresh=8, boundary_thresh=4, min_number_picture_neighbors=2)
     expected = apply_time_delta_cleaning(GEOMETRY, expected, times, min_number_neighbors=1, time_limit=8)
 
-    for monitoring in (None, MonitoringCameraContainer()):
+    for monitoring in (None, CameraMonitoringContainer()):
         mask = cleaner(TEL_ID, image, arrival_times=times, monitoring=monitoring)
         assert expected.any()
         np.testing.assert_array_equal(mask, expected)
@@ -59,10 +59,10 @@ def test_pedestal_std_raises_picture_threshold():
     cleaner = make_cleaner()
     image, times, big, small = two_islands_event()
 
-    monitoring = MonitoringCameraContainer()
+    monitoring = CameraMonitoringContainer()
     pedestal_std = np.zeros(GEOMETRY.n_pixels)
     pedestal_std[small] = 25  # 2.5 * 25 > 50 p.e.
-    monitoring.pedestal.charge_std = pedestal_std
+    monitoring.pixel_statistics.pedestal_image.std = pedestal_std
 
     mask = cleaner(TEL_ID, image, arrival_times=times)
     assert mask[big].all() and mask[small].all()

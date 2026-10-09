@@ -12,11 +12,12 @@ import tables
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.io import fits
 from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
-from astropy.table import QTable, Table, join
+from astropy.table import QTable, Table, join, vstack
 from astropy.time import Time
 from ctapipe.containers import EventType
 from ctapipe.instrument import SubarrayDescription
-from ctapipe.io import read_table
+from ctapipe.io import read_table, write_table
+from ctapipe.io.hdf5dataformat import DL1_SKY_PEDESTAL_IMAGE_GROUP
 from ctapipe.monitoring.interpolation import PointingInterpolator
 from gammapy.data import DataStore
 from pyirf.cuts import evaluate_binned_cut
@@ -950,35 +951,77 @@ def load_photon_list_sst1m(input_file, tel=None, config=None, table='astropy', e
     return data
 
 
-R0_PEDESTAL_TABLE = "/r0/monitoring/telescope/pedestal"
-DL1_PEDESTAL_TABLE = "/dl1/monitoring/telescope/pedestal"
+# statistics of the pedestal events, in chunks of events (one table per telescope, tel_XXX):
+# calibrated images (ctapipe pixel statistics, read by the ctapipe HDF5MonitoringSource)
+# and ADC samples (same structure, at the R0 level)
+DL1_PEDESTAL_GROUP = DL1_SKY_PEDESTAL_IMAGE_GROUP
+R0_PEDESTAL_GROUP = "/r0/monitoring/telescope/calibration/camera/pixel_statistics/sky_pedestal_waveform"
 
 
-def load_dl1_pedestals(input_file):
-
+def chunk_statistics_table(containers):
     """
-    Reads the statistics of the calibrated images (p.e.) of the
-    pedestal events from the input HDF DL1 file.
+    Table of the statistics of chunks of events (`~ctapipe.containers.ChunkStatisticsContainer`),
+    with the columns of the ctapipe pixel statistics tables (time_start, time_end, mean, median, std, ...)
+    """
+    columns = {}
+    for name in containers[0].fields:
+        values = [container[name] for container in containers]
+        columns[name] = Time(values) if isinstance(values[0], Time) else np.array(values)
+    return QTable(columns)
 
-    NOTE: in files produced before the r0 pedestal table existed,
-    this table contains the statistics of the ADC samples, see `load_r0_pedestals`.
+
+def load_pedestals(input_file, group, tel=None):
+    """
+    Reads the tables of statistics of the pedestal events of the telescopes
+    (``group/tel_XXX``), with the column tel_id
 
     Parameters
     ----------
     input_file: string
         Path
+    group: string
+        R0_PEDESTAL_GROUP or DL1_PEDESTAL_GROUP
+    tel: string
+        e.g. \'tel_021\', all the telescopes if None
+
+    Returns
+    -------
+    pedestals: astropy.table.Table
+    """
+    with tables.open_file(input_file) as f:
+        tels = [node._v_name for node in f.get_node(group)._f_iter_nodes("Table")]
+    if tel is not None:
+        tels = [tel]
+    pedestal_tables = []
+    for name in sorted(tels):
+        table = read_table(input_file, f"{group}/{name}")
+        table["tel_id"] = int(name.split("_")[-1])
+        pedestal_tables.append(table)
+    return vstack(pedestal_tables)
+
+
+def load_dl1_pedestals(input_file, tel=None):
+
+    """
+    Reads the statistics of the calibrated images (p.e.) of the
+    pedestal events from the input HDF DL1 file.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+    tel: string
+        e.g. \'tel_021\', all the telescopes if None
 
     Returns
     -------
     pedestals: astropy.table.Table
 
     """
-
-    pedestals = read_table(input_file, DL1_PEDESTAL_TABLE)
-    return pedestals
+    return load_pedestals(input_file, DL1_PEDESTAL_GROUP, tel=tel)
 
 
-def load_r0_pedestals(input_file):
+def load_r0_pedestals(input_file, tel=None):
 
     """
     Reads the statistics of the ADC samples of the pedestal
@@ -988,26 +1031,22 @@ def load_r0_pedestals(input_file):
     ----------
     input_file: string
         Path
+    tel: string
+        e.g. \'tel_021\', all the telescopes if None
 
     Returns
     -------
     pedestals: astropy.table.Table
 
     """
-
-    with tables.open_file(input_file) as f:
-        has_r0_table = R0_PEDESTAL_TABLE in f
-    if has_r0_table:
-        return read_table(input_file, R0_PEDESTAL_TABLE)
-    # older files stored the statistics of the ADC samples in the dl1 table
-    return read_table(input_file, DL1_PEDESTAL_TABLE)
+    return load_pedestals(input_file, R0_PEDESTAL_GROUP, tel=tel)
 
 
-def write_pedestals(input_file, pedestal_table=None, path=DL1_PEDESTAL_TABLE):
+def write_pedestals(input_file, pedestal_table=None, group=DL1_PEDESTAL_GROUP):
 
     """
-    Write table of pedestal events from DL1 file into
-    another DL1 file. Typical usecase is to propagate
+    Write the tables of statistics of the pedestal events (see `load_pedestals`)
+    into another DL1 file. Typical usecase is to propagate
     pedestals from mono DL1 to stereo DL1.
 
     Parameters
@@ -1016,27 +1055,28 @@ def write_pedestals(input_file, pedestal_table=None, path=DL1_PEDESTAL_TABLE):
         Path
 
     pedestal_table: astropy.table.Table
+        with the column tel_id
 
-    path: string
-        Path of the table in the file
+    group: string
+        R0_PEDESTAL_GROUP or DL1_PEDESTAL_GROUP
 
     """
 
     try:
-        write_table_hdf5(pedestal_table, input_file,
-            append=True, path=path,
-            serialize_meta=False
-            )
+        for tel_id in np.unique(pedestal_table["tel_id"]):
+            table = pedestal_table[pedestal_table["tel_id"] == tel_id]
+            table.remove_column("tel_id")
+            write_table(table, input_file, f"{group}/tel_{tel_id:03d}", append=True)
     except Exception:
         logging.warning('Writing pedestals into the file failed!')
 
 
 def write_dl1_pedestals(input_file, pedestal_table=None):
-    write_pedestals(input_file, pedestal_table=pedestal_table, path=DL1_PEDESTAL_TABLE)
+    write_pedestals(input_file, pedestal_table=pedestal_table, group=DL1_PEDESTAL_GROUP)
 
 
 def write_r0_pedestals(input_file, pedestal_table=None):
-    write_pedestals(input_file, pedestal_table=pedestal_table, path=R0_PEDESTAL_TABLE)
+    write_pedestals(input_file, pedestal_table=pedestal_table, group=R0_PEDESTAL_GROUP)
 
 
 def load_extra_table(input_file, key=None, remove_column=None):
@@ -1338,7 +1378,8 @@ def compute_dl1_summary(dl1_file):
         int(tel_id): int(n) for tel_id, n in zip(subarray.tel_ids, tels_with_trigger.sum(axis=0), strict=True)
     }
 
-    is_pedestal = np.asarray(trigger["event_type"]) == EventType.SKY_PEDESTAL.value
+    # pedestal events: SKY_PEDESTAL, or PEDESTAL for the files written with ctapipe < 0.27
+    is_pedestal = np.isin(trigger["event_type"], [EventType.SKY_PEDESTAL.value, EventType.PEDESTAL.value])
     pedestals = {(obs_id, event_id) for obs_id, event_id in trigger["obs_id", "event_id"][is_pedestal]}
 
     survived = set()

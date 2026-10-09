@@ -1,7 +1,7 @@
 """
 Containers of the SST-1M data. The events are ctapipe `~ctapipe.containers.ArrayEventContainer`
 (`SST1MArrayEventContainer`) with the DigiCam specific raw data (R0) and the statistics of
-the ADC samples of the pedestal events (monitoring). The other data levels follow ctapipe.
+the ADC samples of the pedestal events in the camera monitoring. The other data levels follow ctapipe.
 The PyTables descriptions are those of the tables written by sst1mpipe in the DL1/DL2 files.
 """
 from enum import Flag
@@ -10,12 +10,14 @@ from functools import partial
 import numpy as np
 from ctapipe.containers import (
     ArrayEventContainer,
-    MonitoringCameraContainer,
+    CameraMonitoringContainer,
+    ChunkStatisticsContainer,
     MonitoringContainer,
     ObservationBlockContainer,
-    PedestalContainer,
+    PixelStatisticsContainer,
     R0CameraContainer,
     R0Container,
+    TelescopeMonitoringContainer,
 )
 from ctapipe.core import Container, Field, Map
 
@@ -31,8 +33,9 @@ __all__ = [
     "CameraEventType",
     "SST1MR0CameraContainer",
     "SST1MR0Container",
-    "R0PedestalContainer",
-    "SST1MMonitoringCameraContainer",
+    "SST1MPixelStatisticsContainer",
+    "SST1MCameraMonitoringContainer",
+    "SST1MTelescopeMonitoringContainer",
     "SST1MMonitoringContainer",
     "SST1MArrayEventContainer",
     "SST1MObservationBlockContainer",
@@ -102,31 +105,53 @@ class SST1MR0Container(R0Container):
     )
 
 
-class R0PedestalContainer(PedestalContainer):
+class SST1MPixelStatisticsContainer(PixelStatisticsContainer):
     """
-    Statistics of the ADC samples (in ADC) of the pedestal events.
-    The statistics of the calibrated images (in p.e.) are stored in the ctapipe
-    `~ctapipe.containers.PedestalContainer` of `~ctapipe.containers.MonitoringCameraContainer`.
-    """
-
-    default_prefix = "pedestal"
-
-
-class SST1MMonitoringCameraContainer(MonitoringCameraContainer):
-    """
-    ctapipe camera monitoring with the R0 level monitoring of SST-1M
+    ctapipe pixel statistics with the statistics of the ADC samples of the pedestal events.
+    The statistics of the pedestal events are computed in a sliding window of events
+    (`~ctapipe.containers.ChunkStatisticsContainer`, see `sst1mpipe.utils.monitoring_pedestals`).
     """
 
-    r0 = Field(
-        default_factory=R0PedestalContainer,
-        description="Statistics of the ADC samples of the pedestal events",
+    pedestal_image = Field(
+        default_factory=ChunkStatisticsContainer,
+        description=(
+            "Statistics of the calibrated images (p.e.) of the pedestal events, shape (n_pixels)."
+            " Used by the NSBImageCleaner"
+        ),
+    )
+    pedestal_waveform = Field(
+        default_factory=ChunkStatisticsContainer,
+        description=(
+            "Statistics of the ADC samples of the pedestal events, shape (n_channels, n_pixels):"
+            " mean and median over the events of the mean of the samples (baseline), and mean over"
+            " the events of the std of the samples (used for the voltage drop correction and the"
+            " dead pixels)"
+        ),
+    )
+
+
+class SST1MCameraMonitoringContainer(CameraMonitoringContainer):
+    """ctapipe camera monitoring with the SST-1M pixel statistics"""
+
+    pixel_statistics = Field(
+        default_factory=SST1MPixelStatisticsContainer,
+        description="Pixel statistics of the pedestal events",
+    )
+
+
+class SST1MTelescopeMonitoringContainer(TelescopeMonitoringContainer):
+    """ctapipe telescope monitoring with the SST-1M camera monitoring"""
+
+    camera = Field(
+        default_factory=SST1MCameraMonitoringContainer,
+        description="Monitoring data of the camera",
     )
 
 
 class SST1MMonitoringContainer(MonitoringContainer):
     tel = Field(
-        default_factory=partial(Map, SST1MMonitoringCameraContainer),
-        description="map of tel_id to SST1MMonitoringCameraContainer",
+        default_factory=partial(Map, SST1MTelescopeMonitoringContainer),
+        description="map of tel_id to SST1MTelescopeMonitoringContainer",
     )
 
 
@@ -203,10 +228,10 @@ class SST1MObservationBlockContainer(ObservationBlockContainer):
 class SST1MArrayEventContainer(ArrayEventContainer):
     """
     ctapipe array event with the SST-1M raw data (DigiCam specific R0 fields)
-    and the R0 level monitoring (statistics of the ADC samples of the pedestal events)
+    and the SST-1M monitoring (statistics of the ADC samples of the pedestal events)
     """
     r0 = Field(default_factory=SST1MR0Container, description="Raw data of the SST-1M telescopes")
-    mon = Field(default_factory=SST1MMonitoringContainer, description="container for monitoring data (MON)")
+    monitoring = Field(default_factory=SST1MMonitoringContainer, description="Monitoring data")
 
 
 class DL1_info(IsDescription):

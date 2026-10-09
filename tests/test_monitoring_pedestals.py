@@ -1,7 +1,6 @@
-import astropy.units as u
 import numpy as np
 import pytest
-from ctapipe.containers import MonitoringCameraContainer, PedestalContainer
+from ctapipe.containers import CameraMonitoringContainer, ChunkStatisticsContainer, TelescopeMonitoringContainer
 from ctapipe.image import ImageProcessor
 from ctapipe.io import HDF5TableWriter, read_table
 from astropy.time import Time
@@ -27,12 +26,13 @@ def make_event(rng, time_s, tel_id=TEL_ID, image_std=1.0):
     r0 = event.r0.tel[tel_id]
     r0.waveform = rng.normal(300, 5, (N_PIXELS, N_SAMPLES))
     r0.event_time = Time(time_s, format='unix_tai')
+    event.index.event_id = int(time_s)
     event.dl1.tel[tel_id].image = rng.normal(0, image_std, N_PIXELS)
     return event
 
 
 class ImageMonitor(SlidingWindowMonitor):
-    """Minimal subclass monitoring the images in event.mon.tel[tel_id].pedestal"""
+    """Minimal subclass monitoring the images in the pedestal image statistics"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -42,11 +42,15 @@ class ImageMonitor(SlidingWindowMonitor):
         self._append(event, tel_id, event.dl1.tel[tel_id].image.copy())
 
     def _container(self, event, tel_id):
-        return event.mon.tel[tel_id].pedestal
+        return pixel_statistics(event).pedestal_image
 
     def _compute_statistics(self, values):
         self.n_computations += 1
         return values.mean(axis=0), np.median(values, axis=0), values.std(axis=0)
+
+
+def pixel_statistics(event, tel_id=TEL_ID):
+    return event.monitoring.tel[tel_id].camera.pixel_statistics
 
 
 # ---------------------------------------------------------------------------
@@ -92,23 +96,25 @@ def test_call_adds_event_and_fills_container():
         images.append(event.dl1.tel[TEL_ID].image)
         monitor(event, TEL_ID)
 
-    container = event.mon.tel[TEL_ID].pedestal
+    container = pixel_statistics(event).pedestal_image
     images = np.array(images[-3:])
     assert container.n_events == 3
-    np.testing.assert_allclose(container.sample_time.to_value(u.s), 13, rtol=0, atol=1e-9)
-    np.testing.assert_allclose(container.sample_time_min.to_value(u.s), 12, rtol=0, atol=1e-9)
-    np.testing.assert_allclose(container.sample_time_max.to_value(u.s), 14, rtol=0, atol=1e-9)
-    np.testing.assert_allclose(container.charge_mean, images.mean(axis=0))
-    np.testing.assert_allclose(container.charge_median, np.median(images, axis=0))
-    np.testing.assert_allclose(container.charge_std, images.std(axis=0))
+    assert container.is_valid
+    # chunk of the 3 last events
+    np.testing.assert_allclose([container.time_start.unix_tai, container.time_end.unix_tai], [12, 14], rtol=0, atol=1e-9)
+    assert (container.event_id_start, container.event_id_end) == (12, 14)
+    np.testing.assert_allclose(container.mean, images.mean(axis=0))
+    np.testing.assert_allclose(container.median, np.median(images, axis=0))
+    np.testing.assert_allclose(container.std, images.std(axis=0))
+    assert container.outlier_mask.shape == (N_PIXELS, ) and not container.outlier_mask.any()
 
 
 def test_empty_window_does_not_fill_container():
     event = SST1MArrayEventContainer()
     ImageMonitor(subarray=SUBARRAY).fill_monitoring(event, TEL_ID)
 
-    assert event.mon.tel[TEL_ID].pedestal.n_events == -1
-    assert event.mon.tel[TEL_ID].pedestal.charge_std is None
+    assert pixel_statistics(event).pedestal_image.n_events == -1
+    assert pixel_statistics(event).pedestal_image.std is None
 
 
 def test_statistics_only_computed_for_new_events():
@@ -132,7 +138,7 @@ def test_statistics_only_computed_for_new_events():
 
 @pytest.mark.parametrize("monitor_class", [R0PedestalMonitor, DL1PedestalMonitor])
 def test_monitoring_tables_can_be_written(monitor_class, tmp_path):
-    """the containers filled by the monitors are written by ctapipe (as in sst1mpipe_r0_dl1)"""
+    """the containers filled by the monitors are written by ctapipe"""
     rng = np.random.default_rng(3)
     monitor = monitor_class(subarray=SUBARRAY, n_events=3)
     path = tmp_path / "monitoring.h5"
@@ -148,15 +154,17 @@ def test_monitoring_tables_can_be_written(monitor_class, tmp_path):
     table = read_table(path, "/pedestal")
     assert len(table) == 5
     # sliding window of 3 events: the 3 last events for the last row
-    np.testing.assert_allclose(table["sample_time"].quantity.to_value(u.s)[-1], start + 3, rtol=0, atol=1e-6)
-    np.testing.assert_allclose(table["sample_time_min"].quantity.to_value(u.s), start + np.array([0, 0, 0, 1, 2]), rtol=0, atol=1e-6)
-    np.testing.assert_allclose(table["sample_time_max"].quantity.to_value(u.s), start + np.arange(5), rtol=0, atol=1e-6)
+    np.testing.assert_allclose(table["time_start"].unix_tai, start + np.array([0, 0, 0, 1, 2]), rtol=0, atol=1e-6)
+    np.testing.assert_allclose(table["time_end"].unix_tai, start + np.arange(5), rtol=0, atol=1e-6)
+    assert list(table["n_events"]) == [1, 2, 3, 3, 3]
 
 
 def test_monitoring_containers_are_ctapipe_compatible():
-    mon = SST1MArrayEventContainer().mon.tel[TEL_ID]
-    assert isinstance(mon, MonitoringCameraContainer)
-    assert isinstance(mon.r0, PedestalContainer)
+    mon = SST1MArrayEventContainer().monitoring.tel[TEL_ID]
+    assert isinstance(mon, TelescopeMonitoringContainer)
+    assert isinstance(mon.camera, CameraMonitoringContainer)
+    assert isinstance(mon.camera.pixel_statistics.pedestal_image, ChunkStatisticsContainer)
+    assert isinstance(mon.camera.pixel_statistics.pedestal_waveform, ChunkStatisticsContainer)
 
 
 def test_configuration_from_data_config():
@@ -174,14 +182,14 @@ def test_r0_pedestal_monitor():
         samples.append(event.r0.tel[TEL_ID].waveform)
         monitor(event, TEL_ID)
 
-    container = event.mon.tel[TEL_ID].r0
+    container = pixel_statistics(event).pedestal_waveform
     means = np.array(samples[-3:]).mean(axis=2)
     stds = np.array(samples[-3:]).std(axis=2)
-    np.testing.assert_allclose(container.charge_mean, means.mean(axis=0))
-    np.testing.assert_allclose(container.charge_median, np.median(means, axis=0))
-    np.testing.assert_allclose(container.charge_std, stds.mean(axis=0))
-    # the dl1 container is not filled
-    assert event.mon.tel[TEL_ID].pedestal.charge_std is None
+    np.testing.assert_allclose(container.mean, means.mean(axis=0))
+    np.testing.assert_allclose(container.median, np.median(means, axis=0))
+    np.testing.assert_allclose(container.std, stds.mean(axis=0))
+    # the statistics of the images are not filled
+    assert pixel_statistics(event).pedestal_image.std is None
 
 
 def test_r0_pedestal_monitor_ignores_masked_pixels():
@@ -201,13 +209,13 @@ def test_r0_pedestal_monitor_ignores_masked_pixels():
     monitor(event, TEL_ID)
 
     # the masked pixels only use the second event
-    container = event.mon.tel[TEL_ID].r0
-    np.testing.assert_allclose(container.charge_mean[mask], second.mean(axis=1))
-    np.testing.assert_allclose(container.charge_std[mask], second.std(axis=1))
+    container = pixel_statistics(event).pedestal_waveform
+    np.testing.assert_allclose(container.mean[mask], second.mean(axis=1))
+    np.testing.assert_allclose(container.std[mask], second.std(axis=1))
 
 
 def test_dl1_pedestal_monitor_raises_cleaning_threshold():
-    """NSBImageCleaner uses the std of the pedestal images in event.mon.tel[tel_id].pedestal"""
+    """NSBImageCleaner uses the std of the pedestal images of the camera monitoring"""
     rng = np.random.default_rng(5)
     image_processor = ImageProcessor(subarray=SUBARRAY, config=load_config(None, ismc=False))
     monitor = DL1PedestalMonitor(subarray=SUBARRAY)
@@ -215,12 +223,12 @@ def test_dl1_pedestal_monitor_raises_cleaning_threshold():
     image = np.full(N_PIXELS, 12.0)
     times = np.zeros(N_PIXELS)
     event = SST1MArrayEventContainer()
-    assert image_processor.clean(TEL_ID, image, arrival_times=times, monitoring=event.mon.tel[TEL_ID]).all()
+    assert image_processor.clean(TEL_ID, image, arrival_times=times, monitoring=event.monitoring.tel[TEL_ID].camera).all()
 
     for i in range(50):
         event = make_event(rng, time_s=i, image_std=10)
         monitor(event, TEL_ID)
 
     # 2.5 * std ~ 25 p.e. > 12 p.e.
-    assert event.mon.tel[TEL_ID].r0.charge_std is None
-    assert not image_processor.clean(TEL_ID, image, arrival_times=times, monitoring=event.mon.tel[TEL_ID]).any()
+    assert pixel_statistics(event).pedestal_waveform.std is None
+    assert not image_processor.clean(TEL_ID, image, arrival_times=times, monitoring=event.monitoring.tel[TEL_ID].camera).any()

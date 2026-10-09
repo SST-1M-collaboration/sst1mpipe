@@ -65,7 +65,7 @@ def events(simtel_file):
             summary["directions"].append((shower.alt.to_value(u.deg), shower.az.to_value(u.deg)))
             summary["multiplicity"][len(event.trigger.tels_with_trigger)] += 1
             for tel_id in event.trigger.tels_with_trigger:
-                pointing = event.pointing.tel[tel_id]
+                pointing = event.monitoring.tel[tel_id].pointing
                 summary["pointing"].add((round(pointing.altitude.to_value(u.deg), 3), round(pointing.azimuth.to_value(u.deg), 3)))
                 summary["r0"].add((event.r0.tel[tel_id].waveform.shape, event.r0.tel[tel_id].waveform.dtype))
                 summary["r1"].add((event.r1.tel[tel_id].waveform.shape, event.r1.tel[tel_id].waveform.dtype))

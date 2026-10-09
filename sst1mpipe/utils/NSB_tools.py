@@ -9,7 +9,6 @@ import astropy
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.time import Time
 from scipy import interpolate
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
@@ -235,9 +234,20 @@ def get_ped_table_low_res(file_list):
     return bline_table
 
 
+def mean_pedestal_std(ped_table):
+    """Mean over the camera pixels of the std of the ADC samples of the pedestal events (one per row)"""
+    std = np.asarray(ped_table['std'])
+    return np.nanmean(std.reshape(len(std), -1), axis=1)
+
+
+def pedestal_time(ped_table):
+    """Time of the statistics of the pedestal events: middle of the chunk of events (one per row)"""
+    return ped_table['time_start'] + (ped_table['time_end'] - ped_table['time_start']) / 2
+
+
 def plot_average_nsb_VS_time(ped_table,ntel,ax=None, color='blue',label='label'):
-    NSB = VAR_to_NSB(ped_table['pedestal_charge_std'].mean(axis=1)**2,ntel)
-    Dates = [Time(t,scale='utc',format='unix').to_datetime() for t in  ped_table['pedestal_sample_time']]
+    NSB = VAR_to_NSB(mean_pedestal_std(ped_table)**2,ntel)
+    Dates = pedestal_time(ped_table).utc.to_datetime()
     if ax is None:
         f,ax = plt.subplots(figsize=(10,5))
     ax.plot(Dates,NSB,'.',label=label, color=color)
@@ -246,8 +256,8 @@ def plot_average_nsb_VS_time(ped_table,ntel,ax=None, color='blue',label='label')
     return ax
 
 def plot_average_nsb_photon_rate_VS_time(ped_table,ntel,ax=None):
-    NSB = VAR_to_NSB_photon_rate(ped_table['pedestal_charge_std'].mean(axis=1)**2,ntel)
-    Dates = [Time(t,scale='utc',format='unix').to_datetime() for t in  ped_table['pedestal_sample_time']]
+    NSB = VAR_to_NSB_photon_rate(mean_pedestal_std(ped_table)**2,ntel)
+    Dates = pedestal_time(ped_table).utc.to_datetime()
     if ax is None:
         f,ax = plt.subplots(figsize=(10,5))
     ax.plot(Dates,NSB,'.',label=f'tel {ntel%20}')

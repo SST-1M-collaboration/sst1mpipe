@@ -134,7 +134,7 @@ def test_trigger_and_no_pointing_for_dark_run():
         assert event.trigger.tels_with_trigger == [DARK_TEL_ID]
         assert event.trigger.time == DARK_EVENT_TIME[i]
         assert event.trigger.tel[DARK_TEL_ID].time == event.trigger.time
-        assert np.isnan(event.pointing.tel[DARK_TEL_ID].altitude)
+        assert np.isnan(event.monitoring.tel[DARK_TEL_ID].pointing.altitude)
 
 
 @pytest.mark.parametrize("pointing_update_interval, tolerance", [(0, 1e-6 * u.arcsec), (3600, 1 * u.arcmin)])
@@ -157,11 +157,11 @@ def test_pointing_given_by_user(pointing_update_interval, tolerance):
     target = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs")
     for event in source:
         expected = target.transform_to(AltAz(obstime=event.trigger.time, location=location))
-        pointing = event.pointing.tel[DARK_TEL_ID]
+        pointing = event.monitoring.tel[DARK_TEL_ID].pointing
         filled = SkyCoord(az=pointing.azimuth, alt=pointing.altitude, frame=expected)
         assert filled.separation(expected) < tolerance
-        assert u.isclose(event.pointing.array_ra, ra * u.deg)
-        assert u.isclose(event.pointing.array_dec, dec * u.deg)
+        assert u.isclose(event.monitoring.pointing.array_ra, ra * u.deg)
+        assert u.isclose(event.monitoring.pointing.array_dec, dec * u.deg)
 
 
 @pytest.mark.parametrize("target, expected", [
@@ -528,7 +528,7 @@ def test_observation_run(input_file, tel_id, caplog):
     n_events = 0
     for event in source:
         expected = target.transform_to(AltAz(obstime=event.trigger.time, location=location))
-        pointing = event.pointing.tel[tel_id]
+        pointing = event.monitoring.tel[tel_id].pointing
         filled = SkyCoord(az=pointing.azimuth, alt=pointing.altitude, frame=expected)
         assert filled.separation(expected) < 1 * u.arcmin
         assert 74 < pointing.altitude.to_value(u.deg) < 75

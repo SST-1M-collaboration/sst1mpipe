@@ -216,7 +216,7 @@ class muon_finder:
                     continue
                 ## intergrate signal in a fixed window :
                 r0_pedestal_monitor.fill_monitoring(event, tel)
-                VI = VAR_to_Idrop(event.mon.tel[tel].r0.charge_std.mean()**2, 20+self.tel)
+                VI = VAR_to_Idrop(event.monitoring.tel[tel].camera.pixel_statistics.pedestal_waveform.std.mean()**2, 20+self.tel)
                 Q_sum_ADC    = (r0data.waveform[0].T[self.w_start:self.w_end] - r0data.pedestal).sum(axis=0)
                 Q_sum_window = Q_sum_ADC /self.gain /VI /self.window_t
 

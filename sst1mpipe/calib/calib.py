@@ -166,14 +166,16 @@ class R0R1Calibrator(TelescopeComponent):
     1. subtraction of the pedestal computed by DigiCam (``r0.pedestal``)
     2. conversion from ADC to p.e. with the ``dc_to_pe`` of the calibration file
     3. voltage drop correction (``voltage_drop_correction``), from the std of the ADC
-       samples of the pedestal events in ``event.mon.tel[tel_id].r0``
+       samples of the pedestal events in
+       ``event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform``
        (see `sst1mpipe.utils.monitoring_pedestals.R0PedestalMonitor`)
     4. window transmittance correction: division by the correction factor of each pixel
        of ``window_transmittance_file``
     5. bad pixels: pixels with bad calibration parameters (``flag_bad_calibration_pixels``),
        dead pixels (``flag_dead_pixels``) and the ``bad_pixels`` are set to 0 in the R1 waveforms and
-       flagged in ``event.mon.tel[tel_id].pixel_status``, so that their charge is
-       interpolated by the ``invalid_pixel_handler`` of `~ctapipe.calib.CameraCalibrator`.
+       flagged in ``event.monitoring.tel[tel_id].camera.coefficients.outlier_mask``, so that
+       their charge is interpolated by the ``invalid_pixel_handler`` of
+       `~ctapipe.calib.CameraCalibrator`.
 
     6. saturated pixels: the pixels whose maximum ADC sample (pedestal subtracted) is above
        ``saturation_threshold``, with more than ``saturation_width_threshold`` samples above
@@ -182,7 +184,7 @@ class R0R1Calibrator(TelescopeComponent):
        `ImageSaturationCorrector`.
 
     The steps using the pedestal statistics (3 and the dead pixels of 5) are not applied
-    if ``event.mon.tel[tel_id].r0`` is not filled.
+    if the statistics of the ADC samples of the pedestal events are not filled.
 
     For the simulated events (``event.simulation`` filled), the R1 waveforms are given by the
     event source. They are only corrected for the PDE drop due to the NSB, and the
@@ -411,15 +413,12 @@ class R0R1Calibrator(TelescopeComponent):
     @staticmethod
     def _flag_pixels(event, tel_id, mask_bad):
         """Flag the pixels, so that their charge is interpolated by the CameraCalibrator"""
-        pixel_status = event.mon.tel[tel_id].pixel_status
-        pixel_status.hardware_failing_pixels = mask_bad[np.newaxis]
-        pixel_status.flatfield_failing_pixels = mask_bad[np.newaxis]
-        pixel_status.pedestal_failing_pixels = mask_bad[np.newaxis]
+        event.monitoring.tel[tel_id].camera.coefficients.outlier_mask = mask_bad[np.newaxis]
 
     def _calibrate_telescope(self, event, tel_id):
         r0 = event.r0.tel[tel_id]
         dc_to_pe, _ = self.calibration_parameters(tel_id)
-        pedestal_std = event.mon.tel[tel_id].r0.charge_std
+        pedestal_std = event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform.std
 
         voltage_drop = np.asarray(self.voltage_drop(tel_id, pedestal_std))
         waveform = (r0.waveform - r0.pedestal[:, np.newaxis]) / dc_to_pe[:, np.newaxis]

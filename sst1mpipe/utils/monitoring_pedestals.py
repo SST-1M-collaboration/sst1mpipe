@@ -3,8 +3,6 @@ from abc import abstractmethod
 from collections import deque
 from copy import deepcopy
 
-import astropy.units as u
-from astropy.time import Time
 import numpy as np
 from ctapipe.calib import CameraCalibrator
 from ctapipe.core import TelescopeComponent
@@ -25,8 +23,9 @@ MASKED_VALUE = -100
 class SlidingWindowMonitor(TelescopeComponent):
     """
     Base class keeping per pixel quantities of the last ``n_events`` events of each
-    telescope in a sliding window, and filling a monitoring container of
-    ``event.mon.tel[tel_id]`` with their statistics.
+    telescope in a sliding window, and filling a `~ctapipe.containers.ChunkStatisticsContainer`
+    of the pixel statistics of the camera monitoring (``event.monitoring.tel[tel_id].camera``)
+    with their statistics.
 
     Subclasses define which quantities are extracted from an event (`add_event`),
     how their statistics are computed (`_compute_statistics`) and which container
@@ -40,6 +39,7 @@ class SlidingWindowMonitor(TelescopeComponent):
     def __init__(self, subarray, config=None, parent=None, **kwargs):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
         self._timestamps = {}
+        self._event_ids = {}
         self._values = {}
         self._statistics = {}
         self.processed_events = {}
@@ -66,7 +66,7 @@ class SlidingWindowMonitor(TelescopeComponent):
     @abstractmethod
     def _compute_statistics(self, values):
         """
-        Return charge_mean, charge_median, charge_std of ``values``, an array
+        Return the mean, median and std of ``values``, an array
         of shape (n_buffered, ...) of the quantities given to `_append`
         """
 
@@ -77,17 +77,19 @@ class SlidingWindowMonitor(TelescopeComponent):
     def _append(self, event, tel_id, values):
         if tel_id not in self._timestamps:
             self._timestamps[tel_id] = deque(maxlen=self.n_events.tel[tel_id])
+            self._event_ids[tel_id] = deque(maxlen=self.n_events.tel[tel_id])
             self._values[tel_id] = deque(maxlen=self.n_events.tel[tel_id])
             self.processed_events[tel_id] = 0
 
         self._timestamps[tel_id].append(event.r0.tel[tel_id].event_time)
+        self._event_ids[tel_id].append(event.index.event_id)
         self._values[tel_id].append(values)
         self.processed_events[tel_id] += 1
         self._statistics.pop(tel_id, None)
 
     def fill_monitoring(self, event, tel_id):
         """
-        Fill the monitoring container of ``event.mon.tel[tel_id]``.
+        Fill the monitoring container of ``event.monitoring.tel[tel_id]``.
         Nothing is done if the sliding window is empty.
         """
         if self.n_buffered(tel_id) == 0:
@@ -96,25 +98,27 @@ class SlidingWindowMonitor(TelescopeComponent):
         # statistics are only recomputed when a new event is added
         if tel_id not in self._statistics:
             self._statistics[tel_id] = self._compute_statistics(np.array(self._values[tel_id]))
-        charge_mean, charge_median, charge_std = self._statistics[tel_id]
+        mean, median, std = self._statistics[tel_id]
 
-        timestamps = self._timestamps[tel_id]
+        timestamps, event_ids = self._timestamps[tel_id], self._event_ids[tel_id]
         container = self._container(event, tel_id)
         container.n_events = len(timestamps)
-        # the ctapipe PedestalContainer stores the times as Quantity [s] (unix TAI)
-        container.sample_time = Time(timestamps).mean().unix_tai * u.s
-        container.sample_time_min = timestamps[0].unix_tai * u.s
-        container.sample_time_max = timestamps[-1].unix_tai * u.s
-        container.charge_mean = charge_mean
-        container.charge_median = charge_median
-        container.charge_std = charge_std
+        container.time_start = timestamps[0]
+        container.time_end = timestamps[-1]
+        container.event_id_start = event_ids[0]
+        container.event_id_end = event_ids[-1]
+        container.mean = mean
+        container.median = median
+        container.std = std
+        container.outlier_mask = np.zeros(np.shape(mean), dtype=bool)
+        container.is_valid = True
 
 
 class R0PedestalMonitor(SlidingWindowMonitor):
     """
     Statistics of the ADC samples of the pedestal events, filled in
-    ``event.mon.tel[tel_id].r0``. Used for the voltage drop
-    correction and the identification of dead pixels.
+    ``event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform``.
+    Used for the voltage drop correction and the identification of dead pixels.
     """
 
     def add_event(self, event, tel_id, cleaning_mask=None):
@@ -129,7 +133,7 @@ class R0PedestalMonitor(SlidingWindowMonitor):
         self._append(event, tel_id, np.stack([samples.mean(axis=-1), samples.std(axis=-1)]))
 
     def _container(self, event, tel_id):
-        return event.mon.tel[tel_id].r0
+        return event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform
 
     def _compute_statistics(self, values):
         means = np.ma.masked_values(values[:, 0], MASKED_VALUE)
@@ -145,7 +149,8 @@ class R0PedestalMonitor(SlidingWindowMonitor):
 class DL1PedestalMonitor(SlidingWindowMonitor):
     """
     Statistics of the calibrated images (p.e.) of the pedestal events, filled in
-    ``event.mon.tel[tel_id].pedestal``. Used by `ctapipe.image.cleaning.NSBImageCleaner`.
+    ``event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_image``.
+    Used by `ctapipe.image.cleaning.NSBImageCleaner`.
     """
 
     n_events = IntTelescopeParameter(
@@ -157,7 +162,7 @@ class DL1PedestalMonitor(SlidingWindowMonitor):
         self._append(event, tel_id, np.array(event.dl1.tel[tel_id].image, dtype=np.float64))
 
     def _container(self, event, tel_id):
-        return event.mon.tel[tel_id].pedestal
+        return event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_image
 
     def _compute_statistics(self, values):
         return values.mean(axis=0), np.median(values, axis=0), values.std(axis=0)

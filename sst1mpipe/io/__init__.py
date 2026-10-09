@@ -4,6 +4,9 @@
 from .io import (
     add_pointing_dl1_stereo,
     check_outdir,
+    chunk_statistics_table,
+    DL1_PEDESTAL_GROUP,
+    R0_PEDESTAL_GROUP,
     compute_dl1_summary,
     get_dl1_info,
     get_pde_correction_factors,

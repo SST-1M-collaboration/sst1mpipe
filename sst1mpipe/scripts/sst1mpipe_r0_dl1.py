@@ -24,6 +24,7 @@ import argparse
 import logging
 import os
 import sys
+from copy import deepcopy
 from collections import Counter
 
 import astropy.units as u
@@ -31,7 +32,7 @@ import numpy as np
 from ctapipe.calib import CameraCalibrator
 from ctapipe.image import ImageProcessor
 from ctapipe.core import Provenance
-from ctapipe.io import DataWriter, EventSource, SimTelEventSource
+from ctapipe.io import DataWriter, EventSource, SimTelEventSource, write_table
 from ctapipe.reco import ShowerProcessor
 
 import sst1mpipe
@@ -40,7 +41,10 @@ from sst1mpipe.calib import (
     ImageSaturationCorrector,
 )
 from sst1mpipe.io import (
+    DL1_PEDESTAL_GROUP,
+    R0_PEDESTAL_GROUP,
     check_outdir,
+    chunk_statistics_table,
     load_config,
     read_charge_images,
     write_assumed_pointing,
@@ -222,8 +226,8 @@ def main():
             output_file_px_charges = output_file_px_charges.split("_pedestal_hist.h5")[0] + "_" + wobble + "_pedestal_hist.h5"
 
         ## init the sliding windows of pedestal events and load the first pedestal events
-        # r0: statistics of the ADC samples in event.mon.tel[tel].r0 (voltage drop, dead pixels)
-        # dl1: statistics of the calibrated images in event.mon.tel[tel].pedestal (image cleaning)
+        # r0: statistics of the ADC samples in event.monitoring.tel[tel].camera.pixel_statistics.pedestal_waveform (voltage drop, dead pixels)
+        # dl1: statistics of the calibrated images in event.monitoring.tel[tel].camera.pixel_statistics.pedestal_image (image cleaning)
         r0_pedestal_monitor = R0PedestalMonitor(subarray=source.subarray, config=config)
         dl1_pedestal_monitor = DL1PedestalMonitor(subarray=source.subarray, config=config)
         pedestals_in_file = load_first_pedestals(r0_pedestal_monitor, dl1_pedestal_monitor, input_file, config)
@@ -249,7 +253,7 @@ def main():
 
     cleaner = config['ImageProcessor']['image_cleaner_type']
     # NSBImageCleaner raises the picture threshold of each pixel to pedestal_factor * std of the
-    # pedestal images, taken from event.mon.tel[tel].pedestal.charge_std (see below)
+    # pedestal images, taken from event.monitoring.tel[tel].camera.pixel_statistics.pedestal_image.std (see below)
     adaptive_cleaning = (cleaner == 'NSBImageCleaner') and not ismc
     pedestal_std_pe = None
     if adaptive_cleaning:
@@ -283,6 +287,7 @@ def main():
             final_histogram_tel1 = np.zeros(BINS)
             final_histogram_tel2 = np.zeros(BINS)
 
+    pedestal_chunks = {R0_PEDESTAL_GROUP: {}, DL1_PEDESTAL_GROUP: {}}
     with DataWriter(
         source, output_path=output_file,
         overwrite        = True,
@@ -303,7 +308,7 @@ def main():
                     tel_string = get_tel_string(tel, mc=False)
                     if adaptive_cleaning:
                         dl1_pedestal_monitor.fill_monitoring(event, tel)
-                        nsb_level = np.mean(event.mon.tel[tel].pedestal.charge_mean)
+                        nsb_level = np.mean(event.monitoring.tel[tel].camera.pixel_statistics.pedestal_image.mean)
                         charge_to_nsb = config['mean_charge_to_nsb_rate'][tel_string]
                         for setting in charge_to_nsb:
                             min_charge = setting['mean_charge_bin_low']
@@ -321,7 +326,7 @@ def main():
 
                 event_type = event.r0.tel[tel]._event_type.value
 
-                # NOTE: event.index, event.trigger and event.pointing are filled by SST1MEventSource
+                # NOTE: event.index, event.trigger and event.monitoring.tel[tel].pointing are filled by SST1MEventSource
 
 
 
@@ -360,15 +365,15 @@ def main():
                 n_saturated += image_saturation_corrector(event, tel)
 
             if adaptive_cleaning:
-                # NSBImageCleaner reads the std of the pedestal images (in p.e.) from event.mon.tel[tel].pedestal
+                # NSBImageCleaner reads the std of the pedestal images (in p.e.) from event.monitoring.tel[tel].camera.pixel_statistics.pedestal_image
                 if reclean:
-                    event.mon.tel[tel].pedestal.charge_std = pedestal_std_pe
+                    event.monitoring.tel[tel].camera.pixel_statistics.pedestal_image.std = pedestal_std_pe
                 elif pedestals_in_file:
                     # ALWAYS use adaptive cleaning - take data from the online pedestal events
                     dl1_pedestal_monitor.fill_monitoring(event, tel)
                 else:
-                    event.mon.tel[tel].pedestal.charge_std = None
-                pedestal_std_pe = event.mon.tel[tel].pedestal.charge_std
+                    event.monitoring.tel[tel].camera.pixel_statistics.pedestal_image.std = None
+                pedestal_std_pe = event.monitoring.tel[tel].camera.pixel_statistics.pedestal_image.std
                 if pedestal_std_pe is not None:
                     picture_threshold = image_processor.clean.picture_threshold_pe.tel[tel]
                     pedestal_threshold = image_processor.clean.pedestal_factor.tel[tel] * pedestal_std_pe
@@ -395,17 +400,12 @@ def main():
                         r0_pedestal_monitor(event, tel, cleaning_mask=clenaning_mask)
                         new_pedestal = True
 
-                # writing pedestal info: ADC samples (r0) and calibrated images (dl1)
+                # pedestal info: ADC samples (r0) and calibrated images (dl1), written after the events
                 if new_pedestal and (r0_pedestal_monitor.processed_events[tel] % 20 == 0):
-                    writer._writer.write(
-                        table_name='r0/monitoring/telescope/pedestal',
-                        containers=[event.mon.tel[tel].r0],
-                    )
+                    statistics = event.monitoring.tel[tel].camera.pixel_statistics
+                    pedestal_chunks[R0_PEDESTAL_GROUP].setdefault(tel, []).append(deepcopy(statistics.pedestal_waveform))
                     if pedestals_in_file:
-                        writer._writer.write(
-                            table_name='dl1/monitoring/telescope/pedestal',
-                            containers=[event.mon.tel[tel].pedestal],
-                        )
+                        pedestal_chunks[DL1_PEDESTAL_GROUP].setdefault(tel, []).append(deepcopy(statistics.pedestal_image))
 
 
             # Extraction of pixel charge distribution for MC-data tuning
@@ -476,6 +476,10 @@ def main():
 
         if max_events is None and source.is_simulation:
             writer.write_simulated_shower_distributions(source.simulated_shower_distributions)
+
+    for group, chunks in pedestal_chunks.items():
+        for tel_id, tel_chunks in chunks.items():
+            write_table(chunk_statistics_table(tel_chunks), output_file, f"{group}/tel_{tel_id:03d}")
 
     # Write additional params in the DL1 file
     # - these are not defined in the ctapipe containers, but are necessary for (mono) reconstruction

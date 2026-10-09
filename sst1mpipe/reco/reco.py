@@ -1367,8 +1367,7 @@ def make_dl1_stereo(
                     evt.dl1.tel[tel_2] = evt_t2.dl1.tel[tel_2]
 
                     evt.trigger.tel[tel_2].time = evt_t2.trigger.tel[tel_2].time
-                    evt.pointing.tel[tel_2].azimuth  = evt_t2.pointing.tel[tel_2].azimuth
-                    evt.pointing.tel[tel_2].altitude = evt_t2.pointing.tel[tel_2].altitude
+                    evt.monitoring.tel[tel_2].pointing = evt_t2.monitoring.tel[tel_2].pointing
 
                     # add units to hillas parameters (important for stereo reconstruction with shower_processor)
                     evt = event_hillas_add_units(evt)

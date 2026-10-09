@@ -210,7 +210,7 @@ def test_r1_stream():
         assert list(event.r1.tel) == [tel_id]
 
     # trigger
-    assert [event.trigger.event_type for event in events] == [EventType.SUBARRAY, EventType.SKY_PEDESTAL, EventType.UNKNOWN]
+    assert [event.trigger.event_type for event in events] == [EventType.SUBARRAY, EventType.PEDESTAL, EventType.UNKNOWN]
     for event in events:
         assert event.trigger.tels_with_trigger == [tel_id]
         assert event.trigger.time == event.r1.tel[tel_id].event_time

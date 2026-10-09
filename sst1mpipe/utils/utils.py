@@ -378,12 +378,12 @@ def add_pointing_to_events(
     wobble_coords = SkyCoord(ra=float(ra) * u.deg, dec=float(dec) * u.deg, frame='icrs')
     horizon_frame = AltAz(obstime=event.trigger.time, location=location)
     tel_pointing = wobble_coords.transform_to(horizon_frame)
-    event.pointing.tel[telescope].azimuth  = tel_pointing.az.to('rad')
-    event.pointing.tel[telescope].altitude = tel_pointing.alt.to('rad')
-    event.pointing.array_azimuth  = tel_pointing.az.to('rad')
-    event.pointing.array_altitude = tel_pointing.alt.to('rad')
-    event.pointing.array_ra  = wobble_coords.ra.to('rad')
-    event.pointing.array_dec = wobble_coords.dec.to('rad')
+    event.monitoring.tel[telescope].pointing.azimuth  = tel_pointing.az.to('rad')
+    event.monitoring.tel[telescope].pointing.altitude = tel_pointing.alt.to('rad')
+    event.monitoring.pointing.array_azimuth  = tel_pointing.az.to('rad')
+    event.monitoring.pointing.array_altitude = tel_pointing.alt.to('rad')
+    event.monitoring.pointing.array_ra  = wobble_coords.ra.to('rad')
+    event.monitoring.pointing.array_dec = wobble_coords.dec.to('rad')
     return event
 
 

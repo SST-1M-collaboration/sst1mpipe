@@ -342,6 +342,7 @@ class ZMQEventSource(EventSource):
         event.trigger.event_type = camera.event_type
         event.trigger.time = camera.event_time
         event.trigger.tel[tel_id].time = camera.event_time
+        event.trigger.tel[tel_id].event_type = camera.event_type
         event.trigger.tels_with_trigger = [tel_id]
 
     def _camera_event(self, payload):
