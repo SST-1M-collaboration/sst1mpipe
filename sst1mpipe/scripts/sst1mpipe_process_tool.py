@@ -1,15 +1,17 @@
 import os
 from collections import Counter
-from copy import deepcopy
 
+import astropy.units as u
 import numpy as np
+from astropy.table import QTable
+from astropy.time import Time
 from tqdm import tqdm
 from ctapipe.calib import CameraCalibrator
 from ctapipe.containers import EventType, SchedulingBlockType, TelEventIndexContainer
 from ctapipe.core import Tool
 from ctapipe.core.traits import Bool, Integer, List, UseEnum, flag
 from ctapipe.image import ImageProcessor
-from ctapipe.io import EventSource, DataWriter, SimTelEventSource
+from ctapipe.io import EventSource, DataWriter, SimTelEventSource, write_table
 from ctapipe.reco import ShowerProcessor
 
 from sst1mpipe.calib import R0R1Calibrator, ImageSaturationCorrector
@@ -145,7 +147,9 @@ class ProcessorTool(Tool):
         self.n_triggered = Counter()
         self.n_pedestal = 0
         self.n_survived_pedestals = 0
-        # last pointing of each telescope, and whether it is written in the pointing table
+        # pointing of each telescope (time, azimuth, altitude): the rows of the pointing table
+        # and the pointing of the last event
+        self._pointing_rows = {}
         self._last_pointing = {}
         self._writer_closed = False
         self._exit_stack.callback(self._close_writer)
@@ -177,7 +181,7 @@ class ProcessorTool(Tool):
             self.image_processor(event)
             if self.dl1_pedestal_monitor is not None:
                 self.add_dl1_pedestal(event)
-            self.write_pointing(event)
+            self.add_pointing(event)
             self.n_triggered.update(event.trigger.tels_with_trigger)
 
             # the pedestal events are used for the monitoring only
@@ -239,25 +243,34 @@ class ProcessorTool(Tool):
             for tel_id in event.dl1.tel:
                 self.dl1_pedestal_monitor.add_event(event, tel_id)
 
-    def write_pointing(self, event):
+    def add_pointing(self, event):
         """
-        Pointing of the telescopes in the tables dl0/monitoring/telescope/pointing/tel_XXX,
-        read by the ctapipe PointingInterpolator: a row each time the alt/az of the pointing
-        is computed by the event source (and a last row at the time of the last event, in finish)
+        Pointing of the telescopes (event.pointing.tel) for the tables
+        dl0/monitoring/telescope/pointing/tel_XXX read by the ctapipe PointingInterpolator:
+        a row each time the alt/az of the pointing is computed by the event source,
+        and a last row at the time of the last event (see write_pointing_tables)
         """
+        # the pointing of the simulations is written by the DataWriter
+        if self.event_source.is_simulation:
+            return
         for tel_id in event.trigger.tels_with_trigger:
-            # (the pointing of the simulations is written by the DataWriter)
-            pointing = getattr(event.mon.tel[tel_id], "pointing", None)
-            if pointing is None or not np.isfinite(pointing.altitude):
+            pointing = event.pointing.tel[tel_id]
+            if not np.isfinite(pointing.altitude):
                 continue
-            last = self._last_pointing.get(tel_id)
-            new = last is None or (pointing.azimuth, pointing.altitude) != (last[0].azimuth, last[0].altitude)
-            if new:
-                self._write_pointing_row(tel_id, pointing)
-            self._last_pointing[tel_id] = (deepcopy(pointing), new)
+            row = (event.trigger.time, pointing.azimuth, pointing.altitude)
+            rows = self._pointing_rows.setdefault(tel_id, [])
+            if not rows or row[1:] != rows[-1][1:]:
+                rows.append(row)
+            self._last_pointing[tel_id] = row
 
-    def _write_pointing_row(self, tel_id, pointing):
-        self.writer._writer.write(f"dl0/monitoring/telescope/pointing/tel_{tel_id:03d}", [pointing])
+    def write_pointing_tables(self, output_path):
+        """Pointing tables of the telescopes, written after the events"""
+        for tel_id, rows in self._pointing_rows.items():
+            if self._last_pointing[tel_id] is not rows[-1]:
+                rows.append(self._last_pointing[tel_id])
+            time, azimuth, altitude = zip(*rows, strict=True)
+            table = QTable(dict(time=Time(time), azimuth=u.Quantity(azimuth), altitude=u.Quantity(altitude)))
+            write_table(table, output_path, f"/dl0/monitoring/telescope/pointing/tel_{tel_id:03d}")
 
     def write_pedestal_monitoring(self, event):
         """
@@ -279,14 +292,11 @@ class ProcessorTool(Tool):
 
     def finish(self):
 
-        # last pointing of the telescopes, at the time of the last event
-        for tel_id, (pointing, written) in self._last_pointing.items():
-            if not written:
-                self._write_pointing_row(tel_id, pointing)
         if self.event_source.is_simulation:
             self.writer.write_simulated_shower_distributions(self.event_source.simulated_shower_distributions)
         self._close_writer()
         output_path = self.writer.output_path
+        self.write_pointing_tables(output_path)
         if self.n_skipped_events > 0:
             self.log.warning("%d events skipped (scheduling block type not allowed)", self.n_skipped_events)
 

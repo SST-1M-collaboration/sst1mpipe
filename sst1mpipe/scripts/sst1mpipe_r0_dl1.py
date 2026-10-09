@@ -542,11 +542,6 @@ def main():
         swat_event_ids_used=swat_event_ids_used,
     ))
 
-    # We write calibration configuration in the output file
-    # NOTE: If one use the ctapipe merging tool this table is missing in the merged DL1 file!
-    # TODO: Broken after implementation telescope dependent tailcuts, but not supper important
-    # write_r1_dl1_cfg(output_file, config=config)
-
     # Save pixel charges histograms and maps in output file
     if pixel_charges:
 

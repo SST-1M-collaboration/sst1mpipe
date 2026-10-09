@@ -7,14 +7,12 @@ The PyTables descriptions are those of the tables written by sst1mpipe in the DL
 from enum import Flag
 from functools import partial
 
-import astropy.units as u
 import numpy as np
 from ctapipe.containers import (
     ArrayEventContainer,
     MonitoringCameraContainer,
     MonitoringContainer,
     ObservationBlockContainer,
-    NAN_TIME,
     PedestalContainer,
     R0CameraContainer,
     R0Container,
@@ -34,7 +32,6 @@ __all__ = [
     "SST1MR0CameraContainer",
     "SST1MR0Container",
     "R0PedestalContainer",
-    "TelescopePointingMonitoringContainer",
     "SST1MMonitoringCameraContainer",
     "SST1MMonitoringContainer",
     "SST1MArrayEventContainer",
@@ -115,32 +112,14 @@ class R0PedestalContainer(PedestalContainer):
     default_prefix = "pedestal"
 
 
-class TelescopePointingMonitoringContainer(Container):
-    """
-    Pointing of the telescope (alt/az) at a time, written in the table
-    ``/dl0/monitoring/telescope/pointing/tel_XXX`` read by the ctapipe
-    ``PointingInterpolator`` (``HDF5EventSource``, ``TableLoader``)
-    """
-
-    default_prefix = ""
-
-    time = Field(NAN_TIME, "Time of the pointing")
-    azimuth = Field(np.nan * u.rad, "Azimuth of the pointing", unit=u.rad)
-    altitude = Field(np.nan * u.rad, "Altitude of the pointing", unit=u.rad)
-
-
 class SST1MMonitoringCameraContainer(MonitoringCameraContainer):
     """
-    ctapipe camera monitoring with the R0 level monitoring and the pointing of SST-1M
+    ctapipe camera monitoring with the R0 level monitoring of SST-1M
     """
 
     r0 = Field(
         default_factory=R0PedestalContainer,
         description="Statistics of the ADC samples of the pedestal events",
-    )
-    pointing = Field(
-        default_factory=TelescopePointingMonitoringContainer,
-        description="Pointing of the telescope at the time of the event",
     )
 
 

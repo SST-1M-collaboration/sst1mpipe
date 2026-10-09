@@ -600,62 +600,6 @@ def write_assumed_pointing(
     params.write(dl1_file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
 
 
-def write_r1_dl1_cfg(file, config=None):
-    """
-    Write configuration of R1-D1 calibration
-    in the output DL1 file.
-
-    Parameters
-    ----------
-    file: string
-        Path
-    config: dict
-
-    Returns
-    -------
-
-    """
-
-    with tables.open_file(file, mode='a') as f:
-
-        calibrator = config['CameraCalibrator']['image_extractor_type']
-        image_processor = config['ImageProcessor']['image_cleaner_type']
-        telescope_coords = config['telescope_coords']
-
-        emin_cut_g = config['analysis']['gamma_min_simulated_energy_tev']
-        emin_cut_p = config['analysis']['proton_min_simulated_energy_tev']
-
-        for tel in telescope_coords.keys():
-
-            f.create_table(
-                '/configuration/r1_dl1/telescope_coords',
-                tel,
-                pd.DataFrame(config['telescope_coords'][tel], index=[0]).to_records(index=False),
-                createparents=True,
-            )
-
-        f.create_table(
-            '/configuration/r1_dl1/CameraCalibrator',
-            calibrator,
-            pd.DataFrame(config['CameraCalibrator'][calibrator], index=[0]).to_records(index=False),
-            createparents=True,
-        )
-
-        f.create_table(
-            '/configuration/r1_dl1/ImageProcessor',
-            image_processor,
-            pd.DataFrame(config['ImageProcessor'][image_processor], index=[0]).to_records(index=False),
-            createparents=True,
-        )
-
-        f.create_table(
-            '/configuration/r1_dl1',
-            'Emin_cuts',
-            pd.DataFrame({'emin_cut_g_tev': emin_cut_g, 'emin_cut_p_tev': emin_cut_p}, index=[0]).to_records(index=False),
-            createparents=True,
-        )
-
-
 def load_more_dl1_tables_mono(
         file_list, config=None, check_finite=False,
         time_min=0, time_max=np.inf, quality_cuts=False,

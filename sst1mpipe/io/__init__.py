@@ -37,5 +37,4 @@ from .io import (
     write_extra_parameters,
     write_photon_list,
     write_pixel_charges_table,
-    write_r1_dl1_cfg,
 )
