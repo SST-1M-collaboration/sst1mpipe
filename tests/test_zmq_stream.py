@@ -451,7 +451,8 @@ def test_process_camera_event_stream(tmp_path):
 
     table = f"/dl1/event/telescope/parameters/tel_{ZFITS_TEL_ID:03d}"
     stream_parameters, file_parameters = read_table(stream_output, table), read_table(file_output, table)
-    assert len(stream_parameters) == 130
+    # 84 Cherenkov events (the 46 pedestal events are not written)
+    assert len(stream_parameters) == 84
     np.testing.assert_array_equal(stream_parameters["event_id"], file_parameters["event_id"])
     for column in ["camera_frame_hillas_intensity", "camera_frame_hillas_x", "camera_frame_hillas_width"]:
         np.testing.assert_array_equal(stream_parameters[column], file_parameters[column])

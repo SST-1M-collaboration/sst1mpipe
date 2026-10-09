@@ -1,11 +1,13 @@
+import astropy.units as u
 import numpy as np
 import pytest
 from ctapipe.core import run_tool
 from ctapipe.image.cleaning import NSBImageCleaner
-from ctapipe.io import read_table
+from ctapipe.io import HDF5EventSource, read_table
 
 from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES
-from sst1mpipe.io import get_dl1_info
+from sst1mpipe.io import get_dl1_info, load_dl1_sst1m
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 from sst1mpipe.resources import RTA_CONFIG_FILE, TEST_DATA_DIR
 
@@ -43,8 +45,9 @@ def test_process_r0_file(tmp_path, tel_id, voltage_drop_correction):
     output = tmp_path / f"events_{WOBBLE}.dl1.h5"
     assert output.exists()
 
+    # the pedestal events are not written as events
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")
-    assert len(parameters) == run["n_events"]
+    assert len(parameters) == run["n_events"] - run["n_pedestals"]
     intensity = parameters["camera_frame_hillas_intensity"]
     assert np.isfinite(intensity).sum() > 0
     assert np.all(intensity[np.isfinite(intensity)] > 0)
@@ -98,3 +101,63 @@ def test_dl1_pedestal_monitor_used_by_nsb_image_cleaner(tmp_path, monkeypatch):
     # the std of the images (p.e.) grows from 0 (a single image in the window)
     assert np.all(pedestal_stds[2] == 0)
     assert 0.1 < np.median(pedestal_stds[-1]) < 2
+
+
+def test_monitoring_tables(tmp_path):
+    """pointing and pedestal monitoring tables written by sst1mpipe-process"""
+    tel_id, run = 22, OBSERVATION_FILES[22]
+    tel = f"tel_{tel_id:03d}"
+    output = tmp_path / "events.dl1.h5"
+    run_tool(ProcessorTool(), argv=[
+        f"--input={run['path']}",
+        f"--output={output}",
+        f"--config={RTA_CONFIG_FILE}",
+        "--ProcessorTool.wobble_in_output_name=False",
+        "--ProcessorTool.pedestal_monitoring_interval=5",
+        "--R0PedestalMonitor.n_events=4",
+    ], raises=True)
+
+    # pointing of the events, from the event source
+    with SST1MEventSource(run["path"]) as source:
+        pointing = {
+            event.index.event_id: (event.trigger.time, event.pointing.tel[tel_id].azimuth,
+                                   event.pointing.tel[tel_id].altitude)
+            for event in source
+        }
+    times = [time for time, _, _ in pointing.values()]
+
+    # a row each time the alt/az is computed (every second) and at the time of the last event
+    table = read_table(output, f"/dl0/monitoring/telescope/pointing/{tel}")
+    assert table.colnames == ["time", "azimuth", "altitude"]
+    assert np.all(np.diff(table["time"].mjd) > 0)
+    assert table["time"][0] == times[0]
+    assert table["time"][-1] == times[-1]
+    assert 1 < len(table) < run["n_events"]
+
+    # the pointing of the events is interpolated by ctapipe (HDF5EventSource, load_dl1_sst1m)
+    with HDF5EventSource(output) as source:
+        interpolated = {e.index.event_id: e.pointing.tel[tel_id] for e in source}
+    assert len(interpolated) == run["n_events"] - run["n_pedestals"]
+    for event_id, p in interpolated.items():
+        _, azimuth, altitude = pointing[event_id]
+        assert u.isclose(p.azimuth, azimuth, atol=0.01 * u.deg)
+        assert u.isclose(p.altitude, altitude, atol=0.01 * u.deg)
+    data = load_dl1_sst1m(str(output), tel=tel)
+    np.testing.assert_allclose(data["true_az_tel"], [interpolated[e].azimuth.to_value(u.deg) for e in data["event_id"]])
+    np.testing.assert_allclose(data["true_alt_tel"], [interpolated[e].altitude.to_value(u.deg) for e in data["event_id"]])
+
+    # statistics of the pedestal events, every 5 pedestal events
+    n_rows = run["n_pedestals"] // 5
+    r0 = read_table(output, "/r0/monitoring/telescope/pedestal")
+    dl1 = read_table(output, "/dl1/monitoring/telescope/pedestal")
+    assert len(r0) == len(dl1) == n_rows
+    np.testing.assert_array_equal(r0["event_id"], dl1["event_id"])
+    assert np.all(r0["tel_id"] == tel_id)
+    # sliding windows of 4 (R0PedestalMonitor) and 1000 (DL1PedestalMonitor) pedestal events
+    assert list(r0["pedestal_n_events"]) == [4] * n_rows
+    assert list(dl1["pedestal_n_events"]) == [5 * (i + 1) for i in range(n_rows)]
+    assert r0["pedestal_charge_std"].shape == (n_rows, 1, 1296)
+    assert dl1["pedestal_charge_std"].shape == (n_rows, 1296)
+    # ADC baseline (~ 250-350 ADC) and std of the images (~ 1 p.e.)
+    assert 100 < np.nanmedian(r0["pedestal_charge_mean"]) < 1000
+    assert 0.1 < np.nanmedian(dl1["pedestal_charge_std"]) < 3

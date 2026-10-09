@@ -560,6 +560,11 @@ class SST1MEventSource(EventSource):
         pointing = array_event.pointing
         pointing.tel[tel_id].azimuth = azimuth
         pointing.tel[tel_id].altitude = altitude
+        # pointing monitoring: alt/az of the last computation, at the time of the event
+        monitoring = array_event.mon.tel[tel_id].pointing
+        monitoring.time = time
+        monitoring.azimuth = azimuth
+        monitoring.altitude = altitude
         pointing.array_azimuth = azimuth
         pointing.array_altitude = altitude
         pointing.array_ra = pointing_icrs.ra.to(u.rad)

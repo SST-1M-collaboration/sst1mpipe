@@ -17,6 +17,7 @@ from astropy.time import Time
 from ctapipe.containers import EventType
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
+from ctapipe.monitoring.interpolation import PointingInterpolator
 from gammapy.data import DataStore
 from pyirf.cuts import evaluate_binned_cut
 from traitlets.config import Config
@@ -747,6 +748,30 @@ def load_more_dl1_tables_mono(
     return dl1_data.reset_index()
 
 
+def interpolate_pointing(input_file, tel, time):
+    """
+    Pointing (azimuth, altitude) of the telescope at the given times, interpolated from the
+    table /dl0/monitoring/telescope/pointing/tel_XXX written by sst1mpipe-process
+
+    Parameters
+    ----------
+    input_file: string
+        Path of the DL1 file
+    tel: string
+        e.g. \'tel_021\'
+    time: astropy.time.Time
+
+    Returns
+    -------
+    azimuth, altitude: astropy.units.Quantity
+    """
+    tel_id = int(tel.split("_")[-1])
+    interpolator = PointingInterpolator()
+    interpolator.add_table(tel_id, read_table(input_file, "/dl0/monitoring/telescope/pointing/" + tel))
+    altitude, azimuth = interpolator(tel_id, time)
+    return azimuth, altitude
+
+
 def load_dl1_sst1m(
         input_file, tel=None, config=None,
         table='astropy', check_finite=False,
@@ -792,25 +817,33 @@ def load_dl1_sst1m(
         logging.info('Intensity correction of %f applied on %s data.', I_corr, tel)
         events['camera_frame_hillas_intensity'] = events['camera_frame_hillas_intensity'] * I_corr
 
-    if 'true_alt_tel' not in events.keys():
-        try:
-            pointing = read_table(input_file, "/dl1/monitoring/telescope/pointing/" + tel)
-        except Exception:
-            logging.error('Adding pointing information failed! Pointing information is probably not stored in DL1 file.')
-            exit()
-        try:
-            events['true_az_tel'] = pointing['azimuth'].to(u.deg).value
-            events['true_alt_tel'] = pointing['altitude'].to(u.deg).value
-        except Exception:
-            logging.error('Adding pointing information failed! Length of params and pointing tables probably dont match. Broken file.')
-            exit()
-
     # trigger time with ns precision, for the matching of the stereo events
     trigger_time = read_trigger_time(input_file, tel)
     events['_row'] = np.arange(len(events))
     events = join(events, trigger_time, keys=['obs_id', 'event_id'], join_type='left')
     events.sort('_row')
     events.remove_column('_row')
+
+    if 'true_alt_tel' not in events.keys():
+        with tables.open_file(input_file) as h5:
+            pointing_monitoring = "/dl0/monitoring/telescope/pointing/" + tel in h5
+        if pointing_monitoring:
+            # pointing of the observed data (sst1mpipe-process), interpolated at the trigger times
+            azimuth, altitude = interpolate_pointing(input_file, tel, events['trigger_time'])
+            events['true_az_tel'] = azimuth.to_value(u.deg)
+            events['true_alt_tel'] = altitude.to_value(u.deg)
+        else:
+            try:
+                pointing = read_table(input_file, "/dl1/monitoring/telescope/pointing/" + tel)
+            except Exception:
+                logging.error('Adding pointing information failed! Pointing information is probably not stored in DL1 file.')
+                exit()
+            try:
+                events['true_az_tel'] = pointing['azimuth'].to(u.deg).value
+                events['true_alt_tel'] = pointing['altitude'].to(u.deg).value
+            except Exception:
+                logging.error('Adding pointing information failed! Length of params and pointing tables probably dont match. Broken file.')
+                exit()
 
     if stereo:
         stereo_impact = read_table(input_file, "/dl2/event/telescope/impact/HillasReconstructor/" + tel)

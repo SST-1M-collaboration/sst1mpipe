@@ -10,6 +10,7 @@ from ctapipe.time import time_to_ctao_high_res
 from protozfits import File
 
 from sst1mpipe.io import load_dl1_sst1m, read_trigger_time
+from sst1mpipe.io.containers import CameraEventType
 from sst1mpipe.resources import RTA_CONFIG_FILE, TEST_DATA_DIR
 from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 from sst1mpipe.utils import get_trigger_time_ns
@@ -24,9 +25,12 @@ FILES = {
 
 
 def read_zfits_times(path, n_events):
-    """event id (SWAT) and White Rabbit time (s, ns) of the first events of the zfits file"""
+    """
+    event id (SWAT) and White Rabbit time (s, ns) of the Cherenkov events among the first
+    events of the zfits file (the pedestal events are not written in the DL1 file)
+    """
     with File(str(path)) as f:
-        events = list(islice(f.Events, n_events))
+        events = [e for e in islice(f.Events, n_events) if not e.event_type & CameraEventType.INTERNAL.value]
     return (
         np.array([e.arrayEvtNum for e in events], dtype=np.int64),
         np.array([e.local_time_sec for e in events], dtype=np.int64),

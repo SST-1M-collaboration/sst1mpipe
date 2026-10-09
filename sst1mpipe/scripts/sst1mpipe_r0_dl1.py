@@ -475,7 +475,7 @@ def main():
 
 
         if max_events is None and source.is_simulation:
-            writer.write_simulation_histograms(source)
+            writer.write_simulated_shower_distributions(source.simulated_shower_distributions)
 
     # Write additional params in the DL1 file
     # - these are not defined in the ctapipe containers, but are necessary for (mono) reconstruction

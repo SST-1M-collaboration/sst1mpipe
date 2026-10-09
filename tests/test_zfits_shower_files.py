@@ -161,16 +161,17 @@ def test_process_zfits_file(zfits_file, tmp_path):
     n_events = zfits_file["n_showers"] + zfits_file["n_pedestals"]
     trigger = read_table(output, "/dl1/event/subarray/trigger")
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")
-    assert len(trigger) == len(parameters) == n_events
+    # the pedestal events are not written as events
+    assert len(trigger) == len(parameters) == zfits_file["n_showers"]
+    assert np.all(trigger["event_type"] == EventType.SUBARRAY.value)
 
     info = get_dl1_info(output)
     assert info["n_pedestal"][0] == zfits_file["n_pedestals"]
     assert info[f"n_triggered_tel{tel_id - 20}"][0] == n_events
 
     # images of Cherenkov events survive the cleaning
-    is_shower = trigger["event_type"] == EventType.SUBARRAY.value
     intensity = parameters["camera_frame_hillas_intensity"]
-    assert np.isfinite(intensity[is_shower]).sum() > 0
+    assert np.isfinite(intensity).sum() > 0
     assert np.all(intensity[np.isfinite(intensity)] > 0)
 
 

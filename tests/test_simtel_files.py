@@ -199,3 +199,19 @@ def test_process_simtel_file(simtel_file, tmp_path):
         # true images and parameters of the simulation
         assert len(read_table(output, f"/simulation/event/telescope/images/{tel}")) == n_triggered
         assert len(read_table(output, f"/simulation/event/telescope/parameters/{tel}")) == n_triggered
+        # impact distance of the stereo reconstruction (ShowerProcessor, DL2)
+        impact = read_table(output, f"/dl2/event/telescope/impact/HillasReconstructor/{tel}")
+        assert len(impact) == n_triggered
+
+    # shower geometry reconstructed for the stereo events
+    geometry = read_table(output, "/dl2/event/subarray/geometry/HillasReconstructor")
+    assert len(geometry) == n_events
+    multiplicity = np.bincount(tel_trigger["event_id"].astype(np.int64))[geometry["event_id"]]
+    is_valid = geometry["HillasReconstructor_is_valid"]
+    assert is_valid.sum() > 0
+    assert np.all(multiplicity[is_valid] == 2)
+
+    # distribution of all the simulated showers, triggered or not
+    distribution = read_table(output, "/simulation/service/shower_distribution")
+    assert len(distribution) == 1
+    assert distribution["n_entries"][0] > n_events

@@ -1,15 +1,19 @@
 import os
+from collections import Counter
+from copy import deepcopy
 
+import numpy as np
 from tqdm import tqdm
 from ctapipe.calib import CameraCalibrator
-from ctapipe.containers import EventType, SchedulingBlockType
+from ctapipe.containers import EventType, SchedulingBlockType, TelEventIndexContainer
 from ctapipe.core import Tool
-from ctapipe.core.traits import Bool, List, UseEnum, flag
+from ctapipe.core.traits import Bool, Integer, List, UseEnum, flag
 from ctapipe.image import ImageProcessor
 from ctapipe.io import EventSource, DataWriter, SimTelEventSource
+from ctapipe.reco import ShowerProcessor
 
 from sst1mpipe.calib import R0R1Calibrator, ImageSaturationCorrector
-from sst1mpipe.io import compute_dl1_summary, write_dl1_info
+from sst1mpipe.io import write_dl1_info
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
@@ -35,6 +39,14 @@ class ProcessorTool(Tool):
     PDE drop by the R0R1Calibrator (pde_drop_factor).
     Only the events of the runs with an allowed scheduling block type (allowed_sb_types)
     are processed, e.g. the observations but not the transitions between two wobbles.
+
+    The pedestal events are used for the monitoring only: they are not written as events.
+    The statistics of their ADC samples and images are written every
+    pedestal_monitoring_interval pedestal events in the tables
+    r0/monitoring/telescope/pedestal and dl1/monitoring/telescope/pedestal.
+    The pointing of the telescopes is written in dl0/monitoring/telescope/pointing/tel_XXX.
+    The shower geometry is reconstructed by the ShowerProcessor if the DL2 is written
+    (DataWriter.write_dl2).
     """
 
     name = 'sst1mpipe-process'
@@ -66,6 +78,15 @@ class ProcessorTool(Tool):
         ),
     ).tag(config=True)
 
+    pedestal_monitoring_interval = Integer(
+        default_value=20,
+        min=1,
+        help=(
+            "Number of pedestal events of a telescope between two rows of the pedestal"
+            " monitoring tables"
+        ),
+    ).tag(config=True)
+
     aliases = {
         ("i", "input"): "EventSource.input_url",
         ("o", "output"): "DataWriter.output_path",
@@ -84,7 +105,7 @@ class ProcessorTool(Tool):
 
     classes = [
         DBSCANImageCleaner, TimeDBSCANImageCleaner, R0R1Calibrator, R0PedestalMonitor, DL1PedestalMonitor,
-        ImageSaturationCorrector,
+        ImageSaturationCorrector, ShowerProcessor,
     ]
 
     def setup(self):
@@ -114,8 +135,18 @@ class ProcessorTool(Tool):
         # the writer is closed in finish(), to read back the output file. If the processing
         # fails before, it is closed when the tool exits.
         self.writer = DataWriter(event_source=self.event_source, parent=self)
+        # reconstruction of the shower geometry, written in the DL2
+        self.shower_processor = None
+        if self.writer.write_dl2:
+            self.shower_processor = ShowerProcessor(parent=self, subarray=self.event_source.subarray)
         self._sb_types = {}
         self.n_skipped_events = 0
+        # processing summary, counted in the event loop
+        self.n_triggered = Counter()
+        self.n_pedestal = 0
+        self.n_survived_pedestals = 0
+        # last pointing of each telescope, and whether it is written in the pointing table
+        self._last_pointing = {}
         self._writer_closed = False
         self._exit_stack.callback(self._close_writer)
 
@@ -146,6 +177,20 @@ class ProcessorTool(Tool):
             self.image_processor(event)
             if self.dl1_pedestal_monitor is not None:
                 self.add_dl1_pedestal(event)
+            self.write_pointing(event)
+            self.n_triggered.update(event.trigger.tels_with_trigger)
+
+            # the pedestal events are used for the monitoring only
+            if event.trigger.event_type == EventType.SKY_PEDESTAL:
+                self.n_pedestal += 1
+                self.n_survived_pedestals += any(
+                    np.isfinite(dl1.parameters.hillas.intensity) for dl1 in event.dl1.tel.values()
+                )
+                self.write_pedestal_monitoring(event)
+                continue
+
+            if self.shower_processor is not None:
+                self.shower_processor(event)
             self.writer(event)
 
     def scheduling_block_type(self, obs_id):
@@ -194,23 +239,65 @@ class ProcessorTool(Tool):
             for tel_id in event.dl1.tel:
                 self.dl1_pedestal_monitor.add_event(event, tel_id)
 
+    def write_pointing(self, event):
+        """
+        Pointing of the telescopes in the tables dl0/monitoring/telescope/pointing/tel_XXX,
+        read by the ctapipe PointingInterpolator: a row each time the alt/az of the pointing
+        is computed by the event source (and a last row at the time of the last event, in finish)
+        """
+        for tel_id in event.trigger.tels_with_trigger:
+            # (the pointing of the simulations is written by the DataWriter)
+            pointing = getattr(event.mon.tel[tel_id], "pointing", None)
+            if pointing is None or not np.isfinite(pointing.altitude):
+                continue
+            last = self._last_pointing.get(tel_id)
+            new = last is None or (pointing.azimuth, pointing.altitude) != (last[0].azimuth, last[0].altitude)
+            if new:
+                self._write_pointing_row(tel_id, pointing)
+            self._last_pointing[tel_id] = (deepcopy(pointing), new)
+
+    def _write_pointing_row(self, tel_id, pointing):
+        self.writer._writer.write(f"dl0/monitoring/telescope/pointing/tel_{tel_id:03d}", [pointing])
+
+    def write_pedestal_monitoring(self, event):
+        """
+        Statistics of the pedestal events (ADC samples and images) in the pedestal monitoring
+        tables, every pedestal_monitoring_interval pedestal events of the telescope
+        """
+        if self.r0_pedestal_monitor is None:
+            return
+        for tel_id in event.r0.tel:
+            if self.r0_pedestal_monitor.processed_events[tel_id] % self.pedestal_monitoring_interval != 0:
+                continue
+            index = TelEventIndexContainer(obs_id=event.index.obs_id, event_id=event.index.event_id, tel_id=tel_id)
+            monitoring = event.mon.tel[tel_id]
+            self.writer._writer.write("r0/monitoring/telescope/pedestal", [index, monitoring.r0])
+            # statistics of the images including the image of this event
+            self.dl1_pedestal_monitor.fill_monitoring(event, tel_id)
+            if monitoring.pedestal.charge_std is not None:
+                self.writer._writer.write("dl1/monitoring/telescope/pedestal", [index, monitoring.pedestal])
+
     def finish(self):
 
+        # last pointing of the telescopes, at the time of the last event
+        for tel_id, (pointing, written) in self._last_pointing.items():
+            if not written:
+                self._write_pointing_row(tel_id, pointing)
+        if self.event_source.is_simulation:
+            self.writer.write_simulated_shower_distributions(self.event_source.simulated_shower_distributions)
         self._close_writer()
         output_path = self.writer.output_path
         if self.n_skipped_events > 0:
             self.log.warning("%d events skipped (scheduling block type not allowed)", self.n_skipped_events)
 
-        # processing summary, computed from the content of the output file
-        summary = compute_dl1_summary(output_path)
-        self.log.info("Number of events: %d", summary["n_events"])
-        for tel_id, n in summary["n_triggered"].items():
+        n_triggered = {int(tel_id): self.n_triggered[tel_id] for tel_id in self.event_source.subarray.tel_ids}
+        for tel_id, n in n_triggered.items():
             self.log.info("Number of triggered events of telescope %d: %d", tel_id, n)
-        self.log.info("Number of pedestal events: %d", summary["n_pedestal"])
-        if summary["n_pedestal"] > 0:
+        self.log.info("Number of pedestal events: %d", self.n_pedestal)
+        if self.n_pedestal > 0:
             self.log.info(
                 "Fraction of pedestal events that survived cleaning: %f",
-                summary["n_survived_pedestals"] / summary["n_pedestal"],
+                self.n_survived_pedestals / self.n_pedestal,
             )
 
         # observation information, from the event source (SST1MEventSource)
@@ -223,11 +310,11 @@ class ProcessorTool(Tool):
 
         calibration_files, window_files = None, None
         if self.r0_pedestal_monitor is not None:  # observed data
-            tel_ids = [tel_id for tel_id, n in summary["n_triggered"].items() if n > 0]
+            tel_ids = [tel_id for tel_id, n in n_triggered.items() if n > 0]
             calibration_files = ",".join(str(self.r0_r1_calibrator.calibration_file_path(t)) for t in tel_ids)
             window_files = ",".join(str(self.r0_r1_calibrator.window_transmittance_file_path(t)) for t in tel_ids)
 
-        n_triggered = list(summary["n_triggered"].values()) + [0, 0]
+        n_triggered = list(n_triggered.values()) + [0, 0]
         write_dl1_info(output_path, dict(
             calib_file=calibration_files,
             window_file=window_files,
@@ -240,8 +327,8 @@ class ProcessorTool(Tool):
                 None if self.image_saturation_corrector is None
                 else sum(self.image_saturation_corrector.n_saturated_events.values())
             ),
-            n_pedestal=summary["n_pedestal"],
-            n_survived_pedestals=summary["n_survived_pedestals"],
+            n_pedestal=self.n_pedestal,
+            n_survived_pedestals=self.n_survived_pedestals,
             n_triggered_tel1=n_triggered[0],
             n_triggered_tel2=n_triggered[1],
             swat_event_ids_used=getattr(source, "swat_event_ids_available", False),
