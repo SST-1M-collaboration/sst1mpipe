@@ -8,23 +8,26 @@ from datetime import datetime
 import astropy.units as u
 import numpy as np
 import pandas as pd
-from importlib.resources import files
 import tables
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.io import fits
 from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
-from astropy.table import QTable, Table, join
+from astropy.table import QTable, Table, join, vstack
 from astropy.time import Time
-from ctapipe.io import read_table
+from ctapipe.containers import EventType
+from ctapipe.instrument import SubarrayDescription
+from ctapipe.io import read_table, write_table
+from ctapipe.io.hdf5dataformat import DL1_SKY_PEDESTAL_IMAGE_GROUP
+from ctapipe.monitoring.interpolation import PointingInterpolator
 from gammapy.data import DataStore
 from pyirf.cuts import evaluate_binned_cut
 from traitlets.config import Config
 
 import sst1mpipe
 from sst1mpipe.io.containers import DL1_info, DL2_info
+from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
     add_disp,
-    add_event_id,
     add_features,
     add_log_true_energy,
     add_miss,
@@ -33,9 +36,7 @@ from sst1mpipe.utils.utils import (
     add_true_impact,
     event_selection,
     get_finite,
-    get_location,
     get_pointing_radec,
-    get_tel_string,
     get_telescopes,
     stereo_var_cuts,
 )
@@ -121,15 +122,113 @@ def load_config(cfg_file, ismc=False):
     """
     if cfg_file is None:
         logging.info('No config file specified, loading default config.')
-        if ismc:
-            default_config = 'sst1mpipe_mc_config.json'
-        else:
-            default_config = 'sst1mpipe_data_config.json'
-        cfg_file = files('sst1mpipe.data').joinpath(default_config)
+        cfg_file = MC_CONFIG_FILES["low"] if ismc else DATA_CONFIG_FILE
 
     with open(cfg_file) as json_file:
-            config = Config(json.load(json_file))
+        config = json.load(json_file)
 
+    return Config(translate_legacy_calibration_config(config))
+
+
+def translate_legacy_calibration_config(config):
+    """
+    Translates the R0 -> R1 calibration settings of the configuration files written
+    before `sst1mpipe.calib.R0R1Calibrator` (``telescope_calibration``,
+    ``NsbCalibrator.apply_*_Vdrop_correction``, ``analysis.bad_pixels``,
+    ``window_transmittance``) into its ``R0R1Calibrator`` section.
+    ``NsbCalibrator.mc_correction_for_PDE`` can not be translated: if true, the PDE drop
+    factors must be set in ``R0R1Calibrator.pde_drop_factor`` (a ValueError is raised).
+    Nothing is done if the configuration has a ``R0R1Calibrator`` section.
+
+    Parameters
+    ----------
+    config: dict
+
+    Returns
+    -------
+    config: dict
+    """
+    legacy_bad_pixels = config.get("analysis", {}).pop("bad_pixels", None)
+    legacy_windows = config.pop("window_transmittance", None)
+    config = _translate_legacy_r0_r1_settings(config)
+
+    window_files = [
+        ["id", int(key[len("tel_"):]), path] for key, path in (legacy_windows or {}).items() if path is not None
+    ]
+    if len(window_files) > 0:
+        calibrator = config.setdefault("R0R1Calibrator", {})
+        if "window_transmittance_file" in calibrator:
+            logging.warning("Legacy window_transmittance files are ignored, R0R1Calibrator.window_transmittance_file is used.")
+        else:
+            logging.warning(
+                "Legacy window_transmittance files are translated into"
+                " R0R1Calibrator.window_transmittance_file, please update the config file."
+            )
+            calibrator["window_transmittance_file"] = [["type", "*", None]] + window_files
+
+    bad_pixels = [
+        ["id", int(key[len("tel_"):]), list(pixels)]
+        for key, pixels in (legacy_bad_pixels or {}).items() if len(pixels) > 0
+    ]
+    if len(bad_pixels) > 0:
+        calibrator = config.setdefault("R0R1Calibrator", {})
+        if "bad_pixels" in calibrator:
+            logging.warning("Legacy analysis.bad_pixels are ignored, R0R1Calibrator.bad_pixels is used.")
+        else:
+            logging.warning(
+                "Legacy analysis.bad_pixels are translated into R0R1Calibrator.bad_pixels,"
+                " please update the config file."
+            )
+            calibrator["bad_pixels"] = [["type", "*", []]] + bad_pixels
+    return config
+
+
+def _translate_legacy_r0_r1_settings(config):
+    legacy_calibration = config.pop("telescope_calibration", None)
+    nsb_calibrator = config.get("NsbCalibrator", {})
+    pixelwise = nsb_calibrator.pop("apply_pixelwise_Vdrop_correction", None)
+    global_ = nsb_calibrator.pop("apply_global_Vdrop_correction", None)
+    mc_pde_correction = nsb_calibrator.pop("mc_correction_for_PDE", None)
+    if mc_pde_correction:
+        raise ValueError(
+            "NsbCalibrator.mc_correction_for_PDE is replaced by R0R1Calibrator.pde_drop_factor, which"
+            " must match the PDE files of the simulation: see sst1mpipe_mc_config_low_nsb.json and"
+            " sst1mpipe_mc_config_high_nsb.json"
+        )
+
+    if all(value is None for value in (legacy_calibration, pixelwise, global_, mc_pde_correction)):
+        return config
+    if "R0R1Calibrator" in config:
+        logging.warning(
+            "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction,"
+            " mc_correction_for_PDE) are ignored, the R0R1Calibrator section is used."
+        )
+        return config
+
+    logging.warning(
+        "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction,"
+        " mc_correction_for_PDE) are translated into the R0R1Calibrator section,"
+        " please update the config file."
+    )
+    calibrator = {}
+    if legacy_calibration is not None:
+        calibration_files = [["type", "*", None]]
+        for key, path in legacy_calibration.items():
+            if key.startswith("tel_") and path is not None:
+                calibration_files.append(["id", int(key[len("tel_"):]), path])
+        calibrator["calibration_file"] = calibration_files
+        flag_bad_pixels = legacy_calibration.get("bad_calib_px_interpolation", True)
+        calibrator["flag_bad_calibration_pixels"] = flag_bad_pixels
+        # the dead pixels were only flagged with the pixels with bad calibration
+        calibrator["flag_dead_pixels"] = flag_bad_pixels and legacy_calibration.get(
+            "dynamic_dead_px_interpolation", True
+        )
+    if pixelwise or global_ is not None:
+        # the pixelwise correction was applied if both were set
+        calibrator["voltage_drop_correction"] = (
+            "pixelwise" if pixelwise else "global" if global_ else "none"
+        )
+    config["R0R1Calibrator"] = calibrator
     return config
 
 
@@ -297,7 +396,7 @@ def write_charge_fraction(file, survived_charge=None):
 
 
 def write_extra_parameters(
-        file, config=None, ismc=True, meanQ=None, wr_timestamps=None):
+        file, config=None, ismc=True, meanQ=None):
     """
     Opens the output DL1 file and adds some extra parameters
     to the DL1 table.
@@ -310,8 +409,6 @@ def write_extra_parameters(
     ismc: bool
     meanQ: numpy.ndarray
         Mean charge from pedestal events
-    wr_timestamps: numpy.array
-        White Rabbit timestamps, where first colums is fulle seconds, and second is fraction seconds
 
     Returns
     -------
@@ -341,11 +438,6 @@ def write_extra_parameters(
 
         else:
 
-            # write WR timestamps
-            if wr_timestamps is not None:
-                params['time_wr_full_seconds'] = wr_timestamps[:, 0]
-                params['time_wr_frac_seconds'] = wr_timestamps[:, 1]
-
             params["equivalent_focal_length"] = float(config['telescope_equivalent_focal_length'][tel])
 
             # Adding date
@@ -374,13 +466,13 @@ def write_extra_parameters(
 
 
 
-def add_wr_dl1_stereo(file, dl1_data_tabs=None):
+def add_pointing_dl1_stereo(file, dl1_data_tabs=None):
     """
     Opens the DL1 stereo file after coincident event matching and
-    adds two columns with high precision WR timestamps, which are
+    adds the telescope pointing (true_az_tel, true_alt_tel), which is
     stored in mono DL1 tables of both telescopes. This is neccessary
     because we use ctapipe DataWriter to store DL1 stereo file, but
-    ctapipe containers ignore WR.
+    ctapipe containers ignore these columns.
 
     Parameters
     ----------
@@ -397,7 +489,7 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=None):
     if dl1_data_tabs is None:
         dl1_data_tabs = []
 
-    logging.info('Adding WR timestamps back into the DL1 stereo file...')
+    logging.info('Adding pointing back into the DL1 stereo file...')
     telescopes = get_telescopes(file)
 
     if len(telescopes) == len(dl1_data_tabs):
@@ -406,8 +498,6 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=None):
 
             params = read_table(file, "/dl1/event/telescope/parameters/" + tel)
             merged = params.copy()
-            merged['time_wr_full_seconds'] = np.zeros(len(merged)).astype(np.int64)
-            merged['time_wr_frac_seconds'] = np.zeros(len(merged)).astype(np.float64)
             merged['true_az_tel'] = np.zeros(len(merged)).astype(np.float64)
             merged['true_alt_tel'] = np.zeros(len(merged)).astype(np.float64)
 
@@ -419,179 +509,96 @@ def add_wr_dl1_stereo(file, dl1_data_tabs=None):
             # we cannot merge based on obs_id/event_id, because tel1/tel2 data has the same ids in the output file, but not in the input ones!
             # We also cannot merge based on only one parameter, because it turned out that the probability od having e.g. two events with the
             # very same (float64) intensity in data from a signle night is quite high
-            params_tel_small = params_tel[['camera_frame_hillas_intensity', 'camera_frame_hillas_r', 'camera_frame_hillas_skewness', 'time_wr_full_seconds', 'time_wr_frac_seconds', 'true_az_tel', 'true_alt_tel']]
+            params_tel_small = params_tel[['camera_frame_hillas_intensity', 'camera_frame_hillas_r', 'camera_frame_hillas_skewness', 'true_az_tel', 'true_alt_tel']]
 
             for i, (intensity, r, skew) in enumerate(zip(np.array(params['camera_frame_hillas_intensity']), np.array(params['camera_frame_hillas_r']), np.array(params['camera_frame_hillas_skewness']), strict=True)):
                 mask = (intensity == params_tel_small['camera_frame_hillas_intensity']) & (r == params_tel_small['camera_frame_hillas_r']) & (skew == params_tel_small['camera_frame_hillas_skewness'])
 
                 if sum(mask) == 1:
-                    merged[i]['time_wr_full_seconds'] = params_tel_small[mask]['time_wr_full_seconds']
-                    merged[i]['time_wr_frac_seconds'] = params_tel_small[mask]['time_wr_frac_seconds']
                     merged[i]['true_az_tel'] = params_tel_small[mask]['true_az_tel']
                     merged[i]['true_alt_tel'] = params_tel_small[mask]['true_alt_tel']
 
             merged.write(file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
-            logging.info('WR timestamps added to ' + tel + ' param table.')
+            logging.info('Pointing added to ' + tel + ' param table.')
 
     else:
         logging.error('Different number of telescopes in the output file than number of provided DL1 tabs.')
 
 
-def write_wr_timestamps(file, event_source=None):
+def read_trigger_time(input_file, tel):
     """
-    Writes WR timestamps with high numerical precision as two
-    additional columns in the output DL1 table: time_wr_full_seconds,
-    time_wr_frac_seconds. This is neccessary because the timestamp with
-    sufficient numerical precision can be extracted from event source only.
-    It is stored automaticaly in  dl1/event/subarray/trigger, from where
-    it can be read by ctapipe.io.read_table, but with low precision.
-    Therefore, if we want to have the timestamp in dl1, we need to read
-    it again from event source and store it in the existing dl1 file
+    Reads the trigger times of the telescope from the DL1 file
+    (/dl1/event/telescope/trigger), i.e. the White Rabbit timestamps
+    of the SST-1M data, stored with ns precision by ctapipe.
 
     Parameters
     ----------
-    file: string
+    input_file: string
         Path
-    event_source:
-        sst1mpipe.io.sst1m_event_source.SST1MEventSource
+    tel: string
+        Either \'tel_00{1,2}\' (MC) or \'tel_02{1,2}\' (data)
 
     Returns
     -------
+    astropy.table.Table
+        obs_id, event_id, trigger_time (astropy.time.Time, TAI)
 
     """
 
-    logging.info('Adding WR timestamps in DL1 table..')
-
-    for i, event in enumerate(event_source):
-
-        if i == 0:
-            tel = event.sst1m.r0.tels_with_data[0]
-            tel_string = get_tel_string(tel, mc=False)
-            params = read_table(file, "/dl1/event/telescope/parameters/" + tel_string)
-            time_wr_full_seconds_all = np.zeros(len(params)).astype(np.int64)
-            time_wr_fractional_seconds_all = np.zeros(len(params)).astype(np.float64)
-
-        event = add_event_id(event, filename=file, event_number=i)
-
-        ev_mask = params['event_id'] == event.index.event_id
-
-        if sum(ev_mask) == 1:
-
-            localtime = event.sst1m.r0.tel[tel].local_camera_clock.astype(np.uint64)
-
-            S_TO_NS = np.uint64(1e9)
-            full_seconds = localtime // S_TO_NS
-            fractional_seconds = (localtime % S_TO_NS) / S_TO_NS
-
-            time_wr_full_seconds_all[ev_mask] = full_seconds
-            time_wr_fractional_seconds_all[ev_mask] = fractional_seconds
-
-    params['time_wr_full_seconds'] = time_wr_full_seconds_all
-    params['time_wr_frac_seconds'] = time_wr_fractional_seconds_all
-
-    params.write(file, path='/dl1/event/telescope/parameters/'+tel_string, overwrite=True, append=True) #, serialize_meta=True)
-    logging.info('WR timestamps added to ' + tel_string + ' param table.')
+    trigger = read_table(input_file, '/dl1/event/telescope/trigger')
+    trigger = trigger[trigger['tel_id'] == int(tel.split('_')[-1])]
+    return Table({
+        'obs_id': trigger['obs_id'],
+        'event_id': trigger['event_id'],
+        'trigger_time': trigger['time'],
+    })
 
 
 def write_assumed_pointing(
-        processing_info, config=None):
+        dl1_file, tel, ra=None, dec=None, location=None):
     """
     Writes pointing info (per event true_tel_az, true_tel_alt)
-    in the main DL1 table.
+    of the telescope in the main DL1 table.
 
     Parameters
     ----------
-    processing_info:
-        Class Monitoring_R0_DL1
-    config: dict
+    dl1_file: string
+        Path
+    tel: string
+        Telescope, e.g. \'tel_021\'
+    ra: float
+        Pointing RA in deg
+    dec: float
+        Pointing DEC in deg
+    location: astropy.coordinates.EarthLocation
+        Location of the telescope
 
     Returns
     -------
 
     """
-    dl1_file = processing_info.output_file
-    telescopes = get_telescopes(dl1_file)
 
-    pointing_ra = float(processing_info.pointing_ra) * u.deg
-    pointing_dec = float(processing_info.pointing_dec) * u.deg
+    pointing_ra = float(ra) * u.deg
+    pointing_dec = float(dec) * u.deg
     wobble_coords = SkyCoord(ra=pointing_ra, dec=pointing_dec, frame='icrs')
 
-    for tel in telescopes:
+    params = read_table(dl1_file, "/dl1/event/telescope/parameters/" + tel)
+    time = Time(params['local_time'], format='unix', scale='utc')
+    horizon_frame = AltAz(obstime=time, location=location)
+    try:
+        tel_pointing = wobble_coords.transform_to(horizon_frame)
+        params['true_az_tel'] = tel_pointing.az.to_value(u.deg)
+        params['true_alt_tel'] = tel_pointing.alt.to_value(u.deg)
+    except ValueError:
+        logging.info("Broken file %s", dl1_file)
+        params['true_az_tel'] = np.nan
+        params['true_alt_tel'] = np.nan
 
-        params = read_table(dl1_file, "/dl1/event/telescope/parameters/" + tel)
-        location = get_location(config=config, tel=tel)
-        time = Time(params['local_time'], format='unix', scale='utc')
-        horizon_frame = AltAz(obstime=time, location=location)
-        try:
-            tel_pointing = wobble_coords.transform_to(horizon_frame)
-            params['true_az_tel'] = tel_pointing.az.to_value(u.deg)
-            params['true_alt_tel'] = tel_pointing.alt.to_value(u.deg)
-        except ValueError:
-            logging.info("Broken file", dl1_file)
-            params['true_az_tel'] = np.nan
-            params['true_alt_tel'] = np.nan
-
-        # Only combination of both overwrite and append works like expected, i.e. overwrite only telescope parameters and the rest
-        # of the DL1 file remains the same
-        # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
-        # then cannot merge the files and raise error...
-        params.write(dl1_file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
-
-
-def write_r1_dl1_cfg(file, config=None):
-    """
-    Write configuration of R1-D1 calibration
-    in the output DL1 file.
-
-    Parameters
-    ----------
-    file: string
-        Path
-    config: dict
-
-    Returns
-    -------
-
-    """
-
-    with tables.open_file(file, mode='a') as f:
-
-        calibrator = config['CameraCalibrator']['image_extractor_type']
-        image_processor = config['ImageProcessor']['image_cleaner_type']
-        telescope_coords = config['telescope_coords']
-
-        emin_cut_g = config['analysis']['gamma_min_simulated_energy_tev']
-        emin_cut_p = config['analysis']['proton_min_simulated_energy_tev']
-
-        for tel in telescope_coords.keys():
-
-            f.create_table(
-                '/configuration/r1_dl1/telescope_coords',
-                tel,
-                pd.DataFrame(config['telescope_coords'][tel], index=[0]).to_records(index=False),
-                createparents=True,
-            )
-
-        f.create_table(
-            '/configuration/r1_dl1/CameraCalibrator',
-            calibrator,
-            pd.DataFrame(config['CameraCalibrator'][calibrator], index=[0]).to_records(index=False),
-            createparents=True,
-        )
-
-        f.create_table(
-            '/configuration/r1_dl1/ImageProcessor',
-            image_processor,
-            pd.DataFrame(config['ImageProcessor'][image_processor], index=[0]).to_records(index=False),
-            createparents=True,
-        )
-
-        f.create_table(
-            '/configuration/r1_dl1',
-            'Emin_cuts',
-            pd.DataFrame({'emin_cut_g_tev': emin_cut_g, 'emin_cut_p_tev': emin_cut_p}, index=[0]).to_records(index=False),
-            createparents=True,
-        )
+    # Only combination of both overwrite and append works like expected, i.e. overwrite only telescope parameters and the rest
+    # of the DL1 file remains the same
+    # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
+    # then cannot merge the files and raise error...
+    params.write(dl1_file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
 
 
 def load_more_dl1_tables_mono(
@@ -686,6 +693,30 @@ def load_more_dl1_tables_mono(
     return dl1_data.reset_index()
 
 
+def interpolate_pointing(input_file, tel, time):
+    """
+    Pointing (azimuth, altitude) of the telescope at the given times, interpolated from the
+    table /dl0/monitoring/telescope/pointing/tel_XXX written by sst1mpipe-process
+
+    Parameters
+    ----------
+    input_file: string
+        Path of the DL1 file
+    tel: string
+        e.g. \'tel_021\'
+    time: astropy.time.Time
+
+    Returns
+    -------
+    azimuth, altitude: astropy.units.Quantity
+    """
+    tel_id = int(tel.split("_")[-1])
+    interpolator = PointingInterpolator()
+    interpolator.add_table(tel_id, read_table(input_file, "/dl0/monitoring/telescope/pointing/" + tel))
+    altitude, azimuth = interpolator(tel_id, time)
+    return azimuth, altitude
+
+
 def load_dl1_sst1m(
         input_file, tel=None, config=None,
         table='astropy', check_finite=False,
@@ -718,6 +749,8 @@ def load_dl1_sst1m(
     Returns
     -------
     data: pandas.DataFrame or astropy.table.Table
+        with the trigger time (TAI) in the column trigger_time: astropy.time.Time,
+        or numpy.datetime64 (ns) for the pandas.DataFrame
 
     """
 
@@ -729,18 +762,33 @@ def load_dl1_sst1m(
         logging.info('Intensity correction of %f applied on %s data.', I_corr, tel)
         events['camera_frame_hillas_intensity'] = events['camera_frame_hillas_intensity'] * I_corr
 
+    # trigger time with ns precision, for the matching of the stereo events
+    trigger_time = read_trigger_time(input_file, tel)
+    events['_row'] = np.arange(len(events))
+    events = join(events, trigger_time, keys=['obs_id', 'event_id'], join_type='left')
+    events.sort('_row')
+    events.remove_column('_row')
+
     if 'true_alt_tel' not in events.keys():
-        try:
-            pointing = read_table(input_file, "/dl1/monitoring/telescope/pointing/" + tel)
-        except Exception:
-            logging.error('Adding pointing information failed! Pointing information is probably not stored in DL1 file.')
-            exit()
-        try:
-            events['true_az_tel'] = pointing['azimuth'].to(u.deg).value
-            events['true_alt_tel'] = pointing['altitude'].to(u.deg).value
-        except Exception:
-            logging.error('Adding pointing information failed! Length of params and pointing tables probably dont match. Broken file.')
-            exit()
+        with tables.open_file(input_file) as h5:
+            pointing_monitoring = "/dl0/monitoring/telescope/pointing/" + tel in h5
+        if pointing_monitoring:
+            # pointing of the observed data (sst1mpipe-process), interpolated at the trigger times
+            azimuth, altitude = interpolate_pointing(input_file, tel, events['trigger_time'])
+            events['true_az_tel'] = azimuth.to_value(u.deg)
+            events['true_alt_tel'] = altitude.to_value(u.deg)
+        else:
+            try:
+                pointing = read_table(input_file, "/dl1/monitoring/telescope/pointing/" + tel)
+            except Exception:
+                logging.error('Adding pointing information failed! Pointing information is probably not stored in DL1 file.')
+                exit()
+            try:
+                events['true_az_tel'] = pointing['azimuth'].to(u.deg).value
+                events['true_alt_tel'] = pointing['altitude'].to(u.deg).value
+            except Exception:
+                logging.error('Adding pointing information failed! Length of params and pointing tables probably dont match. Broken file.')
+                exit()
 
     if stereo:
         stereo_impact = read_table(input_file, "/dl2/event/telescope/impact/HillasReconstructor/" + tel)
@@ -903,31 +951,102 @@ def load_photon_list_sst1m(input_file, tel=None, config=None, table='astropy', e
     return data
 
 
-def load_dl1_pedestals(input_file):
+# statistics of the pedestal events, in chunks of events (one table per telescope, tel_XXX):
+# calibrated images (ctapipe pixel statistics, read by the ctapipe HDF5MonitoringSource)
+# and ADC samples (same structure, at the R0 level)
+DL1_PEDESTAL_GROUP = DL1_SKY_PEDESTAL_IMAGE_GROUP
+R0_PEDESTAL_GROUP = "/r0/monitoring/telescope/calibration/camera/pixel_statistics/sky_pedestal_waveform"
 
+
+def chunk_statistics_table(containers):
     """
-    Reads tables with pedestal info from the input HDF DL1 file.
+    Table of the statistics of chunks of events (`~ctapipe.containers.ChunkStatisticsContainer`),
+    with the columns of the ctapipe pixel statistics tables (time_start, time_end, mean, median, std, ...)
+    """
+    columns = {}
+    for name in containers[0].fields:
+        values = [container[name] for container in containers]
+        columns[name] = Time(values) if isinstance(values[0], Time) else np.array(values)
+    return QTable(columns)
+
+
+def load_pedestals(input_file, group, tel=None):
+    """
+    Reads the tables of statistics of the pedestal events of the telescopes
+    (``group/tel_XXX``), with the column tel_id
 
     Parameters
     ----------
     input_file: string
         Path
+    group: string
+        R0_PEDESTAL_GROUP or DL1_PEDESTAL_GROUP
+    tel: string
+        e.g. \'tel_021\', all the telescopes if None
+
+    Returns
+    -------
+    pedestals: astropy.table.Table
+    """
+    with tables.open_file(input_file) as f:
+        tels = [node._v_name for node in f.get_node(group)._f_iter_nodes("Table")]
+    if tel is not None:
+        tels = [tel]
+    pedestal_tables = []
+    for name in sorted(tels):
+        table = read_table(input_file, f"{group}/{name}")
+        table["tel_id"] = int(name.split("_")[-1])
+        pedestal_tables.append(table)
+    return vstack(pedestal_tables)
+
+
+def load_dl1_pedestals(input_file, tel=None):
+
+    """
+    Reads the statistics of the calibrated images (p.e.) of the
+    pedestal events from the input HDF DL1 file.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+    tel: string
+        e.g. \'tel_021\', all the telescopes if None
 
     Returns
     -------
     pedestals: astropy.table.Table
 
     """
-
-    pedestals = read_table(input_file, "/dl1/monitoring/telescope/pedestal")
-    return pedestals
+    return load_pedestals(input_file, DL1_PEDESTAL_GROUP, tel=tel)
 
 
-def write_dl1_pedestals(input_file, pedestal_table=None):
+def load_r0_pedestals(input_file, tel=None):
 
     """
-    Write table of pedestal events from DL1 file into
-    another DL1 file. Typical usecase is to propagate
+    Reads the statistics of the ADC samples of the pedestal
+    events from the input HDF DL1 file.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+    tel: string
+        e.g. \'tel_021\', all the telescopes if None
+
+    Returns
+    -------
+    pedestals: astropy.table.Table
+
+    """
+    return load_pedestals(input_file, R0_PEDESTAL_GROUP, tel=tel)
+
+
+def write_pedestals(input_file, pedestal_table=None, group=DL1_PEDESTAL_GROUP):
+
+    """
+    Write the tables of statistics of the pedestal events (see `load_pedestals`)
+    into another DL1 file. Typical usecase is to propagate
     pedestals from mono DL1 to stereo DL1.
 
     Parameters
@@ -936,16 +1055,28 @@ def write_dl1_pedestals(input_file, pedestal_table=None):
         Path
 
     pedestal_table: astropy.table.Table
+        with the column tel_id
+
+    group: string
+        R0_PEDESTAL_GROUP or DL1_PEDESTAL_GROUP
 
     """
 
     try:
-        write_table_hdf5(pedestal_table, input_file,
-            append=True, path='/dl1/monitoring/telescope/pedestal',
-            serialize_meta=False
-            )
+        for tel_id in np.unique(pedestal_table["tel_id"]):
+            table = pedestal_table[pedestal_table["tel_id"] == tel_id]
+            table.remove_column("tel_id")
+            write_table(table, input_file, f"{group}/tel_{tel_id:03d}", append=True)
     except Exception:
         logging.warning('Writing pedestals into the file failed!')
+
+
+def write_dl1_pedestals(input_file, pedestal_table=None):
+    write_pedestals(input_file, pedestal_table=pedestal_table, group=DL1_PEDESTAL_GROUP)
+
+
+def write_r0_pedestals(input_file, pedestal_table=None):
+    write_pedestals(input_file, pedestal_table=pedestal_table, group=R0_PEDESTAL_GROUP)
 
 
 def load_extra_table(input_file, key=None, remove_column=None):
@@ -1176,44 +1307,101 @@ def write_dl2_info(dl2_file, rfs_used=None):
         info.append()
 
 
-def write_dl1_info(processing_info):
+def write_dl1_info(dl1_file, info):
     """
     Stores info tab in the DL1 file
 
     Parameters
     ----------
-        processing_info: Class Monitoring_R0_DL1
+    dl1_file: string
+        Path
+    info: dict
+        Values of the columns of `sst1mpipe.io.containers.DL1_info`.
+        Missing values (None) are stored as '', NaN, -1 or False
+        depending on the type of the column.
 
     Returns
     -------
 
     """
-    dl1_file = processing_info.output_file
-
     with tables.open_file(dl1_file, mode='a') as file:
 
         table = file.create_table(
             '/dl1',
             'info',
             DL1_info,
-            "DL1 production info"
+            "DL1 production info",
+            createparents=True,
         )
-        info = table.row
-        info['sst1mpipe_version'] = sst1mpipe.__version__
-        info['target'] = processing_info.target
-        info['ra'] = processing_info.pointing_ra
-        info['dec'] = processing_info.pointing_dec
-        info['manual_coords'] = processing_info.pointing_manual
-        info['wobble'] = processing_info.wobble
-        info['calib_file'] = processing_info.calibration_file
-        info['window_file'] = processing_info.window_file
-        info['n_saturated'] = processing_info.n_saturated
-        info['n_pedestal'] = processing_info.n_pedestals
-        info['n_survived_pedestals'] = processing_info.n_pedestals_survived
-        info['n_triggered_tel1'] = processing_info.n_triggered_tel1
-        info['n_triggered_tel2'] = processing_info.n_triggered_tel2
-        info['swat_event_ids_used'] = processing_info.swat_event_ids_used
-        info.append()
+        row = table.row
+        row['sst1mpipe_version'] = sst1mpipe.__version__
+        # value of the missing (None) entries for each kind of column
+        missing = {'S': '', 'f': np.nan, 'i': -1, 'b': False}
+        for key, value in info.items():
+            row[key] = missing[table.coldtypes[key].kind] if value is None else value
+        row.append()
+
+
+def compute_dl1_summary(dl1_file):
+    """
+    Counts the events stored in a DL1 file.
+
+    Parameters
+    ----------
+    dl1_file: string
+        Path
+
+    Returns
+    -------
+    dict:
+        n_events: number of events
+        n_triggered: number of triggered events per telescope id
+        n_pedestal: number of pedestal events
+        n_survived_pedestals: number of pedestal events with an image
+        surviving the cleaning (finite hillas intensity) in any telescope
+    """
+    subarray = SubarrayDescription.from_hdf(dl1_file)
+    with tables.open_file(dl1_file) as f:
+        has_events = "/dl1/event/subarray/trigger" in f
+    if not has_events:
+        # no event written, e.g. all the events of the run are skipped
+        return dict(
+            n_events=0,
+            n_triggered={int(tel_id): 0 for tel_id in subarray.tel_ids},
+            n_pedestal=0,
+            n_survived_pedestals=0,
+        )
+    trigger = read_table(dl1_file, "/dl1/event/subarray/trigger")
+
+    tels_with_trigger = np.asarray(trigger["tels_with_trigger"], dtype=bool).reshape(len(trigger), -1)
+    n_triggered = {
+        int(tel_id): int(n) for tel_id, n in zip(subarray.tel_ids, tels_with_trigger.sum(axis=0), strict=True)
+    }
+
+    # pedestal events: SKY_PEDESTAL, or PEDESTAL for the files written with ctapipe < 0.27
+    is_pedestal = np.isin(trigger["event_type"], [EventType.SKY_PEDESTAL.value, EventType.PEDESTAL.value])
+    pedestals = {(obs_id, event_id) for obs_id, event_id in trigger["obs_id", "event_id"][is_pedestal]}
+
+    survived = set()
+    with tables.open_file(dl1_file) as f:
+        parameter_tables = [
+            node._v_pathname for node in f.root.dl1.event.telescope.parameters
+        ] if "/dl1/event/telescope/parameters" in f else []
+    for path in parameter_tables:
+        parameters = read_table(dl1_file, path)
+        # camera_frame_ prefix if the parameters are computed in the camera frame
+        intensity = "hillas_intensity" if "hillas_intensity" in parameters.colnames else "camera_frame_hillas_intensity"
+        has_image = np.isfinite(parameters[intensity])
+        survived |= {
+            (obs_id, event_id) for obs_id, event_id in parameters["obs_id", "event_id"][has_image]
+        } & pedestals
+
+    return dict(
+        n_events=len(trigger),
+        n_triggered=n_triggered,
+        n_pedestal=int(is_pedestal.sum()),
+        n_survived_pedestals=len(survived),
+    )
 
 
 def get_dl1_info(file):
@@ -1476,41 +1664,11 @@ def load_distributions_sst1m(dist_path=None, dl3_path=None):
     return histograms, histograms_diff, zeniths, obsids_sorted, livetimes, survived_ped, bins
 
 
-def get_used_qe_simtel(source):
-    """
-    Reads the simtel cfg file used to run current MC production and extracts
-    all Quntum efficiency (PDE) files listed there. There are also default (dummy)
-    PDE files there as the proper fields in simtel must be first initialized with
-    something before running. This is not dangerous as long us one does not
-    use one of the real PDE files used for the real production as the dummy file..
-
-    Parameters
-    ----------
-    source: ctapipe.io.EventSource
-
-    Returns
-    -------
-    used_qe: numpy.array
-        Array of used PDEs to produce given simtel file
-
-    """
-
-    used_qe = []
-    stringlist=[x[1].decode('utf-8') for x in source.file_.history]
-    string_array = np.array(stringlist)
-    indices = np.arange(0, len(string_array))
-    index_array_eff = indices[np.char.find(string_array, 'QUANTUM_EFFiciency') != -1]
-    for string in string_array[index_array_eff]:
-        s = string.replace('QUANTUM_EFFiciency ', '').split('%')[0].strip()
-        used_qe.append(s[:s.rfind('.')])
-    return np.array(used_qe)
-
-
 def get_pde_correction_factors():
     """
     Reads the default calibration file containing the PDE
     corrections for different PDE files used in MC production.
-    The file is expected to be stored in ../data/mc_pde_correction_factors.json
+    The file is sst1mpipe/resources/calibration/mc_pde_correction_factors.json
 
     Returns
     -------
@@ -1519,10 +1677,7 @@ def get_pde_correction_factors():
     """
 
     try:
-        default_pde_corr_file = 'mc_pde_correction_factors.json'
-        pde_corr_file = files('sst1mpipe.data').joinpath(default_pde_corr_file)
-
-        with open(pde_corr_file) as json_file:
+        with open(PDE_CORRECTION_FACTORS_FILE) as json_file:
                 pde_corr = Config(json.load(json_file))
         return pde_corr
     except Exception:

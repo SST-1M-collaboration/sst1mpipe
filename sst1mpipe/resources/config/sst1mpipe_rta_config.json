@@ -1,0 +1,150 @@
+{
+  "ProcessorTool": {
+    "progress_bar": true
+  },
+  "EventSource": {
+    "input_url": "tcp://localhost:13581",
+    "allowed_tels" : null,
+    "max_events": 100000
+  },
+
+  "SST1MEventSource": {
+    "swapped_modules": [
+      {"tel_id": 22, "start": "2023-09-01T00:00:00", "stop": "2024-07-18T00:00:00", "modules": [59, 88]},
+      {"tel_id": 21, "start": "2025-12-17T12:00:00", "stop": "2026-01-15T12:00:00", "modules": [8, 9]}
+    ]
+  },
+
+  "ZMQEventSource": {
+    "swapped_modules": [
+      {"tel_id": 22, "start": "2023-09-01T00:00:00", "stop": "2024-07-18T00:00:00", "modules": [59, 88]},
+      {"tel_id": 21, "start": "2025-12-17T12:00:00", "stop": "2026-01-15T12:00:00", "modules": [8, 9]}
+    ]
+  },
+
+  "R0PedestalMonitor": {
+    "n_events": 100
+  },
+
+  "DL1PedestalMonitor": {
+    "n_events": 1000
+  },
+
+  "ImageSaturationCorrector": {
+    "integration_level": 0.2,
+    "peak_time_level": 2500
+  },
+
+  "R0R1Calibrator": {
+    "calibration_file": [
+      ["type", "*", null]
+    ],
+    "window_transmittance_file": [
+      ["type", "*", null]
+    ],
+    "voltage_drop_correction": "global",
+    "flag_bad_calibration_pixels": true,
+    "flag_dead_pixels": true,
+    "dead_pixel_std_threshold": 2.5,
+    "saturation_threshold": 3000,
+    "saturation_width_level": 2500,
+    "saturation_width_threshold": 5,
+    "bad_pixels": [
+      ["type", "*", []]
+    ],
+    "pde_drop_factor": [
+      ["type", "*", null],
+      ["id", 21, null],
+      ["id", 22, null]
+    ]
+  },
+
+  "CameraCalibrator": {
+      "image_extractor_type" : "LocalPeakWindowSum",
+      "LocalPeakWindowSum": {
+          "apply_integration_correction": true,
+          "window_shift": 3,
+          "window_width": 7
+      },
+      "data_volume_reducer_type": "NullDataVolumeReducer",
+      "invalid_pixel_handler_type": "NeighborAverage"
+  },
+
+  "ImageProcessor": {
+    "image_cleaner_type": "NSBImageCleaner",
+    "use_telescope_frame": false,
+    "TailcutsImageCleaner": {
+        "picture_threshold_pe": [
+          ["type", "*", 1800]
+        ],
+        "boundary_threshold_pe": [
+          ["type", "*", 1800]
+        ],
+        "min_picture_neighbors": [
+          ["type", "*", 2]
+        ]
+      },
+    "NSBImageCleaner": {
+        "picture_threshold_pe": [
+          ["type", "*", 8]
+        ],
+        "boundary_threshold_pe": [
+          ["type", "*", 4]
+        ],
+        "min_picture_neighbors": [
+          ["type", "*", 2]
+        ],
+        "keep_isolated_pixels": false,
+        "time_limit": 8,
+        "time_num_neighbors": 1,
+        "largest_island_only": false,
+        "pedestal_factor": 2.5,
+        "bright_cleaning_threshold": null
+    },
+    "DBSCANImageCleaner": {
+      "epsilon_r": [
+        ["type", "*", 38.0]
+      ],
+      "minimum_pe": [
+        ["type", "*", 30]
+      ]
+    },
+    "TimeDBSCANImageCleaner": {
+      "epsilon_r": [
+        ["type", "*", 38.0]
+      ],
+      "epsilon_t":[
+        ["type", "*", 40.0]
+      ],
+      "minimum_pe": [
+        ["type", "*", 30]
+      ]
+    },
+    "DBSCANTimeImageCleaner": {
+      "epsilon_t":[
+        ["type", "*", 40.0]
+      ],
+      "minimum_pe": [
+        ["type", "*", 30]
+      ]
+    },
+    "ImageQualityQuery": {
+      "quality_criteria": [
+        [
+          "size_greater_0",
+          "image.sum() > 0"
+        ],
+        [
+          "at_least_2_pixels",
+          "image.size > 1"
+        ]
+      ]
+    }
+  },
+  "DataWriter" : {
+    "compression_level": 0,
+    "write_dl1_images": false,
+    "write_dl1_parameters": true,
+    "overwrite": true
+  }
+}

@@ -9,6 +9,7 @@ Created on Wed Mar 23 16:36:22 2022
 import argparse
 import datetime
 import os
+from itertools import chain, islice
 
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -153,10 +154,10 @@ class shape_maker:
                 )
             mask_low_el_noise = np.ones(self.n_pixels,dtype=bool)
         else:
-            data_stream = SST1MEventSource(
-                filelist=self.file_list,
-                disable_bar = True,
-                max_events=self.max_evt
+            # the files are read one after the other, max_evt events in total
+            data_stream = islice(
+                chain.from_iterable(SST1MEventSource(input_url=path) for path in self.file_list),
+                self.max_evt,
                 )
             calib_param = get_default_calibration(self.tel+20)[0]
             mask_low_el_noise = np.array(calib_param['sigma_el']<5)
@@ -165,15 +166,15 @@ class shape_maker:
         tot_evts = 0
 
         for ii,event in enumerate(data_stream):
-            #for tel in event.sst1m.r0.tels_with_data:
+            #for tel in event.trigger.tels_with_trigger:
                 tel = self.tel+20
                 if self.isMC:
                     r0data = event.r0.tel[tel]
                 else:
-                    r0data = event.sst1m.r0.tel[tel]
+                    r0data = event.r0.tel[tel]
 
                 if ii==0 and not self.isMC:
-                    self.T0 = r0data.local_camera_clock/1e9
+                    self.T0 = r0data.event_time / 1e9
                     self.start_date = datetime.datetime.fromtimestamp(self.T0)
 
 
@@ -184,18 +185,18 @@ class shape_maker:
 
                 if self.isMC:
                     mcdata = event.mc.tel[tel]
-                    Qsum = (r0data.adc_samples[0].T[20:35] - mcdata.pedestal/50.+self.bshift).sum(axis=0)
-                    wfs = (r0data.adc_samples[0].T - mcdata.pedestal/50.+self.bshift).T
+                    Qsum = (r0data.waveform[0].T[20:35] - mcdata.pedestal/50.+self.bshift).sum(axis=0)
+                    wfs = (r0data.waveform[0].T - mcdata.pedestal/50.+self.bshift).T
 
                 else:
-                    if r0data._camera_event_type.value==8:
+                    if r0data._event_type.value==8:
                         if self.dark_baselines is None:
-                            Qsum = (r0data.adc_samples.T[20:35]+self.bshift - r0data.digicam_baseline).sum(axis=0)
-                            wfs = (r0data.adc_samples.T+self.bshift - r0data.digicam_baseline).T
+                            Qsum = (r0data.waveform[0].T[20:35]+self.bshift - r0data.pedestal).sum(axis=0)
+                            wfs = (r0data.waveform[0].T+self.bshift - r0data.pedestal).T
 
                         else:
-                            Qsum = (r0data.adc_samples.T[20:35] - self.dark_baselines ).sum(axis=0)
-                            wfs = (r0data.adc_samples.T - self.dark_baselines).T
+                            Qsum = (r0data.waveform[0].T[20:35] - self.dark_baselines ).sum(axis=0)
+                            wfs = (r0data.waveform[0].T - self.dark_baselines).T
                     else:
                         continue
 
