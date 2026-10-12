@@ -3,26 +3,23 @@ from importlib.resources import files
 
 import numpy as np
 import pytest
+import tables
+from ctapipe.core import run_tool
+from scipy.sparse import csr_matrix
 from traitlets import TraitError
 from traitlets.config import Config
 
-from sst1mpipe.trigger import fixed_point
+from sst1mpipe.instrument.camera import DigiCam
+from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator, fixed_point
 from sst1mpipe.trigger.emulator import (
     READOUT_SECTOR_ORDER,
-    TriggerEmulator,
     fadc,
     module_swap_order,
-    read_trigger_geometry,
+    neighbor_matrix,
     readout_to_patch_order,
     score_quantizer,
 )
 from sst1mpipe.utils import get_subarray
-
-
-def emulator(quantize_step=None):
-    """The TDSCAN wPow2 trigger, in fixed point (e.g. Q14, as the HLS core) or floating point (None)."""
-    return TriggerEmulator(subarray=get_subarray(), config=Config({"TriggerEmulator": {"quantize_step": quantize_step}}))
-
 
 Q14 = {
     "input": "UQ4.0",
@@ -34,20 +31,24 @@ Q14 = {
 }
 
 
+def example_config(name):
+    with files("sst1mpipe.data").joinpath(f"sst1mpipe_trigger_emulator_{name}.json").open() as f:
+        return Config(json.load(f))
+
+
+def tdscan(**section):
+    """TDSCAN wPow2 emulator, floating point unless quantize_step is given."""
+    return TriggerTDSCANEmulator(subarray=get_subarray(), config=Config({"TriggerTDSCANEmulator": section}))
+
+
 def test_example_configs_are_valid():
-    for name in ("sst1mpipe_trigger_emulator_mc.json", "sst1mpipe_trigger_emulator_data.json"):
-        with files("sst1mpipe.data").joinpath(name).open() as f:
-            TriggerEmulator(subarray=get_subarray(), config=Config(json.load(f)))
+    for name in ("mc", "data"):
+        TriggerPatch7Emulator(subarray=get_subarray(), config=example_config(name))
+        TriggerTDSCANEmulator(subarray=get_subarray(), config=example_config(name))
 
 
-def test_disabled_unless_enabled():
-    assert not TriggerEmulator(subarray=get_subarray(), config=Config({})).enabled
-    assert not TriggerEmulator(subarray=get_subarray(), config=Config({"TriggerEmulator": {"patch7_threshold": 300}})).enabled
-
-
-def test_invalid_config_is_refused():
+def test_invalid_tdscan_config_is_refused():
     invalid = (
-        {"patch7": {"threshold": 350}},                        # old nested format
         {"eps_t": 1},                                          # 5 rows of ring_weights for 3 taps
         {"ring_weights": [[0.5, 0.1, 0.2]] * 5},               # rows must be [centre, neighbours]
         {"quantize_step": {"input": "UQ4.0"}},                 # incomplete fixed-point formats
@@ -56,14 +57,13 @@ def test_invalid_config_is_refused():
     )
     for section in invalid:
         with pytest.raises((ValueError, TraitError)):
-            TriggerEmulator(subarray=get_subarray(), config=Config({"TriggerEmulator": section}))
+            tdscan(**section)
 
 
 def test_thresholds_per_telescope():
-    with files("sst1mpipe.data").joinpath("sst1mpipe_trigger_emulator_data.json").open() as f:
-        emu = TriggerEmulator(subarray=get_subarray(), config=Config(json.load(f)))
-    assert emu.patch7_threshold.tel[21] == 225
-    assert emu.patch7_threshold.tel[22] == 350
+    emu = TriggerPatch7Emulator(subarray=get_subarray(), config=example_config("data"))
+    assert emu.threshold.tel[21] == 225
+    assert emu.threshold.tel[22] == 350
 
 
 def test_fixed_point_formats():
@@ -83,14 +83,14 @@ def test_fixed_point_formats():
 
 
 def test_fadc_keeps_negative_pixels():
-    triplets = np.array([[0, 1, 2]])
+    patch_matrix = csr_matrix(np.ones((1, 3), dtype=np.int64))  # one patch of 3 pixels
     baseline = np.array([10.7, 10.0, 10.0])
     waveform = np.array([[5, 10, 300], [13, 12, 300], [14, 1000, 300]])  # 3 pixels, 3 samples
     # sample 0: (5-10) + (13-10) + (14-10) = 2, the negative pixel is not clipped to 0
     # sample 1: (10-10) + (12-10) + (1000-10) = 992 -> 255
     # sample 2: (300-10) * 3 -> 255
-    assert fadc(waveform, baseline, triplets).tolist() == [[2, 255, 255]]
-    assert fadc(np.array([[0], [0], [0]]), baseline, triplets).tolist() == [[0]]
+    assert fadc(waveform, baseline, patch_matrix).tolist() == [[2, 255, 255]]
+    assert fadc(np.zeros((3, 1)), baseline, patch_matrix).tolist() == [[0]]
 
 
 def test_score_quantizer():
@@ -99,23 +99,25 @@ def test_score_quantizer():
 
 
 def test_trigger_geometry():
-    triplets, clusters, neighbors = read_trigger_geometry()
-    assert sorted(triplets.ravel().tolist()) == list(range(1296))
-    for patch, cluster in enumerate(clusters):
-        assert patch in cluster
-        assert len(cluster) <= 7
-        # TDSCAN neighbourhoods are the patch7 clusters, with the patch itself in column 3.
-        assert set(neighbors[patch][neighbors[patch] >= 0]) == set(cluster)
-    assert np.array_equal(neighbors[:, 3], np.arange(432))
+    # Every pixel in exactly one patch of 3, each CSR row listing its 3 pixels.
+    assert np.array_equal(DigiCam.patch_matrix.indptr, np.arange(0, 1297, 3))
+    assert sorted(DigiCam.patch_matrix.indices.tolist()) == list(range(1296))
+
+    neighbors = neighbor_matrix()
+    assert (neighbors != neighbors.T).nnz == 0                  # symmetric
+    assert neighbors.diagonal().sum() == 0                      # a patch is not its own neighbour
+    assert set(np.asarray(neighbors.sum(axis=1)).ravel()) <= {3, 4, 6}  # 6 inside, fewer at the edge
+    assert (neighbors + np.eye(432, dtype=np.int64) != DigiCam.cluster_7_matrix).sum() == 0
 
 
 def test_readout_order():
-    # Sectors in the order sst1mpipe's reader assumes: nothing to reorder.
-    assert np.array_equal(readout_to_patch_order((1, 2, 3)), np.arange(432))
-    # Telescope 2: same layout inside each sector, sectors shifted by one.
-    tel2 = readout_to_patch_order(READOUT_SECTOR_ORDER[22])
-    assert sorted(tel2.tolist()) == list(range(432))
-    assert not np.array_equal(tel2, np.arange(432))
+    for signal in ("input", "output"):
+        # Sectors in the order sst1mpipe's reader assumes: nothing to reorder.
+        assert np.array_equal(readout_to_patch_order((1, 2, 3), signal), np.arange(432))
+        # Telescope 2: same layout inside each sector, sectors shifted by one.
+        tel2 = readout_to_patch_order(READOUT_SECTOR_ORDER[22], signal)
+        assert sorted(tel2.tolist()) == list(range(432))
+        assert not np.array_equal(tel2, np.arange(432))
 
 
 def test_module_swap_moves_trigger_traces_with_pixels():
@@ -130,26 +132,42 @@ def test_module_swap_moves_trigger_traces_with_pixels():
         mask = np.zeros(1296, dtype=bool)
         mask[pix_maps[pix_maps["module"] == module]["pixel_sw_id"]] = True
         masks.append(mask)
-    triplets = read_trigger_geometry()[0]
-    order = module_swap_order(triplets, [masks])
+    order = module_swap_order([masks])
 
     rng = np.random.default_rng(0)
     waveform, baseline = rng.integers(0, 100, (1296, 50)), np.full(1296, 50.0)
     corrected = waveform.copy()  # what swap_modules_r0wf does to the pixels
     corrected[masks[0]], corrected[masks[1]] = waveform[masks[1]], waveform[masks[0]]
 
-    assert np.array_equal(fadc(waveform, baseline, triplets)[order], fadc(corrected, baseline, triplets))
+    assert np.array_equal(fadc(waveform, baseline)[order], fadc(corrected, baseline))
     assert np.count_nonzero(order != np.arange(432)) == 8
-    assert np.array_equal(module_swap_order(triplets, []), np.arange(432))
+    assert np.array_equal(module_swap_order([]), np.arange(432))
+
+
+def test_patch7_sums_clusters():
+    emu = TriggerPatch7Emulator(subarray=get_subarray())
+    traces = np.zeros((432, 50), dtype=np.int64)
+    patch, sample = 200, 20
+    traces[patch, sample] = 100
+
+    output, scores = emu.trigger_output(traces, tel_id=21)
+
+    # Every cluster containing the patch sees it: the patch and its 6 neighbours.
+    cluster = DigiCam.cluster_7_matrix[patch].indices
+    assert sorted(np.flatnonzero(scores[:, sample]).tolist()) == sorted(cluster.tolist())
+    assert scores.sum() == 100 * len(cluster)
+    assert not output.any()                                   # 100 < 242
+    traces[patch, sample] = 250
+    assert emu.trigger_output(traces, tel_id=21)[0][:, sample].sum() == len(cluster)
 
 
 def test_tdscan_single_impulse():
-    emu = emulator(Q14)
+    emu = tdscan(quantize_step=Q14)
     codes = np.zeros((432, 50), dtype=int)
     patch, sample = 200, 20
     codes[patch, sample] = 1
 
-    scores = emu.tdscan(codes)
+    scores = emu.filter(codes)
 
     # Only one tap sees the impulse at each output sample: the score is the
     # centre weight of that tap (+-0.5, SQ1.7 code +-64) requantized to SQ5.2:
@@ -158,32 +176,22 @@ def test_tdscan_single_impulse():
     assert np.count_nonzero(scores[patch]) == 5
 
     # A neighbour sees the ring-1 weights: floor(code / 32) of -1, -4, -16, 8, 32.
-    neighbor = emu.tdscan.neighbors[patch, 0]
+    neighbor = neighbor_matrix()[patch].indices[0]
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0, -0.25, -0.25, -0.25]
 
 
 def test_tdscan_single_impulse_floating_point():
-    emu = emulator(None)
+    emu = tdscan()
     codes = np.zeros((432, 50), dtype=int)
     patch, sample = 200, 20
     codes[patch, sample] = 1
 
-    scores = emu.tdscan(codes)
+    scores = emu.filter(codes)
 
     # Without quantization the scores are the weights themselves, tap 4 first.
     assert scores[patch, 18:23].tolist() == [0.5, 0.5, -0.5, -0.5, 0.5]
-    neighbor = emu.tdscan.neighbors[patch, 0]
+    neighbor = neighbor_matrix()[patch].indices[0]
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0625, -0.125, -0.03125, -0.0078125]
-
-
-def test_as_sst1m_event_gives_each_event_its_own_r0():
-    from ctapipe.containers import ArrayEventContainer
-
-    from sst1mpipe.trigger import as_sst1m_event
-
-    first, second = as_sst1m_event(ArrayEventContainer()), as_sst1m_event(ArrayEventContainer())
-    first.sst1m.r0.tel[1].trigger_output_tdscan = np.ones((432, 50), dtype=bool)
-    assert 1 not in second.sst1m.r0.tel
 
 
 def test_missing_trigger_traces_are_refused():
@@ -192,17 +200,23 @@ def test_missing_trigger_traces_are_refused():
     event = SST1MArrayEventContainer()
     event.sst1m.r0.tel[22].trigger_input_traces = np.zeros((432, 50)) * np.nan   # what the reader stores
     with pytest.raises(ValueError, match="no trigger_input_traces"):
-        emulator().triplet_traces(event, 22, is_simulation=False)
+        tdscan().trigger_traces(event, 22)
 
 
-def test_duplicate_event_is_refused():
-    from sst1mpipe.io.containers import SST1MArrayEventContainer
+def test_trigger_tool(tmp_path):
+    from sst1mpipe.scripts.sst1mpipe_trigger_tool import TriggerTool
 
-    emu = emulator()
-    traces = np.zeros((432, 50), dtype=np.int64)
-    emu.triplet_traces = lambda event, tel_id, is_simulation: traces
-    event = SST1MArrayEventContainer()
-    event.index.obs_id, event.index.event_id = 1, 7
-    emu.process(event, [22], is_simulation=False, is_pedestal=False)
-    with pytest.raises(ValueError, match="seen twice"):
-        emu.process(event, [22], is_simulation=False, is_pedestal=False)
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps(example_config("data")))
+    output = tmp_path / "trigger.h5"
+    input_file = files("sst1mpipe.resources.zfits").joinpath("SST1M1_20260121_0001.fits.fz")
+    argv = ["-i", str(input_file), "-o", str(output), "-m", "20", "--config", str(config),
+            "--save-outputs", "--compare-camera"]
+    assert run_tool(TriggerTool(), argv=argv, cwd=tmp_path) == 0
+
+    with tables.open_file(output) as f:
+        table = f.root.trigger_emulation.tel_021
+        assert len(table) > 0
+        assert table.coldtypes["trigger_traces"] == np.dtype((np.uint8, (432, 50)))
+        assert table.coldtypes["tdscan_output"] == np.dtype((bool, (432, 50)))
+        assert {"patch7", "tdscan", "camera_patch7", "camera_patch7_mismatches"} <= set(table.colnames)
