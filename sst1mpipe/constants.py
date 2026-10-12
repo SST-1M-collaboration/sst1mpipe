@@ -1,6 +1,11 @@
 import numpy as np
 from astropy import units as u
-from ctapipe.instrument.subarray import EarthLocation
+
+from importlib.resources import files
+
+
+from ctapipe.instrument.subarray import EarthLocation, SubarrayDescription
+from sst1mpipe.instrument.camera import Camera
 
 # Should be SST1M position - #TODO
 REFERENCE_LOCATION = EarthLocation(
@@ -9,8 +14,12 @@ REFERENCE_LOCATION = EarthLocation(
     height=0 * u.m,  # MC obs-level
 )
 
+SUBARRAY_DESCRIPTION = SubarrayDescription.from_hdf(files('sst1mpipe.data').joinpath('sst1m_array.h5'))
 
-
+CAMERA = Camera()
+GEOMETRY = CAMERA.geometry
+N_PIXELS = GEOMETRY.n_pixels
+N_CHANNELS = 1
 
 
 PATCH_ID_INPUT = [
