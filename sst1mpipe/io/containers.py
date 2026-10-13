@@ -12,6 +12,7 @@ from ctapipe.containers import (
     ArrayEventContainer,
     CameraMonitoringContainer,
     ChunkStatisticsContainer,
+    EventType,
     MonitoringContainer,
     ObservationBlockContainer,
     PixelStatisticsContainer,
@@ -31,6 +32,7 @@ from tables import (
 
 __all__ = [
     "CameraEventType",
+    "PEDESTAL_EVENT_TYPES",
     "SST1MR0CameraContainer",
     "SST1MR0Container",
     "SST1MPixelStatisticsContainer",
@@ -59,6 +61,10 @@ class CameraEventType(Flag):
     CONTINUOUS = 0x80  # continuous readout marker
     MUON_DETECT = 0x10000  # camera server detected muon
     HILLAS = 0x20000  # camera server computed Hillas parametrs
+
+
+# ctapipe event types of the SST-1M pedestal events: SKY_PEDESTAL, DARK_PEDESTAL in the dark runs
+PEDESTAL_EVENT_TYPES = (EventType.SKY_PEDESTAL, EventType.DARK_PEDESTAL)
 
 
 class SST1MR0CameraContainer(R0CameraContainer):

@@ -13,12 +13,14 @@ import astropy.units as u
 import numpy as np
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
-from ctapipe.containers import CoordinateFrameType, ObservingMode, PointingMode, SchedulingBlockType
+from ctapipe.containers import CoordinateFrameType, EventType, ObservingMode, PointingMode, SchedulingBlockType
 
 import sst1mpipe.io.sst1m_event_source as sst1m_event_source
 from sst1mpipe.io.sst1m_event_source import (
     SST1MEventSource,
+    camera_event_type_to_event_type,
     file_has_swat_event_ids,
+    is_dark_run,
     file_start_and_duration,
     observing_mode,
     parse_file_name,
@@ -129,12 +131,38 @@ def test_trigger_and_no_pointing_for_dark_run():
     observation_block = source.observation_blocks[DARK_OBS_ID]
     assert np.isnan(observation_block.subarray_pointing_lon)
     assert source.scheduling_blocks[DARK_OBS_ID].pointing_mode == PointingMode.UNKNOWN
+    assert source.is_dark_run
 
     for i, event in enumerate(source):
         assert event.trigger.tels_with_trigger == [DARK_TEL_ID]
         assert event.trigger.time == DARK_EVENT_TIME[i]
         assert event.trigger.tel[DARK_TEL_ID].time == event.trigger.time
+        # internal triggers of a dark run
+        assert event.trigger.event_type == EventType.DARK_PEDESTAL
+        assert event.trigger.tel[DARK_TEL_ID].event_type == EventType.DARK_PEDESTAL
         assert np.isnan(event.monitoring.tel[DARK_TEL_ID].pointing.altitude)
+
+
+@pytest.mark.parametrize("camera_event_type, dark, event_type", [
+    (CameraEventType.INTERNAL, False, EventType.SKY_PEDESTAL),
+    (CameraEventType.INTERNAL, True, EventType.DARK_PEDESTAL),
+    (CameraEventType.PATCH7, False, EventType.SUBARRAY),
+    (CameraEventType.PATCH7, True, EventType.SUBARRAY),
+    (CameraEventType.PATCH19 | CameraEventType.MUON_TRIGGER, False, EventType.SUBARRAY),
+    # value of the camera events of the files
+    (8, False, EventType.SKY_PEDESTAL),
+    (1, True, EventType.SUBARRAY),
+])
+def test_camera_event_type_to_event_type(camera_event_type, dark, event_type):
+    assert camera_event_type_to_event_type(camera_event_type, dark=dark) == event_type
+
+
+@pytest.mark.parametrize("target, dark", [
+    ("DARK", True), ("drak", True), (" dark ", True),
+    ("bias", False), ("MRK421", False), ("Transition", False), ("", False), (None, False),
+])
+def test_is_dark_run(target, dark):
+    assert is_dark_run(target) == dark
 
 
 @pytest.mark.parametrize("pointing_update_interval, tolerance", [(0, 1e-6 * u.arcsec), (3600, 1 * u.arcmin)])

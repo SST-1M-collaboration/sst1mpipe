@@ -12,7 +12,7 @@ from ctapipe.io import read_table
 from traitlets import traitlets
 
 
-from sst1mpipe.io.zmq_event_source import ZMQEventSource, run_header_obs_id
+from sst1mpipe.io.zmq_event_source import ZMQEventSource, run_header_obs_id, stream_event_type
 from sst1mpipe.constants import N_PIXELS, N_CHANNELS, SUBARRAY_DESCRIPTION
 from ctapipe.containers import EventType, SchedulingBlockType
 from ctapipe.io.datalevels import DataLevel
@@ -210,7 +210,9 @@ def test_r1_stream():
         assert list(event.r1.tel) == [tel_id]
 
     # trigger
-    assert [event.trigger.event_type for event in events] == [EventType.SUBARRAY, EventType.PEDESTAL, EventType.UNKNOWN]
+    # the generic PEDESTAL events (2) are sky pedestal events, out of a dark run
+    assert [event.trigger.event_type for event in events] == [EventType.SUBARRAY, EventType.SKY_PEDESTAL, EventType.UNKNOWN]
+    assert [event.trigger.tel[tel_id].event_type for event in events] == [event.trigger.event_type for event in events]
     for event in events:
         assert event.trigger.tels_with_trigger == [tel_id]
         assert event.trigger.time == event.r1.tel[tel_id].event_time
@@ -378,6 +380,34 @@ def test_camera_event_stream():
     assert DataLevel.R0 in source.datalevels
     # SWAT array event ids, as for the file
     assert_same_r0_events(events, SST1MEventSource(ZFITS_FILE))
+    source.close()
+
+
+@pytest.mark.parametrize("value, dark, event_type", [
+    (32, False, EventType.SUBARRAY),
+    (2, False, EventType.SKY_PEDESTAL),
+    (2, True, EventType.DARK_PEDESTAL),
+    (5, True, EventType.SKY_PEDESTAL),
+    (3, False, EventType.DARK_PEDESTAL),
+    (200, False, EventType.UNKNOWN),
+])
+def test_stream_event_type(value, dark, event_type):
+    assert stream_event_type(value, dark=dark) == event_type
+
+
+def test_camera_event_stream_of_dark_run():
+    """the pedestal events of a dark run (CALIBRATION scheduling block) are dark pedestal events"""
+    dark_file = TEST_DATA_DIR / "zfits" / "SST1M2_20260119_0007.fits.fz"
+    endpoint = "inproc://test_camera_event_stream_of_dark_run"
+    source = ZMQEventSource(endpoint, scheduling_block_type="CALIBRATION")
+    send(source, [*camera_event_messages(dark_file, n_events=5), cta_message(END_OF_STREAM)], endpoint)
+
+    events = list(source)
+    assert source.is_dark_run
+    assert [event.trigger.event_type for event in events] == [EventType.DARK_PEDESTAL] * 5
+    # as for the file
+    file_events = list(SST1MEventSource(dark_file, max_events=5))
+    assert [event.trigger.event_type for event in file_events] == [EventType.DARK_PEDESTAL] * 5
     source.close()
 
 

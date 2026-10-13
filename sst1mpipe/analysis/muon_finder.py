@@ -1,5 +1,4 @@
 import argparse
-import datetime
 import glob
 import multiprocessing as mp
 import os
@@ -57,7 +56,7 @@ class muon_finder:
     def __init__(self,
                  filename    = '/net/cs2/data/raw/2024/01/29/SST1M2/SST1M2_20240129_0050.fits.fz',
                  plot_dir     = './muons_plots/',
-                 tel          = 1,
+                 tel          = 22,
                  max_evt      = 200,
                  gain         = 1.,
                  plot         = False,
@@ -65,6 +64,10 @@ class muon_finder:
 
 
 
+
+        # telescope id of the data: 21 or 22 (1 or 2 in the simulations)
+        if tel not in (21, 22):
+            raise ValueError(f"Telescope {tel} not known, 21 or 22 expected")
 
         self.tailcuts_1 = 5
         self.tailcuts_2 = 4
@@ -90,6 +93,7 @@ class muon_finder:
         self.max_evt         = max_evt
         self.gain            = gain
         self.tel             = tel
+        self.sim_tel_id      = tel - 20
 
         self.plot=plot
         self.ismc = ismc
@@ -165,10 +169,10 @@ class muon_finder:
             r0_pedestal_monitor = R0PedestalMonitor(subarray=get_subarray(), config=DEFAULT_CONFIG)
             dl1_pedestal_monitor = DL1PedestalMonitor(subarray=get_subarray(), config=DEFAULT_CONFIG)
             load_first_pedestals(r0_pedestal_monitor, dl1_pedestal_monitor, self.filename, DEFAULT_CONFIG)
-            if r0_pedestal_monitor.n_buffered(20 + self.tel) == 0:
+            if r0_pedestal_monitor.n_buffered(self.tel) == 0:
                 print("No pedestal events found in firsts events. Skipping run")
                 return
-            print(f"{r0_pedestal_monitor.n_buffered(20 + self.tel)} pedestals events loaded in buffer")
+            print(f"{r0_pedestal_monitor.n_buffered(self.tel)} pedestals events loaded in buffer")
 
         #####################################
         ### Loop in all events to find muons:
@@ -176,10 +180,10 @@ class muon_finder:
 
         for ii,event in enumerate(data_stream):
             if self.ismc:
-                if self.tel not in event.trigger.tels_with_trigger:
+                if self.sim_tel_id not in event.trigger.tels_with_trigger:
                     continue
-                r0data = event.r0.tel[self.tel]
-                r1data = event.r1.tel[self.tel]
+                r0data = event.r0.tel[self.sim_tel_id]
+                r1data = event.r1.tel[self.sim_tel_id]
                 Q_sum_ADC    = (r0data.waveform[0].T[self.w_start:self.w_end]).sum(axis=0)
                 Q_sum_window = (r1data.waveform[0].T[self.w_start:self.w_end]).sum(axis=0)
                 E_mu = event.simulation.shower.energy
@@ -188,8 +192,7 @@ class muon_finder:
 
                 tel = event.trigger.tels_with_trigger[0]
                 if ii==0:
-                    T0 = event.r0.tel[tel].event_time / 1e9
-                    start_date = datetime.datetime.fromtimestamp(T0)
+                    start_date = event.r0.tel[tel].event_time.utc.to_datetime()
                     # datestr = "{}/{}/{} at {}h{}".format(start_date.day,
                     #                                      start_date.month,
                     #                                      start_date.year,
@@ -216,7 +219,7 @@ class muon_finder:
                     continue
                 ## intergrate signal in a fixed window :
                 r0_pedestal_monitor.fill_monitoring(event, tel)
-                VI = VAR_to_Idrop(event.monitoring.tel[tel].camera.pixel_statistics.pedestal_waveform.std.mean()**2, 20+self.tel)
+                VI = VAR_to_Idrop(event.monitoring.tel[tel].camera.pixel_statistics.pedestal_waveform.std.mean()**2, self.tel)
                 Q_sum_ADC    = (r0data.waveform[0].T[self.w_start:self.w_end] - r0data.pedestal).sum(axis=0)
                 Q_sum_window = Q_sum_ADC /self.gain /VI /self.window_t
 
@@ -443,7 +446,7 @@ if __name__ == "__main__":
         parser.add_argument('--data_path',    type=str, default = "")
         parser.add_argument('--plot_dir',     type=str, default = None )
         parser.add_argument('--table_dir',    type=str, default = '/mnt/nfs28_auger3/tavernier/sst1m/muon_ana/muons_table20241126' )
-        parser.add_argument('--tel',          type=int, default = 2)
+        parser.add_argument('--tel',          type=int, default = 22, choices=[21, 22])
         parser.add_argument('--max_evt',      type=int, default = 20000000)
         parser.add_argument('--ismc',         type=bool, default = False)
 
@@ -451,7 +454,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
-    if args.tel==2:
+    if args.tel==22:
         calib_df = pd.read_hdf('/mnt/nfs19/tavernier/sst1m/calib/averaged_calib_param_v2_tel2.h5')
     else:
         calib_df = pd.read_hdf('/mnt/nfs19/tavernier/sst1m/calib/averaged_calib_param_v2_tel1.h5')

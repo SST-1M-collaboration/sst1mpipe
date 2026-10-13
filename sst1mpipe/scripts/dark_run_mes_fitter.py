@@ -100,13 +100,13 @@ def read_dark_run_events(file_list, max_events=None):
         for event in source:
             if max_events is not None and n_events >= max_events:
                 break
-            if event.trigger.event_type != EventType.SKY_PEDESTAL:
+            if event.trigger.event_type != EventType.DARK_PEDESTAL:
                 n_not_pedestal += 1
                 continue
             n_events += 1
             yield event
         if n_not_pedestal > 0:
-            print(f"Warning : {n_not_pedestal} events of the dark run {path} are not pedestal events, not used")
+            print(f"Warning : {n_not_pedestal} events of the dark run {path} are not dark pedestal events, not used")
         if max_events is not None and n_events >= max_events:
             return
 

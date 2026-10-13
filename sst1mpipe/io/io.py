@@ -14,7 +14,6 @@ from astropy.io import fits
 from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
 from astropy.table import QTable, Table, join, vstack
 from astropy.time import Time
-from ctapipe.containers import EventType
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table, write_table
 from ctapipe.io.hdf5dataformat import DL1_SKY_PEDESTAL_IMAGE_GROUP
@@ -24,7 +23,7 @@ from pyirf.cuts import evaluate_binned_cut
 from traitlets.config import Config
 
 import sst1mpipe
-from sst1mpipe.io.containers import DL1_info, DL2_info
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES, DL1_info, DL2_info
 from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
     add_disp,
@@ -1378,8 +1377,7 @@ def compute_dl1_summary(dl1_file):
         int(tel_id): int(n) for tel_id, n in zip(subarray.tel_ids, tels_with_trigger.sum(axis=0), strict=True)
     }
 
-    # pedestal events: SKY_PEDESTAL, or PEDESTAL for the files written with ctapipe < 0.27
-    is_pedestal = np.isin(trigger["event_type"], [EventType.SKY_PEDESTAL.value, EventType.PEDESTAL.value])
+    is_pedestal = np.isin(trigger["event_type"], [event_type.value for event_type in PEDESTAL_EVENT_TYPES])
     pedestals = {(obs_id, event_id) for obs_id, event_id in trigger["obs_id", "event_id"][is_pedestal]}
 
     survived = set()

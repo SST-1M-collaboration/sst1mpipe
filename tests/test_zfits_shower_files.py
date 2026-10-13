@@ -293,18 +293,19 @@ def test_dark_run_events(capsys):
 
     assert len(events) == 20
     assert {event.index.obs_id for event in events} == {202601190007}
-    assert {event.trigger.event_type for event in events} == {EventType.SKY_PEDESTAL}
+    assert {event.trigger.event_type for event in events} == {EventType.DARK_PEDESTAL}
     assert "is not a dark run" in capsys.readouterr().out
 
 
 def test_dark_run_events_not_pedestal(monkeypatch, capsys):
-    """the events of a dark run which are not pedestal events are not used"""
+    """the events of a dark run which are not dark pedestal events are not used"""
     # the run with Cherenkov events taken as a dark run
     monkeypatch.setattr(sst1m_event_source, "scheduling_block_type", lambda target: SchedulingBlockType.CALIBRATION)
+    monkeypatch.setattr(sst1m_event_source, "is_dark_run", lambda target: True)
     path = TEST_DATA_DIR / "zfits" / FILES[21]["name"]
 
     events = list(read_dark_run_events([path]))
 
     assert len(events) == FILES[21]["n_pedestals"]
-    assert {event.trigger.event_type for event in events} == {EventType.SKY_PEDESTAL}
+    assert {event.trigger.event_type for event in events} == {EventType.DARK_PEDESTAL}
     assert f"{FILES[21]['n_showers']} events of the dark run" in capsys.readouterr().out

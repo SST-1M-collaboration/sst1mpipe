@@ -8,7 +8,7 @@ from astropy.table import QTable
 from astropy.time import Time
 from tqdm import tqdm
 from ctapipe.calib import CameraCalibrator
-from ctapipe.containers import EventType, SchedulingBlockType
+from ctapipe.containers import SchedulingBlockType
 from ctapipe.core import Tool
 from ctapipe.core.traits import Bool, Integer, List, UseEnum, flag
 from ctapipe.image import ImageProcessor
@@ -17,14 +17,11 @@ from ctapipe.reco import ShowerProcessor
 
 from sst1mpipe.calib import R0R1Calibrator, ImageSaturationCorrector
 from sst1mpipe.io import DL1_PEDESTAL_GROUP, R0_PEDESTAL_GROUP, chunk_statistics_table, write_dl1_info
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
-
-
-# event types of the pedestal events: SKY_PEDESTAL (SST-1M raw data), PEDESTAL (CTAO R1/DL0 streams)
-PEDESTAL_EVENT_TYPES = (EventType.SKY_PEDESTAL, EventType.PEDESTAL)
 
 
 class ProcessorTool(Tool):

@@ -97,7 +97,8 @@ def parse_target_field(field):
 # targets of the TARGET field which are not observations of a source, compared in lower case
 # (with the typos found in the files)
 TRANSITION_TARGETS = ("transition",)
-CALIBRATION_TARGETS = ("dark", "drak", "bias")
+DARK_TARGETS = ("dark", "drak")
+CALIBRATION_TARGETS = DARK_TARGETS + ("bias",)
 ENGINEERING_TARGETS = ("wrtest",)
 UNKNOWN_TARGETS = ("", "unknown", "none")
 
@@ -116,6 +117,27 @@ def scheduling_block_type(target):
     if name in ENGINEERING_TARGETS:
         return SchedulingBlockType.ENGINEERING
     return SchedulingBlockType.OBSERVATION
+
+
+def is_dark_run(target):
+    """True for the dark runs (camera closed), from their target (TARGET field of the file)"""
+    return (target or "").strip().lower() in DARK_TARGETS
+
+
+def pedestal_event_type(dark=False):
+    """ctapipe EventType of the pedestal events: DARK_PEDESTAL in a dark run, SKY_PEDESTAL otherwise"""
+    return EventType.DARK_PEDESTAL if dark else EventType.SKY_PEDESTAL
+
+
+def camera_event_type_to_event_type(camera_event_type, dark=False):
+    """
+    ctapipe EventType of a DigiCam camera event type (`CameraEventType`): the internal
+    triggers are the pedestal events (DARK_PEDESTAL in a dark run, SKY_PEDESTAL otherwise),
+    the other events are triggered by the camera (SUBARRAY)
+    """
+    if CameraEventType(camera_event_type) == CameraEventType.INTERNAL:
+        return pedestal_event_type(dark)
+    return EventType.SUBARRAY
 
 
 def observing_mode(wobble):
@@ -278,7 +300,7 @@ def read_trigger_traces(traces, prepare, name, n_samples):
     return np.full((432, n_samples), np.nan)
 
 
-def fill_r0_event(array_event, camera_event, order=None):
+def fill_r0_event(array_event, camera_event, order=None, dark=False):
     """
     Fill the R0 data of the telescope (``event.r0``) and the trigger (time, telescope,
     event type) of ``array_event`` with a DigiCam camera event (``DataModel.CameraEvent``
@@ -292,6 +314,8 @@ def fill_r0_event(array_event, camera_event, order=None):
     order: callable or None
         ``order(tel_id, pixel_ids, time)``: order of the pixels in the camera,
         e.g. with the wrongly connected modules swapped. By default by pixel id.
+    dark: bool
+        True for a dark run: the pedestal events are DARK_PEDESTAL, else SKY_PEDESTAL
 
     Returns
     -------
@@ -326,8 +350,7 @@ def fill_r0_event(array_event, camera_event, order=None):
     array_event.trigger.time = local_time
     array_event.trigger.tel[tel_id].time = local_time
     array_event.trigger.tels_with_trigger = [tel_id]
-    # internal triggers are the pedestal events
-    event_type = EventType.SKY_PEDESTAL if r0.event_type == CameraEventType.INTERNAL else EventType.SUBARRAY
+    event_type = camera_event_type_to_event_type(r0.event_type, dark=dark)
     array_event.trigger.event_type = event_type
     array_event.trigger.tel[tel_id].event_type = event_type
     return tel_id
@@ -504,6 +527,11 @@ class SST1MEventSource(EventSource):
         return self._target
 
     @property
+    def is_dark_run(self):
+        """True for a dark run (TARGET field of the file): its pedestal events are DARK_PEDESTAL"""
+        return is_dark_run(self._target)
+
+    @property
     def wobble(self):
         """Wobble from the TARGET field of the file (``W<n>``, ``UNDEF`` or None)"""
         return self._wobble
@@ -613,7 +641,7 @@ class SST1MEventSource(EventSource):
 
                 array_event.r0.tel.clear()
                 try:
-                    tel_id = fill_r0_event(array_event, event, self._pixel_order)
+                    tel_id = fill_r0_event(array_event, event, self._pixel_order, dark=self.is_dark_run)
                 except AttributeError as err:
                     raise AttributeError(
                         f"Could not read the event {event_counter} (eventNumber {event.eventNumber})"
