@@ -30,7 +30,8 @@ from protozfits import (
 )
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer, StreamCameraConfigContainer
-from sst1mpipe.io.sst1m_event_source import fill_r0_event, parse_swapped_modules, pedestal_event_type, pixel_order
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
+from sst1mpipe.io.sst1m_event_source import fill_r0_event, parse_swapped_modules, pixel_order
 from sst1mpipe.resources import SUBARRAY_FILE
 
 __all__ = ["ZMQEventSource", "DataStream"]
@@ -89,11 +90,11 @@ def run_header_obs_id(run_header):
     return int(run_header.runNumber)
 
 
-def stream_event_type(value, dark=False):
+def stream_event_type(value, pedestal_type=EventType.SKY_PEDESTAL):
     """
     ctapipe EventType of the event type of a R1 or DL0 event message (CTAO event type),
-    UNKNOWN if it is not a known type. The generic PEDESTAL events are DARK_PEDESTAL in a
-    dark run and SKY_PEDESTAL otherwise, as the pedestal events of the DigiCam camera events
+    UNKNOWN if it is not a known type. The generic PEDESTAL events are of type ``pedestal_type``,
+    as the pedestal events of the DigiCam camera events
     (see `sst1mpipe.io.sst1m_event_source.camera_event_type_to_event_type`).
     """
     try:
@@ -101,7 +102,7 @@ def stream_event_type(value, dark=False):
     except ValueError:
         return EventType.UNKNOWN
     if event_type == EventType.PEDESTAL:
-        return pedestal_event_type(dark)
+        return pedestal_type
     return event_type
 
 
@@ -152,8 +153,8 @@ class ZMQEventSource(EventSource):
 
     The scheduling and observation blocks are only known once the data stream message is
     received; the type of the scheduling block is not sent and is ``scheduling_block_type``.
-    The pedestal events of a stream with a CALIBRATION scheduling block (dark run) are
-    DARK_PEDESTAL events, SKY_PEDESTAL otherwise.
+    The type of the pedestal events (internal triggers of the camera events, generic PEDESTAL
+    events of the R1/DL0 events) is not sent either and is ``pedestal_event_type``.
     """
 
     input_url = Unicode(
@@ -172,6 +173,15 @@ class ZMQEventSource(EventSource):
         help="Type of the scheduling blocks of the stream, which is not sent in the stream",
     ).tag(config=True)
 
+    pedestal_event_type = UseEnum(
+        EventType,
+        default_value=EventType.SKY_PEDESTAL,
+        help=(
+            "Event type of the pedestal events of the stream, which is not sent in the stream:"
+            " SKY_PEDESTAL, DARK_PEDESTAL (dark run) or ELECTRONIC_PEDESTAL (bias run)"
+        ),
+    ).tag(config=True)
+
     swapped_modules = List(
         trait=Dict(),
         default_value=[],
@@ -184,6 +194,11 @@ class ZMQEventSource(EventSource):
     def __init__(self, input_url=Undefined, config=None, parent=None, **kwargs):
 
         super().__init__(input_url=input_url, config=config, parent=parent, **kwargs)
+        if self.pedestal_event_type not in PEDESTAL_EVENT_TYPES:
+            raise ValueError(
+                f"pedestal_event_type {self.pedestal_event_type.name} is not a pedestal event type:"
+                f" {[event_type.name for event_type in PEDESTAL_EVENT_TYPES]}"
+            )
         self._context = zmq.Context()
         self.socket = self._context.socket(zmq.PULL)
         self.socket.connect(self.input_url)
@@ -363,7 +378,7 @@ class ZMQEventSource(EventSource):
 
         event = SST1MArrayEventContainer()
         event.r0.meta = dict(is_simulation=False)
-        tel_id = fill_r0_event(event, camera_event, self._pixel_order, dark=self.is_dark_run)
+        tel_id = fill_r0_event(event, camera_event, self._pixel_order, pedestal_type=self.pedestal_event_type)
 
         # the event ids of the stream are the SWAT array event ids if the first event has one
         if self._swat_event_ids is None:
@@ -385,7 +400,7 @@ class ZMQEventSource(EventSource):
 
         event = SST1MArrayEventContainer()
         r1 = event.r1.tel[tel_id]
-        r1.event_type = stream_event_type(message.event_type, dark=self.is_dark_run)
+        r1.event_type = stream_event_type(message.event_type, pedestal_type=self.pedestal_event_type)
         r1.event_time = ctao_high_res_to_time(message.event_time_s, message.event_time_qns)
         stored = any_array_to_numpy(message.waveform).reshape((n_channels, n_pixels, n_samples))
         r1.waveform = decode_waveform(stored, data_stream)
@@ -410,7 +425,7 @@ class ZMQEventSource(EventSource):
 
         event = SST1MArrayEventContainer()
         dl0 = event.dl0.tel[tel_id]
-        dl0.event_type = stream_event_type(message.event_type, dark=self.is_dark_run)
+        dl0.event_type = stream_event_type(message.event_type, pedestal_type=self.pedestal_event_type)
         dl0.event_time = ctao_high_res_to_time(message.event_time_s, message.event_time_qns)
         stored = any_array_to_numpy(message.waveform).reshape((n_channels, n_pixels, n_samples))
         pedestal = any_array_to_numpy(message.pedestal_intensity).reshape((n_channels, n_pixels))
@@ -423,11 +438,6 @@ class ZMQEventSource(EventSource):
         obs_id = self._obs_id(tel_id)
         self._fill_index_and_trigger(event, tel_id, message.event_id, obs_id, dl0)
         return event
-
-    @property
-    def is_dark_run(self):
-        """True for a dark run (CALIBRATION scheduling block): its pedestal events are DARK_PEDESTAL"""
-        return self.scheduling_block_type == SchedulingBlockType.CALIBRATION
 
     def close(self):
         self.socket.close(linger=0)

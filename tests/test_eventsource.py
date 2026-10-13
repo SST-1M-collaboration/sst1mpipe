@@ -20,7 +20,7 @@ from sst1mpipe.io.sst1m_event_source import (
     SST1MEventSource,
     camera_event_type_to_event_type,
     file_has_swat_event_ids,
-    is_dark_run,
+    pedestal_event_type,
     file_start_and_duration,
     observing_mode,
     parse_file_name,
@@ -131,7 +131,7 @@ def test_trigger_and_no_pointing_for_dark_run():
     observation_block = source.observation_blocks[DARK_OBS_ID]
     assert np.isnan(observation_block.subarray_pointing_lon)
     assert source.scheduling_blocks[DARK_OBS_ID].pointing_mode == PointingMode.UNKNOWN
-    assert source.is_dark_run
+    assert source.pedestal_event_type == EventType.DARK_PEDESTAL
 
     for i, event in enumerate(source):
         assert event.trigger.tels_with_trigger == [DARK_TEL_ID]
@@ -143,26 +143,31 @@ def test_trigger_and_no_pointing_for_dark_run():
         assert np.isnan(event.monitoring.tel[DARK_TEL_ID].pointing.altitude)
 
 
-@pytest.mark.parametrize("camera_event_type, dark, event_type", [
-    (CameraEventType.INTERNAL, False, EventType.SKY_PEDESTAL),
-    (CameraEventType.INTERNAL, True, EventType.DARK_PEDESTAL),
-    (CameraEventType.PATCH7, False, EventType.SUBARRAY),
-    (CameraEventType.PATCH7, True, EventType.SUBARRAY),
-    (CameraEventType.PATCH19 | CameraEventType.MUON_TRIGGER, False, EventType.SUBARRAY),
+@pytest.mark.parametrize("camera_event_type, pedestal_type, event_type", [
+    (CameraEventType.INTERNAL, EventType.SKY_PEDESTAL, EventType.SKY_PEDESTAL),
+    (CameraEventType.INTERNAL, EventType.DARK_PEDESTAL, EventType.DARK_PEDESTAL),
+    (CameraEventType.INTERNAL, EventType.ELECTRONIC_PEDESTAL, EventType.ELECTRONIC_PEDESTAL),
+    (CameraEventType.PATCH7, EventType.SKY_PEDESTAL, EventType.SUBARRAY),
+    (CameraEventType.PATCH7, EventType.DARK_PEDESTAL, EventType.SUBARRAY),
+    (CameraEventType.PATCH19 | CameraEventType.MUON_TRIGGER, EventType.SKY_PEDESTAL, EventType.SUBARRAY),
     # value of the camera events of the files
-    (8, False, EventType.SKY_PEDESTAL),
-    (1, True, EventType.SUBARRAY),
+    (8, EventType.SKY_PEDESTAL, EventType.SKY_PEDESTAL),
+    (1, EventType.DARK_PEDESTAL, EventType.SUBARRAY),
 ])
-def test_camera_event_type_to_event_type(camera_event_type, dark, event_type):
-    assert camera_event_type_to_event_type(camera_event_type, dark=dark) == event_type
+def test_camera_event_type_to_event_type(camera_event_type, pedestal_type, event_type):
+    assert camera_event_type_to_event_type(camera_event_type, pedestal_type=pedestal_type) == event_type
+    if pedestal_type == EventType.SKY_PEDESTAL:
+        assert camera_event_type_to_event_type(camera_event_type) == event_type
 
 
-@pytest.mark.parametrize("target, dark", [
-    ("DARK", True), ("drak", True), (" dark ", True),
-    ("bias", False), ("MRK421", False), ("Transition", False), ("", False), (None, False),
+@pytest.mark.parametrize("target, event_type", [
+    ("DARK", EventType.DARK_PEDESTAL), ("drak", EventType.DARK_PEDESTAL), (" dark ", EventType.DARK_PEDESTAL),
+    ("bias", EventType.ELECTRONIC_PEDESTAL), ("BIAS", EventType.ELECTRONIC_PEDESTAL),
+    ("MRK421", EventType.SKY_PEDESTAL), ("Transition", EventType.SKY_PEDESTAL),
+    ("", EventType.SKY_PEDESTAL), (None, EventType.SKY_PEDESTAL),
 ])
-def test_is_dark_run(target, dark):
-    assert is_dark_run(target) == dark
+def test_pedestal_event_type(target, event_type):
+    assert pedestal_event_type(target) == event_type
 
 
 @pytest.mark.parametrize("pointing_update_interval, tolerance", [(0, 1e-6 * u.arcsec), (3600, 1 * u.arcmin)])

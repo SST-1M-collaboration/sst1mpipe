@@ -98,7 +98,8 @@ def parse_target_field(field):
 # (with the typos found in the files)
 TRANSITION_TARGETS = ("transition",)
 DARK_TARGETS = ("dark", "drak")
-CALIBRATION_TARGETS = DARK_TARGETS + ("bias",)
+BIAS_TARGETS = ("bias",)
+CALIBRATION_TARGETS = DARK_TARGETS + BIAS_TARGETS
 ENGINEERING_TARGETS = ("wrtest",)
 UNKNOWN_TARGETS = ("", "unknown", "none")
 
@@ -119,24 +120,28 @@ def scheduling_block_type(target):
     return SchedulingBlockType.OBSERVATION
 
 
-def is_dark_run(target):
-    """True for the dark runs (camera closed), from their target (TARGET field of the file)"""
-    return (target or "").strip().lower() in DARK_TARGETS
+def pedestal_event_type(target):
+    """
+    ctapipe EventType of the pedestal events of a run, from its target (TARGET field of the file):
+    DARK_PEDESTAL for the dark runs (camera closed), ELECTRONIC_PEDESTAL for the bias runs
+    and SKY_PEDESTAL for the other runs
+    """
+    name = (target or "").strip().lower()
+    if name in DARK_TARGETS:
+        return EventType.DARK_PEDESTAL
+    if name in BIAS_TARGETS:
+        return EventType.ELECTRONIC_PEDESTAL
+    return EventType.SKY_PEDESTAL
 
 
-def pedestal_event_type(dark=False):
-    """ctapipe EventType of the pedestal events: DARK_PEDESTAL in a dark run, SKY_PEDESTAL otherwise"""
-    return EventType.DARK_PEDESTAL if dark else EventType.SKY_PEDESTAL
-
-
-def camera_event_type_to_event_type(camera_event_type, dark=False):
+def camera_event_type_to_event_type(camera_event_type, pedestal_type=EventType.SKY_PEDESTAL):
     """
     ctapipe EventType of a DigiCam camera event type (`CameraEventType`): the internal
-    triggers are the pedestal events (DARK_PEDESTAL in a dark run, SKY_PEDESTAL otherwise),
+    triggers are the pedestal events, of type ``pedestal_type`` (see `pedestal_event_type`),
     the other events are triggered by the camera (SUBARRAY)
     """
     if CameraEventType(camera_event_type) == CameraEventType.INTERNAL:
-        return pedestal_event_type(dark)
+        return pedestal_type
     return EventType.SUBARRAY
 
 
@@ -300,7 +305,7 @@ def read_trigger_traces(traces, prepare, name, n_samples):
     return np.full((432, n_samples), np.nan)
 
 
-def fill_r0_event(array_event, camera_event, order=None, dark=False):
+def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType.SKY_PEDESTAL):
     """
     Fill the R0 data of the telescope (``event.r0``) and the trigger (time, telescope,
     event type) of ``array_event`` with a DigiCam camera event (``DataModel.CameraEvent``
@@ -314,8 +319,8 @@ def fill_r0_event(array_event, camera_event, order=None, dark=False):
     order: callable or None
         ``order(tel_id, pixel_ids, time)``: order of the pixels in the camera,
         e.g. with the wrongly connected modules swapped. By default by pixel id.
-    dark: bool
-        True for a dark run: the pedestal events are DARK_PEDESTAL, else SKY_PEDESTAL
+    pedestal_type: ctapipe.containers.EventType
+        Event type of the pedestal events (internal triggers) of the run, see `pedestal_event_type`
 
     Returns
     -------
@@ -350,7 +355,7 @@ def fill_r0_event(array_event, camera_event, order=None, dark=False):
     array_event.trigger.time = local_time
     array_event.trigger.tel[tel_id].time = local_time
     array_event.trigger.tels_with_trigger = [tel_id]
-    event_type = camera_event_type_to_event_type(r0.event_type, dark=dark)
+    event_type = camera_event_type_to_event_type(r0.event_type, pedestal_type=pedestal_type)
     array_event.trigger.event_type = event_type
     array_event.trigger.tel[tel_id].event_type = event_type
     return tel_id
@@ -527,9 +532,12 @@ class SST1MEventSource(EventSource):
         return self._target
 
     @property
-    def is_dark_run(self):
-        """True for a dark run (TARGET field of the file): its pedestal events are DARK_PEDESTAL"""
-        return is_dark_run(self._target)
+    def pedestal_event_type(self):
+        """
+        Event type of the pedestal events of the run, from its target (TARGET field of the file):
+        DARK_PEDESTAL (dark run), ELECTRONIC_PEDESTAL (bias run) or SKY_PEDESTAL
+        """
+        return pedestal_event_type(self._target)
 
     @property
     def wobble(self):
@@ -641,7 +649,7 @@ class SST1MEventSource(EventSource):
 
                 array_event.r0.tel.clear()
                 try:
-                    tel_id = fill_r0_event(array_event, event, self._pixel_order, dark=self.is_dark_run)
+                    tel_id = fill_r0_event(array_event, event, self._pixel_order, pedestal_type=self.pedestal_event_type)
                 except AttributeError as err:
                     raise AttributeError(
                         f"Could not read the event {event_counter} (eventNumber {event.eventNumber})"

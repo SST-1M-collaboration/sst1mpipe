@@ -64,7 +64,8 @@ class CameraEventType(Flag):
 
 
 # ctapipe event types of the SST-1M pedestal events: SKY_PEDESTAL, DARK_PEDESTAL in the dark runs
-PEDESTAL_EVENT_TYPES = (EventType.SKY_PEDESTAL, EventType.DARK_PEDESTAL)
+# and ELECTRONIC_PEDESTAL in the bias runs
+PEDESTAL_EVENT_TYPES = (EventType.SKY_PEDESTAL, EventType.DARK_PEDESTAL, EventType.ELECTRONIC_PEDESTAL)
 
 
 class SST1MR0CameraContainer(R0CameraContainer):

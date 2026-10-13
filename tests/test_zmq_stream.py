@@ -383,27 +383,35 @@ def test_camera_event_stream():
     source.close()
 
 
-@pytest.mark.parametrize("value, dark, event_type", [
-    (32, False, EventType.SUBARRAY),
-    (2, False, EventType.SKY_PEDESTAL),
-    (2, True, EventType.DARK_PEDESTAL),
-    (5, True, EventType.SKY_PEDESTAL),
-    (3, False, EventType.DARK_PEDESTAL),
-    (200, False, EventType.UNKNOWN),
+@pytest.mark.parametrize("value, pedestal_type, event_type", [
+    (32, EventType.SKY_PEDESTAL, EventType.SUBARRAY),
+    (2, EventType.SKY_PEDESTAL, EventType.SKY_PEDESTAL),
+    (2, EventType.DARK_PEDESTAL, EventType.DARK_PEDESTAL),
+    (2, EventType.ELECTRONIC_PEDESTAL, EventType.ELECTRONIC_PEDESTAL),
+    (5, EventType.DARK_PEDESTAL, EventType.SKY_PEDESTAL),
+    (3, EventType.SKY_PEDESTAL, EventType.DARK_PEDESTAL),
+    (200, EventType.SKY_PEDESTAL, EventType.UNKNOWN),
 ])
-def test_stream_event_type(value, dark, event_type):
-    assert stream_event_type(value, dark=dark) == event_type
+def test_stream_event_type(value, pedestal_type, event_type):
+    assert stream_event_type(value, pedestal_type=pedestal_type) == event_type
+
+
+def test_pedestal_event_type_of_stream():
+    source = ZMQEventSource("inproc://test_pedestal_event_type_of_stream")
+    assert source.pedestal_event_type == EventType.SKY_PEDESTAL
+    source.close()
+    with pytest.raises(ValueError, match="not a pedestal event type"):
+        ZMQEventSource("inproc://test_pedestal_event_type_of_stream", pedestal_event_type="SUBARRAY")
 
 
 def test_camera_event_stream_of_dark_run():
-    """the pedestal events of a dark run (CALIBRATION scheduling block) are dark pedestal events"""
+    """the pedestal events of a dark run (pedestal_event_type DARK_PEDESTAL) are dark pedestal events"""
     dark_file = TEST_DATA_DIR / "zfits" / "SST1M2_20260119_0007.fits.fz"
     endpoint = "inproc://test_camera_event_stream_of_dark_run"
-    source = ZMQEventSource(endpoint, scheduling_block_type="CALIBRATION")
+    source = ZMQEventSource(endpoint, scheduling_block_type="CALIBRATION", pedestal_event_type="DARK_PEDESTAL")
     send(source, [*camera_event_messages(dark_file, n_events=5), cta_message(END_OF_STREAM)], endpoint)
 
     events = list(source)
-    assert source.is_dark_run
     assert [event.trigger.event_type for event in events] == [EventType.DARK_PEDESTAL] * 5
     # as for the file
     file_events = list(SST1MEventSource(dark_file, max_events=5))

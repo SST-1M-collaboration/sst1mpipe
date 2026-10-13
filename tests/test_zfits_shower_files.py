@@ -301,7 +301,7 @@ def test_dark_run_events_not_pedestal(monkeypatch, capsys):
     """the events of a dark run which are not dark pedestal events are not used"""
     # the run with Cherenkov events taken as a dark run
     monkeypatch.setattr(sst1m_event_source, "scheduling_block_type", lambda target: SchedulingBlockType.CALIBRATION)
-    monkeypatch.setattr(sst1m_event_source, "is_dark_run", lambda target: True)
+    monkeypatch.setattr(sst1m_event_source, "pedestal_event_type", lambda target: EventType.DARK_PEDESTAL)
     path = TEST_DATA_DIR / "zfits" / FILES[21]["name"]
 
     events = list(read_dark_run_events([path]))
