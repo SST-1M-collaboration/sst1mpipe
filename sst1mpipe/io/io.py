@@ -958,6 +958,35 @@ DL1_PEDESTAL_GROUP = DL1_SKY_PEDESTAL_IMAGE_GROUP
 R0_PEDESTAL_GROUP = f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform"
 
 
+# groups of the monitoring data of a monitoring file (sst1mpipe-monitoring): pointing, statistics
+# of the ADC samples and of the images of the pedestal events
+MONITORING_GROUPS = ("/dl0/monitoring", "/r0/monitoring", "/dl1/monitoring")
+
+
+def copy_monitoring(monitoring_file, output_file):
+    """
+    Copy the monitoring data (tables of MONITORING_GROUPS) of a monitoring file of
+    sst1mpipe-monitoring into another file, e.g. the DL1 file of the run
+
+    Parameters
+    ----------
+    monitoring_file: string
+        Path
+    output_file: string
+        Path, the tables already in the file are overwritten
+    """
+    with tables.open_file(monitoring_file) as source, tables.open_file(output_file, mode="a") as output:
+        for group in MONITORING_GROUPS:
+            if group not in source:
+                continue
+            for table in source.get_node(group)._f_walknodes("Table"):
+                parent = table._v_parent._v_pathname
+                if parent not in output:
+                    where, name = parent.rsplit("/", 1)
+                    output.create_group(where or "/", name, createparents=True)
+                table._f_copy(newparent=output.get_node(parent), overwrite=True)
+
+
 def chunk_statistics_table(containers):
     """
     Table of the statistics of chunks of events (`~ctapipe.containers.ChunkStatisticsContainer`),

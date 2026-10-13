@@ -67,6 +67,10 @@ sst1mpipe-monitoring = "sst1mpipe.scripts.sst1mpipe_monitoring_tool:main"
 [project.entry-points.ctapipe_io]
 SST1MEventSource = "sst1mpipe.io.sst1m_event_source:SST1MEventSource"
 
+# MonitoringSource implementations found by ctapipe.io.MonitoringSource
+[project.entry-points.ctapipe_monitoring]
+SST1MMonitoringSource = "sst1mpipe.io.monitoring_source:SST1MMonitoringSource"
+
 [tool.ruff]
 target-version = "py314"
 

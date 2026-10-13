@@ -10,14 +10,15 @@ from tqdm import tqdm
 from ctapipe.calib import CameraCalibrator
 from ctapipe.containers import SchedulingBlockType
 from ctapipe.core import Tool
-from ctapipe.core.traits import Bool, Integer, List, UseEnum, flag
+from ctapipe.core.traits import Bool, ComponentName, Integer, List, UseEnum, classes_with_traits, flag
 from ctapipe.image import ImageProcessor
-from ctapipe.io import EventSource, DataWriter, SimTelEventSource, write_table
+from ctapipe.io import EventSource, DataWriter, MonitoringSource, SimTelEventSource, write_table
 from ctapipe.reco import ShowerProcessor
 
 from sst1mpipe.calib import R0R1Calibrator, ImageSaturationCorrector
-from sst1mpipe.io import DL1_PEDESTAL_GROUP, R0_PEDESTAL_GROUP, chunk_statistics_table, write_dl1_info
+from sst1mpipe.io import DL1_PEDESTAL_GROUP, R0_PEDESTAL_GROUP, chunk_statistics_table, copy_monitoring, write_dl1_info
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
+from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
@@ -31,13 +32,21 @@ class ProcessorTool(Tool):
     This implementation is based on the ctapipe.tool.ProcessorTool
 
     For the SST-1M raw data (R0, SST1MEventSource), the R0 -> R1 calibration is done
-    by the R0R1Calibrator. The statistics of the ADC samples of the pedestal events,
-    used for the voltage drop correction and the dead pixels, are computed in a sliding
-    window by the R0PedestalMonitor: these corrections are applied once the first
-    pedestal event of the telescope is read.
-    In the same way, the statistics of the calibrated images of the pedestal events are
-    computed by the DL1PedestalMonitor, for the NSBImageCleaner which raises the picture
-    threshold of the pixels with a high pedestal std.
+    by the R0R1Calibrator, with the statistics of the ADC samples of the pedestal events
+    (voltage drop correction and dead pixels). The statistics of the calibrated images of
+    the pedestal events are used by the NSBImageCleaner, which raises the picture threshold
+    of the pixels with a high pedestal std. These statistics are given by:
+
+    - the monitoring sources (monitoring_source_list), e.g. the monitoring file of the run
+      written by sst1mpipe-monitoring (SST1MMonitoringSource), as in ctapipe-process.
+      The monitoring containers of each event (pointing, statistics of the pedestal events)
+      are filled before its calibration. The pedestal events are not processed, and the events
+      without monitoring data (no chunk of pedestal events at their time) are skipped.
+      The monitoring data are copied into the output file (attach_monitoring).
+    - without monitoring source, the sliding windows of the R0PedestalMonitor and of the
+      DL1PedestalMonitor, filled with the pedestal events during the processing: these
+      corrections are applied once the first pedestal event of the telescope is read.
+
     The charges and peak times of the saturated pixels are corrected by the ImageSaturationCorrector.
     For the simulations (SimTelEventSource), the R1 waveforms are corrected for the
     PDE drop by the R0R1Calibrator (pde_drop_factor).
@@ -45,9 +54,9 @@ class ProcessorTool(Tool):
     are processed, e.g. the observations but not the transitions between two wobbles.
 
     The pedestal events are used for the monitoring only: they are not written as events.
-    The statistics of their images and ADC samples (sliding windows of the pedestal monitors)
-    are written every pedestal_monitoring_interval pedestal events, in the ctapipe pixel
-    statistics tables
+    Without monitoring source, the statistics of their images and ADC samples (sliding windows
+    of the pedestal monitors) are written every pedestal_monitoring_interval pedestal events,
+    in the ctapipe pixel statistics tables
     dl1/monitoring/telescope/calibration/camera/pixel_statistics/sky_pedestal_image/tel_XXX
     (read by the ctapipe HDF5MonitoringSource) and
     r0/monitoring/telescope/calibration/camera/pixel_statistics/sky_pedestal_waveform/tel_XXX.
@@ -59,6 +68,8 @@ class ProcessorTool(Tool):
     name = 'sst1mpipe-process'
     description = __doc__
     examples = ("sst1mpipe-process -i mysim.simtel.gz -o events.dl1.h5",
+                "sst1mpipe-process -i run.fits.fz -o events.dl1.h5 --monitoring-source SST1MMonitoringSource"
+                " --SST1MMonitoringSource.input_files=run.monitoring.h5",
                 "sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 "
                 "--config sst1mpipe/resources/config/sst1mpipe_rta_config.json --log-level INFO")
 
@@ -94,11 +105,30 @@ class ProcessorTool(Tool):
         ),
     ).tag(config=True)
 
+    monitoring_source_list = List(
+        ComponentName(MonitoringSource),
+        default_value=[],
+        help=(
+            "Monitoring sources filling the monitoring containers of the events before their"
+            " calibration, e.g. SST1MMonitoringSource (monitoring file of sst1mpipe-monitoring)."
+            " Later sources overwrite earlier ones if their monitoring types overlap."
+        ),
+    ).tag(config=True)
+
+    attach_monitoring = Bool(
+        default_value=True,
+        help=(
+            "Copy the monitoring data of the monitoring files of the monitoring sources into the"
+            " output file (pointing, statistics of the pedestal events)"
+        ),
+    ).tag(config=True)
+
     aliases = {
         ("i", "input"): "EventSource.input_url",
         ("o", "output"): "DataWriter.output_path",
         ("t", "allowed-tels"): "EventSource.allowed_tels",
         ("m", "max-events"): "EventSource.max_events",
+        "monitoring-source": "ProcessorTool.monitoring_source_list",
     }
 
     flags = {
@@ -112,8 +142,8 @@ class ProcessorTool(Tool):
 
     classes = [
         DBSCANImageCleaner, TimeDBSCANImageCleaner, R0R1Calibrator, R0PedestalMonitor, DL1PedestalMonitor,
-        ImageSaturationCorrector, ShowerProcessor,
-    ]
+        ImageSaturationCorrector, ShowerProcessor, SST1MMonitoringSource,
+    ] + classes_with_traits(MonitoringSource)
 
     def setup(self):
 
@@ -121,20 +151,28 @@ class ProcessorTool(Tool):
             self.event_source = self.enter_context(ZMQEventSource(parent=self))
         else:
             self.event_source = self.enter_context(EventSource(parent=self))
+        subarray = self.event_source.subarray
+        # monitoring data of the events, e.g. the monitoring file of the run (sst1mpipe-monitoring)
+        self.monitoring_sources = [
+            self.enter_context(MonitoringSource.from_name(name, subarray=subarray, parent=self))
+            for name in self.monitoring_source_list
+        ]
+        self._monitoring_pointing = any(getattr(source, "has_pointings", False) for source in self.monitoring_sources)
         # R0 -> R1 calibration of the SST-1M raw data, PDE drop correction of the simulations.
-        # The pedestal statistics are computed for the SST-1M data, from its pedestal events
+        # Without monitoring source, the pedestal statistics are computed from the pedestal events
         self.r0_pedestal_monitor = None
         self.dl1_pedestal_monitor = None
         self.r0_r1_calibrator = None
         self.image_saturation_corrector = None
-        subarray = self.event_source.subarray
         # the SST-1M raw data (R0) of the files or of the ZMQ stream (DigiCam camera events);
         # for the R1 events of a stream, the R0 -> R1 calibration does nothing
-        if isinstance(self.event_source, SST1MEventSource | ZMQEventSource):
-            self.r0_pedestal_monitor = R0PedestalMonitor(parent=self, subarray=subarray)
+        self.raw_data = isinstance(self.event_source, SST1MEventSource | ZMQEventSource)
+        if self.raw_data:
             self.image_saturation_corrector = ImageSaturationCorrector(parent=self, subarray=subarray)
-            self.dl1_pedestal_monitor = DL1PedestalMonitor(parent=self, subarray=subarray)
             self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
+            if len(self.monitoring_sources) == 0:
+                self.r0_pedestal_monitor = R0PedestalMonitor(parent=self, subarray=subarray)
+                self.dl1_pedestal_monitor = DL1PedestalMonitor(parent=self, subarray=subarray)
         elif isinstance(self.event_source, SimTelEventSource):
             self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
         self.camera_calibrator = CameraCalibrator(parent=self, subarray=self.event_source.subarray)
@@ -148,6 +186,7 @@ class ProcessorTool(Tool):
             self.shower_processor = ShowerProcessor(parent=self, subarray=self.event_source.subarray)
         self._sb_types = {}
         self.n_skipped_events = 0
+        self.n_events_without_monitoring = 0
         # processing summary, counted in the event loop
         self.n_triggered = Counter()
         self.n_pedestal = 0
@@ -177,6 +216,9 @@ class ProcessorTool(Tool):
             if not self.is_allowed(event):
                 self.n_skipped_events += 1
                 continue
+            if len(self.monitoring_sources) > 0:
+                if not self.fill_monitoring(event):
+                    continue
             if self.r0_r1_calibrator is not None:
                 self.calibrate_r0_r1(event)
             self.camera_calibrator(event)
@@ -204,6 +246,29 @@ class ProcessorTool(Tool):
                 self.shower_processor(event)
             self.writer(event)
 
+    def fill_monitoring(self, event):
+        """
+        Fill the monitoring containers of the event with the monitoring sources.
+        False if the event is not processed: a pedestal event (used by the monitoring only),
+        or an event without monitoring data (statistics of the pedestal events, pointing if
+        given by the monitoring sources) at its time.
+        """
+        for monitoring_source in self.monitoring_sources:
+            monitoring_source.fill_monitoring_container(event)
+        if event.trigger.event_type in PEDESTAL_EVENT_TYPES:
+            self.n_triggered.update(event.trigger.tels_with_trigger)
+            self.n_pedestal += 1
+            return False
+        for tel_id in event.r0.tel:
+            monitoring = event.monitoring.tel[tel_id]
+            statistics = monitoring.camera.pixel_statistics
+            no_pointing = self._monitoring_pointing and not np.isfinite(monitoring.pointing.altitude)
+            if statistics.pedestal_waveform.std is None or statistics.pedestal_image.std is None or no_pointing:
+                self.n_triggered.update(event.trigger.tels_with_trigger)
+                self.n_events_without_monitoring += 1
+                return False
+        return True
+
     def scheduling_block_type(self, obs_id):
         """Type of the scheduling block of the observation block, None if unknown"""
         if obs_id not in self._sb_types:
@@ -225,15 +290,19 @@ class ProcessorTool(Tool):
         return sb_type is None or sb_type in self.allowed_sb_types
 
     def calibrate_r0_r1(self, event):
-        """R0 -> R1 calibration, with the pedestal statistics of the sliding window"""
-        if self.r0_pedestal_monitor is None:
+        """
+        R0 -> R1 calibration, with the pedestal statistics of the monitoring sources or of the
+        sliding window
+        """
+        if not self.raw_data:
             # simulation: PDE drop correction of the R1 waveforms
             self.r0_r1_calibrator(event)
             return
         for tel_id in event.r0.tel:
-            if event.trigger.event_type in PEDESTAL_EVENT_TYPES:
-                self.r0_pedestal_monitor.add_event(event, tel_id)
-            self.r0_pedestal_monitor.fill_monitoring(event, tel_id)
+            if self.r0_pedestal_monitor is not None:
+                if event.trigger.event_type in PEDESTAL_EVENT_TYPES:
+                    self.r0_pedestal_monitor.add_event(event, tel_id)
+                self.r0_pedestal_monitor.fill_monitoring(event, tel_id)
             self.r0_r1_calibrator(event, tel_id)
 
     def fill_dl1_pedestal_monitoring(self, event):
@@ -257,8 +326,9 @@ class ProcessorTool(Tool):
         a row each time the alt/az of the pointing is computed by the event source,
         and a last row at the time of the last event (see write_pointing_tables)
         """
-        # the pointing of the simulations is written by the DataWriter
-        if self.event_source.is_simulation:
+        # the pointing of the simulations is written by the DataWriter, the pointing of the
+        # monitoring sources is copied from their files
+        if self.event_source.is_simulation or len(self.monitoring_sources) > 0:
             return
         for tel_id in event.trigger.tels_with_trigger:
             pointing = event.monitoring.tel[tel_id].pointing
@@ -311,8 +381,17 @@ class ProcessorTool(Tool):
         output_path = self.writer.output_path
         self.write_pointing_tables(output_path)
         self.write_pedestal_monitoring_tables(output_path)
+        if self.attach_monitoring:
+            for monitoring_source in self.monitoring_sources:
+                for monitoring_file in getattr(monitoring_source, "input_files", []):
+                    copy_monitoring(monitoring_file, output_path)
+                    self.log.info("Monitoring data of %s copied into the output file", monitoring_file)
         if self.n_skipped_events > 0:
             self.log.warning("%d events skipped (scheduling block type not allowed)", self.n_skipped_events)
+        if self.n_events_without_monitoring > 0:
+            self.log.warning(
+                "%d events skipped (no monitoring data at their time)", self.n_events_without_monitoring,
+            )
 
         n_triggered = {int(tel_id): self.n_triggered[tel_id] for tel_id in self.event_source.subarray.tel_ids}
         for tel_id, n in n_triggered.items():
@@ -333,7 +412,7 @@ class ProcessorTool(Tool):
         self.log.info("Target: %s, wobble: %s, pointing: %s (manual: %s)", target, wobble, pointing, pointing_manual)
 
         calibration_files, window_files = None, None
-        if self.r0_pedestal_monitor is not None:  # observed data
+        if self.raw_data:  # observed data
             tel_ids = [tel_id for tel_id, n in n_triggered.items() if n > 0]
             calibration_files = ",".join(str(self.r0_r1_calibrator.calibration_file_path(t)) for t in tel_ids)
             window_files = ",".join(str(self.r0_r1_calibrator.window_transmittance_file_path(t)) for t in tel_ids)

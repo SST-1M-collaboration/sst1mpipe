@@ -349,7 +349,8 @@ class R0R1Calibrator(TelescopeComponent):
         if pedestal_std is None or correction == "none":
             return 1.0
         if correction == "global":
-            return VAR_to_Idrop(np.median(pedestal_std**2), tel_id)
+            # without the pixels without statistics (outliers of the monitoring)
+            return VAR_to_Idrop(np.nanmedian(pedestal_std**2), tel_id)
         return VAR_to_Idrop(pedestal_std**2, tel_id)
 
     def bad_pixel_mask(self, tel_id, pedestal_std):
@@ -360,7 +361,8 @@ class R0R1Calibrator(TelescopeComponent):
         if self.flag_bad_calibration_pixels.tel[tel_id]:
             mask_bad |= mask_bad_calibration
         if self.flag_dead_pixels.tel[tel_id] and pedestal_std is not None:
-            mask_bad |= pedestal_std[0, :] < self.dead_pixel_std_threshold.tel[tel_id]
+            # the pixels without statistics (NaN, outliers of the monitoring) are dead pixels
+            mask_bad |= ~(pedestal_std[0, :] >= self.dead_pixel_std_threshold.tel[tel_id])
         mask_bad[self.static_bad_pixels(tel_id)] = True
         return mask_bad
 

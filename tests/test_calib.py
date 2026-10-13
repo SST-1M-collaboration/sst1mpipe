@@ -158,6 +158,20 @@ def test_bad_pixels(event, flag_bad_calibration, flag_dead, threshold, expected_
     assert np.all(event.r1.tel[TEL_ID].waveform[:, ~flagged].any(axis=-1))
 
 
+def test_pixels_without_statistics(event):
+    """the pixels without statistics (NaN: outliers of the monitoring) are dead pixels,
+    and are not used for the global voltage drop correction"""
+    pedestal_std = np.full((1, 1296), 4.0)
+    pedestal_std[0, :10] = np.nan
+    calibrator_r0_r1 = calibrator(voltage_drop_correction="global")
+    calibrator_r0_r1(with_pedestal_std(event, pedestal_std), TEL_ID)
+
+    flagged = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
+    assert np.all(flagged[:10])
+    assert calibrator_r0_r1.voltage_drop(TEL_ID, pedestal_std) == calibrator_r0_r1.voltage_drop(TEL_ID, np.full((1, 1296), 4.0))
+    assert np.all(np.isfinite(event.r1.tel[TEL_ID].waveform))
+
+
 def test_calibration_file_per_telescope():
 
     default = calibrator()
