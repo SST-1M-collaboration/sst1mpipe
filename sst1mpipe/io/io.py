@@ -953,8 +953,9 @@ def load_photon_list_sst1m(input_file, tel=None, config=None, table='astropy', e
 # statistics of the pedestal events, in chunks of events (one table per telescope, tel_XXX):
 # calibrated images (ctapipe pixel statistics, read by the ctapipe HDF5MonitoringSource)
 # and ADC samples (same structure, at the R0 level)
+R0_PIXEL_STATISTICS_GROUP = "/r0/monitoring/telescope/calibration/camera/pixel_statistics"
 DL1_PEDESTAL_GROUP = DL1_SKY_PEDESTAL_IMAGE_GROUP
-R0_PEDESTAL_GROUP = "/r0/monitoring/telescope/calibration/camera/pixel_statistics/sky_pedestal_waveform"
+R0_PEDESTAL_GROUP = f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform"
 
 
 def chunk_statistics_table(containers):

@@ -20,6 +20,7 @@ __all__ = [
     "DATA_CONFIG_FILE",
     "MC_CONFIG_FILES",
     "RTA_CONFIG_FILE",
+    "MONITORING_CONFIG_FILE",
     "PDE_CORRECTION_FACTORS_FILE",
     "SUBARRAY_FILE",
     "PIXEL_MAPPING_FILE",
@@ -38,6 +39,7 @@ TEST_DATA_DIR = RESOURCES_DIR / "test_data"
 DATA_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_data_config.json"
 MC_CONFIG_FILES = {nsb: CONFIG_DIR / f"sst1mpipe_mc_config_{nsb}_nsb.json" for nsb in ("low", "high")}
 RTA_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_rta_config.json"
+MONITORING_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_monitoring_config.json"
 
 PDE_CORRECTION_FACTORS_FILE = CALIBRATION_DIR / "mc_pde_correction_factors.json"
 
