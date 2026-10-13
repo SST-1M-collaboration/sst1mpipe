@@ -38,7 +38,7 @@ class PedestalWaveformAggregator(StatisticsAggregator):
       correction and the dead pixels)
     """
 
-    def compute_stats(self, data, masked_elements_of_sample) -> ChunkStatisticsContainer:
+    def _compute_stats(self, data, masked_elements_of_sample) -> ChunkStatisticsContainer:
         mask = None
         if masked_elements_of_sample is not None:
             mask = np.broadcast_to(masked_elements_of_sample, np.shape(data))

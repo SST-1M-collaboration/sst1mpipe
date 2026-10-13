@@ -167,7 +167,7 @@ def test_pedestal_waveform_aggregator():
     rng = np.random.default_rng(0)
     data = rng.normal(size=(10, 2, 1, 4))
     data[3, :, 0, 1] = np.nan
-    stats = PedestalWaveformAggregator().compute_stats(data, None)
+    stats = PedestalWaveformAggregator()._compute_stats(data, None)
     valid = np.isfinite(data[:, 0, 0, 1])
     np.testing.assert_allclose(stats.mean[0, 0], data[:, 0, 0, 0].mean())
     np.testing.assert_allclose(stats.median[0, 1], np.median(data[valid, 0, 0, 1]))
@@ -176,6 +176,6 @@ def test_pedestal_waveform_aggregator():
 
     masked = np.zeros((2, 1, 4), dtype=bool)
     masked[:, 0, 3] = True
-    stats = PedestalWaveformAggregator().compute_stats(data, masked)
+    stats = PedestalWaveformAggregator()._compute_stats(data, masked)
     assert np.isnan(stats.mean[0, 3]) and stats.n_events[0, 3] == 0
 

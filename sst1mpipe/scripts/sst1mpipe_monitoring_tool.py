@@ -194,9 +194,9 @@ class MonitoringTool(Tool):
         with HDF5TableWriter(self.output_path, mode="w", add_prefix=True, parent=self) as writer:
             subarray.to_hdf(writer.h5file)
             for scheduling_block in source.scheduling_blocks.values():
-                writer.write("configuration/observation/scheduling_block", scheduling_block, time_format="mjd")
+                writer.write("configuration/observation/scheduling_block", scheduling_block)
             for observation_block in source.observation_blocks.values():
-                writer.write("configuration/observation/observation_block", observation_block, time_format="mjd")
+                writer.write("configuration/observation/observation_block", observation_block)
             write_reference_metadata_headers(
                 obs_ids=source.obs_ids,
                 subarray=subarray,
