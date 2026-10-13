@@ -20,7 +20,7 @@ Products of automatic processing (all data levels up to DL3) can be found in:
 
 Those are sorted by date, source observed, and the telescope used (``cs1``, ``cs2`` and ``stereo`` for coincident events).
 All data level directories also contain configuration file and log file for each processed run, so 
-user can easily check if the processing went OK and which version of ``sst1mpipe``wasused. Random Forest models used in authomatic analysis 
+user can easily check if the processing went OK and which version of ``sst1mpipe`` was used. Random Forest models used in authomatic analysis 
 can be found in
 
 ``/data/work/analysis/MC/prod_january_2023/``
@@ -89,6 +89,11 @@ Default config file for data:
 
 R0 to DL1
 ~~~~~~~~~
+
+.. note::
+
+   The raw data can also be processed with the ctapipe tools ``sst1mpipe-monitoring`` and
+   ``sst1mpipe-process``, see :ref:`data_processing`.
 
 To calibrate raw data (R0) or MC (R1) and process them to DL1, one may run ``sst1mpipe_r0_dl1`` script. Inputs are a single raw 
 ``.fits.fz`` data file (containing single telescope data) or ``.simtel.gz`` output file of sim_telarray (may contain mono and coincident events 

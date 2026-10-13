@@ -67,11 +67,20 @@ class ProcessorTool(Tool):
 
     name = 'sst1mpipe-process'
     description = __doc__
-    examples = ("sst1mpipe-process -i mysim.simtel.gz -o events.dl1.h5",
-                "sst1mpipe-process -i run.fits.fz -o events.dl1.h5 --monitoring-source SST1MMonitoringSource"
-                " --SST1MMonitoringSource.input_files=run.monitoring.h5",
-                "sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 "
-                "--config sst1mpipe/resources/config/sst1mpipe_rta_config.json --log-level INFO")
+    examples = """
+    Simulations:
+
+    > sst1mpipe-process -i mysim.simtel.gz -o events.dl1.h5 --config sst1mpipe_mc_config_low_nsb.json
+
+    Raw data of a run with its monitoring file (sst1mpipe-monitoring):
+
+    > sst1mpipe-process -i run.fits.fz -o run.dl1.h5 --config sst1mpipe_data_config.json
+      --monitoring-source SST1MMonitoringSource --SST1MMonitoringSource.input_files=run.monitoring.h5
+
+    ZMQ stream:
+
+    > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json
+    """
 
     progress_bar = Bool(
         help="show progress bar during processing", default_value=False
@@ -140,10 +149,15 @@ class ProcessorTool(Tool):
             "don't show a progress bar during event processing",)
     }
 
-    classes = [
-        DBSCANImageCleaner, TimeDBSCANImageCleaner, R0R1Calibrator, R0PedestalMonitor, DL1PedestalMonitor,
-        ImageSaturationCorrector, ShowerProcessor, SST1MMonitoringSource,
-    ] + classes_with_traits(MonitoringSource)
+    classes = (
+        [
+            CameraCalibrator, ImageProcessor, DataWriter, DBSCANImageCleaner, TimeDBSCANImageCleaner,
+            R0R1Calibrator, R0PedestalMonitor, DL1PedestalMonitor, ImageSaturationCorrector, ShowerProcessor,
+            SST1MMonitoringSource,
+        ]
+        + classes_with_traits(EventSource)
+        + classes_with_traits(MonitoringSource)
+    )
 
     def setup(self):
 
