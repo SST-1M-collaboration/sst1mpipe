@@ -494,9 +494,9 @@ def test_process_camera_event_stream(tmp_path):
         sender.join(timeout=10)
         producer.close(linger=0)
         context.term()
-    # the R0 -> R1 calibration and the pedestal monitoring of the SST-1M raw data are used
+    # the R0 -> R1 calibration of the SST-1M raw data is used, the pedestal events are not processed
     assert tool.r0_r1_calibrator is not None
-    assert tool.r0_pedestal_monitor.n_buffered(ZFITS_TEL_ID) > 0
+    assert tool.n_pedestal == 46
 
     file_output = tmp_path / "file.dl1.h5"
     run_tool(ProcessorTool(), argv=[

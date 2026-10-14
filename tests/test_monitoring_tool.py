@@ -3,6 +3,7 @@ import astropy.units as u
 import numpy as np
 import pytest
 import tables
+from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
 from ctapipe.containers import ArrayEventContainer, SchedulingBlockType
 from ctapipe.core import run_tool
@@ -103,13 +104,17 @@ def test_pointing_table(observation_monitoring):
     """pointing of the telescope from its first to its last event"""
     table = read_table(observation_monitoring, f"{DL0_TEL_POINTING_GROUP}/tel_{TEL_ID:03d}")
     with SST1MEventSource(OBSERVATION_FILE) as source:
-        events = [(event.trigger.time, event.monitoring.tel[TEL_ID].pointing) for event in source]
+        times = Time([event.trigger.time for event in source])
+        pointing, subarray = source.pointing, source.subarray
 
-    assert table["time"][0] == events[0][0] and table["time"][-1] == events[-1][0]
+    assert table["time"][0] == times[0] and table["time"][-1] == times[-1]
     assert np.all(np.diff(table["time"].mjd) > 0)
-    # same pointing as the event source at the time of the first event
-    assert u.isclose(table["altitude"].quantity[0], events[0][1].altitude, atol=1e-6 * u.deg)
-    assert u.isclose(table["azimuth"].quantity[0], events[0][1].azimuth, atol=1e-6 * u.deg)
+    # alt/az of the RA/Dec of the run at the location of the telescope
+    location = subarray.tel_coords.to_earth_location()[subarray.tel_index_array[TEL_ID]]
+    expected = pointing.transform_to(AltAz(obstime=table["time"], location=location))
+    filled = SkyCoord(az=table["azimuth"].quantity, alt=table["altitude"].quantity, frame=expected)
+    assert np.all(filled.separation(expected) < 1e-6 * u.arcsec)
+    assert np.all((74 * u.deg < expected.alt) & (expected.alt < 75 * u.deg))
 
 
 def test_read_by_ctapipe_monitoring_source(observation_monitoring):

@@ -7,7 +7,7 @@ from itertools import islice
 
 import numpy as np
 from astropy import units as u
-from astropy.coordinates import AltAz, SkyCoord
+from astropy.coordinates import SkyCoord
 import astropy.io.ascii as aio
 from astropy.io import fits
 from astropy.time import Time
@@ -20,7 +20,7 @@ from ctapipe.containers import (
     SchedulingBlockType,
 )
 from ctapipe.core import Provenance
-from ctapipe.core.traits import Bool, Dict, Float, List, UseEnum
+from ctapipe.core.traits import Dict, Float, List, UseEnum
 from ctapipe.instrument import FocalLengthKind
 from ctapipe.io import (
     EventSource,
@@ -404,13 +404,6 @@ class SST1MEventSource(EventSource):
         )
     ).tag(config = True)
 
-    pointing_information = Bool(
-        default_value = True,
-        help = (
-            'Fill pointing information.'
-        ),
-    ).tag(config = True)
-
     pointing_ra = Float(
         default_value=None,
         allow_none=True,
@@ -421,14 +414,6 @@ class SST1MEventSource(EventSource):
         default_value=None,
         allow_none=True,
         help="Pointing declination in deg. Overrides the TARGET field of the file.",
-    ).tag(config=True)
-
-    pointing_update_interval = Float(
-        default_value=1.0,
-        help=(
-            "The altitude and azimuth of the pointing are recomputed when the time of the"
-            " event differs by more than this value (in s) from the last computation."
-        ),
     ).tag(config=True)
 
     focal_length_choice = UseEnum(
@@ -489,10 +474,9 @@ class SST1MEventSource(EventSource):
         elif file_pointing is None:
             self.log.warning(
                 "No pointing in the TARGET field (%r) of %s: the altitude and azimuth of the"
-                " telescope pointing are not reconstructed", header.get('TARGET'), self.input_url,
+                " telescope pointing are not reconstructed (no pointing in the monitoring data)",
+                header.get('TARGET'), self.input_url,
             )
-        self._tel_locations = {}
-        self._altaz_cache = {}
 
         self._scheduling_blocks, self._observation_blocks = self._make_blocks(header)
 
@@ -573,12 +557,6 @@ class SST1MEventSource(EventSource):
         """True if the pointing is given by the user and not read from the file"""
         return self._pointing_manual
 
-    def _tel_location(self, tel_id):
-        if tel_id not in self._tel_locations:
-            locations = self.subarray.tel_coords.to_earth_location()
-            self._tel_locations[tel_id] = locations[self.subarray.tel_index_array[tel_id]]
-        return self._tel_locations[tel_id]
-
     def swapped_pixels(self, tel_id, time):
         """
         Pixel ids of the wrongly connected modules (pairs) of the telescope ``tel_id``
@@ -593,27 +571,16 @@ class SST1MEventSource(EventSource):
         """
         return pixel_order(self._pixel_swaps, tel_id, pixel_ids, time)
 
-    def _fill_pointing(self, array_event, tel_id, time):
-        pointing_icrs = self._pointing
-        if not self.pointing_information or pointing_icrs is None:
+    def _fill_array_pointing(self, array_event):
+        """
+        Right ascension and declination of the pointing of the run. The altitude and azimuth of the
+        pointing of the telescope are given by the monitoring data (pointing table of
+        sst1mpipe-monitoring, read by the SST1MMonitoringSource)
+        """
+        if self._pointing is None:
             return
-
-        # the alt/az transformation is slow, it is only recomputed when the time changed enough
-        cached = self._altaz_cache.get(tel_id)
-        if cached is None or abs((time - cached[0]).to_value(u.s)) > self.pointing_update_interval:
-            horizon_frame = AltAz(obstime=time, location=self._tel_location(tel_id))
-            altaz = pointing_icrs.transform_to(horizon_frame)
-            cached = (time, altaz.az.to(u.rad), altaz.alt.to(u.rad))
-            self._altaz_cache[tel_id] = cached
-        _, azimuth, altitude = cached
-
-        array_event.monitoring.tel[tel_id].pointing.azimuth = azimuth
-        array_event.monitoring.tel[tel_id].pointing.altitude = altitude
-        pointing = array_event.monitoring.pointing
-        pointing.array_azimuth = azimuth
-        pointing.array_altitude = altitude
-        pointing.array_ra = pointing_icrs.ra.to(u.rad)
-        pointing.array_dec = pointing_icrs.dec.to(u.rad)
+        array_event.monitoring.pointing.array_ra = self._pointing.ra.to(u.rad)
+        array_event.monitoring.pointing.array_dec = self._pointing.dec.to(u.rad)
 
     @property
     def is_simulation(self):
@@ -652,24 +619,24 @@ class SST1MEventSource(EventSource):
         the trigger and the pointing are filled.
         """
         self.log.info("Reading %s", input_path)
-        array_event = SST1MArrayEventContainer()
         with File(input_path) as f:
-            array_event.r0.meta = dict(is_simulation=False)
             for event_counter, event in enumerate(f.Events):
+                # a new container for each event: its monitoring data are filled by the monitoring sources
+                array_event = SST1MArrayEventContainer()
+                array_event.r0.meta = dict(is_simulation=False)
                 if self._swat_event_ids_available:
                     array_event.index.event_id = event.arrayEvtNum
                 else:
                     array_event.index.event_id = event.eventNumber
 
-                array_event.r0.tel.clear()
                 try:
-                    tel_id = fill_r0_event(array_event, event, self._pixel_order, pedestal_type=self.pedestal_event_type)
+                    fill_r0_event(array_event, event, self._pixel_order, pedestal_type=self.pedestal_event_type)
                 except AttributeError as err:
                     raise AttributeError(
                         f"Could not read the event {event_counter} (eventNumber {event.eventNumber})"
                         f" of the file {input_path}"
                     ) from err
-                self._fill_pointing(array_event, tel_id, array_event.trigger.time)
+                self._fill_array_pointing(array_event)
                 yield array_event
 
     @staticmethod

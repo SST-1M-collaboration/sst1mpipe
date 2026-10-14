@@ -38,7 +38,6 @@
       "voltage_drop_correction": "global",
       "flag_bad_calibration_pixels": true,
       "flag_dead_pixels": true,
-      "dead_pixel_std_threshold": 2.5,
       "saturation_threshold": 3000,
       "saturation_width_level": 2500,
       "saturation_width_threshold": 5,
@@ -120,7 +119,8 @@
     },
 
     "R0PedestalMonitor": {
-        "n_events": 100
+        "n_events": 100,
+        "dead_pixel_std_threshold": 2.5
     },
 
     "DL1PedestalMonitor": {

@@ -12,7 +12,6 @@
   },
 
   "SST1MEventSource": {
-    "pointing_information": false,
     "pointing_ra": null,
     "pointing_dec": null,
     "focal_length_choice": "EQUIVALENT",
@@ -29,7 +28,6 @@
     "pde_drop_factor": [["type", "*", null]],
     "flag_bad_calibration_pixels": [["type", "*", true]],
     "flag_dead_pixels": [["type", "*", false]],
-    "dead_pixel_std_threshold": [["type", "*", 2.5]],
     "bad_pixels": [["type", "*", []], ["id", 21, []], ["id", 22, []]],
     "saturation_threshold": [["type", "*", 3000]],
     "saturation_width_level": [["type", "*", 2500]],

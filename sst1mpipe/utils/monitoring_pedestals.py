@@ -1,3 +1,8 @@
+"""
+Statistics of the pedestal events in sliding windows of the last pedestal events, computed during
+the processing. Used by sst1mpipe_r0_dl1 only: the ctapipe tools (sst1mpipe-process) use the
+monitoring data of sst1mpipe-monitoring (statistics in chunks of pedestal events).
+"""
 import logging
 from abc import abstractmethod
 from collections import deque
@@ -6,7 +11,7 @@ from copy import deepcopy
 import numpy as np
 from ctapipe.calib import CameraCalibrator
 from ctapipe.core import TelescopeComponent
-from ctapipe.core.traits import IntTelescopeParameter
+from ctapipe.core.traits import FloatTelescopeParameter, IntTelescopeParameter
 from ctapipe.image import ImageProcessor
 
 from sst1mpipe.calib import (
@@ -118,8 +123,23 @@ class R0PedestalMonitor(SlidingWindowMonitor):
     """
     Statistics of the ADC samples of the pedestal events, filled in
     ``event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform``.
-    Used for the voltage drop correction and the identification of dead pixels.
+    Used for the voltage drop correction and the identification of dead pixels: the pixels
+    with a std of the samples below ``dead_pixel_std_threshold`` have no statistics (NaN),
+    they are the dead pixels of the R0R1Calibrator.
     """
+
+    dead_pixel_std_threshold = FloatTelescopeParameter(
+        default_value=2.5,
+        help="Std of the ADC samples of the pedestal events (in ADC) below which a pixel is dead",
+    ).tag(config=True)
+
+    def fill_monitoring(self, event, tel_id):
+        super().fill_monitoring(event, tel_id)
+        container = self._container(event, tel_id)
+        if container.std is not None:
+            dead = container.std < self.dead_pixel_std_threshold.tel[tel_id]
+            container.std = np.where(dead, np.nan, container.std)
+            container.outlier_mask = dead
 
     def add_event(self, event, tel_id, cleaning_mask=None):
         """

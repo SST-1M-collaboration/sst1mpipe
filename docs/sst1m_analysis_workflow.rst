@@ -118,7 +118,7 @@ See ``--help`` for possible inputs. Some of them, which might not be obvious:
   * ``calibration_file`` - calibration files based on analysis of dark runs (``null``: default file of the telescope). Should be taken relatively close to the date of observation
   * ``window_transmittance_file`` - camera window transmittance correction factors of the pixels, measured in the lab (``null``: default file of the telescope, can be kept)
   * ``voltage_drop_correction`` - ``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB
-  * ``flag_bad_calibration_pixels``, ``flag_dead_pixels`` and ``dead_pixel_std_threshold`` - pixels set to 0 and interpolated
+  * ``flag_bad_calibration_pixels`` and ``flag_dead_pixels`` - pixels set to 0 and interpolated. The dead pixels are the pixels with a std of the ADC samples of the pedestal events below ``R0PedestalMonitor.dead_pixel_std_threshold``
   * ``bad_pixels`` - ids of pixels always set to 0 and interpolated (data and MC)
   * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the R1 waveforms are divided by this factor, which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.json`` and ``sst1mpipe_mc_config_high_nsb.json`` have the factors of the low and high NSB simulations
 

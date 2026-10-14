@@ -6,8 +6,9 @@ import astropy.units as u
 import numpy as np
 import pytest
 import tables
+from astropy.coordinates import AltAz
 from ctapipe.core import run_tool
-from ctapipe.io import MonitoringSource, read_table
+from ctapipe.io import HDF5EventSource, MonitoringSource, read_table
 from ctapipe.io.hdf5dataformat import DL1_PIXEL_STATISTICS_GROUP
 from ctapipe.io.monitoringtypes import MonitoringType
 
@@ -55,6 +56,11 @@ def monitoring(tmp_path_factory):
     return monitoring_file(path, "--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size=5")
 
 
+def pointing_altaz(source, time):
+    """alt/az of the pointing of the run (RA/Dec of the event source) at the site of the array"""
+    return source.pointing.transform_to(AltAz(obstime=time, location=source.subarray.reference_location))
+
+
 def test_monitoring_source_plugin(monitoring):
     with SST1MEventSource(INPUT_FILE) as source:
         monitoring_source = MonitoringSource.from_name(
@@ -72,8 +78,9 @@ def test_fill_monitoring_container(monitoring):
     with SST1MEventSource(INPUT_FILE) as source:
         monitoring_source = SST1MMonitoringSource(subarray=source.subarray, input_files=[monitoring])
         for event in source:
-            source_pointing = event.monitoring.tel[TEL_ID].pointing
-            source_altitude, source_azimuth = source_pointing.altitude, source_pointing.azimuth
+            # the event source gives the RA/Dec of the pointing only
+            assert np.isnan(event.monitoring.tel[TEL_ID].pointing.altitude)
+            altaz = pointing_altaz(source, event.trigger.time)
             monitoring_source.fill_monitoring_container(event)
             monitoring = event.monitoring.tel[TEL_ID]
             statistics = monitoring.camera.pixel_statistics
@@ -87,8 +94,8 @@ def test_fill_monitoring_container(monitoring):
             # statistics of the images, channel 0
             assert statistics.pedestal_image.std.shape == (1296, )
             # pointing interpolated from the pointing table
-            assert u.isclose(monitoring.pointing.altitude, source_altitude, atol=0.01 * u.deg)
-            assert u.isclose(monitoring.pointing.azimuth, source_azimuth, atol=0.01 * u.deg)
+            assert u.isclose(monitoring.pointing.altitude, altaz.alt, atol=0.01 * u.deg)
+            assert u.isclose(monitoring.pointing.azimuth, altaz.az, atol=0.01 * u.deg)
 
 
 def test_no_statistics_out_of_the_chunks(monitoring):
@@ -108,14 +115,13 @@ def test_no_statistics_out_of_the_chunks(monitoring):
 
 
 def test_process_with_monitoring_source(monitoring, tmp_path):
-    """the same events and images as with the pedestal monitors of the processing"""
+    """the monitoring data are used for the calibration and attached to the DL1 file"""
     output = tmp_path / "events.dl1.h5"
     tool = process(
         INPUT_FILE, output,
         "--monitoring-source=SST1MMonitoringSource",
         f"--SST1MMonitoringSource.input_files={monitoring}",
     )
-    assert tool.r0_pedestal_monitor is None and tool.dl1_pedestal_monitor is None
     assert tool.n_events_without_monitoring == 0
 
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{TEL_ID:03d}")
@@ -133,8 +139,19 @@ def test_process_with_monitoring_source(monitoring, tmp_path):
         assert len(monitoring_tables) == 3
         for path in monitoring_tables:
             np.testing.assert_array_equal(dl1.get_node(path).read(), source.get_node(path).read())
+    # the pointing of the events is interpolated by ctapipe (HDF5EventSource) and by load_dl1_sst1m
+    with SST1MEventSource(INPUT_FILE) as source:
+        times = {e.index.event_id: e.trigger.time for e in source}
+        altaz = {event_id: pointing_altaz(source, time) for event_id, time in times.items()}
+    with HDF5EventSource(output) as source:
+        interpolated = {e.index.event_id: e.monitoring.tel[TEL_ID].pointing for e in source}
+    assert len(interpolated) == N_EVENTS - N_PEDESTALS
+    for event_id, pointing in interpolated.items():
+        assert u.isclose(pointing.altitude, altaz[event_id].alt, atol=0.01 * u.deg)
+        assert u.isclose(pointing.azimuth, altaz[event_id].az, atol=0.01 * u.deg)
     data = load_dl1_sst1m(str(output), tel=f"tel_{TEL_ID:03d}")
-    assert np.all((70 < data["true_alt_tel"]) & (data["true_alt_tel"] < 80))
+    np.testing.assert_allclose(data["true_alt_tel"], [interpolated[e].altitude.to_value(u.deg) for e in data["event_id"]])
+    np.testing.assert_allclose(data["true_az_tel"], [interpolated[e].azimuth.to_value(u.deg) for e in data["event_id"]])
 
 
 def test_process_without_attached_monitoring(monitoring, tmp_path):

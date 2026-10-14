@@ -53,7 +53,7 @@ The raw data file is read once, and the monitoring file contains:
 
 * **pointing** of the telescope, ``/dl0/monitoring/telescope/pointing/tel_XXX``: altitude and azimuth
   of the target of the run (TARGET field of the file, or ``--SST1MEventSource.pointing_ra`` and
-  ``--SST1MEventSource.pointing_dec``) every ``pointing_update_interval`` (1 s) from the first to the
+  ``--SST1MEventSource.pointing_dec``) every ``--MonitoringTool.pointing_update_interval`` (1 s) from the first to the
   last event of the run. The runs without pointing (e.g. dark runs) have no pointing table.
 * **statistics of the ADC samples of the pedestal events**,
   ``/r0/monitoring/telescope/calibration/camera/pixel_statistics/<event type>_waveform/tel_XXX``,
@@ -160,12 +160,12 @@ Other settings of the processing:
 * ``--DataWriter.write_dl1_images``, ``--DataWriter.write_r1_waveforms``: images and waveforms written
 * ``--progress``: progress bar
 
-**Without monitoring source**, the statistics of the pedestal events are computed during the processing,
-in sliding windows of the last pedestal events (``R0PedestalMonitor.n_events``,
-``DL1PedestalMonitor.n_events``), and written in the output file every
-``ProcessorTool.pedestal_monitoring_interval`` pedestal events, with the pointing of the events. This is
-used for the ZMQ streams of the real-time analysis (``sst1mpipe_rta_config.json``), without monitoring
-file.
+**Without monitoring source**, the raw data are calibrated without the statistics of the pedestal
+events: no voltage drop correction, no dead pixels (only the ``bad_pixels`` and the pixels with bad
+calibration parameters), and the picture thresholds of the ``NSBImageCleaner`` are not raised. The
+output file has no pointing (the event source gives the RA/Dec of the run only), so it cannot be
+reconstructed in DL2 by ``sst1mpipe_dl1_dl2``. This is used for the ZMQ streams of the real-time analysis
+(``sst1mpipe_rta_config.json``); a monitoring file can be given to the stream as well.
 
 **Simulations** (``.simtel.gz`` files) are processed without monitoring source, with the MC
 configuration files (``sst1mpipe_mc_config_low_nsb.json``, ``sst1mpipe_mc_config_high_nsb.json``):

@@ -192,6 +192,23 @@ def test_r0_pedestal_monitor():
     assert pixel_statistics(event).pedestal_image.std is None
 
 
+@pytest.mark.parametrize("threshold, expected_dead", [(2.5, True), (0.5, False)])
+def test_r0_pedestal_monitor_dead_pixels(threshold, expected_dead):
+    """the pixels with a std of the samples below dead_pixel_std_threshold have no statistics (NaN)"""
+    rng = np.random.default_rng(6)
+    monitor = R0PedestalMonitor(subarray=SUBARRAY, dead_pixel_std_threshold=threshold)
+    dead_pixel = 100
+    event = make_event(rng, time_s=0)
+    event.r0.tel[TEL_ID].waveform[dead_pixel] = rng.normal(300, 1, N_SAMPLES)
+    monitor(event, TEL_ID)
+
+    container = pixel_statistics(event).pedestal_waveform
+    assert np.isnan(container.std[dead_pixel]) == expected_dead
+    assert container.outlier_mask[dead_pixel] == expected_dead
+    assert np.all(np.isfinite(np.delete(container.std, dead_pixel)))
+    assert not np.delete(container.outlier_mask, dead_pixel).any()
+
+
 def test_r0_pedestal_monitor_ignores_masked_pixels():
     rng = np.random.default_rng(4)
     monitor = R0PedestalMonitor(subarray=SUBARRAY)

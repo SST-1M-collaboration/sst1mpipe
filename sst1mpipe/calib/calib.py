@@ -168,11 +168,12 @@ class R0R1Calibrator(TelescopeComponent):
     3. voltage drop correction (``voltage_drop_correction``), from the std of the ADC
        samples of the pedestal events in
        ``event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform``
-       (see `sst1mpipe.utils.monitoring_pedestals.R0PedestalMonitor`)
+       (monitoring data of sst1mpipe-monitoring, see `sst1mpipe.io.monitoring_source.SST1MMonitoringSource`)
     4. window transmittance correction: division by the correction factor of each pixel
        of ``window_transmittance_file``
     5. bad pixels: pixels with bad calibration parameters (``flag_bad_calibration_pixels``),
-       dead pixels (``flag_dead_pixels``) and the ``bad_pixels`` are set to 0 in the R1 waveforms and
+       dead pixels (``flag_dead_pixels``: the pixels without statistics of the ADC samples, i.e.
+       the outliers of the monitoring) and the ``bad_pixels`` are set to 0 in the R1 waveforms and
        flagged in ``event.monitoring.tel[tel_id].camera.coefficients.outlier_mask``, so that
        their charge is interpolated by the ``invalid_pixel_handler`` of
        `~ctapipe.calib.CameraCalibrator`.
@@ -241,12 +242,10 @@ class R0R1Calibrator(TelescopeComponent):
 
     flag_dead_pixels = BoolTelescopeParameter(
         default_value=True,
-        help="Set to 0 and flag the pixels whose pedestal std is below dead_pixel_std_threshold",
-    ).tag(config=True)
-
-    dead_pixel_std_threshold = FloatTelescopeParameter(
-        default_value=2.5,
-        help="Std of the ADC samples of the pedestal events (in ADC) below which a pixel is dead",
+        help=(
+            "Set to 0 and flag the dead pixels: the pixels without statistics of the ADC samples of"
+            " the pedestal events (NaN), i.e. the outliers of the monitoring"
+        ),
     ).tag(config=True)
 
     saturation_threshold = FloatTelescopeParameter(
@@ -336,10 +335,9 @@ class R0R1Calibrator(TelescopeComponent):
             self._calibration[tel_id] = (dc_to_pe, mask_bad)
             self.log.info(
                 "Telescope %d: calibration file %s, voltage drop correction: %s,"
-                " flag bad calibration pixels: %s, flag dead pixels: %s (pedestal std < %.2f ADC)",
+                " flag bad calibration pixels: %s, flag dead pixels: %s",
                 tel_id, path, self.voltage_drop_correction.tel[tel_id],
                 self.flag_bad_calibration_pixels.tel[tel_id], self.flag_dead_pixels.tel[tel_id],
-                self.dead_pixel_std_threshold.tel[tel_id],
             )
         return self._calibration[tel_id]
 
@@ -362,7 +360,7 @@ class R0R1Calibrator(TelescopeComponent):
             mask_bad |= mask_bad_calibration
         if self.flag_dead_pixels.tel[tel_id] and pedestal_std is not None:
             # the pixels without statistics (NaN, outliers of the monitoring) are dead pixels
-            mask_bad |= ~(pedestal_std[0, :] >= self.dead_pixel_std_threshold.tel[tel_id])
+            mask_bad |= np.isnan(pedestal_std[0, :])
         mask_bad[self.static_bad_pixels(tel_id)] = True
         return mask_bad
 

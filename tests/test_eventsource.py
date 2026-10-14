@@ -11,7 +11,7 @@ from ctapipe.io import EventSource, HDF5TableWriter, read_table
 
 import astropy.units as u
 import numpy as np
-from astropy.coordinates import AltAz, SkyCoord
+from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from ctapipe.containers import CoordinateFrameType, EventType, ObservingMode, PointingMode, SchedulingBlockType
 
@@ -170,14 +170,10 @@ def test_pedestal_event_type(target, event_type):
     assert pedestal_event_type(target) == event_type
 
 
-@pytest.mark.parametrize("pointing_update_interval, tolerance", [(0, 1e-6 * u.arcsec), (3600, 1 * u.arcmin)])
-def test_pointing_given_by_user(pointing_update_interval, tolerance):
+def test_pointing_given_by_user():
 
     ra, dec = 83.633, 22.0145
-    source = SST1MEventSource(
-        input_url=DARK_FILE, max_events=MAX_ITERATIONS,
-        pointing_ra=ra, pointing_dec=dec, pointing_update_interval=pointing_update_interval,
-    )
+    source = SST1MEventSource(input_url=DARK_FILE, max_events=MAX_ITERATIONS, pointing_ra=ra, pointing_dec=dec)
 
     assert source.pointing_manual
     observation_block = source.observation_blocks[DARK_OBS_ID]
@@ -186,13 +182,9 @@ def test_pointing_given_by_user(pointing_update_interval, tolerance):
     assert observation_block.subarray_pointing_frame == CoordinateFrameType.ICRS
     assert source.scheduling_blocks[DARK_OBS_ID].pointing_mode == PointingMode.TRACK
 
-    location = source.subarray.tel_coords.to_earth_location()[source.subarray.tel_index_array[DARK_TEL_ID]]
-    target = SkyCoord(ra=ra * u.deg, dec=dec * u.deg, frame="icrs")
+    # RA/Dec of the pointing of the events; their alt/az is given by the monitoring (sst1mpipe-monitoring)
     for event in source:
-        expected = target.transform_to(AltAz(obstime=event.trigger.time, location=location))
-        pointing = event.monitoring.tel[DARK_TEL_ID].pointing
-        filled = SkyCoord(az=pointing.azimuth, alt=pointing.altitude, frame=expected)
-        assert filled.separation(expected) < tolerance
+        assert np.isnan(event.monitoring.tel[DARK_TEL_ID].pointing.altitude)
         assert u.isclose(event.monitoring.pointing.array_ra, ra * u.deg)
         assert u.isclose(event.monitoring.pointing.array_dec, dec * u.deg)
 
@@ -555,15 +547,12 @@ def test_observation_run(input_file, tel_id, caplog):
     assert observation_block.subarray_pointing_frame == CoordinateFrameType.ICRS
     assert source.swat_event_ids_available
 
-    # alt/az of the pointing of the telescope, recomputed every second
-    location = source.subarray.tel_coords.to_earth_location()[source.subarray.tel_index_array[tel_id]]
-    target = SkyCoord(ra=166.9948 * u.deg, dec=38.1053 * u.deg, frame="icrs")
+    # RA/Dec of the pointing of the events; their alt/az is given by the monitoring (sst1mpipe-monitoring)
+    assert source.pointing.separation(SkyCoord(ra=166.9948 * u.deg, dec=38.1053 * u.deg)) < 1 * u.arcsec
     n_events = 0
     for event in source:
-        expected = target.transform_to(AltAz(obstime=event.trigger.time, location=location))
-        pointing = event.monitoring.tel[tel_id].pointing
-        filled = SkyCoord(az=pointing.azimuth, alt=pointing.altitude, frame=expected)
-        assert filled.separation(expected) < 1 * u.arcmin
-        assert 74 < pointing.altitude.to_value(u.deg) < 75
+        assert u.isclose(event.monitoring.pointing.array_ra, 166.9948 * u.deg)
+        assert u.isclose(event.monitoring.pointing.array_dec, 38.1053 * u.deg)
+        assert np.isnan(event.monitoring.tel[tel_id].pointing.altitude)
         n_events += 1
     assert n_events == 20

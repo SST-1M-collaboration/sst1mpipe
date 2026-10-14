@@ -130,30 +130,27 @@ def test_no_voltage_drop_correction_without_pedestals(event):
     assert calibrator_r0_r1.voltage_drop(TEL_ID, None) == 1.0
 
 
-@pytest.mark.parametrize("flag_bad_calibration, flag_dead, threshold, expected_dead", [
-    (False, False, 2.5, False),
-    (True, False, 2.5, False),
-    (False, True, 2.5, True),
-    (True, True, 2.5, True),
-    (True, True, 0.5, False),
-])
-def test_bad_pixels(event, flag_bad_calibration, flag_dead, threshold, expected_dead):
+@pytest.mark.parametrize("flag_bad_calibration", [False, True])
+@pytest.mark.parametrize("flag_dead", [False, True])
+def test_bad_pixels(event, flag_bad_calibration, flag_dead):
 
-    dead_pixel = 100
+    # dead pixel: outlier of the monitoring, without statistics (NaN); a pixel with a low std is not dead
+    dead_pixel, low_std_pixel = 100, 101
     pedestal_std = np.full((1, 1296), 4.0)
-    pedestal_std[0, dead_pixel] = 1.0
+    pedestal_std[0, dead_pixel] = np.nan
+    pedestal_std[0, low_std_pixel] = 1.0
     calibrator_r0_r1 = calibrator(
         flag_bad_calibration_pixels=flag_bad_calibration,
         flag_dead_pixels=flag_dead,
-        dead_pixel_std_threshold=threshold,
     )
     calibrator_r0_r1(with_pedestal_std(event, pedestal_std), TEL_ID)
 
     _, mask_bad_calibration = calibrator_r0_r1.calibration_parameters(TEL_ID)
     flagged = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
-    assert mask_bad_calibration.any() and not mask_bad_calibration[dead_pixel]
+    assert mask_bad_calibration.any() and not mask_bad_calibration[[dead_pixel, low_std_pixel]].any()
     assert np.all(flagged[mask_bad_calibration] == flag_bad_calibration)
-    assert flagged[dead_pixel] == expected_dead
+    assert flagged[dead_pixel] == flag_dead
+    assert not flagged[low_std_pixel]
     assert np.all(event.r1.tel[TEL_ID].waveform[:, flagged] == 0)
     assert np.all(event.r1.tel[TEL_ID].waveform[:, ~flagged].any(axis=-1))
 
@@ -255,7 +252,6 @@ def test_default_config_settings():
         assert calibrator_r0_r1.voltage_drop_correction.tel[tel_id] == "global"
         assert calibrator_r0_r1.flag_bad_calibration_pixels.tel[tel_id]
         assert calibrator_r0_r1.flag_dead_pixels.tel[tel_id]
-        assert calibrator_r0_r1.dead_pixel_std_threshold.tel[tel_id] == 2.5
         assert calibrator_r0_r1.calibration_file_path(tel_id).name == DEFAULT_CALIBRATION_FILES[tel_id]
 
 

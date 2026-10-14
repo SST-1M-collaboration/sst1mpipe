@@ -17,15 +17,26 @@ from scipy.optimize import minimize
 
 from sst1mpipe.calib.calib import get_default_window
 from sst1mpipe.io import load_config
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
+from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.utils import get_subarray
-from sst1mpipe.utils.monitoring_pedestals import DL1PedestalMonitor, R0PedestalMonitor, load_first_pedestals
 from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE
 
 DEFAULT_CONFIG_FILE = DATA_CONFIG_FILE
 
 DEFAULT_CONFIG = load_config(DEFAULT_CONFIG_FILE, ismc=False)
+
+
+def monitoring_file_name(filename, monitoring_dir):
+    """
+    Monitoring file of sst1mpipe-monitoring of a raw data file in monitoring_dir,
+    e.g. SST1M2_20240129_0050.monitoring.h5 for SST1M2_20240129_0050.fits.fz
+    """
+    stem = os.path.basename(filename).split(".")[0]
+    return os.path.join(monitoring_dir, f"{stem}.monitoring.h5")
+
+
 def get_res_dict(ismc=False):
     result_dict  = dict({ 'toa'       : [],
                           'x'         : [],
@@ -60,7 +71,8 @@ class muon_finder:
                  max_evt      = 200,
                  gain         = 1.,
                  plot         = False,
-                 ismc         = False):
+                 ismc         = False,
+                 monitoring_file = None):
 
 
 
@@ -68,6 +80,10 @@ class muon_finder:
         # telescope id of the data: 21 or 22 (1 or 2 in the simulations)
         if tel not in (21, 22):
             raise ValueError(f"Telescope {tel} not known, 21 or 22 expected")
+        # statistics of the pedestal events of the run (sst1mpipe-monitoring), for the data
+        if not ismc and monitoring_file is None:
+            raise ValueError("The monitoring file of the run (sst1mpipe-monitoring) is needed for the data")
+        self.monitoring_file = monitoring_file
 
         self.tailcuts_1 = 5
         self.tailcuts_2 = 4
@@ -166,13 +182,10 @@ class muon_finder:
                 max_events  = self.max_evt,
                 )
 
-            r0_pedestal_monitor = R0PedestalMonitor(subarray=get_subarray(), config=DEFAULT_CONFIG)
-            dl1_pedestal_monitor = DL1PedestalMonitor(subarray=get_subarray(), config=DEFAULT_CONFIG)
-            load_first_pedestals(r0_pedestal_monitor, dl1_pedestal_monitor, self.filename, DEFAULT_CONFIG)
-            if r0_pedestal_monitor.n_buffered(self.tel) == 0:
-                print("No pedestal events found in firsts events. Skipping run")
-                return
-            print(f"{r0_pedestal_monitor.n_buffered(self.tel)} pedestals events loaded in buffer")
+            monitoring_source = SST1MMonitoringSource(
+                subarray=data_stream.subarray, input_files=[self.monitoring_file],
+            )
+            print(f"monitoring file {self.monitoring_file} opened")
 
         #####################################
         ### Loop in all events to find muons:
@@ -206,9 +219,7 @@ class muon_finder:
                 # (swapped_modules of the config)
                 r0data = event.r0.tel[tel]
 
-                if r0data._event_type.value==8:
-                    r0_pedestal_monitor(event, tel)
-
+                if event.trigger.event_type in PEDESTAL_EVENT_TYPES:
                     mbs   = r0data.waveform[0].mean(axis=1)
                     bsstd = r0data.waveform[0].std(axis=1)
                     self.mbs.append(mbs[mbs>0].mean())
@@ -218,8 +229,13 @@ class muon_finder:
                         self.bsstd = self.bsstd[-100:]
                     continue
                 ## intergrate signal in a fixed window :
-                r0_pedestal_monitor.fill_monitoring(event, tel)
-                VI = VAR_to_Idrop(event.monitoring.tel[tel].camera.pixel_statistics.pedestal_waveform.std.mean()**2, self.tel)
+                # std of the ADC samples of the pedestal events at the time of the event,
+                # NaN for the dead pixels; the events without monitoring data are skipped
+                monitoring_source.fill_monitoring_container(event)
+                pedestal_std = event.monitoring.tel[tel].camera.pixel_statistics.pedestal_waveform.std
+                if pedestal_std is None:
+                    continue
+                VI = VAR_to_Idrop(np.nanmean(pedestal_std)**2, self.tel)
                 Q_sum_ADC    = (r0data.waveform[0].T[self.w_start:self.w_end] - r0data.pedestal).sum(axis=0)
                 Q_sum_window = Q_sum_ADC /self.gain /VI /self.window_t
 
@@ -444,6 +460,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     if True:
         parser.add_argument('--data_path',    type=str, default = "")
+        parser.add_argument('--monitoring_dir', type=str, default = None,
+                            help="directory of the monitoring files of the runs (sst1mpipe-monitoring),"
+                                 " e.g. SST1M2_20240129_0050.monitoring.h5, for the data")
         parser.add_argument('--plot_dir',     type=str, default = None )
         parser.add_argument('--table_dir',    type=str, default = '/mnt/nfs28_auger3/tavernier/sst1m/muon_ana/muons_table20241126' )
         parser.add_argument('--tel',          type=int, default = 22, choices=[21, 22])
@@ -467,7 +486,10 @@ if __name__ == "__main__":
                               tel          = args.tel,
                               max_evt      = args.max_evt,
                               ismc         = args.ismc,
-                              gain         = gains)
+                              gain         = gains,
+                              monitoring_file = (
+                                  None if args.ismc else monitoring_file_name(filename, args.monitoring_dir)
+                              ))
 
         try:
             finder.get_muons()
