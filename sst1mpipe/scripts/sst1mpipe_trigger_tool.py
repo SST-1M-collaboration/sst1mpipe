@@ -8,7 +8,6 @@ from tqdm import tqdm
 
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator
-from sst1mpipe.utils import add_event_id
 
 
 class TriggerEmulationContainer(Container):
@@ -86,7 +85,7 @@ class TriggerTool(Tool):
             raise ValueError("--compare-camera needs real data (.fits.fz): simulations have no recorded trigger output")
         if self.is_real_data:
             self.event_source = self.enter_context(
-                SST1MEventSource([str(self.input_url)], max_events=self.max_events, parent=self))
+                SST1MEventSource(input_url=self.input_url, max_events=self.max_events, parent=self))
         else:
             self.event_source = self.enter_context(
                 EventSource(self.input_url, max_events=self.max_events, parent=self))
@@ -107,21 +106,25 @@ class TriggerTool(Tool):
         self.counts = Counter()
 
     def start(self):
-        for event_number, event in enumerate(tqdm(
+        for event in tqdm(
             self.event_source,
             desc=self.event_source.__class__.__name__,
             total=self.event_source.max_events,
             disable=not self.progress_bar,
-        )):
-            if self.is_real_data:
-                # obs_id from the file name (SST1M1_<date>_<run>), as sst1mpipe_r0_dl1 does
-                run_name = self.input_url.name.removesuffix(".fits.fz")
-                event = add_event_id(event, filename=run_name, event_number=event_number)
+        ):
             for tel_id in event.r0.tel.keys():
                 self.writer.write(f"tel_{tel_id:03d}", [self.emulate(event, tel_id)])
 
     def emulate(self, event, tel_id):
-        traces = self.patch7.trigger_traces(event, tel_id)
+        if self.is_real_data:
+            # module swaps at the time of the event, undone for the trigger traces
+            swapped_pixels = self.event_source.swapped_pixels(tel_id, event.trigger.time)
+            traces = self.patch7.trigger_traces(event, tel_id, swapped_pixels=swapped_pixels)
+        else:
+            # simulated pedestal per sample, read by eventio from the simtel file
+            monitoring = self.event_source.file_.camera_monitorings[tel_id]
+            pedestal = monitoring["pedestal"] / monitoring["n_ped_slices"]
+            traces = self.patch7.trigger_traces(event, tel_id, pedestal=pedestal)
         patch7_output, patch7_scores = self.patch7.trigger_output(traces, tel_id)
         tdscan_output, tdscan_scores = self.tdscan.trigger_output(traces, tel_id)
 
@@ -129,7 +132,7 @@ class TriggerTool(Tool):
             obs_id=event.index.obs_id,
             event_id=event.index.event_id,
             tel_id=tel_id,
-            event_type=int(event.sst1m.r0.tel[tel_id].camera_event_type.value) if self.is_real_data else -1,
+            event_type=int(event.r0.tel[tel_id].event_type.value) if self.is_real_data else -1,
             trigger_traces=traces.astype(np.uint8),
             patch7_max=int(patch7_scores.max()),
             patch7=bool(patch7_output.any()),
@@ -143,7 +146,7 @@ class TriggerTool(Tool):
         self.counts[tel_id, "tdscan"] += result.tdscan
 
         if self.compare_camera:
-            camera_output = self.patch7.hardware_output(event, tel_id)
+            camera_output = self.patch7.hardware_output(event, tel_id, swapped_pixels=swapped_pixels)
             result.camera_patch7 = bool(camera_output.any())
             result.camera_patch7_mismatches = int(np.sum(camera_output != patch7_output))
             self.counts[tel_id, "camera_patch7"] += result.camera_patch7
