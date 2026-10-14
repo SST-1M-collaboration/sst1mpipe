@@ -1,10 +1,13 @@
 from ctapipe.io import EventSource
 import pathlib
+import threading
 from itertools import islice
 
 import numpy as np
+import tables
 import zmq
 import pytest
+from ctapipe.io import read_table
 from traitlets import traitlets
 
 
@@ -25,7 +28,7 @@ from protozfits import (
 from sst1mpipe.io.containers import StreamCameraConfigContainer
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
-from conftest import DARK_FILE, TRANSITION_FILES
+from conftest import DARK_FILE, TRANSITION_FILES, run_process
 
 def create_fake_dl0_event_message(event_id: int, tel_id: int ):
 
@@ -296,6 +299,45 @@ def test_dl0_stream():
     source.close()
 
 
+def test_process_r1_stream(tmp_path):
+    """sst1mpipe-process reading a R1 stream up to the DL1 parameters"""
+    tel_id, n_events = 21, 20
+    context = zmq.Context()
+    producer = context.socket(zmq.PUSH)
+    port = producer.bind_to_random_port("tcp://127.0.0.1")
+    rng = np.random.default_rng(0)
+    events = []
+    for i in range(n_events):
+        message_type, event = r1_event(i, tel_id, 0)
+        # stored values of a waveform of 0 +- 1 (decoded), with a signal in a few pixels
+        waveform = rng.normal(0, 1, (N_PIXELS, N_SAMPLES))
+        waveform[:20, 20:25] += 30
+        stored = np.round((waveform + WAVEFORM_OFFSET) * WAVEFORM_SCALE).astype(np.uint16)
+        event.waveform.CopyFrom(numpy_to_any_array(stored))
+        events.append(cta_message((message_type, event)))
+    messages = [cta_message(r1_data_stream(tel_id), r1_camera_config(tel_id)), *events, cta_message(END_OF_STREAM)]
+    # the messages are sent once the tool is connected
+    sender = threading.Thread(target=lambda: [producer.send(message) for message in messages], daemon=True)
+    sender.start()
+
+    output = tmp_path / "events.dl1.h5"
+    try:
+        run_process(f"tcp://127.0.0.1:{port}", output)
+    finally:
+        sender.join(timeout=10)
+        producer.close(linger=0)
+        context.term()
+
+    trigger = read_table(output, "/dl1/event/subarray/trigger")
+    assert len(trigger) == n_events
+    assert set(trigger["obs_id"]) == {OBS_ID}
+    parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")
+    assert len(parameters) == n_events
+    # the blocks are written by the DataWriter before the data stream message is received
+    with tables.open_file(output) as h5:
+        assert "/configuration/observation/observation_block" not in h5
+
+
 # ---------------------------------------------------------------------------
 # DigiCam camera events (DataModel.CameraEvent), replayed from a zfits file
 # ---------------------------------------------------------------------------
@@ -423,6 +465,40 @@ def test_camera_event_ids_without_swat():
     # no data stream
     assert {event.index.obs_id for event in events} == {0}
     source.close()
+
+
+def test_process_camera_event_stream(tmp_path):
+    """sst1mpipe-process gives the same DL1 parameters for the stream and the zfits file"""
+    context = zmq.Context()
+    producer = context.socket(zmq.PUSH)
+    port = producer.bind_to_random_port("tcp://127.0.0.1")
+    messages = [*camera_event_messages(ZFITS_FILE), cta_message(END_OF_STREAM)]
+    sender = threading.Thread(target=lambda: [producer.send(message) for message in messages], daemon=True)
+    sender.start()
+
+    stream_output = tmp_path / "stream.dl1.h5"
+    try:
+        tool = run_process(f"tcp://127.0.0.1:{port}", stream_output)
+    finally:
+        sender.join(timeout=10)
+        producer.close(linger=0)
+        context.term()
+    # the R0 -> R1 calibration of the SST-1M raw data is used, the pedestal events are not processed
+    assert tool.r0_r1_calibrator is not None
+    assert tool.n_pedestal == 46
+
+    file_output = tmp_path / "file.dl1.h5"
+    # run of the transition between two wobbles
+    run_process(ZFITS_FILE, file_output, "--ProcessorTool.allowed_sb_types=UNKNOWN")
+
+    table = f"/dl1/event/telescope/parameters/tel_{ZFITS_TEL_ID:03d}"
+    stream_parameters, file_parameters = read_table(stream_output, table), read_table(file_output, table)
+    # 84 Cherenkov events (the 46 pedestal events are not written)
+    assert len(stream_parameters) == 84
+    np.testing.assert_array_equal(stream_parameters["event_id"], file_parameters["event_id"])
+    for column in ["camera_frame_hillas_intensity", "camera_frame_hillas_x", "camera_frame_hillas_width"]:
+        np.testing.assert_array_equal(stream_parameters[column], file_parameters[column])
+    assert np.isfinite(stream_parameters["camera_frame_hillas_intensity"]).sum() > 0
 
 
 # ---------------------------------------------------------------------------

@@ -178,7 +178,7 @@ options are:
 
 * ``SlidingWindow`` - For analysis of the data without precise White Rabbit timestamps (i.e. taken before 25th September 2023) one needs to use this method. It first searches for the time offset between the two DL1 tables providing maximum number of coindicent events and then selects the closest ones.
 
-* ``WhiteRabbitClosest`` - Works on data with precise WR timestamps in the DL1 table, i.e. all data taken after 25th September 2023. It only finds the closest tel2 event to each tel1 event (precision of WR is high enough to avoid random coincidences for usual trigger rates of the telescopes).
+* ``WhiteRabbitClosest`` - Works on data with precise WR timestamps, i.e. all data taken after 25th September 2023. The trigger times are read with ns precision from the DL1 trigger tables (``/dl1/event/telescope/trigger``). It only finds the closest tel2 event to each tel1 event (precision of WR is high enough to avoid random coincidences for usual trigger rates of the telescopes).
 
 * ``SWATEventIDs`` - After 30th January 2024 the coincident events are tagged by SWAT, providing them with the same ``arrayEvtNum``, resulting in the same ``event_id`` in the DL1 files. The DL1 events can be then matched just based on their ``event_id``.
 
