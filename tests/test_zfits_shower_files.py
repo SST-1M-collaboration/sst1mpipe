@@ -82,7 +82,8 @@ def test_zfits_file_is_read_by_sst1m_event_source(zfits_file):
         assert isinstance(source, SST1MEventSource)
         assert not source.is_simulation
         assert source.obs_ids == [zfits_file["obs_id"]]
-        assert list(source.subarray.tel_ids) == [21, 22]
+        # the telescope of the file only
+        assert list(source.subarray.tel_ids) == [zfits_file["tel_id"]]
 
 
 def test_event_ids(zfits_file, events):

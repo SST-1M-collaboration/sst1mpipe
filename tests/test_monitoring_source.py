@@ -60,9 +60,8 @@ def test_monitoring_source_plugin(monitoring):
         monitoring_source = MonitoringSource.from_name(
             "SST1MMonitoringSource", subarray=source.subarray, input_files=[monitoring],
         )
-        # only the telescope of the monitoring file, among the telescopes of the event source
-        assert source.subarray.tel_ids.tolist() == [21, 22]
-        assert monitoring_source.subarray.tel_ids.tolist() == [TEL_ID]
+        # the telescope of the run
+        assert source.subarray.tel_ids.tolist() == monitoring_source.subarray.tel_ids.tolist() == [TEL_ID]
         assert isinstance(monitoring_source, SST1MMonitoringSource)
 
 

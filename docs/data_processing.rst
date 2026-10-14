@@ -147,7 +147,7 @@ cleaned and parametrized (``ImageProcessor``), and their shower geometry is reco
 The output file contains the DL1 (and DL2) of the events, ``/dl1/info`` (summary of the processing:
 calibration files, target, number of triggered and pedestal events) and, with
 ``--ProcessorTool.attach_monitoring=True`` (default), a copy of the monitoring data of the monitoring
-file. The DL1 file is then self-contained: e.g. ``load_dl1_sst1m`` reads the pointing of the events
+file (``attach_monitoring_file``). The DL1 file is then self-contained: e.g. ``load_dl1_sst1m`` reads the pointing of the events
 from it. The wobble of the run is added to the name of the output file (``_W1``,
 ``--ProcessorTool.wobble_in_output_name``).
 
@@ -197,15 +197,23 @@ dark runs have no pointing.
 ----------
 
 **Monitoring data into a DL1 file**: if the DL1 file was produced without the monitoring data
-(``--ProcessorTool.attach_monitoring=False``), they can be copied into it afterwards:
+(``--ProcessorTool.attach_monitoring=False``), they can be attached to it afterwards. The ctapipe
+monitoring data (pointing, statistics of the images) are attached by ``ctapipe-merge`` with the
+``monitoring-only`` merge strategy, and ``attach_monitoring_file`` also attaches the statistics of the
+ADC samples (``/r0/monitoring``):
+
+.. code-block:: bash
+
+    ctapipe-merge --append --merge-strategy monitoring-only \
+        SST1M1_20260120_1179.monitoring.h5 --output SST1M1_20260120_1179_W1.dl1.h5
 
 .. code-block:: python
 
-    from sst1mpipe.io import copy_monitoring
+    from sst1mpipe.io import attach_monitoring_file
 
-    copy_monitoring("SST1M1_20260120_1179.monitoring.h5", "SST1M1_20260120_1179_W1.dl1.h5")
+    attach_monitoring_file("SST1M1_20260120_1179.monitoring.h5", "SST1M1_20260120_1179_W1.dl1.h5")
 
-**DL1 files of several runs** (e.g. a night of a telescope) are merged with ``ctapipe-merge``:
+**DL1 files of several runs of a telescope** (e.g. a night) are merged with ``ctapipe-merge`` (the files of the two telescopes have different subarrays: they are combined by the stereo step):
 
 .. code-block:: bash
 

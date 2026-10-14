@@ -112,9 +112,30 @@ def test_subarray(tmp_path):
 
     subarray = SUBARRAY_DESCRIPTION
     subarray.to_hdf(file)
-    source = ZMQEventSource(input_url="inproc://test", subarray_file=file)
+    # the telescope of the stream given by allowed_tels
+    source = ZMQEventSource(input_url="inproc://test", subarray_file=file, allowed_tels={22})
 
     assert subarray.name == source.subarray.name
+    assert source.subarray.tel_ids.tolist() == [22]
+    source.close()
+
+
+def test_subarray_of_the_stream():
+    """the telescope of the stream from its first messages, which are kept for the event loop"""
+    endpoint = "inproc://test_subarray_of_the_stream"
+    tel_id = 21
+    source = ZMQEventSource(endpoint)
+    send(source, [
+        cta_message(r1_data_stream(tel_id), r1_camera_config(tel_id)),
+        cta_message(r1_event(1, tel_id, 50)),
+        cta_message(END_OF_STREAM),
+    ], endpoint)
+
+    assert source.subarray.tel_ids.tolist() == [tel_id]
+    events = list(source)
+    assert [event.index.event_id for event in events] == [1]
+    assert list(source.data_streams) == [tel_id] and list(source.camera_config) == [tel_id]
+    source.close()
 
 @pytest.mark.xfail(raises=traitlets.TraitError) # Unfortunately ctapipe does not allow urls with tcp:// but only Path
 @pytest.mark.parametrize("url", ["tcp://192.168.1.1:1986", "inproc://test"])

@@ -169,11 +169,10 @@ class MonitoringTool(Tool):
             self.pedestal_images[tel_id, event_type].append((event.trigger.tel[tel_id].time, event.index.event_id, image))
 
     def finish(self):
-        tel_ids = sorted(self.event_times)
-        if len(tel_ids) == 0:
+        if len(self.event_times) == 0:
             self.log.warning("No event read, no monitoring data written")
             return
-        self.write_configuration(tel_ids)
+        self.write_configuration()
         self.write_pointing_tables()
         self.write_statistics_tables(
             self.pedestal_waveforms, self.waveform_calculator, "waveform", R0_PIXEL_STATISTICS_GROUP,
@@ -184,13 +183,13 @@ class MonitoringTool(Tool):
         Provenance().add_output_file(str(self.output_path), role="Monitoring")
         self.log.info("Monitoring data written in %s", self.output_path)
 
-    def write_configuration(self, tel_ids):
+    def write_configuration(self):
         """
-        Description of the telescopes of the run, scheduling and observation blocks and reference
+        Description of the telescope of the run, scheduling and observation blocks and reference
         metadata (as in the files of the ctapipe DataWriter)
         """
         source = self.event_source
-        subarray = source.subarray.select_subarray(tel_ids)
+        subarray = source.subarray
         with HDF5TableWriter(self.output_path, mode="w", add_prefix=True, parent=self) as writer:
             subarray.to_hdf(writer.h5file)
             for scheduling_block in source.scheduling_blocks.values():

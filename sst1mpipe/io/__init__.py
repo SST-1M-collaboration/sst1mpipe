@@ -5,7 +5,7 @@ from .io import (
     add_pointing_dl1_stereo,
     check_outdir,
     chunk_statistics_table,
-    copy_monitoring,
+    attach_monitoring_file,
     DL1_PEDESTAL_GROUP,
     R0_PEDESTAL_GROUP,
     R0_PIXEL_STATISTICS_GROUP,

@@ -16,7 +16,7 @@ from ctapipe.io import EventSource, DataWriter, MonitoringSource, SimTelEventSou
 from ctapipe.reco import ShowerProcessor
 
 from sst1mpipe.calib import R0R1Calibrator, ImageSaturationCorrector
-from sst1mpipe.io import DL1_PEDESTAL_GROUP, R0_PEDESTAL_GROUP, chunk_statistics_table, copy_monitoring, write_dl1_info
+from sst1mpipe.io import DL1_PEDESTAL_GROUP, R0_PEDESTAL_GROUP, chunk_statistics_table, attach_monitoring_file, write_dl1_info
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
@@ -398,8 +398,8 @@ class ProcessorTool(Tool):
         if self.attach_monitoring:
             for monitoring_source in self.monitoring_sources:
                 for monitoring_file in getattr(monitoring_source, "input_files", []):
-                    copy_monitoring(monitoring_file, output_path)
-                    self.log.info("Monitoring data of %s copied into the output file", monitoring_file)
+                    attach_monitoring_file(monitoring_file, output_path)
+                    self.log.info("Monitoring data of %s attached to the output file", monitoring_file)
         if self.n_skipped_events > 0:
             self.log.warning("%d events skipped (scheduling block type not allowed)", self.n_skipped_events)
         if self.n_events_without_monitoring > 0:
@@ -431,7 +431,10 @@ class ProcessorTool(Tool):
             calibration_files = ",".join(str(self.r0_r1_calibrator.calibration_file_path(t)) for t in tel_ids)
             window_files = ",".join(str(self.r0_r1_calibrator.window_transmittance_file_path(t)) for t in tel_ids)
 
-        n_triggered = list(n_triggered.values()) + [0, 0]
+        # telescopes 1 and 2: 21 and 22, or 1 and 2 in the simulations
+        n_triggered_tel = {1: 0, 2: 0}
+        for tel_id, n in n_triggered.items():
+            n_triggered_tel[tel_id - 20 if tel_id > 20 else tel_id] = n
         write_dl1_info(output_path, dict(
             calib_file=calibration_files,
             window_file=window_files,
@@ -446,8 +449,8 @@ class ProcessorTool(Tool):
             ),
             n_pedestal=self.n_pedestal,
             n_survived_pedestals=self.n_survived_pedestals,
-            n_triggered_tel1=n_triggered[0],
-            n_triggered_tel2=n_triggered[1],
+            n_triggered_tel1=n_triggered_tel[1],
+            n_triggered_tel2=n_triggered_tel[2],
             swat_event_ids_used=getattr(source, "swat_event_ids_available", False),
         ))
 

@@ -15,7 +15,7 @@ from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
 from astropy.table import QTable, Table, join, vstack
 from astropy.time import Time
 from ctapipe.instrument import SubarrayDescription
-from ctapipe.io import read_table, write_table
+from ctapipe.io import HDF5Merger, read_table, write_table
 from ctapipe.io.hdf5dataformat import DL1_SKY_PEDESTAL_IMAGE_GROUP
 from ctapipe.monitoring.interpolation import PointingInterpolator
 from gammapy.data import DataStore
@@ -958,33 +958,32 @@ DL1_PEDESTAL_GROUP = DL1_SKY_PEDESTAL_IMAGE_GROUP
 R0_PEDESTAL_GROUP = f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform"
 
 
-# groups of the monitoring data of a monitoring file (sst1mpipe-monitoring): pointing, statistics
-# of the ADC samples and of the images of the pedestal events
-MONITORING_GROUPS = ("/dl0/monitoring", "/r0/monitoring", "/dl1/monitoring")
-
-
-def copy_monitoring(monitoring_file, output_file):
+def attach_monitoring_file(monitoring_file, output_file):
     """
-    Copy the monitoring data (tables of MONITORING_GROUPS) of a monitoring file of
-    sst1mpipe-monitoring into another file, e.g. the DL1 file of the run
+    Attach the monitoring data of a monitoring file of sst1mpipe-monitoring to a file of the
+    same run, e.g. its DL1 file: the ctapipe monitoring data (pointing, statistics of the images
+    of the pedestal events) with the ctapipe HDF5Merger (merge strategy monitoring-only), and the
+    statistics of the ADC samples of the pedestal events (R0_PIXEL_STATISTICS_GROUP)
 
     Parameters
     ----------
     monitoring_file: string
         Path
     output_file: string
-        Path, the tables already in the file are overwritten
+        Path
     """
+    with HDF5Merger(output_path=output_file, append=True, merge_strategy="monitoring-only") as merger:
+        merger(monitoring_file)
+
     with tables.open_file(monitoring_file) as source, tables.open_file(output_file, mode="a") as output:
-        for group in MONITORING_GROUPS:
-            if group not in source:
-                continue
-            for table in source.get_node(group)._f_walknodes("Table"):
-                parent = table._v_parent._v_pathname
-                if parent not in output:
-                    where, name = parent.rsplit("/", 1)
-                    output.create_group(where or "/", name, createparents=True)
-                table._f_copy(newparent=output.get_node(parent), overwrite=True)
+        if R0_PIXEL_STATISTICS_GROUP not in source:
+            return
+        for table in source.get_node(R0_PIXEL_STATISTICS_GROUP)._f_walknodes("Table"):
+            parent = table._v_parent._v_pathname
+            if parent not in output:
+                where, name = parent.rsplit("/", 1)
+                output.create_group(where, name, createparents=True)
+            table._f_copy(newparent=output.get_node(parent), overwrite=True)
 
 
 def chunk_statistics_table(containers):

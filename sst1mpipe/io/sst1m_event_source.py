@@ -211,6 +211,19 @@ def read_digicam_config(path):
     )
 
 
+def tel_id_from_file(path):
+    """
+    Telescope of a SST-1M raw data file: from its name (see `tel_id_from_file_name`), or from
+    its first event. None for an empty file.
+    """
+    tel_id = tel_id_from_file_name(path)
+    if tel_id is not None:
+        return tel_id
+    with File(str(path)) as f:
+        first_event = next(iter(f.Events), None)
+    return None if first_event is None else int(first_event.telescopeID)
+
+
 def file_has_swat_event_ids(path, n_events=N_EVENTS_SWAT_ID_CHECK):
     """
     True if any of the first ``n_events`` events of the file has a non zero
@@ -450,9 +463,10 @@ class SST1MEventSource(EventSource):
         date_run = parse_file_name(self.input_url)
         self.run_number = int(date_run[1]) if date_run else 0
         self.run_id = int(''.join(date_run)) if date_run else 0
-        self.tel_id = tel_id_from_file_name(self.input_url) or 0
+        self.tel_id = tel_id_from_file(self.input_url) or 0
 
-        self._subarray = SUBARRAY_DESCRIPTION
+        # the telescope of the file only
+        self._subarray = SUBARRAY_DESCRIPTION.select_subarray([self.tel_id], name=SUBARRAY_DESCRIPTION.name)
 
         # Target and pointing from the TARGET field of the file, unless the pointing is given by the user
         header = fits.getheader(self.input_url, 'Events')

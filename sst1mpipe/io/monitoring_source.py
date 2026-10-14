@@ -5,7 +5,6 @@ Monitoring source of the monitoring files of sst1mpipe-monitoring, used by sst1m
 import numpy as np
 import tables
 from ctapipe.containers import StatisticsContainer, TelescopePointingContainer
-from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import HDF5MonitoringSource, read_table
 from ctapipe.io.monitoringtypes import MonitoringType
 from ctapipe.monitoring import StatisticsInterpolator
@@ -27,27 +26,12 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
     - the statistics of the images of the pedestal events of channel 0 in
       ``camera.pixel_statistics.pedestal_image``, of shape (n_pixels,) as the images (DigiCam
       has a single channel), for the NSBImageCleaner
-    - the telescopes of the monitoring files (a run of a telescope) among those of the event source
 
     The statistics are interpolated with the chunks of pedestal events containing the time of the
     event, within ``timestamp_tolerance``. Without such a chunk, the statistics are not filled
     (``std`` is None). The outlier pixels of the statistics (e.g. the dead pixels) are NaN.
     Out of the time range of the pointing table, the pointing is NaN.
     """
-
-    def _read_and_validate_subarrays(self):
-        """
-        The telescopes of the monitoring files, which must be described as in the subarray
-        of the event source (if given)
-        """
-        file_subarrays = [SubarrayDescription.from_hdf(path) for path in self.input_files]
-        tel_ids = sorted(set().union(*(subarray.tel_ids for subarray in file_subarrays)))
-        reference = self.subarray if self.subarray is not None else file_subarrays[0]
-        for path, subarray in zip(self.input_files, file_subarrays, strict=True):
-            for tel_id in subarray.tel_ids:
-                if tel_id not in reference.tel or str(subarray.tel[tel_id]) != str(reference.tel[tel_id]):
-                    raise OSError(f"Telescope {tel_id} of the monitoring file {path} is not in the subarray")
-        self.subarray = reference.select_subarray(tel_ids)
 
     def _process_single_file(self, file):
         super()._process_single_file(file)

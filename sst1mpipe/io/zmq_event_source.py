@@ -3,6 +3,7 @@ Event source of the telescope events sent in a ZMQ stream (protocol buffers, e.g
 camera server for the real time analysis): DigiCam R0 events (``DataModel.CameraEvent``,
 as in the zfits files) and CTAO R1 and DL0 events.
 """
+from collections import deque
 from dataclasses import dataclass
 from functools import partial
 
@@ -90,6 +91,33 @@ def run_header_obs_id(run_header):
     return int(run_header.runNumber)
 
 
+# message type of the stream -> protobuf message class and field(s) of the telescope id
+_TEL_ID_FIELDS = {
+    CoreMessages_pb2.CAMERA_EVENT: (ProtoDataModel_pb2.CameraEvent, ("telescopeID", )),
+    CoreMessages_pb2.CAMERA_RUN_HEADER: (ProtoDataModel_pb2.CameraRunHeader, ("telescopeID", "telescope_id")),
+    CoreMessages_pb2.R1_EVENT: (R1v1_pb2.Event, ("tel_id", )),
+    CoreMessages_pb2.TELESCOPE_DATA_STREAM: (R1v1_pb2.TelescopeDataStream, ("tel_id", )),
+    CoreMessages_pb2.CAMERA_CONFIG: (R1v1_pb2.CameraConfiguration, ("tel_id", )),
+    CoreMessages_pb2.DL0_TELESCOPE_EVENT: (DL0v1_Telescope_pb2.Event, ("tel_id", )),
+    CoreMessages_pb2.DL0_TELESCOPE_DATA_STREAM: (DL0v1_Telescope_pb2.DataStream, ("tel_id", )),
+    CoreMessages_pb2.DL0_TELESCOPE_CAMERA_CONFIG: (DL0v1_Telescope_pb2.CameraConfiguration, ("tel_id", )),
+}
+
+
+def message_tel_id(msg_type, payload):
+    """Telescope id of a payload of a message of the stream, None if it has none"""
+    if msg_type not in _TEL_ID_FIELDS:
+        return None
+    message_class, fields = _TEL_ID_FIELDS[msg_type]
+    message = message_class()
+    message.ParseFromString(payload)
+    for field in fields:
+        tel_id = getattr(message, field)
+        if tel_id:
+            return int(tel_id)
+    return None
+
+
 def stream_event_type(value, pedestal_type=EventType.SKY_PEDESTAL):
     """
     ctapipe EventType of the event type of a R1 or DL0 event message (CTAO event type),
@@ -155,6 +183,11 @@ class ZMQEventSource(EventSource):
     received; the type of the scheduling block is not sent and is ``scheduling_block_type``.
     The type of the pedestal events (internal triggers of the camera events, generic PEDESTAL
     events of the R1/DL0 events) is not sent either and is ``pedestal_event_type``.
+
+    A stream contains the data of a single telescope, and the subarray of the source is this
+    telescope: ``allowed_tels`` if it gives a single telescope, otherwise the telescope of the
+    first messages of the stream (received when the subarray is first used, and kept for the
+    event loop).
     """
 
     input_url = Unicode(
@@ -203,7 +236,9 @@ class ZMQEventSource(EventSource):
         self.socket = self._context.socket(zmq.PULL)
         self.socket.connect(self.input_url)
         self.log.info("Connect to socket %s", self.input_url)
-        self._subarray = SubarrayDescription.from_hdf(self.subarray_file)
+        self._subarray = None
+        # messages received before the event loop, to find the telescope of the stream
+        self._pending_messages = deque()
         self._scheduling_blocks = {}
         self._observation_blocks = {}
         self._data_streams = {}
@@ -228,7 +263,42 @@ class ZMQEventSource(EventSource):
 
     @property
     def subarray(self) -> SubarrayDescription:
+        """The telescope of the stream (see `stream_tel_id`)"""
+        if self._subarray is None:
+            subarray = SubarrayDescription.from_hdf(self.subarray_file)
+            tel_id = self.stream_tel_id()
+            if tel_id is None:
+                self.log.warning("Telescope of the stream unknown, subarray of all the telescopes")
+                self._subarray = subarray
+            else:
+                self._subarray = subarray.select_subarray([tel_id], name=subarray.name)
         return self._subarray
+
+    def stream_tel_id(self):
+        """
+        Telescope of the stream: ``allowed_tels`` if it gives a single telescope, otherwise the
+        telescope of the first messages giving one. These messages are kept for the event loop.
+        None if the stream ends before.
+        """
+        if self.allowed_tels is not None and len(self.allowed_tels) == 1:
+            return next(iter(self.allowed_tels))
+        while True:
+            data = self.socket.recv()
+            self._pending_messages.append(data)
+            message = CoreMessages_pb2.CTAMessage()
+            message.ParseFromString(data)
+            for msg_type, payload in zip(message.payload_type, message.payload_data, strict=True):
+                if msg_type == CoreMessages_pb2.END_OF_STREAM:
+                    return None
+                tel_id = message_tel_id(msg_type, payload)
+                if tel_id:
+                    return tel_id
+
+    def _receive(self):
+        """Next message of the stream, first the messages already received"""
+        if self._pending_messages:
+            return self._pending_messages.popleft()
+        return self.socket.recv()
 
     @property
     def observation_blocks(self) -> dict[int, ObservationBlockContainer]:
@@ -267,7 +337,7 @@ class ZMQEventSource(EventSource):
         count = 0
         while not self._end_of_stream:
             message = CoreMessages_pb2.CTAMessage()
-            message.ParseFromString(self.socket.recv())
+            message.ParseFromString(self._receive())
             for msg_type, payload in zip(message.payload_type, message.payload_data, strict=True):
                 event = self._read_payload(msg_type, payload)
                 if event is not None:
