@@ -349,7 +349,7 @@ def main():
                 dl2_path = base_path_source + '/dl2/' + version
                 is_dl2 = len(glob.glob(dl2_path+'/'+'*.h5'))
             if not is_dl3:
-                dl3_path = base_path_source + '/dl3/' + version
+                dl3_path = base_path_source + '/dl3_eff/' + version
                 is_dl3 = len(glob.glob(dl3_path+'/'+'*.fits'))
 
             if not is_dl1:

@@ -1,8 +1,8 @@
-from importlib.resources import files
 from cts_core import camera
 from scipy.sparse import csr_matrix
 
 from sst1mpipe.instrument import geometry
+from sst1mpipe.resources import CAMERA_CONFIG_FILE
 
 
 class Camera(camera.Camera):
@@ -12,7 +12,7 @@ class Camera(camera.Camera):
     `cts_core.camera.Camera`.
 
     It can be constucted without a path, it will then use the
-    file sst1mpipe/test/resources/camera_config.cfg,
+    file sst1mpipe/resources/instrument/camera_config.cfg,
     which is delivered with sst1mpipe.
 
     It does exactly the same as cts_core.camera.Camera but it has
@@ -23,9 +23,7 @@ class Camera(camera.Camera):
 
     def __init__(self, *args, **kwargs):
         if not args and kwargs.get('_config_file') is None:
-            kwargs['_config_file'] = files('sst1mpipe.resources').joinpath(
-                    'camera_config.cfg'
-                )
+            kwargs['_config_file'] = CAMERA_CONFIG_FILE
 
             self.config_file = kwargs['_config_file']
         elif args:
