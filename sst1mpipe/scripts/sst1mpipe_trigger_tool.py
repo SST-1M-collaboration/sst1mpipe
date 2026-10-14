@@ -6,7 +6,6 @@ from ctapipe.core.traits import Bool, Int, Path, flag
 from ctapipe.io import EventSource, HDF5TableWriter
 from tqdm import tqdm
 
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator
 
 
@@ -80,15 +79,11 @@ class TriggerTool(Tool):
         if self.output_path.exists() and not self.overwrite:
             raise ValueError(f"{self.output_path} exists, use --overwrite to replace it")
 
-        self.is_real_data = str(self.input_url).endswith(".fits.fz")
-        if self.compare_camera and not self.is_real_data:
-            raise ValueError("--compare-camera needs real data (.fits.fz): simulations have no recorded trigger output")
-        if self.is_real_data:
-            self.event_source = self.enter_context(
-                SST1MEventSource(input_url=self.input_url, max_events=self.max_events, parent=self))
-        else:
-            self.event_source = self.enter_context(
-                EventSource(self.input_url, max_events=self.max_events, parent=self))
+        # SST1MEventSource for the SST-1M raw data, SimTelEventSource for the simulations (is_compatible)
+        self.event_source = self.enter_context(
+            EventSource(input_url=self.input_url, max_events=self.max_events, parent=self))
+        if self.compare_camera and self.event_source.is_simulation:
+            raise ValueError("--compare-camera needs real data: simulations have no recorded trigger output")
 
         subarray = self.event_source.subarray
         self.patch7 = TriggerPatch7Emulator(subarray=subarray, parent=self)
@@ -116,7 +111,7 @@ class TriggerTool(Tool):
                 self.writer.write(f"tel_{tel_id:03d}", [self.emulate(event, tel_id)])
 
     def emulate(self, event, tel_id):
-        if self.is_real_data:
+        if not self.event_source.is_simulation:
             # module swaps at the time of the event, undone for the trigger traces
             swapped_pixels = self.event_source.swapped_pixels(tel_id, event.trigger.time)
             traces = self.patch7.trigger_traces(event, tel_id, swapped_pixels=swapped_pixels)
@@ -132,7 +127,7 @@ class TriggerTool(Tool):
             obs_id=event.index.obs_id,
             event_id=event.index.event_id,
             tel_id=tel_id,
-            event_type=int(event.r0.tel[tel_id].event_type.value) if self.is_real_data else -1,
+            event_type=int(event.r0.tel[tel_id].event_type.value) if not self.event_source.is_simulation else -1,
             trigger_traces=traces.astype(np.uint8),
             patch7_max=int(patch7_scores.max()),
             patch7=bool(patch7_output.any()),
