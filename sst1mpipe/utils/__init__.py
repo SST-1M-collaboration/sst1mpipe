@@ -1,7 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
 
-from .cleaning import ImageCleanerSST, image_cleaner_setup
+from . import cleaning  # registers the custom ImageCleaners in ctapipe
 from .NSB_tools import (
     VAR_to_Idrop,
     VAR_to_NSB,
@@ -49,8 +49,6 @@ from .utils import (
     get_moon_params,
     get_moon_phase,
     get_pointing_radec,
-    get_swaped_modules,
-    swap_modules_r0wf,
     get_sources_in_dir,
     get_stereo_method,
     get_subarray,
@@ -59,11 +57,10 @@ from .utils import (
     get_target_pos,
     get_tel_string,
     get_telescopes,
-    get_wr_timestamp,
+    get_trigger_time_ns,
     mc_correct_shower_reuse,
     mix_gamma_proton,
     polar_to_cartesian,
-    remove_bad_pixels,
     remove_stereo,
     simbad_query,
     stereo_var_cuts,

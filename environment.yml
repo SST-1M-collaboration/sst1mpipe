@@ -3,10 +3,11 @@ channels:
   - conda-forge
   - default
 dependencies:
-  - python==3.11
+  - python==3.12
   - pip
   - coverage
-  - ctapipe==0.21.2
+  - ctapipe==0.32.0
+  - eventio # optional dependency of ctapipe, used to read the simtel files
   - click
   - gammapy==1.3 # required for compatibilities with astropy
   - h5py
@@ -14,6 +15,8 @@ dependencies:
   - protozfits # used to read zfits files and protocolbuffer messages
   - astroquery=0.4.6
   - matplotlib
+  - astropy<7 # astropy.coordinates.get_moon is removed in astropy 7 (sst1mpipe_obsplan)
+  - numpy<2 # astropy 6.1 fails to import with numpy 2.4 (np.in1d removed)
   - nbmake # used to pytest jupyter notebooks
   - pytables
   - pytest

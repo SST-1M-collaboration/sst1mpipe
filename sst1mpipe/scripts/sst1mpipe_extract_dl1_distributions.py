@@ -28,12 +28,12 @@ from gammapy.data import DataStore
 
 from sst1mpipe.io import (
     check_outdir,
-    load_dl1_pedestals,
+    load_r0_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
 )
 from sst1mpipe.utils import get_telescopes
-from sst1mpipe.utils.NSB_tools import VAR_to_NSB
+from sst1mpipe.utils.NSB_tools import VAR_to_NSB, mean_pedestal_std
 
 
 def parse_args():
@@ -242,12 +242,12 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
             print('Broken file: ' + input_file + ', skipping.')
             continue
         try:
-            pt = load_dl1_pedestals(input_file)
+            pt = load_r0_pedestals(input_file)
             if '1' in tel:
                 cs=21
             else:
                 cs=22
-            NSB = VAR_to_NSB(pt['pedestal_charge_std'].mean(axis=1)**2, cs)
+            NSB = VAR_to_NSB(mean_pedestal_std(pt)**2, cs)
             nsb.append(NSB.mean())
         except Exception:
             print('No pedestals in : ' + input_file + '.')

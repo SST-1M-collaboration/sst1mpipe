@@ -5,9 +5,7 @@ Licensed under the 3-clause BSD style license.
 
 import logging
 import os
-import re
 from datetime import datetime
-import json
 
 import astropy.constants as c
 import astropy.units as u
@@ -15,9 +13,7 @@ import ctaplot
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
 import pandas as pd
-from importlib.resources import files
 import tables
 from astropy.coordinates import (
     AltAz,
@@ -29,7 +25,6 @@ from astropy.coordinates import (
     get_sun,
 )
 from astropy.io import fits
-import astropy.io.ascii as aio
 from astropy.time import Time
 from astroquery.simbad import Simbad
 from ctapipe.coordinates import CameraFrame
@@ -38,10 +33,10 @@ from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
 from gammapy.data import DataStore
 
+from sst1mpipe.io.sst1m_event_source import parse_target_field
+from sst1mpipe.time import camera_clock_to_time
+from sst1mpipe.resources import SUBARRAY_FILE
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-MAPPING_FILE_PATH = BASE_DIR / "data" / "digicam_pixels_mapping_V5T.txt"
-INVERTED_MODULE_LIST_PATH = BASE_DIR / "data" / "inverted_module_list.json"
 
 def get_target(file, force_pointing=False):
     """
@@ -86,31 +81,12 @@ def get_target(file, force_pointing=False):
                 logging.info('Transition to the next wobble, or dark file, not on-source pointing direction, FILE SKIPPED.')
                 hdul.close()
                 exit()
-            if pointing_string.count('_') > 1:
-                delimiter = '_'
-            elif pointing_string.count(',') > 1:
-                delimiter = ','
-            else:
+            target, wobble, ra, dec = parse_target_field(pointing_string)
+            if wobble is None:
                 logging.warning('Wrong format of coordinates in the fits header, unknown delimiter')
-                target, ra, dec, wobble = None, None, None, None
-                return target, ra, dec, wobble
-
-            target = pointing_string.split(delimiter)[0]
-            try:
-                if len(pointing_string.split(delimiter)) == 4:
-                    ra = float(pointing_string.split(delimiter)[2])
-                    dec = float(pointing_string.split(delimiter)[3])
-                elif len(pointing_string.split(delimiter)) == 3:
-                    ra = float(pointing_string.split(delimiter)[1])
-                    dec = float(pointing_string.split(delimiter)[2])
-                else:
-                    logging.warning('Wrong format of coordinates in the fits header. Field with either 3 or 4 entries is expected.')
-                    ra, dec = None, None
-            except ValueError:
-                logging.warning('Wrong format of coordinates in the fits header, cannot convert to float!')
-                ra, dec = None, None
-            match = re.search(r'W\d+', pointing_string)
-            wobble = match.group(0) if match else 'UNDEF'
+                return None, None, None, None
+            if ra is None:
+                logging.warning('Wrong format of coordinates in the fits header, cannot read RA, DEC')
         except KeyError:
             logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
             target, ra, dec, wobble = None, None, None, None
@@ -152,29 +128,28 @@ def get_stereo_method(config):
         return stereo_method
 
 
-def get_wr_timestamp(data):
+def get_trigger_time_ns(data):
     """
-    Reads WR timestamps stored in two columns in the DL1
-    table in seconds, and converts them in nanoseconds
-    with high numerical precission.
+    Trigger times of the DL1 table (trigger_time column, see
+    sst1mpipe.io.load_dl1_sst1m) as integers in ns, without
+    loss of precision, e.g. to match the stereo events.
 
     Parameters
     ----------
-    data: pandas.DataFrame
+    data: pandas.DataFrame or astropy.table.Table
         DL1 table
 
     Returns
     -------
-    numpy.int64
-        Precise timestamp in nanoseconds
+    numpy.ndarray of numpy.int64
+        ns since 1970-01-01 (TAI)
 
     """
 
-    S_TO_NS = np.int64(1e9)
-    t1 = np.array(data['time_wr_full_seconds']).astype(np.int64) * S_TO_NS
-    t2 = np.array(data['time_wr_frac_seconds']).astype(np.float64) * S_TO_NS
-    t = t1 + t2.astype(np.int64)
-    return t
+    time = data['trigger_time']
+    if isinstance(time, Time):
+        time = time.to_value('datetime64')
+    return np.asarray(time).astype('datetime64[ns]').astype(np.int64)
 
 
 def get_tel_string(tel, mc=True):
@@ -186,7 +161,7 @@ def get_tel_string(tel, mc=True):
     ----------
     tel: int
         Telescope number as in
-        event.sst1m.r0.tels_with_data
+        event.trigger.tels_with_trigger
     mc: bool
 
     Returns
@@ -330,25 +305,10 @@ def add_trigger_time(event, telescope=None):
 
     """
 
-    localtime = event.sst1m.r0.tel[telescope].local_camera_clock.astype(np.uint64)
-    # assuming local_camera_clock in gps (gps = tai - 19s), gps scale does not exist in astropy
-    # tai = utc + 37 s (this is not constant in time and depend on leap seconds)
-    #event.trigger.time = Time(localtime * u.s + 19 * u.s, format='unix', scale='tai') - 37 * u.s
 
-    # assuming local_camera_clock in tai and conversion to utc
-    #event.trigger.time = Time(localtime * u.s, format='unix', scale='tai') - 37 * u.s
 
-    # assuming local_camera_clock in utc
-    #event.trigger.time = Time(localtime, format='unix', scale='utc')
-
-    # Time in event.trigger.time is stored in seconds, but should have ns precision, see
-    # https://github.com/cta-observatory/ctapipe_io_nectarcam/issues/24
-    # But if we read the data, using ctapipe.io.read_table, the numerical precision is lost anyway
     # We assume tai scale
-    S_TO_NS = np.uint64(1e9)
-    full_seconds = localtime // S_TO_NS
-    fractional_seconds = (localtime % S_TO_NS) / S_TO_NS
-    event.trigger.time = Time(full_seconds, fractional_seconds, format='unix_tai')
+    event.trigger.time = camera_clock_to_time(event.r0.tel[telescope].event_time)
     event.trigger.tel[telescope].time = event.trigger.time
 
     return event
@@ -378,8 +338,8 @@ def add_event_id(event, filename=None, event_number=0):
     date = filename.split('/')[-1].split('_')[1]
     obs_id = date + filename.split('/')[-1].split('_')[2]
 
-    if event.sst1m.r0.event_id > 0:
-        event_id = event.sst1m.r0.event_id
+    if event.index.event_id > 0:
+        event_id = event.index.event_id
     else:
         event_id = str(int(filename.split('/')[-1].split('_')[2])) + str(event_number).zfill(6)
         logging.warning('Event IDs are not stored in raw data. Replacing with event ID based on date and event count.')
@@ -418,12 +378,12 @@ def add_pointing_to_events(
     wobble_coords = SkyCoord(ra=float(ra) * u.deg, dec=float(dec) * u.deg, frame='icrs')
     horizon_frame = AltAz(obstime=event.trigger.time, location=location)
     tel_pointing = wobble_coords.transform_to(horizon_frame)
-    event.pointing.tel[telescope].azimuth  = tel_pointing.az.to('rad')
-    event.pointing.tel[telescope].altitude = tel_pointing.alt.to('rad')
-    event.pointing.array_azimuth  = tel_pointing.az.to('rad')
-    event.pointing.array_altitude = tel_pointing.alt.to('rad')
-    event.pointing.array_ra  = wobble_coords.ra.to('rad')
-    event.pointing.array_dec = wobble_coords.dec.to('rad')
+    event.monitoring.tel[telescope].pointing.azimuth  = tel_pointing.az.to('rad')
+    event.monitoring.tel[telescope].pointing.altitude = tel_pointing.alt.to('rad')
+    event.monitoring.pointing.array_azimuth  = tel_pointing.az.to('rad')
+    event.monitoring.pointing.array_altitude = tel_pointing.alt.to('rad')
+    event.monitoring.pointing.array_ra  = wobble_coords.ra.to('rad')
+    event.monitoring.pointing.array_dec = wobble_coords.dec.to('rad')
     return event
 
 
@@ -835,131 +795,6 @@ def correct_true_image(event):
     return event
 
 
-
-
-def get_swaped_modules(event,inv_list_path = INVERTED_MODULE_LIST_PATH, mappingfilepath=MAPPING_FILE_PATH):
-    """
-
-    get module list for wrongly mapped pixels
-    Pixel numbering is based on
-    data/inverted_module_list.json
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    Returns
-    -------
-    mask_list:
-        list of mask used to swap waveforms
-
-    """
-    pix_maps = aio.read(mappingfilepath)
-
-    mask_list = []
-    tel = event.sst1m.r0.tels_with_data[0]
-    with open(inv_list_path, encoding="utf-8") as f:
-        inv_list = json.load(f)
-    for key in inv_list.keys():
-        if inv_list[key]['ntel'] == tel:
-            localtime = event.sst1m.r0.tel[tel].local_camera_clock/1e9
-            time = Time(localtime, format='unix_tai')
-            time_min = Time(inv_list[key]['date_sart'], format='isot', scale='utc')
-            time_max = Time(inv_list[key]['date_stop'], format='isot', scale='utc')
-
-            if (time > time_min) and (time < time_max):
-                module_1 = inv_list[key]['module_1']
-                module_2 = inv_list[key]['module_2']
-
-                mask1 = np.zeros(1296, dtype=bool)
-                mask1[pix_maps[(pix_maps["module"]==module_1)]['pixel_sw_id']] = True
-
-                mask2 = np.zeros(1296, dtype=bool)
-                mask2[pix_maps[(pix_maps["module"]==module_2)]['pixel_sw_id']] = True
-
-                mask_list.append([mask1,mask2])
-                logging.info('Data on tel ' + str(tel) + f' SWAPPING wrongly connected modules {module_1} and {module_2}')
-
-    return mask_list
-
-
-def swap_modules_r0wf(event,mask1,mask2,tel=None):
-
-    """
-    Swaps pixel R0 waveforms between any two masks
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    mask1 : int
-    mask1 : int
-    tel   : int
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    """
-
-
-    waveform_1 = event.sst1m.r0.tel[tel].adc_samples[mask1,:]
-    bs_1 = event.sst1m.r0.tel[tel].digicam_baseline[mask1]
-
-    waveform_2 = event.sst1m.r0.tel[tel].adc_samples[mask2,:]
-    bs_2 = event.sst1m.r0.tel[tel].digicam_baseline[mask2]
-
-    event.sst1m.r0.tel[tel].adc_samples[mask1] = waveform_2
-    event.sst1m.r0.tel[tel].adc_samples[mask2] = waveform_1
-
-    event.sst1m.r0.tel[tel].digicam_baseline[mask1] = bs_2
-    event.sst1m.r0.tel[tel].digicam_baseline[mask2] = bs_1
-
-    return event
-
-def remove_bad_pixels(event, config=None):
-    """
-    Fills bad pixel waveforms with zeros and
-    flags them in proper containers. Charges in
-    these pixels are then interpolated using method
-    set in cfg: invalid_pixel_handler_type
-    Default is NeighborAverage, but can be turned
-    off with 'null'
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-    config: dict
-
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    """
-
-    if "bad_pixels" in config["analysis"]:
-        for tel in event.trigger.tels_with_trigger:
-            tel_name = "tel_"+str(tel).zfill(3)
-            if tel_name in config["analysis"]["bad_pixels"]:
-                if len(config["analysis"]["bad_pixels"][tel_name]):
-
-                    mask_bad = np.zeros(1296)
-                    mask_bad[config["analysis"]["bad_pixels"][tel_name]] = 1
-                    mask_bad = mask_bad.astype(bool)
-
-                    N_samples = event.r0.tel[tel].waveform[0].shape[1]
-                    event.r0.tel[tel].waveform[0][mask_bad] = np.zeros(N_samples)
-                    event.r1.tel[tel].waveform[mask_bad] = np.zeros(N_samples)
-                    event.simulation.tel[tel].true_image[mask_bad] = 0
-                    event.mon.tel[tel].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
-                    event.mon.tel[tel].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
-                    event.mon.tel[tel].pixel_status['pedestal_failing_pixels'] = np.array([mask_bad])
-
-    return event
 
 
 def check_output_dl1(file):
@@ -1782,9 +1617,7 @@ def get_pointing_radec(input_file):
 
 def get_subarray():
 
-    subarray_file = files('sst1mpipe.data').joinpath(
-                                'sst1m_array.h5'
-                            )
+    subarray_file = SUBARRAY_FILE
 
     subarray = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
     return subarray

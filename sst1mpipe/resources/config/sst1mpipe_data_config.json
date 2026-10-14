@@ -1,56 +1,104 @@
-{
+{   "array_center_coords": {
+      "long_deg": 14.7825010,
+      "lat_deg": 49.9124420,
+      "height_m": 511.195000
+    },
     "telescope_coords": {
-      "tel_001": {
+      "tel_021": {
         "long_deg": 14.782924,
         "lat_deg": 49.911800,
         "height_m": 510
       },
-      "tel_002": {
+      "tel_022": {
         "long_deg": 14.782078,
         "lat_deg": 49.913084,
         "height_m": 510
       }
     },
-    "allowed_tels": null,
+
+    "SST1MEventSource": {
+      "swapped_modules": [
+        {"tel_id": 22, "start": "2023-09-01T00:00:00", "stop": "2024-07-18T00:00:00", "modules": [59, 88]},
+        {"tel_id": 21, "start": "2025-12-17T12:00:00", "stop": "2026-01-15T12:00:00", "modules": [8, 9]}
+      ]
+    },
+
+    "ImageSaturationCorrector": {
+      "integration_level": 0.2,
+      "peak_time_level": 2500
+    },
+
+    "R0R1Calibrator": {
+      "calibration_file": [
+        ["type", "*", null]
+      ],
+      "window_transmittance_file": [
+        ["type", "*", null]
+      ],
+      "voltage_drop_correction": "global",
+      "flag_bad_calibration_pixels": true,
+      "flag_dead_pixels": true,
+      "saturation_threshold": 3000,
+      "saturation_width_level": 2500,
+      "saturation_width_threshold": 5,
+      "bad_pixels": [
+        ["type", "*", []]
+      ],
+      "pde_drop_factor": [
+        ["type", "*", null],
+        ["id", 21, null],
+        ["id", 22, null]
+      ]
+    },
+
+    "telescope_equivalent_focal_length": {
+      "tel_021": 5.6,
+      "tel_022": 5.6
+    },
+
+    "stereo": {
+      "event_matching_method" : "WhiteRabbitClosest",
+      "SlidingWindow": {
+        "window_half_width": 1E-3,
+        "offset_search": {
+          "time_start": -1E-2,
+          "time_stop": 1E-2,
+          "time_step": 2E-5
+        }
+      },
+      "WhiteRabbitClosest": {
+        "max_time_diff_ns": 1E4
+      },
+      "SWATEventIDs": {}
+    },
 
     "analysis": {
+      "min_number_pedestals": 100,
       "global_theta_cut": 0.2,
-      "global_gammaness_cut": 0.6,
-      "gamma_efficiency": 0.6,
-      "theta2_efficiency": 0.68,
+      "global_gammaness_cut": 0.75,
       "stereo_delta_disp_cut_deg": null,
       "stereo_relative_std_reco_energy_cut": null,
       "stereo_std_gammaness_cut": null,
-      "significance_fit": true,
+      "gamma_efficiency": 0.7,
       "log_energy_min_tev":-1,
       "log_energy_max_tev": 3,
       "n_energy_bins": 21,
-      "n_bins_migration": 51,
-      "fov_offset_max_deg": 6,
-      "nbins_fov_offset": 9,
-      "fov_offset_bg_max_deg": 8,
-      "nbins_fov_offset_bg": 17,
-      "source_offset_max_deg": 1,
-      "nbins_source_offset": 501,
       "gamma_min_simulated_energy_tev": 0.2,
       "proton_min_simulated_energy_tev": 0.4,
-      "true_energy_scaling_factor": 1.0,
-      "n_training_events": 7E5,
+      "n_training_events": 5E5,
       "gamma_to_proton_training_ratio": 1.0,
+      "reco_energy_scaling_factor": 1.0,
       "stereo_reco_weights": "camera_frame_hillas_intensity",
       "observation_time_h": 50,
       "off_regions": 5,
-      "bad_pixels": {
-        "tel_001": [],
-        "tel_002": []
-      }
+      "ped_time_window": 10
     },
 
     "event_selection": {
-        "camera_frame_hillas_intensity": [0, 1000000],
+        "camera_frame_hillas_intensity": [50, 1000000],
         "camera_frame_hillas_width": [0, 100],
         "camera_frame_hillas_length": [0, 100],
-        "leakage_intensity_width_2": [0, 1]
+        "leakage_intensity_width_2": [0, 0.7]
     },
 
     "CameraCalibrator": {
@@ -64,78 +112,62 @@
     },
 
     "NsbCalibrator": {
-      "intensity_correction": {
-        "tel_001": 1.0,
-        "tel_002": 1.0
-      },
-      "mc_correction_for_PDE": true
-  },
+        "intensity_correction": {
+          "tel_021": 1.0,
+          "tel_022": 1.0
+        }
+    },
+
+    "R0PedestalMonitor": {
+        "n_events": 100,
+        "dead_pixel_std_threshold": 2.5
+    },
+
+    "DL1PedestalMonitor": {
+        "n_events": 1000
+    },
 
     "ImageProcessor": {
-      "image_cleaner_type": "ImageCleanerSST",
-      "use_telescope_frame": false,
-      "TailcutsImageCleaner": {
-          "picture_threshold_pe": [
-            ["id", 1, 8],
-            ["id", 2, 9]
-          ],
-          "boundary_threshold_pe": [
-            ["id", 1, 4],
-            ["id", 2, 4]
-          ],
-          "min_picture_neighbors": [
-            ["id", 1, 2],
-            ["id", 2, 2]
-          ]
-        },
-        "ImageCleanerSST": {
-          "telescope_defaults": {
-            "tel_001": [
-            {
-                "min_nsb_level": 0,
-                "stdev_scaling": 2.5,
-                "picture_threshold_pe": 8,
-                "boundary_threshold_pe": 4,
-                "min_picture_neighbors": 2,
-                "keep_isolated": false,
-                "min_time_neighbors" : 1,
-                "time_limit_ns" : 8,
-                "only_main_island" : false
-            }, {
-                "min_nsb_level": 2.3554,
-                "stdev_scaling": 2.5,
-                "picture_threshold_pe": 8,
-                "boundary_threshold_pe": 4,
-                "min_picture_neighbors": 2,
-                "keep_isolated": false,
-                "min_time_neighbors" : 1,
-                "time_limit_ns" : 8,
-                "only_main_island" : false
-            }],
-            "tel_002": [
-            {
-                "min_nsb_level": 0,
-                "stdev_scaling": 2.5,
-                "picture_threshold_pe": 8,
-                "boundary_threshold_pe": 4,
-                "min_picture_neighbors": 2,
-                "keep_isolated": false,
-                "min_time_neighbors" : 1,
-                "time_limit_ns" : 8,
-                "only_main_island" : false
-            }, {
-                "min_nsb_level": 2.4287,
-                "stdev_scaling": 2.5,
-                "picture_threshold_pe": 8,
-                "boundary_threshold_pe": 4,
-                "min_picture_neighbors": 2,
-                "keep_isolated": false,
-                "min_time_neighbors" : 1,
-                "time_limit_ns" : 8,
-                "only_main_island" : false
-            }]
-          }
+        "image_cleaner_type": "NSBImageCleaner",
+        "use_telescope_frame": false,
+        "TailcutsImageCleaner": {
+            "picture_threshold_pe": [
+              ["id", 21, 8],
+              ["id", 22, 9]
+            ],
+            "boundary_threshold_pe": [
+              ["id", 21, 4],
+              ["id", 22, 4]
+            ],
+            "min_picture_neighbors": [
+              ["id", 21, 2],
+              ["id", 22, 2]
+            ]
+          },
+        "NSBImageCleaner": {
+            "picture_threshold_pe": [
+              ["id", 21, 8],
+              ["id", 22, 8]
+            ],
+            "boundary_threshold_pe": [
+              ["id", 21, 4],
+              ["id", 22, 4]
+            ],
+            "min_picture_neighbors": [
+              ["id", 21, 2],
+              ["id", 22, 2]
+            ],
+            "keep_isolated_pixels": false,
+            "time_limit": 8,
+            "time_num_neighbors": 1,
+            "largest_island_only": false,
+            "pedestal_factor": 2.5,
+            "bright_cleaning_threshold": null
         }
+    },
+
+    "DataWriter": {
+      "write_dl2": true
     },
 
     "ShowerProcessor": {
@@ -201,7 +233,7 @@
         "HillasReconstructor_tel_impact_distance",
         "HillasReconstructor_h_max"
      ],
-     
+        
     "particle_classification_features": [
         "log_camera_frame_hillas_intensity",
         "camera_frame_hillas_width",
@@ -214,7 +246,9 @@
         "camera_frame_hillas_x",
         "camera_frame_hillas_y",
         "HillasReconstructor_tel_impact_distance",
-        "HillasReconstructor_h_max"
+        "HillasReconstructor_h_max",
+        "log_reco_energy",
+        "reco_disp_norm"
       ],
 
     "disp_method": "disp_norm_sign",
@@ -232,7 +266,7 @@
         "HillasReconstructor_h_max"
       ],
 
-      "disp_classification_features": [
+    "disp_classification_features": [
         "log_camera_frame_hillas_intensity",
         "camera_frame_hillas_width",
         "camera_frame_hillas_length",
@@ -274,6 +308,28 @@
         "leakage_intensity_width_2_tel2",
         "HillasReconstructor_tel_impact_distance_tel2",
         "HillasReconstructor_h_max"
-]
+      ],
+
+    "mean_charge_to_nsb_rate": {
+        "tel_021": [
+          {
+            "mean_charge_bin_low": 0,
+            "nsb_rate": "low"
+          }, {
+            "mean_charge_bin_low": 2.3554,
+            "nsb_rate": "med"
+          }
+        ],
+        "tel_022": [
+          {
+            "mean_charge_bin_low": 0,
+            "nsb_rate": "low"
+          }, {
+            "mean_charge_bin_low": 2.4287,
+            "nsb_rate": "med"
+          }
+        ]
+      }
 
 }
+
