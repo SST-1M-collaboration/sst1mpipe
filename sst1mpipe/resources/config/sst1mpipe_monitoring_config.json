@@ -1,0 +1,119 @@
+{
+  "MonitoringTool": {
+    "output_path": "monitoring.h5",
+    "overwrite": false,
+    "progress_bar": true,
+    "pointing_update_interval": 1.0
+  },
+
+  "EventSource": {
+    "max_events": null,
+    "allowed_tels": null
+  },
+
+  "SST1MEventSource": {
+    "pointing_ra": null,
+    "pointing_dec": null,
+    "focal_length_choice": "EQUIVALENT",
+    "swapped_modules": [
+      {"tel_id": 22, "start": "2023-09-01T00:00:00", "stop": "2024-07-18T00:00:00", "modules": [59, 88]},
+      {"tel_id": 21, "start": "2025-12-17T12:00:00", "stop": "2026-01-15T12:00:00", "modules": [8, 9]}
+    ]
+  },
+
+  "R0R1Calibrator": {
+    "calibration_file": [["type", "*", null]],
+    "window_transmittance_file": [["type", "*", null]],
+    "voltage_drop_correction": [["type", "*", "none"]],
+    "pde_drop_factor": [["type", "*", null]],
+    "flag_bad_calibration_pixels": [["type", "*", true]],
+    "flag_dead_pixels": [["type", "*", false]],
+    "bad_pixels": [["type", "*", []], ["id", 21, []], ["id", 22, []]],
+    "saturation_threshold": [["type", "*", 3000]],
+    "saturation_width_level": [["type", "*", 2500]],
+    "saturation_width_threshold": [["type", "*", 5]]
+  },
+
+  "CameraCalibrator": {
+    "data_volume_reducer_type": "NullDataVolumeReducer",
+    "image_extractor_type": [["type", "*", "LocalPeakWindowSum"]],
+    "invalid_pixel_handler_type": "NeighborAverage",
+    "apply_peak_time_shift": [["type", "*", true]],
+    "apply_waveform_time_shift": [["type", "*", false]],
+    "LocalPeakWindowSum": {
+      "window_width": [["type", "*", 7]],
+      "window_shift": [["type", "*", 3]],
+      "apply_integration_correction": [["type", "*", true]]
+    }
+  },
+
+  "WaveformStatisticsCalculator": {
+    "stats_aggregator_type": [["type", "*", "PedestalWaveformAggregator"]],
+    "faulty_pixels_fraction": 0.1,
+    "outlier_detector_list": [
+      {"apply_to": "std", "name": "MedianOutlierDetector", "config": {"median_range_factors": [-0.5, 10.0]}}
+    ],
+    "PedestalWaveformAggregator": {
+      "chunking_type": "SizeChunking",
+      "SizeChunking": {
+        "chunk_size": 100,
+        "chunk_shift": null,
+        "last_chunk_policy": "overlap",
+        "allow_undersized_tables": true
+      },
+      "TimeChunking": {
+        "chunk_duration": "1 s",
+        "chunk_shift": "0 s",
+        "last_chunk_policy": "overlap",
+        "allow_undersized_tables": true
+      }
+    }
+  },
+
+  "ImageStatisticsCalculator": {
+    "stats_aggregator_type": [["type", "*", "PlainAggregator"]],
+    "faulty_pixels_fraction": 0.1,
+    "outlier_detector_list": [],
+    "PlainAggregator": {
+      "chunking_type": "SizeChunking",
+      "SizeChunking": {
+        "chunk_size": 1000,
+        "chunk_shift": null,
+        "last_chunk_policy": "overlap",
+        "allow_undersized_tables": true
+      },
+      "TimeChunking": {
+        "chunk_duration": "10 s",
+        "chunk_shift": "0 s",
+        "last_chunk_policy": "overlap",
+        "allow_undersized_tables": true
+      }
+    },
+    "SigmaClippingAggregator": {
+      "max_sigma": 4,
+      "iterations": 5,
+      "chunking_type": "SizeChunking",
+      "SizeChunking": {
+        "chunk_size": 1000,
+        "chunk_shift": null,
+        "last_chunk_policy": "overlap",
+        "allow_undersized_tables": true
+      }
+    }
+  },
+
+  "Contact": {
+    "name": "SST-1M collaboration",
+    "email": "unknown",
+    "organization": "SST-1M"
+  },
+
+  "Instrument": {
+    "site": "Other",
+    "class_": "Subarray",
+    "type_": "SST-1M",
+    "subtype": "unspecified",
+    "version": "unspecified",
+    "id_": "SST1M_miniarray"
+  }
+}
