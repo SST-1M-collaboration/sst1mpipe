@@ -7,53 +7,26 @@ import numpy as np
 import pytest
 import tables
 from astropy.coordinates import AltAz
-from ctapipe.core import run_tool
 from ctapipe.io import HDF5EventSource, MonitoringSource, read_table
 from ctapipe.io.hdf5dataformat import DL1_PIXEL_STATISTICS_GROUP
 from ctapipe.io.monitoringtypes import MonitoringType
 
+from conftest import OBSERVATION_RUNS, monitoring_source_args, run_monitoring, run_process
 from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP, get_dl1_info, load_dl1_sst1m
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource, statistics_container
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.resources import MONITORING_CONFIG_FILE, RTA_CONFIG_FILE, TEST_DATA_DIR
-from sst1mpipe.scripts.sst1mpipe_monitoring_tool import MonitoringTool
-from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 
-# observation of Mrk 421 by tel 22: 35 events, 13 pedestal events
-INPUT_FILE = TEST_DATA_DIR / "zfits" / "SST1M2_20260120_1102.fits.fz"
+# observation of Mrk 421 by tel 22
 TEL_ID = 22
-N_EVENTS, N_PEDESTALS = 35, 13
-
-
-def monitoring_file(path, *args):
-    run_tool(MonitoringTool(), argv=[
-        f"--input={INPUT_FILE}",
-        f"--output={path}",
-        f"--config={MONITORING_CONFIG_FILE}",
-        "--no-progress",
-        *args,
-    ], raises=True)
-    return path
-
-
-def process(input_file, output, *args):
-    tool = ProcessorTool()
-    run_tool(tool, argv=[
-        f"--input={input_file}",
-        f"--output={output}",
-        f"--config={RTA_CONFIG_FILE}",
-        "--no-progress",
-        "--ProcessorTool.wobble_in_output_name=False",
-        *args,
-    ], raises=True)
-    return tool
+INPUT_FILE = OBSERVATION_RUNS[TEL_ID]["path"]
+N_EVENTS, N_PEDESTALS = OBSERVATION_RUNS[TEL_ID]["n_events"], OBSERVATION_RUNS[TEL_ID]["n_pedestals"]
 
 
 @pytest.fixture(scope="module")
-def monitoring(tmp_path_factory):
-    path = tmp_path_factory.mktemp("monitoring") / "run.monitoring.h5"
-    return monitoring_file(path, "--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size=5")
+def monitoring(observation_monitoring):
+    """monitoring file of the observation of tel 22, chunks of 5 pedestal events"""
+    return observation_monitoring[TEL_ID]
 
 
 def pointing_altaz(source, time):
@@ -117,11 +90,7 @@ def test_no_statistics_out_of_the_chunks(monitoring):
 def test_process_with_monitoring_source(monitoring, tmp_path):
     """the monitoring data are used for the calibration and attached to the DL1 file"""
     output = tmp_path / "events.dl1.h5"
-    tool = process(
-        INPUT_FILE, output,
-        "--monitoring-source=SST1MMonitoringSource",
-        f"--SST1MMonitoringSource.input_files={monitoring}",
-    )
+    tool = run_process(INPUT_FILE, output, *monitoring_source_args(monitoring))
     assert tool.n_events_without_monitoring == 0
 
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{TEL_ID:03d}")
@@ -156,12 +125,7 @@ def test_process_with_monitoring_source(monitoring, tmp_path):
 
 def test_process_without_attached_monitoring(monitoring, tmp_path):
     output = tmp_path / "events.dl1.h5"
-    process(
-        INPUT_FILE, output,
-        "--monitoring-source=SST1MMonitoringSource",
-        f"--SST1MMonitoringSource.input_files={monitoring}",
-        "--ProcessorTool.attach_monitoring=False",
-    )
+    run_process(INPUT_FILE, output, *monitoring_source_args(monitoring), "--ProcessorTool.attach_monitoring=False")
     with tables.open_file(output) as dl1:
         assert "/dl0/monitoring" not in dl1 and "/r0/monitoring" not in dl1 and "/dl1/monitoring" not in dl1
 
@@ -171,7 +135,8 @@ def test_events_without_monitoring(tmp_path):
     monitoring of the 20 first events, without timestamp tolerance: the events out of the chunks
     of pedestal events or of the pointing table are skipped
     """
-    monitoring = monitoring_file(tmp_path / "run.monitoring.h5", "--max-events=20")
+    monitoring = tmp_path / "run.monitoring.h5"
+    run_monitoring(INPUT_FILE, monitoring, "--max-events=20")
     chunks = [
         read_table(monitoring, f"{group}/tel_{TEL_ID:03d}")
         for group in (f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform", f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image")
@@ -188,11 +153,8 @@ def test_events_without_monitoring(tmp_path):
     assert n_without > 0
 
     output = tmp_path / "events.dl1.h5"
-    tool = process(
-        INPUT_FILE, output,
-        "--monitoring-source=SST1MMonitoringSource",
-        f"--SST1MMonitoringSource.input_files={monitoring}",
-        "--SST1MMonitoringSource.timestamp_tolerance=0 s",
+    tool = run_process(
+        INPUT_FILE, output, *monitoring_source_args(monitoring), "--SST1MMonitoringSource.timestamp_tolerance=0 s",
     )
     assert tool.n_events_without_monitoring == n_without
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{TEL_ID:03d}")

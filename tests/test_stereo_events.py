@@ -4,35 +4,25 @@ of the test files: the run of tel 22 (35 events) is taken during the run of tel 
 """
 import numpy as np
 import pytest
-from ctapipe.core import run_tool
-from protozfits import File
 
+from conftest import OBSERVATION_RUNS, read_zfits_events, run_process
 from sst1mpipe.io import read_trigger_time
 from sst1mpipe.io.containers import CameraEventType
-from sst1mpipe.resources import RTA_CONFIG_FILE, TEST_DATA_DIR
-from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 from sst1mpipe.utils import get_trigger_time_ns
 
-FILE_TEL_1 = TEST_DATA_DIR / "zfits" / "SST1M1_20260120_1179.fits.fz"
-FILE_TEL_2 = TEST_DATA_DIR / "zfits" / "SST1M2_20260120_1102.fits.fz"
+FILE_TEL_1, FILE_TEL_2 = OBSERVATION_RUNS[21]["path"], OBSERVATION_RUNS[22]["path"]
 # events of tel 21 around the run of tel 22
 EVENTS_TEL_1 = slice(4150, 4328)
 # SWAT array event id -> trigger time of tel 22 - trigger time of tel 21 (ns)
 COINCIDENT_EVENTS = {25085157: 32, 25085168: 48}
 # maximum time difference of coincident events (stereo WhiteRabbitClosest method)
 MAX_TIME_DIFF_NS = 10_000
-S_TO_NS = 1_000_000_000
 
 
 def read_events(path, events=slice(None)):
     """SWAT event id, White Rabbit time (ns) and camera event type of the events of a zfits file"""
-    with File(str(path)) as f:
-        rows = list(f.Events[events])
-    return (
-        np.array([row.arrayEvtNum for row in rows], dtype=np.int64),
-        np.array([row.local_time_sec * S_TO_NS + row.local_time_nanosec for row in rows], dtype=np.int64),
-        np.array([row.event_type for row in rows]),
-    )
+    events = read_zfits_events(path, events)
+    return events["event_id"], events["time"], events["event_type"]
 
 
 def match_closest_in_time(time_1, time_2, max_time_diff):
@@ -88,12 +78,7 @@ def test_coincident_events_trigger_time(events_tel_1, events_tel_2):
 def test_coincident_events_dl1(events_tel_1, tmp_path):
     """the trigger times of the DL1 file of tel 22 give the same coincident events"""
     output = tmp_path / "events.dl1.h5"
-    run_tool(ProcessorTool(), argv=[
-        f"--input={FILE_TEL_2}",
-        f"--output={output}",
-        f"--config={RTA_CONFIG_FILE}",
-        "--ProcessorTool.wobble_in_output_name=False",
-    ], raises=True)
+    run_process(FILE_TEL_2, output)
     trigger_time = read_trigger_time(output, "tel_022")
 
     ids_1, time_1, _ = events_tel_1

@@ -1,69 +1,32 @@
 import numpy as np
 import pytest
 import tables
-from ctapipe.core import run_tool
 from ctapipe.image.cleaning import NSBImageCleaner
 from ctapipe.io import read_table
 from ctapipe.io.hdf5dataformat import DL1_PIXEL_STATISTICS_GROUP
 
+from conftest import OBSERVATION_RUNS, monitoring_source_args, run_process
 from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES
 from sst1mpipe.io import get_dl1_info, load_dl1_sst1m
-from sst1mpipe.scripts.sst1mpipe_monitoring_tool import MonitoringTool
-from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
-from sst1mpipe.resources import MONITORING_CONFIG_FILE, RTA_CONFIG_FILE, TEST_DATA_DIR
 
-# observation of Mrk 421 (wobble W1) by both telescopes, with Cherenkov and pedestal events
-OBSERVATION_FILES = {
-    21: dict(path=TEST_DATA_DIR / "zfits" / "SST1M1_20260120_1179.fits.fz", n_events=150, n_pedestals=40),
-    22: dict(path=TEST_DATA_DIR / "zfits" / "SST1M2_20260120_1102.fits.fz", n_events=35, n_pedestals=13),
-}
 TARGET, WOBBLE, RA, DEC = "MRK421", "W1", 166.9948, 38.1053
 
 
-def process(run, output, *args):
-    tool = ProcessorTool()
-    run_tool(tool, argv=[
-        f"--input={run['path']}",
-        f"--output={output}",
-        f"--config={RTA_CONFIG_FILE}",
-        f"--max-events={run['n_events']}",
-        "--no-progress",
-        *args,
-    ], raises=True)
-    return tool
+def process(run, output, *args, **kwargs):
+    """sst1mpipe-process of the events of an observation run used in the tests"""
+    return run_process(run["path"], output, f"--max-events={run['n_events']}", *args, **kwargs)
 
 
-@pytest.fixture(scope="module")
-def monitoring_files(tmp_path_factory):
-    """monitoring files of the first events of the runs (sst1mpipe-monitoring), with chunks of 10 pedestal events"""
-    directory = tmp_path_factory.mktemp("monitoring")
-    paths = {}
-    for tel_id, run in OBSERVATION_FILES.items():
-        paths[tel_id] = directory / f"tel_{tel_id}.monitoring.h5"
-        run_tool(MonitoringTool(), argv=[
-            f"--input={run['path']}",
-            f"--output={paths[tel_id]}",
-            f"--config={MONITORING_CONFIG_FILE}",
-            f"--max-events={run['n_events']}",
-            "--no-progress",
-            "--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size=10",
-        ], raises=True)
-    return paths
-
-
-def monitoring_source(monitoring_file):
-    return ["--monitoring-source=SST1MMonitoringSource", f"--SST1MMonitoringSource.input_files={monitoring_file}"]
-
-
-@pytest.mark.parametrize("tel_id", sorted(OBSERVATION_FILES))
+@pytest.mark.parametrize("tel_id", sorted(OBSERVATION_RUNS))
 @pytest.mark.parametrize("voltage_drop_correction", ["global", "none"])
-def test_process_r0_file(tmp_path, monitoring_files, tel_id, voltage_drop_correction):
+def test_process_r0_file(tmp_path, observation_monitoring, tel_id, voltage_drop_correction):
     """regular processing of an observation run with its monitoring file, from R0 up to the DL1 parameters"""
-    run = OBSERVATION_FILES[tel_id]
+    run = OBSERVATION_RUNS[tel_id]
     tool = process(
         run, tmp_path / "events.dl1.h5",
-        *monitoring_source(monitoring_files[tel_id]),
+        *monitoring_source_args(observation_monitoring[tel_id]),
         f"--R0R1Calibrator.voltage_drop_correction={voltage_drop_correction}",
+        wobble_in_output_name=True,
     )
     # the R0 -> R1 calibration is configured from the config file and the command line
     assert tool.r0_r1_calibrator.voltage_drop_correction.tel[tel_id] == voltage_drop_correction
@@ -108,15 +71,11 @@ def nsb_cleaner_pedestal_stds(monkeypatch):
     return pedestal_stds
 
 
-def test_monitoring_used_by_nsb_image_cleaner(tmp_path, monitoring_files, nsb_cleaner_pedestal_stds):
-    tel_id, run = 21, OBSERVATION_FILES[21]
-    process(
-        run, tmp_path / "events.dl1.h5",
-        *monitoring_source(monitoring_files[tel_id]),
-        "--ProcessorTool.wobble_in_output_name=False",
-    )
+def test_monitoring_used_by_nsb_image_cleaner(tmp_path, observation_monitoring, nsb_cleaner_pedestal_stds):
+    tel_id, run = 21, OBSERVATION_RUNS[21]
+    process(run, tmp_path / "events.dl1.h5", *monitoring_source_args(observation_monitoring[tel_id]))
     # std of the images of the single chunk of pedestal events (chunks of 1000 events), channel 0
-    image = read_table(monitoring_files[tel_id], f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/tel_{tel_id:03d}")
+    image = read_table(observation_monitoring[tel_id], f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/tel_{tel_id:03d}")
     assert len(image) == 1
     assert len(nsb_cleaner_pedestal_stds) == run["n_events"] - run["n_pedestals"]
     for std in nsb_cleaner_pedestal_stds:
@@ -126,9 +85,9 @@ def test_monitoring_used_by_nsb_image_cleaner(tmp_path, monitoring_files, nsb_cl
 
 def test_process_without_monitoring_source(tmp_path, nsb_cleaner_pedestal_stds):
     """the raw data are calibrated without the statistics of the pedestal events, and without pointing"""
-    tel_id, run = 22, OBSERVATION_FILES[22]
+    tel_id, run = 22, OBSERVATION_RUNS[22]
     output, log_file = tmp_path / "events.dl1.h5", tmp_path / "process.log"
-    tool = process(run, output, "--ProcessorTool.wobble_in_output_name=False", f"--log-file={log_file}")
+    tool = process(run, output, f"--log-file={log_file}")
     assert "No monitoring source" in log_file.read_text()
     assert tool.monitoring_sources == []
 

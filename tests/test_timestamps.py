@@ -1,27 +1,19 @@
 import shutil
-from itertools import islice
 
 import numpy as np
 import pytest
 import tables
-from ctapipe.core import run_tool
 from ctapipe.io import read_table
 from ctapipe.time import time_to_ctao_high_res
-from protozfits import File
 
+from conftest import OBSERVATION_RUNS, S_TO_NS, read_zfits_events, run_process
 from sst1mpipe.io import load_dl1_sst1m, read_trigger_time
 from sst1mpipe.io.containers import CameraEventType
-from sst1mpipe.resources import RTA_CONFIG_FILE, TEST_DATA_DIR
-from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 from sst1mpipe.utils import get_trigger_time_ns
 
 N_EVENTS = 50
-S_TO_NS = 1_000_000_000
 # observation of Mrk 421 by both telescopes (35 events for tel 22)
-FILES = {
-    21: (TEST_DATA_DIR / "zfits").joinpath('SST1M1_20260120_1179.fits.fz'),
-    22: (TEST_DATA_DIR / "zfits").joinpath('SST1M2_20260120_1102.fits.fz'),
-}
+FILES = {tel_id: run["path"] for tel_id, run in OBSERVATION_RUNS.items()}
 
 
 def read_zfits_times(path, n_events):
@@ -29,26 +21,16 @@ def read_zfits_times(path, n_events):
     event id (SWAT) and White Rabbit time (s, ns) of the Cherenkov events among the first
     events of the zfits file (the pedestal events are not written in the DL1 file)
     """
-    with File(str(path)) as f:
-        events = [e for e in islice(f.Events, n_events) if not e.event_type & CameraEventType.INTERNAL.value]
-    return (
-        np.array([e.arrayEvtNum for e in events], dtype=np.int64),
-        np.array([e.local_time_sec for e in events], dtype=np.int64),
-        np.array([e.local_time_nanosec for e in events], dtype=np.int64),
-    )
+    events = read_zfits_events(path, slice(n_events))
+    cherenkov = (events["event_type"] & CameraEventType.INTERNAL.value) == 0
+    return events["event_id"][cherenkov], events["time_s"][cherenkov], events["time_ns"][cherenkov]
 
 
 @pytest.fixture(scope="module", params=sorted(FILES))
 def dl1_file(request, tmp_path_factory):
     tel_id = request.param
     output = tmp_path_factory.mktemp(f"timestamps_{tel_id}") / "events.dl1.h5"
-    run_tool(ProcessorTool(), argv=[
-        f"--input={FILES[tel_id]}",
-        f"--output={output}",
-        f"--config={RTA_CONFIG_FILE}",
-        f"--max-events={N_EVENTS}",
-        "--ProcessorTool.wobble_in_output_name=False",
-    ], raises=True)
+    run_process(FILES[tel_id], output, f"--max-events={N_EVENTS}")
     return tel_id, output
 
 

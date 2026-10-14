@@ -17,6 +17,7 @@ from traitlets.config import Config
 
 from sst1mpipe.calib import ImageSaturationCorrector, R0R1Calibrator
 from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES, DEFAULT_WINDOW_FILES
+from conftest import DARK_FILE
 from sst1mpipe.io import load_config, translate_legacy_calibration_config
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import get_subarray
@@ -26,12 +27,9 @@ from sst1mpipe.resources import (
     DATA_CONFIG_FILE,
     MC_CONFIG_FILES,
     PDE_CORRECTION_FACTORS_FILE,
-    TEST_DATA_DIR,
     WINDOW_DIR,
 )
 
-# dark run of tel 22: pedestal events only
-DARK_FILE = (TEST_DATA_DIR / "zfits").joinpath('SST1M2_20260119_0007.fits.fz')
 CONFIG = load_config(DATA_CONFIG_FILE, ismc=False)
 TEL_ID = 22
 CALIBRATION_FILE_TEL_2 = str((CALIBRATION_DIR / DEFAULT_CALIBRATION_FILES[22]))

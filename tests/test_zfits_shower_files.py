@@ -7,16 +7,14 @@ import tables
 from astropy.time import Time
 from ctapipe.containers import CoordinateFrameType, EventType, ObservingMode, PointingMode, SchedulingBlockType
 from ctapipe.core import Provenance
-from ctapipe.core import run_tool
 from ctapipe.io import DataWriter, EventSource, read_table
 
+from conftest import DARK_FILE, TRANSITION_FILES, run_process
 from sst1mpipe.io import get_dl1_info
 from sst1mpipe.io.containers import CameraEventType
 import sst1mpipe.io.sst1m_event_source as sst1m_event_source
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.resources import RTA_CONFIG_FILE, TEST_DATA_DIR
 from sst1mpipe.scripts.dark_run_mes_fitter import read_dark_run_events
-from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 
 N_PIXELS = 1296
 N_SAMPLES = 50
@@ -26,13 +24,13 @@ N_TRIGGER_PATCHES = 432
 # and pedestal events (internal trigger), with SWAT array event ids
 FILES = {
     21: dict(
-        name="SST1M1_20260121_0206.fits.fz", obs_id=202601210206,
+        path=TRANSITION_FILES[21], obs_id=202601210206,
         n_showers=84, n_pedestals=46, first_event_id=33759138, last_event_id=33759393,
         start="2026-01-21T18:49:45.441", stop="2026-01-21T18:49:45.894",
         date="2026-01-21T18:49:10", date_end="2026-01-21T18:49:10",
     ),
     22: dict(
-        name="SST1M2_20260121_0585.fits.fz", obs_id=202601210585,
+        path=TRANSITION_FILES[22], obs_id=202601210585,
         n_showers=179, n_pedestals=67, first_event_id=43710705, last_event_id=43711231,
         start="2026-01-21T23:26:37.633", stop="2026-01-21T23:26:38.303",
         date="2026-01-21T23:26:02", date_end="2026-01-21T23:26:03",
@@ -43,7 +41,7 @@ FILES = {
 @pytest.fixture(scope="module", params=sorted(FILES))
 def zfits_file(request):
     tel_id = request.param
-    return FILES[tel_id] | {"tel_id": tel_id, "path": TEST_DATA_DIR / "zfits" / FILES[tel_id]["name"]}
+    return FILES[tel_id] | {"tel_id": tel_id}
 
 
 @pytest.fixture(scope="module")
@@ -151,13 +149,8 @@ def test_process_zfits_file(zfits_file, tmp_path):
     """sst1mpipe-process from R0 up to the DL1 parameters"""
     tel_id = zfits_file["tel_id"]
     output = tmp_path / "events.dl1.h5"
-    run_tool(ProcessorTool(), argv=[
-        f"--input={zfits_file['path']}",
-        f"--output={output}",
-        f"--config={RTA_CONFIG_FILE}",
-        # runs of the transition between two wobbles
-        "--ProcessorTool.allowed_sb_types=UNKNOWN",
-    ], raises=True)
+    # runs of the transition between two wobbles
+    run_process(zfits_file["path"], output, "--ProcessorTool.allowed_sb_types=UNKNOWN")
 
     n_events = zfits_file["n_showers"] + zfits_file["n_pedestals"]
     trigger = read_table(output, "/dl1/event/subarray/trigger")
@@ -209,7 +202,7 @@ def test_blocks_of_transition_run(zfits_file):
 
 
 def test_pointing_given_by_the_user():
-    path = TEST_DATA_DIR / "zfits" / FILES[21]["name"]
+    path = TRANSITION_FILES[21]
     with SST1MEventSource(path, max_events=1, pointing_ra=83.63, pointing_dec=22.01) as source:
         assert source.pointing_manual
         scheduling_block = source.scheduling_blocks[FILES[21]["obs_id"]]
@@ -251,12 +244,7 @@ def test_blocks_written_in_the_output(zfits_file, tmp_path):
 def test_process_skips_transition_runs(zfits_file, tmp_path):
     """only the runs of the allowed scheduling block types (OBSERVATION by default) are processed"""
     output = tmp_path / "events.dl1.h5"
-    tool = ProcessorTool()
-    run_tool(tool, argv=[
-        f"--input={zfits_file['path']}",
-        f"--output={output}",
-        f"--config={RTA_CONFIG_FILE}",
-    ], raises=True)
+    tool = run_process(zfits_file["path"], output)
 
     n_events = zfits_file["n_showers"] + zfits_file["n_pedestals"]
     assert tool.n_skipped_events == n_events
@@ -271,15 +259,10 @@ def test_process_skips_transition_runs(zfits_file, tmp_path):
 
 
 def test_allowed_sb_types_list(tmp_path):
-    tool = ProcessorTool()
-    run_tool(tool, argv=[
-        f"--input={TEST_DATA_DIR / 'zfits' / FILES[21]['name']}",
-        f"--output={tmp_path / 'events.dl1.h5'}",
-        f"--config={RTA_CONFIG_FILE}",
-        "--max-events=5",
-        "--ProcessorTool.allowed_sb_types", "OBSERVATION",
-        "--ProcessorTool.allowed_sb_types", "UNKNOWN",
-    ], raises=True)
+    tool = run_process(
+        TRANSITION_FILES[21], tmp_path / "events.dl1.h5", "--max-events=5",
+        "--ProcessorTool.allowed_sb_types", "OBSERVATION", "--ProcessorTool.allowed_sb_types", "UNKNOWN",
+    )
 
     assert tool.allowed_sb_types == [SchedulingBlockType.OBSERVATION, SchedulingBlockType.UNKNOWN]
     assert tool.n_skipped_events == 0
@@ -287,10 +270,7 @@ def test_allowed_sb_types_list(tmp_path):
 
 def test_dark_run_events(capsys):
     """the dark run script only uses the pedestal events of the dark runs"""
-    transition_file = TEST_DATA_DIR / "zfits" / FILES[21]["name"]
-    dark_file = TEST_DATA_DIR / "zfits" / "SST1M2_20260119_0007.fits.fz"
-
-    events = list(read_dark_run_events([transition_file, dark_file], max_events=20))
+    events = list(read_dark_run_events([TRANSITION_FILES[21], DARK_FILE], max_events=20))
 
     assert len(events) == 20
     assert {event.index.obs_id for event in events} == {202601190007}
@@ -303,7 +283,7 @@ def test_dark_run_events_not_pedestal(monkeypatch, capsys):
     # the run with Cherenkov events taken as a dark run
     monkeypatch.setattr(sst1m_event_source, "scheduling_block_type", lambda target: SchedulingBlockType.CALIBRATION)
     monkeypatch.setattr(sst1m_event_source, "pedestal_event_type", lambda target: EventType.DARK_PEDESTAL)
-    path = TEST_DATA_DIR / "zfits" / FILES[21]["name"]
+    path = TRANSITION_FILES[21]
 
     events = list(read_dark_run_events([path]))
 

@@ -15,6 +15,7 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 from ctapipe.containers import CoordinateFrameType, EventType, ObservingMode, PointingMode, SchedulingBlockType
 
+from conftest import DARK_FILE, OBSERVATION_RUNS, TRANSITION_FILES, ZFITS_DIR
 import sst1mpipe.io.sst1m_event_source as sst1m_event_source
 from sst1mpipe.io.sst1m_event_source import (
     SST1MEventSource,
@@ -30,11 +31,9 @@ from sst1mpipe.io.sst1m_event_source import (
 )
 from sst1mpipe.time import camera_clock_to_time
 from sst1mpipe.io.containers import CameraEventType, DigicamConfigContainer, SST1MR0CameraContainer
-from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR
+from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE
 
-# dark run of tel 22: pedestal events (internal triggers) only
-DARK_FILE = (TEST_DATA_DIR / "zfits").joinpath('SST1M2_20260119_0007.fits.fz')
-ZFITS_FILES = glob.glob(str(TEST_DATA_DIR / "zfits/*fits.fz"))
+ZFITS_FILES = glob.glob(str(ZFITS_DIR / "*fits.fz"))
 
 MAX_ITERATIONS = 5
 
@@ -471,8 +470,8 @@ def test_no_warning_pointing_in_file(monkeypatch, caplog):
 
 @pytest.mark.parametrize("input_file, first_sn, digicam_time", [
     (DARK_FILE, 1120024, (626, 367976660)),
-    (TEST_DATA_DIR / "zfits" / "SST1M1_20260120_1179.fits.fz", 2110003, (5122, 938643252)),
-    (TEST_DATA_DIR / "zfits" / "SST1M2_20260121_0585.fits.fz", 1120024, (6865, 247889788)),
+    (OBSERVATION_RUNS[21]["path"], 2110003, (5122, 938643252)),
+    (TRANSITION_FILES[22], 1120024, (6865, 247889788)),
 ])
 def test_digicam_config(input_file, first_sn, digicam_time):
     """configuration of the DigiCam boards, from the DigicamConfig table of the file"""
@@ -522,10 +521,7 @@ def test_no_digicam_config(monkeypatch):
     assert sst1m_event_source.read_digicam_config("file.fits.fz") is None
 
 
-@pytest.mark.parametrize("input_file, tel_id", [
-    (TEST_DATA_DIR / "zfits" / "SST1M1_20260120_1179.fits.fz", 21),
-    (TEST_DATA_DIR / "zfits" / "SST1M2_20260120_1102.fits.fz", 22),
-])
+@pytest.mark.parametrize("input_file, tel_id", [(run["path"], tel_id) for tel_id, run in OBSERVATION_RUNS.items()])
 def test_observation_run(input_file, tel_id, caplog):
     """observation of Mrk 421: blocks and pointing from the TARGET field of the file"""
     with caplog.at_level(logging.WARNING):

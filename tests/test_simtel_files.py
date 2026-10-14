@@ -6,12 +6,11 @@ import numpy as np
 import pytest
 from astropy.coordinates import angular_separation
 from ctapipe.containers import EventType
-from ctapipe.core import run_tool
 from ctapipe.io import EventSource, SimTelEventSource, read_table
 
+from conftest import run_process
 from sst1mpipe.io import get_dl1_info
 from sst1mpipe.resources import MC_CONFIG_FILES, TEST_DATA_DIR
-from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 
 SIMTEL_DIR = TEST_DATA_DIR / "simtel"
 GAMMA_ID, PROTON_ID = 0, 101
@@ -164,11 +163,7 @@ def test_waveforms_and_true_images(events):
 def test_process_simtel_file(simtel_file, tmp_path):
     """sst1mpipe-process from R0 (simulated waveforms) up to the DL1 parameters"""
     output = tmp_path / "events.dl1.h5"
-    run_tool(ProcessorTool(), argv=[
-        f"--input={simtel_file['path']}",
-        f"--output={output}",
-        f"--config={MC_CONFIG_FILES['low']}",
-    ], raises=True)
+    run_process(simtel_file["path"], output, config=MC_CONFIG_FILES["low"])
 
     n_events = simtel_file["n_events"]
     trigger = read_table(output, "/dl1/event/subarray/trigger")

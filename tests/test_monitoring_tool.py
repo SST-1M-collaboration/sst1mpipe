@@ -6,38 +6,20 @@ import tables
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
 from ctapipe.containers import ArrayEventContainer, SchedulingBlockType
-from ctapipe.core import run_tool
 from ctapipe.core.tool import ToolConfigurationError
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import HDF5MonitoringSource, read_table
 from ctapipe.io.hdf5dataformat import DL0_TEL_POINTING_GROUP, DL1_PIXEL_STATISTICS_GROUP
 from ctapipe.io.metadata import read_reference_metadata
 
+from conftest import DARK_FILE, OBSERVATION_RUNS, WAVEFORM_CHUNK_SIZE, run_monitoring
 from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP
 from sst1mpipe.io.containers import CameraEventType
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.monitoring import PedestalWaveformAggregator
-from sst1mpipe.resources import MONITORING_CONFIG_FILE, TEST_DATA_DIR
-from sst1mpipe.scripts.sst1mpipe_monitoring_tool import MonitoringTool
 
-# observation of Mrk 421 (35 events, 13 pedestal events) and dark run (225 pedestal events) of tel 22
-OBSERVATION_FILE = TEST_DATA_DIR / "zfits" / "SST1M2_20260120_1102.fits.fz"
-DARK_FILE = TEST_DATA_DIR / "zfits" / "SST1M2_20260119_0007.fits.fz"
 TEL_ID = 22
-N_PEDESTALS = 13
-WAVEFORM_CHUNK_SIZE = 5
-
-
-def run_monitoring(input_file, output, *args):
-    tool = MonitoringTool()
-    run_tool(tool, argv=[
-        f"--input={input_file}",
-        f"--output={output}",
-        f"--config={MONITORING_CONFIG_FILE}",
-        "--no-progress",
-        *args,
-    ], raises=True)
-    return tool
+OBSERVATION_FILE, N_PEDESTALS = OBSERVATION_RUNS[TEL_ID]["path"], OBSERVATION_RUNS[TEL_ID]["n_pedestals"]
 
 
 def read_pedestal_waveforms(path):
@@ -52,22 +34,19 @@ def read_pedestal_waveforms(path):
 
 
 @pytest.fixture(scope="module")
-def observation_monitoring(tmp_path_factory):
-    output = tmp_path_factory.mktemp("monitoring") / "observation.monitoring.h5"
-    run_monitoring(
-        OBSERVATION_FILE, output,
-        f"--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size={WAVEFORM_CHUNK_SIZE}",
-    )
-    return output
+def monitoring_file(observation_monitoring):
+    """monitoring file of the observation of tel 22, chunks of WAVEFORM_CHUNK_SIZE pedestal events"""
+    return observation_monitoring[TEL_ID]
 
 
-def test_waveform_statistics(observation_monitoring):
+def test_waveform_statistics(monitoring_file):
     """statistics of the ADC samples of the pedestal events, in chunks of 5 pedestal events"""
-    table = read_table(observation_monitoring, f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform/tel_{TEL_ID:03d}")
+    table = read_table(monitoring_file, f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform/tel_{TEL_ID:03d}")
     times, event_ids, waveforms = read_pedestal_waveforms(OBSERVATION_FILE)
     assert len(times) == N_PEDESTALS
 
     # chunks of 5 events, the last one overlapping the previous one (last_chunk_policy overlap)
+    assert WAVEFORM_CHUNK_SIZE == 5
     chunks = [slice(0, 5), slice(5, 10), slice(8, 13)]
     assert len(table) == len(chunks)
     for row, chunk in zip(table, chunks, strict=True):
@@ -87,9 +66,9 @@ def test_waveform_statistics(observation_monitoring):
     assert 200 < np.median(table["mean"]) < 600
 
 
-def test_image_statistics(observation_monitoring):
+def test_image_statistics(monitoring_file):
     """statistics of the images of the pedestal events, a single chunk (allow_undersized_tables)"""
-    table = read_table(observation_monitoring, f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/tel_{TEL_ID:03d}")
+    table = read_table(monitoring_file, f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/tel_{TEL_ID:03d}")
     times, _, _ = read_pedestal_waveforms(OBSERVATION_FILE)
 
     assert len(table) == 1
@@ -100,9 +79,9 @@ def test_image_statistics(observation_monitoring):
     assert 0.1 < np.median(table["std"]) < 3
 
 
-def test_pointing_table(observation_monitoring):
+def test_pointing_table(monitoring_file):
     """pointing of the telescope from its first to its last event"""
-    table = read_table(observation_monitoring, f"{DL0_TEL_POINTING_GROUP}/tel_{TEL_ID:03d}")
+    table = read_table(monitoring_file, f"{DL0_TEL_POINTING_GROUP}/tel_{TEL_ID:03d}")
     with SST1MEventSource(OBSERVATION_FILE) as source:
         times = Time([event.trigger.time for event in source])
         pointing, subarray = source.pointing, source.subarray
@@ -117,9 +96,9 @@ def test_pointing_table(observation_monitoring):
     assert np.all((74 * u.deg < expected.alt) & (expected.alt < 75 * u.deg))
 
 
-def test_read_by_ctapipe_monitoring_source(observation_monitoring):
+def test_read_by_ctapipe_monitoring_source(monitoring_file):
     """the monitoring file is read by the ctapipe HDF5MonitoringSource"""
-    source = HDF5MonitoringSource(input_files=[observation_monitoring])
+    source = HDF5MonitoringSource(input_files=[monitoring_file])
     assert source.subarray.tel_ids.tolist() == [TEL_ID]
     assert {t.name for t in source.monitoring_types} == {"PIXEL_STATISTICS", "TELESCOPE_POINTINGS"}
 
@@ -128,18 +107,18 @@ def test_read_by_ctapipe_monitoring_source(observation_monitoring):
     event.trigger.time = times[5]
     source.fill_monitoring_container(event)
     monitoring = event.monitoring.tel[TEL_ID]
-    image = read_table(observation_monitoring, f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/tel_{TEL_ID:03d}")
+    image = read_table(monitoring_file, f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/tel_{TEL_ID:03d}")
     np.testing.assert_array_equal(monitoring.camera.pixel_statistics.pedestal_image.std, image["std"][0])
     assert 70 * u.deg < monitoring.pointing.altitude < 80 * u.deg
 
 
-def test_configuration_and_metadata(observation_monitoring):
-    assert SubarrayDescription.from_hdf(observation_monitoring).tel_ids.tolist() == [TEL_ID]
-    scheduling_block = read_table(observation_monitoring, "/configuration/observation/scheduling_block")
+def test_configuration_and_metadata(monitoring_file):
+    assert SubarrayDescription.from_hdf(monitoring_file).tel_ids.tolist() == [TEL_ID]
+    scheduling_block = read_table(monitoring_file, "/configuration/observation/scheduling_block")
     assert scheduling_block["sb_type"][0] == SchedulingBlockType.OBSERVATION.value
-    observation_block = read_table(observation_monitoring, "/configuration/observation/observation_block")
+    observation_block = read_table(monitoring_file, "/configuration/observation/observation_block")
     assert observation_block["target"][0] == "MRK421"
-    assert read_reference_metadata(observation_monitoring).activity.name == "sst1mpipe-monitoring"
+    assert read_reference_metadata(monitoring_file).activity.name == "sst1mpipe-monitoring"
 
 
 def test_dark_run(tmp_path):

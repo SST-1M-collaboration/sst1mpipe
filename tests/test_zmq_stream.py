@@ -7,7 +7,6 @@ import numpy as np
 import tables
 import zmq
 import pytest
-from ctapipe.core import run_tool
 from ctapipe.io import read_table
 from traitlets import traitlets
 
@@ -28,8 +27,8 @@ from protozfits import (
 
 from sst1mpipe.io.containers import StreamCameraConfigContainer
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.resources import RTA_CONFIG_FILE, TEST_DATA_DIR
-from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
+
+from conftest import DARK_FILE, TRANSITION_FILES, run_process
 
 def create_fake_dl0_event_message(event_id: int, tel_id: int ):
 
@@ -323,11 +322,7 @@ def test_process_r1_stream(tmp_path):
 
     output = tmp_path / "events.dl1.h5"
     try:
-        run_tool(ProcessorTool(), argv=[
-            f"--input=tcp://127.0.0.1:{port}",
-            f"--output={output}",
-            f"--config={RTA_CONFIG_FILE}",
-        ], raises=True)
+        run_process(f"tcp://127.0.0.1:{port}", output)
     finally:
         sender.join(timeout=10)
         producer.close(linger=0)
@@ -347,7 +342,7 @@ def test_process_r1_stream(tmp_path):
 # DigiCam camera events (DataModel.CameraEvent), replayed from a zfits file
 # ---------------------------------------------------------------------------
 
-ZFITS_FILE = TEST_DATA_DIR / "zfits" / "SST1M1_20260121_0206.fits.fz"
+ZFITS_FILE = TRANSITION_FILES[21]
 ZFITS_TEL_ID = 21
 R0_FIELDS = [
     "waveform", "pedestal", "pixel_flags", "camera_event_number", "event_type",
@@ -427,15 +422,14 @@ def test_pedestal_event_type_of_stream():
 
 def test_camera_event_stream_of_dark_run():
     """the pedestal events of a dark run (pedestal_event_type DARK_PEDESTAL) are dark pedestal events"""
-    dark_file = TEST_DATA_DIR / "zfits" / "SST1M2_20260119_0007.fits.fz"
     endpoint = "inproc://test_camera_event_stream_of_dark_run"
     source = ZMQEventSource(endpoint, scheduling_block_type="CALIBRATION", pedestal_event_type="DARK_PEDESTAL")
-    send(source, [*camera_event_messages(dark_file, n_events=5), cta_message(END_OF_STREAM)], endpoint)
+    send(source, [*camera_event_messages(DARK_FILE, n_events=5), cta_message(END_OF_STREAM)], endpoint)
 
     events = list(source)
     assert [event.trigger.event_type for event in events] == [EventType.DARK_PEDESTAL] * 5
     # as for the file
-    file_events = list(SST1MEventSource(dark_file, max_events=5))
+    file_events = list(SST1MEventSource(DARK_FILE, max_events=5))
     assert [event.trigger.event_type for event in file_events] == [EventType.DARK_PEDESTAL] * 5
     source.close()
 
@@ -484,12 +478,7 @@ def test_process_camera_event_stream(tmp_path):
 
     stream_output = tmp_path / "stream.dl1.h5"
     try:
-        tool = ProcessorTool()
-        run_tool(tool, argv=[
-            f"--input=tcp://127.0.0.1:{port}",
-            f"--output={stream_output}",
-            f"--config={RTA_CONFIG_FILE}",
-        ], raises=True)
+        tool = run_process(f"tcp://127.0.0.1:{port}", stream_output)
     finally:
         sender.join(timeout=10)
         producer.close(linger=0)
@@ -499,14 +488,8 @@ def test_process_camera_event_stream(tmp_path):
     assert tool.n_pedestal == 46
 
     file_output = tmp_path / "file.dl1.h5"
-    run_tool(ProcessorTool(), argv=[
-        f"--input={ZFITS_FILE}",
-        f"--output={file_output}",
-        f"--config={RTA_CONFIG_FILE}",
-        "--ProcessorTool.wobble_in_output_name=False",
-        # run of the transition between two wobbles
-        "--ProcessorTool.allowed_sb_types=UNKNOWN",
-    ], raises=True)
+    # run of the transition between two wobbles
+    run_process(ZFITS_FILE, file_output, "--ProcessorTool.allowed_sb_types=UNKNOWN")
 
     table = f"/dl1/event/telescope/parameters/tel_{ZFITS_TEL_ID:03d}"
     stream_parameters, file_parameters = read_table(stream_output, table), read_table(file_output, table)
