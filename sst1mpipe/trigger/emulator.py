@@ -13,9 +13,9 @@ Both take the R0 data of one telescope event and return the trigger output,
 one boolean per patch and sample (432, T). They work on the 432 triplet
 traces (the FADC output, one trace per patch of 3 pixels), which come from:
 
-* real data: ``trigger_input_traces``, computed by the FPGA itself, put in
+* real data: ``trigger_input_traces`` of the R0 data, computed by the FPGA itself, put in
   patch_sw_id order (see ``readout_to_patch_order``) and with the module swaps
-  of ``inverted_module_list.json`` undone as for the pixels;
+  (``SST1MEventSource.swapped_modules``) undone as for the pixels;
 * simulation: the raw waveform minus the simulated pedestal, through the FADC
   of the gateware (signed pixels, upper clip only, triplet sum clipped to 0-255).
 
@@ -35,7 +35,6 @@ from scipy.sparse import identity
 from sst1mpipe.constants import PATCH_ID_INPUT_SORT_IDS, PATCH_ID_OUTPUT_SORT_IDS
 from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.trigger import fixed_point
-from sst1mpipe.utils import get_swaped_modules
 
 N_PIXELS = 1296
 N_PATCHES = 432
@@ -95,18 +94,17 @@ def readout_to_patch_order(sector_order, signal="input"):
     return np.argsort(sort_ids)[readout_position]
 
 
-def module_swap_order(swapped_modules):
-    """Patch order that undoes the module swaps of ``inverted_module_list.json``.
+def module_swap_order(swapped_pixels):
+    """Patch order that undoes the module swaps of ``SST1MEventSource.swapped_modules``.
 
-    For some periods two modules were connected in each other's place. sst1mpipe
-    moves their pixels back (``swap_modules_r0wf``), but the FPGA trigger traces
-    stay as recorded: ``traces[order]`` puts each patch back on its pixels.
-    ``swapped_modules`` is the list of pixel mask pairs of ``get_swaped_modules``.
+    For some periods two modules were connected in each other's place. SST1MEventSource
+    moves their pixels back, but the FPGA trigger traces stay as recorded:
+    ``traces[order]`` puts each patch back on its pixels.
+    ``swapped_pixels`` is the list of pixel id pairs of ``SST1MEventSource.swapped_pixels``.
     """
-    # Same moves as swap_modules_r0wf: corrected pixel p shows recorded pixel pixel_order[p].
+    # Same moves as SST1MEventSource: corrected pixel p shows recorded pixel pixel_order[p].
     pixel_order = np.arange(N_PIXELS)
-    for mask_1, mask_2 in swapped_modules:
-        pixels_1, pixels_2 = np.flatnonzero(mask_1), np.flatnonzero(mask_2)
+    for pixels_1, pixels_2 in swapped_pixels:
         pixel_order[pixels_1], pixel_order[pixels_2] = pixel_order[pixels_2], pixel_order[pixels_1]
 
     # Row p of the CSR patch matrix holds the 3 pixels of patch p.
@@ -156,27 +154,33 @@ class TriggerEmulator(TelescopeComponent):
         self._readout_to_patch = {tel: readout_to_patch_order(order) for tel, order in READOUT_SECTOR_ORDER.items()}
         self._module_swaps = {}  # tel_id -> patch order undoing the module swaps, set on the first event as sst1mpipe does
 
-    def trigger_traces(self, event, tel_id):
-        """Triplet traces (432, T), the FADC output, in patch_sw_id order."""
+    def trigger_traces(self, event, tel_id, pedestal=None, swapped_pixels=()):
+        """
+        Triplet traces (432, T), the FADC output, in patch_sw_id order.
+
+        Simulation: ``pedestal`` is the simulated pedestal per sample (n_channels, n_pixels), e.g.
+        ``camera_monitorings[tel_id]["pedestal"] / camera_monitorings[tel_id]["n_ped_slices"]``
+        of the simtel file. Real data: ``swapped_pixels`` are the pixel id pairs of the wrongly
+        connected modules at the time of the event (``SST1MEventSource.swapped_pixels``).
+        """
         if event.simulation is not None:
             waveform = event.r0.tel[tel_id].waveform[0]
-            baseline = event.mon.tel[tel_id].calibration.pedestal_per_sample[0]
-            return fadc(waveform, baseline)
+            return fadc(waveform, pedestal[0])
 
         if tel_id not in self._readout_to_patch:
             raise ValueError(f"No trigger readout order known for telescope {tel_id}, see READOUT_SECTOR_ORDER")
-        traces = np.asarray(event.sst1m.r0.tel[tel_id].trigger_input_traces)
+        traces = np.asarray(event.r0.tel[tel_id].trigger_input_traces)
         if not np.all(np.isfinite(traces)):
             raise ValueError(
                 f"Telescope {tel_id}: no trigger_input_traces in this file (the reader filled them with NaN), "
                 "the trigger cannot be emulated on it"
             )
-        return traces[self._readout_to_patch[tel_id]][self.module_swap(event, tel_id)].astype(np.int64)
+        return traces[self._readout_to_patch[tel_id]][self.module_swap(tel_id, swapped_pixels)].astype(np.int64)
 
-    def module_swap(self, event, tel_id):
+    def module_swap(self, tel_id, swapped_pixels):
         """Patch order undoing the module swaps of this telescope (real data)."""
         if tel_id not in self._module_swaps:
-            self._module_swaps[tel_id] = module_swap_order(get_swaped_modules(event))
+            self._module_swaps[tel_id] = module_swap_order(swapped_pixels)
         return self._module_swaps[tel_id]
 
     def scores(self, traces):
@@ -203,13 +207,13 @@ class TriggerPatch7Emulator(TriggerEmulator):
     def scores(self, traces):
         return DigiCam.cluster_7_matrix.dot(traces)
 
-    def hardware_output(self, event, tel_id):
+    def hardware_output(self, event, tel_id, swapped_pixels=()):
         """patch7 output recorded by the camera (432, T) bool, in patch_sw_id order (real data)."""
-        output = np.asarray(event.sst1m.r0.tel[tel_id].trigger_output_patch7)
+        output = np.asarray(event.r0.tel[tel_id].trigger_output_patch7)
         if not np.all(np.isfinite(output)):
             raise ValueError(f"Telescope {tel_id}: no trigger_output_patch7 in this file")
         order = readout_to_patch_order(READOUT_SECTOR_ORDER[tel_id], signal="output")
-        return output[order][self.module_swap(event, tel_id)].astype(bool)
+        return output[order][self.module_swap(tel_id, swapped_pixels)].astype(bool)
 
 
 class TriggerTDSCANEmulator(TriggerEmulator):

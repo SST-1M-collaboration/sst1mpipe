@@ -1,5 +1,4 @@
 import json
-from importlib.resources import files
 
 import numpy as np
 import pytest
@@ -9,6 +8,7 @@ from scipy.sparse import csr_matrix
 from traitlets import TraitError
 from traitlets.config import Config
 
+from conftest import TRANSITION_FILES
 from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.resources import CONFIG_DIR
 from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator, fixed_point
@@ -124,21 +124,17 @@ def test_readout_order():
 def test_module_swap_moves_trigger_traces_with_pixels():
     from astropy.io import ascii
 
-    from sst1mpipe.utils.utils import MAPPING_FILE_PATH
+    from sst1mpipe.resources import PIXEL_MAPPING_FILE
 
     # Telescope 2, 2023-09-01 to 2024-07-18: modules 59 and 88 connected in each other's place.
-    pix_maps = ascii.read(MAPPING_FILE_PATH)
-    masks = []
-    for module in (59, 88):
-        mask = np.zeros(1296, dtype=bool)
-        mask[pix_maps[pix_maps["module"] == module]["pixel_sw_id"]] = True
-        masks.append(mask)
-    order = module_swap_order([masks])
+    pix_maps = ascii.read(PIXEL_MAPPING_FILE)
+    pixels = [np.sort(np.asarray(pix_maps[pix_maps["module"] == module]["pixel_sw_id"])) for module in (59, 88)]
+    order = module_swap_order([pixels])
 
     rng = np.random.default_rng(0)
     waveform, baseline = rng.integers(0, 100, (1296, 50)), np.full(1296, 50.0)
-    corrected = waveform.copy()  # what swap_modules_r0wf does to the pixels
-    corrected[masks[0]], corrected[masks[1]] = waveform[masks[1]], waveform[masks[0]]
+    corrected = waveform.copy()  # what SST1MEventSource does to the pixels
+    corrected[pixels[0]], corrected[pixels[1]] = waveform[pixels[1]], waveform[pixels[0]]
 
     assert np.array_equal(fadc(waveform, baseline)[order], fadc(corrected, baseline))
     assert np.count_nonzero(order != np.arange(432)) == 8
@@ -199,7 +195,7 @@ def test_missing_trigger_traces_are_refused():
     from sst1mpipe.io.containers import SST1MArrayEventContainer
 
     event = SST1MArrayEventContainer()
-    event.sst1m.r0.tel[22].trigger_input_traces = np.zeros((432, 50)) * np.nan   # what the reader stores
+    event.r0.tel[22].trigger_input_traces = np.zeros((432, 50)) * np.nan   # what the reader stores
     with pytest.raises(ValueError, match="no trigger_input_traces"):
         tdscan().trigger_traces(event, 22)
 
@@ -210,7 +206,7 @@ def test_trigger_tool(tmp_path):
     config = tmp_path / "config.json"
     config.write_text(json.dumps(example_config("data")))
     output = tmp_path / "trigger.h5"
-    input_file = files("sst1mpipe.resources.zfits").joinpath("SST1M1_20260121_0001.fits.fz")
+    input_file = TRANSITION_FILES[21]
     argv = ["-i", str(input_file), "-o", str(output), "-m", "20", "--config", str(config),
             "--save-outputs", "--compare-camera"]
     assert run_tool(TriggerTool(), argv=argv, cwd=tmp_path) == 0
