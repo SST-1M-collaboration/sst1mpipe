@@ -89,8 +89,7 @@
       "reco_energy_scaling_factor": 1.0,
       "stereo_reco_weights": "camera_frame_hillas_intensity",
       "observation_time_h": 50,
-      "off_regions": 5,
-      "ped_time_window": 10
+      "off_regions": 5
     },
 
     "event_selection": {

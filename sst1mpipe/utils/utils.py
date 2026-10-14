@@ -780,32 +780,6 @@ def mix_gamma_proton(params_gammas, params_protons, max_events=None, gp_training
     return mixed
 
 
-def correct_true_image(event):
-    """
-    For an unknown reason, event.simulation.tel[tel].true_image
-    is sometimes None, which kills the rest of the script
-    and simulation histogram is not saved. Here we repace
-    it with an array of zeros.
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    """
-
-    for tel in event.trigger.tels_with_trigger:
-        if event.simulation.tel[tel].true_image is None:
-            event.simulation.tel[tel].true_image = np.zeros(1296, dtype='int32')
-
-    return event
-
-
 def check_output_dl1(file):
     """
     Checks if simulated shower distributions
