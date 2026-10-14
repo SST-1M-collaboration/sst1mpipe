@@ -1,6 +1,6 @@
 """
-Shared test data: the SST-1M runs of the test data, the monitoring tool run on them
-(sst1mpipe-monitoring) and a reader of the events of the zfits files.
+Shared test data: the SST-1M runs of the test data, the tools run on them (sst1mpipe-monitoring,
+sst1mpipe-process) and a reader of the events of the zfits files.
 The constants and functions are imported by the test modules (``from conftest import ...``).
 """
 import numpy as np
@@ -9,8 +9,9 @@ from astropy.utils import iers
 from ctapipe.core import run_tool
 from protozfits import File
 
-from sst1mpipe.resources import MONITORING_CONFIG_FILE, TEST_DATA_DIR
+from sst1mpipe.resources import MONITORING_CONFIG_FILE, RTA_CONFIG_FILE, TEST_DATA_DIR
 from sst1mpipe.scripts.sst1mpipe_monitoring_tool import MonitoringTool
+from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
 
 # the tests do not download the IERS tables (Earth orientation): the alt/az of the pointing
 # are computed with the tables of astropy, precise enough for the tests (< 1 arcmin), without
@@ -50,6 +51,28 @@ def run_monitoring(input_file, output, *args):
         *args,
     ], raises=True)
     return tool
+
+
+def run_process(input_file, output, *args, config=RTA_CONFIG_FILE, wobble_in_output_name=False):
+    """
+    sst1mpipe-process (RTA config by default), returns the tool.
+    The output file keeps its name, unless wobble_in_output_name.
+    """
+    tool = ProcessorTool()
+    run_tool(tool, argv=[
+        f"--input={input_file}",
+        f"--output={output}",
+        f"--config={config}",
+        "--no-progress",
+        f"--ProcessorTool.wobble_in_output_name={wobble_in_output_name}",
+        *args,
+    ], raises=True)
+    return tool
+
+
+def monitoring_source_args(monitoring_file):
+    """sst1mpipe-process arguments to use a monitoring file of sst1mpipe-monitoring"""
+    return ["--monitoring-source=SST1MMonitoringSource", f"--SST1MMonitoringSource.input_files={monitoring_file}"]
 
 
 def read_zfits_events(path, events=slice(None)):
