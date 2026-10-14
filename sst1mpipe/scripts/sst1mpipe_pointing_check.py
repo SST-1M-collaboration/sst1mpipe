@@ -26,7 +26,6 @@ import sys
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
-from importlib.resources import files
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
 from ctapipe.coordinates import CameraFrame
@@ -38,6 +37,7 @@ from sst1mpipe.io import (
     load_config,
 )
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.resources import SUBARRAY_FILE
 from sst1mpipe.utils import (
     get_location,
     get_target,
@@ -150,7 +150,7 @@ def main():
     source = SST1MEventSource([input_file], max_events=None)
 
     ### This sould probably be moved to sst1m_event_source
-    subarray_file = files('sst1mpipe.data').joinpath('sst1m_array.h5')
+    subarray_file = SUBARRAY_FILE
 
     subarray = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
     source._subarray = subarray

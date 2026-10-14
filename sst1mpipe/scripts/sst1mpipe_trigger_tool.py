@@ -41,9 +41,9 @@ class TriggerTool(Tool):
     name = "sst1mpipe-trigger"
     description = __doc__
     examples = (
-        "sst1mpipe-trigger -i gamma.simtel.gz -o gamma_trigger.h5 --config sst1mpipe/data/sst1mpipe_trigger_emulator_mc.json\n"
+        "sst1mpipe-trigger -i gamma.simtel.gz -o gamma_trigger.h5 --config sst1mpipe/resources/config/sst1mpipe_trigger_emulator_mc.json\n"
         "sst1mpipe-trigger -i SST1M1_20260426_0250.fits.fz -o trigger.h5 "
-        "--config sst1mpipe/data/sst1mpipe_trigger_emulator_data.json --compare-camera"
+        "--config sst1mpipe/resources/config/sst1mpipe_trigger_emulator_data.json --compare-camera"
     )
 
     input_url = Path(exists=True, directory_ok=False, help="Input file: simtel or SST-1M .fits.fz").tag(config=True)

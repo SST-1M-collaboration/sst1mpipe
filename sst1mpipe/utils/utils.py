@@ -15,9 +15,7 @@ import ctaplot
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
 import pandas as pd
-from importlib.resources import files
 import tables
 from astropy.coordinates import (
     AltAz,
@@ -38,10 +36,10 @@ from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
 from gammapy.data import DataStore
 
+from sst1mpipe.resources import INSTRUMENT_DIR, PIXEL_MAPPING_FILE, SUBARRAY_FILE
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-MAPPING_FILE_PATH = BASE_DIR / "data" / "digicam_pixels_mapping_V5T.txt"
-INVERTED_MODULE_LIST_PATH = BASE_DIR / "data" / "inverted_module_list.json"
+MAPPING_FILE_PATH = PIXEL_MAPPING_FILE
+INVERTED_MODULE_LIST_PATH = INSTRUMENT_DIR / "inverted_module_list.json"
 
 def get_target(file, force_pointing=False):
     """
@@ -1782,11 +1780,7 @@ def get_pointing_radec(input_file):
 
 def get_subarray():
 
-    subarray_file = files('sst1mpipe.data').joinpath(
-                                'sst1m_array.h5'
-                            )
-
-    subarray = SubarrayDescription.from_hdf(subarray_file, focal_length_choice="EQUIVALENT")
+    subarray = SubarrayDescription.from_hdf(SUBARRAY_FILE, focal_length_choice="EQUIVALENT")
     return subarray
 
 

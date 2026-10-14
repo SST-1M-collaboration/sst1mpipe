@@ -25,7 +25,7 @@ and the neighbour matrix derived from it (TDSCAN).
 
 The ``sst1mpipe-trigger`` tool (``sst1mpipe/scripts/sst1mpipe_trigger_tool.py``)
 runs both emulators on a file. Configuration examples:
-``sst1mpipe/data/sst1mpipe_trigger_emulator_{mc,data}.json``.
+``sst1mpipe/resources/config/sst1mpipe_trigger_emulator_{mc,data}.json``.
 """
 import numpy as np
 from ctapipe.core import TelescopeComponent
