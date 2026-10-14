@@ -37,7 +37,8 @@ sst1mpipe = [
   "resources/calibration/dark_runs/*",
   "resources/instrument/*",
   "resources/test_data/zfits/*",
-  "resources/test_data/simtel/*"
+  "resources/test_data/simtel/*",
+  "resources/test_data/drive/*"
 ]
 
 [project.scripts]
@@ -52,6 +53,7 @@ sst1mpipe_r0_dl1 = "sst1mpipe.scripts.sst1mpipe_r0_dl1:main"
 sst1mpipe_mc_train_rfs = "sst1mpipe.scripts.sst1mpipe_mc_train_rfs:main"
 sst1mpipe_merge_hdf5 = "sst1mpipe.scripts.sst1mpipe_merge_hdf5:main"
 sst1mpipe_pointing_check = "sst1mpipe.scripts.sst1mpipe_pointing_check:main"
+sst1mpipe_plot_drive_pointing = "sst1mpipe.scripts.sst1mpipe_plot_drive_pointing:main"
 rate_scans_extraction = "sst1mpipe.scripts.rate_scans_extraction:main"
 create_hdu_indexes = "sst1mpipe.scripts.create_hdu_indexes:main"
 sst1mpipe_extract_dl1_distributions = "sst1mpipe.scripts.sst1mpipe_extract_dl1_distributions:main"
