@@ -45,10 +45,8 @@ sst1mpipe_dl1_dl2 = "sst1mpipe.scripts.sst1mpipe_dl1_dl2:main"
 sst1mpipe_data_dl1_dl1_stereo = "sst1mpipe.scripts.sst1mpipe_data_dl1_dl1_stereo:main"
 sst1mpipe_data_get_photon_list = "sst1mpipe.scripts.sst1mpipe_data_get_photon_list:main"
 sst1mpipe_data_dl2_dl3 = "sst1mpipe.scripts.sst1mpipe_data_dl2_dl3:main"
-sst1mpipe_get_tunning_params = "sst1mpipe.scripts.sst1mpipe_get_tunning_params:main"
 sst1mpipe_mc_performance = "sst1mpipe.scripts.sst1mpipe_mc_performance:main"
 sst1mpipe_mc_make_irfs = "sst1mpipe.scripts.sst1mpipe_mc_make_irfs:main"
-sst1mpipe_r0_dl1 = "sst1mpipe.scripts.sst1mpipe_r0_dl1:main"
 sst1mpipe_mc_train_rfs = "sst1mpipe.scripts.sst1mpipe_mc_train_rfs:main"
 sst1mpipe_merge_hdf5 = "sst1mpipe.scripts.sst1mpipe_merge_hdf5:main"
 sst1mpipe_pointing_check = "sst1mpipe.scripts.sst1mpipe_pointing_check:main"
@@ -91,7 +89,7 @@ command_line = "-m pytest tests/"
 source = ["sst1mpipe/"]
 
 [tool.coverage.report]
-fail_under = 6
+fail_under = 18
 show_missing = true
 sort = "Cover"
 
