@@ -780,34 +780,6 @@ def mix_gamma_proton(params_gammas, params_protons, max_events=None, gp_training
     return mixed
 
 
-def correct_true_image(event):
-    """
-    For an unknown reason, event.simulation.tel[tel].true_image
-    is sometimes None, which kills the rest of the script
-    and simulation histogram is not saved. Here we repace
-    it with an array of zeros.
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    """
-
-    for tel in event.trigger.tels_with_trigger:
-        if event.simulation.tel[tel].true_image is None:
-            event.simulation.tel[tel].true_image = np.zeros(1296, dtype='int32')
-
-    return event
-
-
-
-
 def check_output_dl1(file):
     """
     Checks if simulated shower distributions
@@ -1246,7 +1218,13 @@ def get_horizon_frame(config=None, telescope=None, times=None):
     return horizon_frame
 
 
-def get_survived_ped_fraction(dl1_files, logs=None, tel=None):
+def get_survived_ped_fraction(dl1_files, tel=None):
+    """
+    Zenith angle and time of the first event, fraction of the pedestal events which survive the
+    cleaning (/dl1/info), wobble and run number of the DL1 files of a telescope. The files without
+    pointing or without pedestal events are skipped.
+    """
+    from sst1mpipe.io import get_dl1_info, load_dl1_sst1m, pedestal_cleaning_fractions
 
     zenith_angles = []
     times = []
@@ -1256,40 +1234,23 @@ def get_survived_ped_fraction(dl1_files, logs=None, tel=None):
     runs = []
 
     for file in dl1_files:
+        ped_fraction, _ = pedestal_cleaning_fractions(file)
+        if np.isnan(ped_fraction):
+            continue
         try:
-            zenith_angle = 90. - read_table(file, "/dl1/event/telescope/parameters/"+tel)['true_alt_tel'][0]
-
-        except tables.exceptions.NoSuchNodeError:
+            events = load_dl1_sst1m(file, tel=tel)
+        except SystemExit:
+            # load_dl1_sst1m exits without pointing
             print(file, 'No pointing info!')
             continue
 
-        time = read_table(file, "/dl1/event/telescope/parameters/"+tel)['local_time'][0]
-
-        # find log
-        date = file.split('/')[-1].split('.')[0].split('_')[1]
-        run = file.split('/')[-1].split('.')[0].split('_')[2]
-        res = [i for i in logs if date in i]
-        log_file = [i for i in res if run in i][0]
-
-        # find fraction of pedestals in log
-        word = 'Fraction of pedestal'
-        with open(log_file) as fp:
-            # read all lines in a list
-            lines = fp.readlines()
-            for line in lines:
-                # check if string present on a current line
-                if line.find(word) != -1:
-                    ped_fraction = float(line.split(': ')[-1])
-                    zenith_angles.append(zenith_angle)
-                    times.append(time)
-                    runs.append(int(run))
-                    ped_fractions.append(ped_fraction)
-                    filenames.append(file)
-
-                    if "W1" in file:
-                        wobble.append("W1")
-                    elif "W2" in file:
-                        wobble.append("W2")
+        zenith_angles.append(90. - events['true_alt_tel'][0])
+        times.append(events['local_time'][0])
+        ped_fractions.append(ped_fraction)
+        wobble.append(get_dl1_info(file)['wobble'][0])
+        # obs_id: date and run number, e.g. 202601201179
+        runs.append(int(str(events['obs_id'][0])[8:]))
+        filenames.append(file)
 
     zenith_angles = np.array(zenith_angles)
     times = np.array(times)

@@ -11,8 +11,8 @@ import pandas as pd
 import tables
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.io import fits
-from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
-from astropy.table import QTable, Table, join, vstack
+from astropy.io.misc.hdf5 import read_table_hdf5
+from astropy.table import Table, join, vstack
 from astropy.time import Time
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import HDF5Merger, read_table, write_table
@@ -41,68 +41,6 @@ from sst1mpipe.utils.utils import (
     join_in_order,
     stereo_var_cuts,
 )
-
-
-def read_charges_data(file):
-    """
-    Read pixel charges distribution from
-    histogram files stored with sst1mpipe_r0_dl1
-    from real data files
-
-    Parameters
-    ----------
-    file: string
-        Path to HDF file with histogram of
-        pedestal charges
-
-    Returns
-    -------
-    bin_centers: astropy.table.table.QTable
-    charge_norm: astropy.table.table.Table
-
-    """
-
-    bins = read_table_hdf5(file, path='bins')['pe_bins']
-    charge = read_table_hdf5(file, path='charge')['pixel_charge']
-    charge_norm = charge/sum(charge)
-    bin_centers = (bins[1:]-bins[:-1]) / 2 + bins[:-1]
-    return bin_centers, charge_norm
-
-
-def read_charges_mc(file, tel=None):
-    """
-    Read pixel charges distribution from
-    histogram files stored with sst1mpipe_r0_dl1
-    from MC files (where we have distributions for
-    all simulated telescopes in single histogram
-    file)
-
-    Parameters
-    ----------
-    file: string
-        Path to HDF file with histogram of
-        pedestal charges
-    tel: string
-
-    Returns
-    -------
-    bin_centers: astropy.table.table.QTable
-    charge_norm: astropy.table.table.Table
-
-    """
-
-    bins = read_table_hdf5(file, path='bins')['pe_bins']
-    charge = read_table_hdf5(file, path='charge')['pixel_charge_tel'+str(tel)]
-    charge_norm = charge/sum(charge)
-    bin_centers = (bins[1:]-bins[:-1]) / 2 + bins[:-1]
-    return bin_centers, charge_norm
-
-
-def read_charge_images(file):
-
-    ped_q_map = read_table_hdf5(file, path='charge_images')
-    ped_q_map['start_time'] = np.array(ped_q_map['start_time'], dtype='datetime64[ns]')
-    return ped_q_map
 
 
 def load_config(cfg_file, ismc=False):
@@ -332,70 +270,6 @@ def write_photon_list(
         )
 
 
-def write_pixel_charges_table(
-        data, bin_edges, names=None,
-        output_file=None):
-
-    res_t = Table(data=data, names=names)
-    bins_t = QTable(data=bin_edges[..., np.newaxis], names=['pe_bins'])
-    write_table_hdf5(bins_t, output_file, path='bins', overwrite=True, append=True, serialize_meta=True)
-    write_table_hdf5(res_t, output_file, path='charge', overwrite=True, append=True)
-
-
-def write_charge_images(ped_q_map, output_file=None):
-
-    start_times = np.array(ped_q_map, dtype=object)[:,0]
-    start_times = np.array([x.datetime64.astype(np.uint64) for x in start_times])[..., np.newaxis]
-    start_times = np.hstack(start_times)
-
-    n_ped = np.array(ped_q_map, dtype=object)[:,1]
-    n_ped = np.hstack(n_ped.astype(int))
-
-    q_map = np.array(ped_q_map, dtype=object)[:,2:3]
-    q_map = np.hstack(q_map)
-    q_map = np.vstack(q_map)
-
-    stdev_map = np.array(ped_q_map, dtype=object)[:,3:4]
-    stdev_map = np.hstack(stdev_map)
-    stdev_map = np.vstack(stdev_map)
-
-    ped_names = ['start_time', 'n', 'average_q', 'stdev_q']
-    q_maps_t = Table(data=[start_times, n_ped, q_map, stdev_map], names=ped_names)
-    write_table_hdf5(q_maps_t, output_file, path='charge_images', overwrite=True, append=True, serialize_meta=True)
-
-
-def write_charge_fraction(file, survived_charge=None):
-    """
-    Writes fraction of survived charge after cleaning in
-    the DL1 table of each telescope. Works on MC only
-    as it needs true charge.
-
-    Parameters
-    ----------
-    file: string
-        Path to the output DL1 file
-    survived_charge: dict
-        Dictionary of survived charge fraction per
-        telescope
-
-    Returns
-    -------
-
-    """
-
-    if survived_charge is None:
-        survived_charge = {}
-
-    telescopes = get_telescopes(file)
-
-    for tel in telescopes:
-
-        params = read_table(file, "/dl1/event/telescope/parameters/" + tel)
-        merged_table = params.copy()
-        merged_table['survived_charge_fraction'] = survived_charge[tel]
-        merged_table.write(file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
-
-
 def write_extra_parameters(
         file, config=None, ismc=True, meanQ=None):
     """
@@ -553,53 +427,6 @@ def read_trigger_time(input_file, tel):
         'event_id': trigger['event_id'],
         'trigger_time': trigger['time'],
     })
-
-
-def write_assumed_pointing(
-        dl1_file, tel, ra=None, dec=None, location=None):
-    """
-    Writes pointing info (per event true_tel_az, true_tel_alt)
-    of the telescope in the main DL1 table.
-
-    Parameters
-    ----------
-    dl1_file: string
-        Path
-    tel: string
-        Telescope, e.g. \'tel_021\'
-    ra: float
-        Pointing RA in deg
-    dec: float
-        Pointing DEC in deg
-    location: astropy.coordinates.EarthLocation
-        Location of the telescope
-
-    Returns
-    -------
-
-    """
-
-    pointing_ra = float(ra) * u.deg
-    pointing_dec = float(dec) * u.deg
-    wobble_coords = SkyCoord(ra=pointing_ra, dec=pointing_dec, frame='icrs')
-
-    params = read_table(dl1_file, "/dl1/event/telescope/parameters/" + tel)
-    time = Time(params['local_time'], format='unix', scale='utc')
-    horizon_frame = AltAz(obstime=time, location=location)
-    try:
-        tel_pointing = wobble_coords.transform_to(horizon_frame)
-        params['true_az_tel'] = tel_pointing.az.to_value(u.deg)
-        params['true_alt_tel'] = tel_pointing.alt.to_value(u.deg)
-    except ValueError:
-        logging.info("Broken file %s", dl1_file)
-        params['true_az_tel'] = np.nan
-        params['true_alt_tel'] = np.nan
-
-    # Only combination of both overwrite and append works like expected, i.e. overwrite only telescope parameters and the rest
-    # of the DL1 file remains the same
-    # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
-    # then cannot merge the files and raise error...
-    params.write(dl1_file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
 
 
 def load_more_dl1_tables_mono(
@@ -1073,18 +900,6 @@ def attach_monitoring_file(monitoring_file, output_file):
             table._f_copy(newparent=output.get_node(parent), overwrite=True)
 
 
-def chunk_statistics_table(containers):
-    """
-    Table of the statistics of chunks of events (`~ctapipe.containers.ChunkStatisticsContainer`),
-    with the columns of the ctapipe pixel statistics tables (time_start, time_end, mean, median, std, ...)
-    """
-    columns = {}
-    for name in containers[0].fields:
-        values = [container[name] for container in containers]
-        columns[name] = Time(values) if isinstance(values[0], Time) else np.array(values)
-    return QTable(columns)
-
-
 def load_pedestals(input_file, group, tel=None):
     """
     Reads the tables of statistics of the pedestal events of the telescopes
@@ -1461,6 +1276,18 @@ def get_dl1_info(file):
 
     info = read_table(file, "/dl1/info")
     return info
+
+
+def pedestal_cleaning_fractions(dl1_file):
+    """
+    Fraction of the pedestal events which survive the cleaning, and average fraction of pixels
+    with a raised picture threshold (NSBImageCleaner), from /dl1/info. NaN if not available.
+    """
+    info = get_dl1_info(dl1_file)
+    n_pedestal = info['n_pedestal'][0]
+    ped_fraction = info['n_survived_pedestals'][0] / n_pedestal if n_pedestal > 0 else np.nan
+    raised_fraction = info['raised_threshold_fraction'][0] if 'raised_threshold_fraction' in info.colnames else np.nan
+    return ped_fraction, raised_fraction
 
 
 def load_more_dl2_files(files, config=None,

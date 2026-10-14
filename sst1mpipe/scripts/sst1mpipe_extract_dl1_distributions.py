@@ -28,10 +28,10 @@ from gammapy.data import DataStore
 
 from sst1mpipe.io import (
     check_outdir,
-    get_dl1_info,
     load_r0_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
+    pedestal_cleaning_fractions,
 )
 from sst1mpipe.utils import get_telescopes
 from sst1mpipe.utils.NSB_tools import VAR_to_NSB, mean_pedestal_std
@@ -197,18 +197,6 @@ def get_table(rate, diff_rate, bin_edges=None):
     table["diff_rate"] = diff_rate
 
     return table
-
-def pedestal_cleaning_fractions(dl1_file):
-    """
-    Fraction of the pedestal events which survive the cleaning, and average fraction of pixels
-    with a raised picture threshold (NSBImageCleaner), from /dl1/info. NaN if not available.
-    """
-    info = get_dl1_info(dl1_file)
-    n_pedestal = info['n_pedestal'][0]
-    ped_fraction = info['n_survived_pedestals'][0] / n_pedestal if n_pedestal > 0 else np.nan
-    raised_fraction = info['raised_threshold_fraction'][0] if 'raised_threshold_fraction' in info.colnames else np.nan
-    return ped_fraction, raised_fraction
-
 
 def load_data(files, config=None, tel=None, data_level='dl1'):
     i = 0

@@ -29,7 +29,6 @@ from .utils import (
     check_same_shower_fraction,
     clip_alt,
     correct_number_simulated_showers,
-    correct_true_image,
     disp,
     disp_to_pos,
     disp_vector,
@@ -65,7 +64,3 @@ from .utils import (
     simbad_query,
     stereo_var_cuts,
 )
-
-#from .monitoring_pedestals import (
-#    sliding_pedestals,
-#)

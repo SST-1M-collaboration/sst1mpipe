@@ -115,8 +115,9 @@ class SST1MR0Container(R0Container):
 class SST1MPixelStatisticsContainer(PixelStatisticsContainer):
     """
     ctapipe pixel statistics with the statistics of the ADC samples of the pedestal events.
-    The statistics of the pedestal events are computed in a sliding window of events
-    (`~ctapipe.containers.ChunkStatisticsContainer`, see `sst1mpipe.utils.monitoring_pedestals`).
+    The statistics of the pedestal events are computed in chunks of events
+    (`~ctapipe.containers.ChunkStatisticsContainer`) by sst1mpipe-monitoring, and filled by
+    `sst1mpipe.io.monitoring_source.SST1MMonitoringSource`.
     """
 
     pedestal_image = Field(

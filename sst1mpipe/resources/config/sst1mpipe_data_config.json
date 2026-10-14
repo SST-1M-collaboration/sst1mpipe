@@ -73,7 +73,6 @@
     },
 
     "analysis": {
-      "min_number_pedestals": 100,
       "global_theta_cut": 0.2,
       "global_gammaness_cut": 0.75,
       "stereo_delta_disp_cut_deg": null,
@@ -90,8 +89,7 @@
       "reco_energy_scaling_factor": 1.0,
       "stereo_reco_weights": "camera_frame_hillas_intensity",
       "observation_time_h": 50,
-      "off_regions": 5,
-      "ped_time_window": 10
+      "off_regions": 5
     },
 
     "event_selection": {
@@ -116,15 +114,6 @@
           "tel_021": 1.0,
           "tel_022": 1.0
         }
-    },
-
-    "R0PedestalMonitor": {
-        "n_events": 100,
-        "dead_pixel_std_threshold": 2.5
-    },
-
-    "DL1PedestalMonitor": {
-        "n_events": 1000
     },
 
     "ImageProcessor": {

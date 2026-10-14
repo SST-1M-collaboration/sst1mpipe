@@ -7,8 +7,8 @@ from ctapipe.io.hdf5dataformat import DL1_PIXEL_STATISTICS_GROUP
 
 from conftest import OBSERVATION_RUNS, monitoring_source_args, run_process
 from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES
-from sst1mpipe.io import get_dl1_info, load_dl1_sst1m
-from sst1mpipe.scripts.sst1mpipe_extract_dl1_distributions import pedestal_cleaning_fractions
+from sst1mpipe.io import get_dl1_info, load_dl1_sst1m, pedestal_cleaning_fractions
+from sst1mpipe.utils import get_survived_ped_fraction
 
 TARGET, WOBBLE, RA, DEC = "MRK421", "W1", 166.9948, 38.1053
 
@@ -55,6 +55,10 @@ def test_process_r0_file(tmp_path, observation_monitoring, tel_id, voltage_drop_
     # fraction of pixels whose picture threshold is raised by the NSBImageCleaner
     assert 0 <= info["raised_threshold_fraction"][0] < 1
     assert pedestal_cleaning_fractions(output) == (0, info["raised_threshold_fraction"][0])
+    zenith, _, ped_fractions, wobble, runs, _ = get_survived_ped_fraction([str(output)], tel=f"tel_{tel_id:03d}")
+    assert list(ped_fractions) == [0] and list(wobble) == [WOBBLE]
+    assert list(runs) == [int(run["path"].name.split(".")[0].split("_")[2])]
+    assert 15 < zenith[0] < 17
     assert (info["target"][0], info["wobble"][0]) == (TARGET, WOBBLE)
     assert (info["ra"][0], info["dec"][0]) == pytest.approx((RA, DEC))
     assert not info["manual_coords"][0]
