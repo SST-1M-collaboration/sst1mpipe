@@ -61,7 +61,6 @@ from .utils import (
     mc_correct_shower_reuse,
     mix_gamma_proton,
     polar_to_cartesian,
-    remove_bad_pixels,
     remove_stereo,
     simbad_query,
     stereo_var_cuts,
