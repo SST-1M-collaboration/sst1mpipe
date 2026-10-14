@@ -25,6 +25,7 @@ from astropy.coordinates import (
     get_sun,
 )
 from astropy.io import fits
+from astropy.table import join
 from astropy.time import Time
 from astroquery.simbad import Simbad
 from ctapipe.coordinates import CameraFrame
@@ -647,6 +648,16 @@ def correct_number_simulated_showers(
     return simulated_event_info
 
 
+def join_in_order(table, other, keys=("obs_id", "event_id"), join_type="inner"):
+    """Join of two astropy tables on keys, keeping the order of the rows of the first table"""
+    table = table.copy(copy_data=False)
+    table["_row"] = np.arange(len(table))
+    joined = join(table, other, keys=list(keys), join_type=join_type, metadata_conflicts="silent")
+    joined.sort("_row")
+    joined.remove_column("_row")
+    return joined
+
+
 def energy_min_cut(file, config=None):
 
     mc = read_table(file, "/configuration/simulation/run")
@@ -910,26 +921,29 @@ def add_pointing_mc(
 
     """
 
-    string = "/dl1/monitoring/telescope/pointing/" + tel
-    pointing = read_table(input_file, string)
+    # fixed pointing of the telescope in each simulation run (obs_id)
+    pointing = read_table(input_file, "/configuration/telescope/pointing/" + tel)
+    index = {obs_id: i for i, obs_id in enumerate(pointing['obs_id'])}
+    rows = [index[obs_id] for obs_id in data['obs_id']]
 
     merged_table = data.copy()
 
-    merged_table['true_az_tel'] = np.ones(len(merged_table)) * (pointing['azimuth'][0] * pointing['azimuth'].unit).to(u.deg)
-    merged_table['true_alt_tel'] = np.ones(len(merged_table)) * (pointing['altitude'][0] * pointing['altitude'].unit).to(u.deg)
+    merged_table['true_az_tel'] = pointing['telescope_pointing_azimuth'].quantity[rows].to(u.deg)
+    merged_table['true_alt_tel'] = pointing['telescope_pointing_altitude'].quantity[rows].to(u.deg)
 
     return merged_table
 
 
-def add_disp(paramtable, config=None, telescope=None):
+def add_disp(paramtable, horizon_frame):
     """
     Add DISP parameters in the DL1 MC table.
 
     Parameters
     ----------
     paramtable: astropy.table.Table
-    config: dict
-    telescope: string
+    horizon_frame: astropy.coordinates.AltAz
+        Frame of the true direction of the showers and of the pointing
+        of the telescope (true_alt/true_az, true_alt_tel/true_az_tel)
 
     Returns
     -------
@@ -938,8 +952,6 @@ def add_disp(paramtable, config=None, telescope=None):
     """
 
     merged_table = paramtable
-
-    horizon_frame = get_horizon_frame(config=config, telescope=telescope)
 
     true_coordinates = get_event_pos_in_camera(merged_table, horizon_frame, true_pos=True)
     merged_table['true_camera_x'] = true_coordinates[0]

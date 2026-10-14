@@ -246,3 +246,9 @@ Reading the outputs
     # ctapipe readers: the pointing of the events is interpolated from the pointing table
     with TableLoader("SST1M1_20260120_1179_W1.dl1.h5") as loader:
         table = loader.read_telescope_events([21], dl1_parameters=True, pointing=True)
+
+``load_dl1_sst1m`` adds the parameters of the analysis which are not computed by ctapipe
+(``add_dl1_extra_parameters``): ``log_camera_frame_hillas_intensity``, ``camera_frame_hillas_wl``,
+``equivalent_focal_length``; for the observed data ``local_time``, ``date`` and ``meanQ`` (mean charge
+of the pedestal images); for the simulations the true parameters of the showers, ``log_true_energy``,
+the DISP parameters, ``miss`` and ``true_tel_impact_distance``. They are not written in the DL1 files.

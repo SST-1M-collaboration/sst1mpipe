@@ -14,6 +14,7 @@ from astropy.io import fits
 from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
 from astropy.table import QTable, Table, join, vstack
 from astropy.time import Time
+from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import HDF5Merger, read_table, write_table
 from ctapipe.io.hdf5dataformat import DL1_SKY_PEDESTAL_IMAGE_GROUP
 from ctapipe.monitoring.interpolation import PointingInterpolator
@@ -34,8 +35,10 @@ from sst1mpipe.utils.utils import (
     add_true_impact,
     event_selection,
     get_finite,
+    get_horizon_frame,
     get_pointing_radec,
     get_telescopes,
+    join_in_order,
     stereo_var_cuts,
 )
 
@@ -429,7 +432,7 @@ def write_extra_parameters(
             merged_table = join(params, simulation, keys=['obs_id', 'event_id'])
             configuration = read_table(file, "/configuration/instrument/telescope/optics")
             merged_table['equivalent_focal_length'] = configuration['equivalent_focal_length'] * np.ones(len(merged_table))
-            merged_table = add_disp(merged_table, config=config, telescope=tel)
+            merged_table = add_disp(merged_table, get_horizon_frame(config=config, telescope=tel))
             merged_table = add_miss(merged_table)
             merged_table = add_true_impact(merged_table, input_file=file, tel=tel)
             merged_table = add_log_true_energy(merged_table)
@@ -715,6 +718,88 @@ def interpolate_pointing(input_file, tel, time):
     return azimuth, altitude
 
 
+SIMULATION_SHOWER_TABLE = "/simulation/event/subarray/shower"
+
+
+def add_dl1_extra_parameters(events, input_file, tel):
+    """
+    Add to the DL1 parameters of a telescope the parameters used by the analysis which are not
+    computed by ctapipe. They are computed from the parameters and from the other tables of the
+    DL1 file, when they are not already in the table (DL1 files of the former sst1mpipe_r0_dl1,
+    which wrote them in the file):
+
+    - ``log_camera_frame_hillas_intensity`` and ``camera_frame_hillas_wl``, always computed
+      (from the intensity scaled by load_dl1_sst1m)
+    - ``equivalent_focal_length`` (m), from the subarray of the file
+    - observed data: ``local_time`` (unix time of the trigger, s), ``date`` (date of the run:
+      first 8 digits of the obs_id, e.g. 20260120) and ``meanQ`` (mean charge of the pedestal
+      images of the chunk of pedestal events at the time of the event, in p.e., if the monitoring
+      data are in the file)
+    - simulations: the true parameters of the shower (/simulation/event/subarray/shower),
+      ``log_true_energy``, ``true_camera_x``/``true_camera_y``, the DISP parameters, ``miss``
+      and ``true_tel_impact_distance``
+
+    Parameters
+    ----------
+    events: astropy.table.Table
+        DL1 parameters, with the trigger time (trigger_time) and the pointing of the telescope
+        (true_az_tel, true_alt_tel), see load_dl1_sst1m
+    input_file: string
+        Path of the DL1 file
+    tel: string
+        e.g. 'tel_021'
+
+    Returns
+    -------
+    astropy.table.Table
+    """
+    tel_id = int(tel.split("_")[-1])
+    subarray = SubarrayDescription.from_hdf(input_file)
+    events = add_features(events)
+    if "equivalent_focal_length" not in events.keys():
+        focal_length = subarray.tel[tel_id].optics.equivalent_focal_length.to(u.m)
+        events["equivalent_focal_length"] = np.full(len(events), focal_length.value) * u.m
+
+    with tables.open_file(input_file) as h5:
+        simulation = SIMULATION_SHOWER_TABLE in h5
+        pedestal_images = f"{DL1_PEDESTAL_GROUP}/{tel}" in h5
+
+    if simulation:
+        if "true_energy" not in events.keys():
+            events = join_in_order(events, read_table(input_file, SIMULATION_SHOWER_TABLE))
+        if "log_true_energy" not in events.keys():
+            events = add_log_true_energy(events)
+        if "disp_norm" not in events.keys():
+            # the camera coordinates do not depend on the location and time of the frame
+            events = add_disp(events, AltAz(location=subarray.reference_location))
+            events = add_miss(events)
+        if "true_tel_impact_distance" not in events.keys():
+            events = add_true_impact(events, input_file=input_file, tel=tel)
+        return events
+
+    if "local_time" not in events.keys():
+        events["local_time"] = events["trigger_time"].unix
+    if "date" not in events.keys():
+        dates = {obs_id: int(str(obs_id)[:8]) for obs_id in np.unique(events["obs_id"])}
+        events["date"] = np.array([dates[obs_id] for obs_id in events["obs_id"]], dtype=np.int64)
+    if "meanQ" not in events.keys() and pedestal_images:
+        events["meanQ"] = pedestal_mean_charge(input_file, tel, events["trigger_time"])
+    return events
+
+
+def pedestal_mean_charge(input_file, tel, times):
+    """
+    Mean over the pixels of the mean charge of the pedestal images (p.e.) at the given times:
+    statistics of the chunk of pedestal events started before each time (the first chunk for the
+    times before it), from the DL1 monitoring data of the file (sst1mpipe-monitoring)
+    """
+    chunks = read_table(input_file, f"{DL1_PEDESTAL_GROUP}/{tel}")
+    mean = np.asarray(chunks["mean"], dtype=np.float64)
+    mean = np.nanmean(mean.reshape(len(mean), -1), axis=1)
+    index = np.searchsorted(chunks["time_start"].mjd, Time(times).mjd, side="right") - 1
+    return mean[np.clip(index, 0, len(mean) - 1)]
+
+
 def load_dl1_sst1m(
         input_file, tel=None, config=None,
         table='astropy', check_finite=False,
@@ -762,15 +847,16 @@ def load_dl1_sst1m(
 
     # trigger time with ns precision, for the matching of the stereo events
     trigger_time = read_trigger_time(input_file, tel)
-    events['_row'] = np.arange(len(events))
-    events = join(events, trigger_time, keys=['obs_id', 'event_id'], join_type='left')
-    events.sort('_row')
-    events.remove_column('_row')
+    events = join_in_order(events, trigger_time, join_type='left')
 
+    with tables.open_file(input_file) as h5:
+        simulation = SIMULATION_SHOWER_TABLE in h5
+        pointing_monitoring = "/dl0/monitoring/telescope/pointing/" + tel in h5
     if 'true_alt_tel' not in events.keys():
-        with tables.open_file(input_file) as h5:
-            pointing_monitoring = "/dl0/monitoring/telescope/pointing/" + tel in h5
-        if pointing_monitoring:
+        if simulation:
+            # fixed pointing of the simulation (DL1 files of sst1mpipe-process)
+            events = add_pointing_mc(events, input_file=input_file, tel=tel)
+        elif pointing_monitoring:
             # pointing of the observed data (sst1mpipe-process), interpolated at the trigger times
             azimuth, altitude = interpolate_pointing(input_file, tel, events['trigger_time'])
             events['true_az_tel'] = azimuth.to_value(u.deg)
@@ -787,6 +873,8 @@ def load_dl1_sst1m(
             except Exception:
                 logging.error('Adding pointing information failed! Length of params and pointing tables probably dont match. Broken file.')
                 exit()
+
+    events = add_dl1_extra_parameters(events, input_file, tel)
 
     if stereo:
         stereo_impact = read_table(input_file, "/dl2/event/telescope/impact/HillasReconstructor/" + tel)
