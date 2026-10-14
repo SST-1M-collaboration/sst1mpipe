@@ -28,6 +28,7 @@ from gammapy.data import DataStore
 
 from sst1mpipe.io import (
     check_outdir,
+    get_dl1_info,
     load_r0_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
@@ -106,8 +107,6 @@ def main():
     if len(files) > 0:
         stereo = True
 
-    logs = glob.glob(data_path_dl1 + "/*.log")
-
     if len(files) == 0:
         files = glob.glob(data_path_dl1 + '/*dl1.h5')
     if len(files) == 0:
@@ -125,7 +124,7 @@ def main():
             break
 
     for tel in tels:
-        dl1_data, ped_fractions, recleaned_fractions, times, nsb = load_data(files, logs, config=None, tel=tel, data_level='dl1')
+        dl1_data, ped_fractions, recleaned_fractions, times, nsb = load_data(files, config=None, tel=tel, data_level='dl1')
 
         # NSB calculated for tel2 in stereo is not correct as only tel1 pedetals are propagated to the stereo DL1 files
         if stereo & (str(tel[-1]) == '2'):
@@ -199,7 +198,19 @@ def get_table(rate, diff_rate, bin_edges=None):
 
     return table
 
-def load_data(files, logs, config=None, tel=None, data_level='dl1'):
+def pedestal_cleaning_fractions(dl1_file):
+    """
+    Fraction of the pedestal events which survive the cleaning, and average fraction of pixels
+    with a raised picture threshold (NSBImageCleaner), from /dl1/info. NaN if not available.
+    """
+    info = get_dl1_info(dl1_file)
+    n_pedestal = info['n_pedestal'][0]
+    ped_fraction = info['n_survived_pedestals'][0] / n_pedestal if n_pedestal > 0 else np.nan
+    raised_fraction = info['raised_threshold_fraction'][0] if 'raised_threshold_fraction' in info.colnames else np.nan
+    return ped_fraction, raised_fraction
+
+
+def load_data(files, config=None, tel=None, data_level='dl1'):
     i = 0
     data = None
     ped_fractions = []
@@ -213,28 +224,9 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
                 df = load_dl1_sst1m(input_file, tel=tel, config=config, table='pandas')
                 times.append(df['local_time'][0])
 
-                # find log
-                date = input_file.split('/')[-1].split('.')[0].split('_')[1]
-                run = input_file.split('/')[-1].split('.')[0].split('_')[2]
-                res = [i for i in logs if date in i]
-                log_file = [i for i in res if run in i][0]
-
-                # find fraction of pedestals in log
-                ped = 'Fraction of pedestal'
-                reclean = 'raised picture threshold'
-                with open(log_file) as fp:
-                    # read all lines in a list
-                    lines = fp.readlines()
-                    ped_fraction = 100
-                    recleaned_fraction = 0
-                    for line in lines:
-                        # check if string present on a current line
-                        if line.find(ped) != -1:
-                            ped_fraction = float(line.split(': ')[-1])
-                        if line.find(reclean) != -1:
-                            recleaned_fraction = float(line.split(': ')[-1])
-                    ped_fractions.append(ped_fraction)
-                    recleaned_fractions.append(recleaned_fraction)
+                ped_fraction, recleaned_fraction = pedestal_cleaning_fractions(input_file)
+                ped_fractions.append(ped_fraction)
+                recleaned_fractions.append(recleaned_fraction)
 
             elif data_level == 'dl2':
                 df = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')

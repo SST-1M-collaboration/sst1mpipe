@@ -253,6 +253,7 @@ class DL1_info(IsDescription):
     n_saturated          = Int64Col()
     n_pedestal           = Int64Col()
     n_survived_pedestals = Float64Col()
+    raised_threshold_fraction = Float64Col()
     n_triggered_tel1     = Int64Col()
     n_triggered_tel2     = Int64Col()
     swat_event_ids_used  = BoolCol()

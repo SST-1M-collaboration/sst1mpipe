@@ -137,15 +137,17 @@ monitoring containers of each event with the monitoring data at its time, before
 The statistics of an event are those of the chunk of pedestal events at its time, or at most
 ``--SST1MMonitoringSource.timestamp_tolerance`` (1 s) before or after it. The events without monitoring
 data (no chunk at their time, or out of the pointing table) cannot be calibrated: they are skipped, and
-their number is given in the log. The pedestal events are not processed (they are used by the
-monitoring only).
+their number is given in the log. The pedestal events are calibrated and cleaned but not written:
+they are used to count the fraction of pedestal events which survive the cleaning.
 
 Then the events are calibrated (``R0R1Calibrator``, ``CameraCalibrator``, ``ImageSaturationCorrector``),
 cleaned and parametrized (``ImageProcessor``), and their shower geometry is reconstructed
 (``ShowerProcessor``) if the DL2 is written (``DataWriter.write_dl2``, true in the data config).
 
 The output file contains the DL1 (and DL2) of the events, ``/dl1/info`` (summary of the processing:
-calibration files, target, number of triggered and pedestal events) and, with
+calibration files, target, number of triggered and pedestal events, number of pedestal events which
+survive the cleaning, average fraction of pixels whose picture threshold is raised by the
+``NSBImageCleaner``) and, with
 ``--ProcessorTool.attach_monitoring=True`` (default), a copy of the monitoring data of the monitoring
 file (``attach_monitoring_file``). The DL1 file is then self-contained: e.g. ``load_dl1_sst1m`` reads the pointing of the events
 from it. The wobble of the run is added to the name of the output file (``_W1``,

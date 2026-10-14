@@ -8,6 +8,7 @@ from ctapipe.containers import SchedulingBlockType
 from ctapipe.core import Tool
 from ctapipe.core.traits import Bool, ComponentName, List, UseEnum, classes_with_traits, flag
 from ctapipe.image import ImageProcessor
+from ctapipe.image.cleaning import NSBImageCleaner
 from ctapipe.io import EventSource, DataWriter, MonitoringSource, SimTelEventSource
 from ctapipe.reco import ShowerProcessor
 
@@ -46,8 +47,11 @@ class ProcessorTool(Tool):
     Only the events of the runs with an allowed scheduling block type (allowed_sb_types)
     are processed, e.g. the observations but not the transitions between two wobbles.
 
-    The pedestal events are used by the monitoring only (sst1mpipe-monitoring): they are not
-    processed. The shower geometry is reconstructed by the ShowerProcessor if the DL2 is written
+    The pedestal events are used by the monitoring (sst1mpipe-monitoring) and are not written:
+    they are calibrated and cleaned to count the fraction of them which survive the cleaning
+    (n_survived_pedestals in /dl1/info). The average fraction of pixels whose picture threshold
+    is raised by the NSBImageCleaner is also given in /dl1/info (raised_threshold_fraction).
+    The shower geometry is reconstructed by the ShowerProcessor if the DL2 is written
     (DataWriter.write_dl2).
     """
 
@@ -181,6 +185,9 @@ class ProcessorTool(Tool):
         # processing summary, counted in the event loop
         self.n_triggered = Counter()
         self.n_pedestal = 0
+        self.n_survived_pedestals = 0
+        # sum and number of the fractions of pixels with a raised picture threshold
+        self._raised_threshold = [0.0, 0]
         self._writer_closed = False
         self._exit_stack.callback(self._close_writer)
 
@@ -201,12 +208,10 @@ class ProcessorTool(Tool):
                 self.n_skipped_events += 1
                 continue
             self.n_triggered.update(event.trigger.tels_with_trigger)
-            # the pedestal events are used by the monitoring only
-            if event.trigger.event_type in PEDESTAL_EVENT_TYPES:
-                self.n_pedestal += 1
-                continue
+            is_pedestal = event.trigger.event_type in PEDESTAL_EVENT_TYPES
+            self.n_pedestal += is_pedestal
             if len(self.monitoring_sources) > 0 and not self.fill_monitoring(event):
-                self.n_events_without_monitoring += 1
+                self.n_events_without_monitoring += not is_pedestal
                 continue
 
             # R0 -> R1 calibration with the statistics of the monitoring sources (raw data),
@@ -218,6 +223,13 @@ class ProcessorTool(Tool):
             if self.image_saturation_corrector is not None and len(event.r0.tel) > 0:
                 self.image_saturation_corrector(event)
             self.image_processor(event)
+            self.add_raised_threshold_fraction(event)
+            # the pedestal events are not written: fraction of them which survive the cleaning
+            if is_pedestal:
+                self.n_survived_pedestals += any(
+                    np.isfinite(dl1.parameters.hillas.intensity) for dl1 in event.dl1.tel.values()
+                )
+                continue
             if self.shower_processor is not None:
                 self.shower_processor(event)
             self.writer(event)
@@ -237,6 +249,28 @@ class ProcessorTool(Tool):
             if statistics.pedestal_waveform.std is None or statistics.pedestal_image.std is None or no_pointing:
                 return False
         return True
+
+    def add_raised_threshold_fraction(self, event):
+        """
+        Fraction of the pixels of the cleaned images whose picture threshold is raised by the
+        NSBImageCleaner (pedestal_factor * std of the pedestal images above picture_threshold_pe)
+        """
+        cleaner = self.image_processor.clean
+        if not isinstance(cleaner, NSBImageCleaner):
+            return
+        for tel_id in event.dl1.tel:
+            std = event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_image.std
+            if std is None:
+                continue
+            raised = cleaner.pedestal_factor.tel[tel_id] * np.asarray(std) > cleaner.picture_threshold_pe.tel[tel_id]
+            self._raised_threshold[0] += np.mean(raised)
+            self._raised_threshold[1] += 1
+
+    @property
+    def raised_threshold_fraction(self):
+        """Average fraction of pixels with a raised picture threshold, None without statistics"""
+        total, n = self._raised_threshold
+        return total / n if n > 0 else None
 
     def scheduling_block_type(self, obs_id):
         """Type of the scheduling block of the observation block, None if unknown"""
@@ -280,6 +314,15 @@ class ProcessorTool(Tool):
         for tel_id, n in n_triggered.items():
             self.log.info("Number of triggered events of telescope %d: %d", tel_id, n)
         self.log.info("Number of pedestal events: %d", self.n_pedestal)
+        if self.n_pedestal > 0:
+            self.log.info(
+                "Fraction of pedestal events that survived cleaning: %f", self.n_survived_pedestals / self.n_pedestal,
+            )
+        if self.raised_threshold_fraction is not None:
+            self.log.info(
+                "Average (per event) fraction of pixels with raised picture threshold: %f",
+                self.raised_threshold_fraction,
+            )
 
         # observation information, from the event source (SST1MEventSource)
         source = self.event_source
@@ -312,8 +355,8 @@ class ProcessorTool(Tool):
                 else sum(self.image_saturation_corrector.n_saturated_events.values())
             ),
             n_pedestal=self.n_pedestal,
-            # the pedestal events are not processed
-            n_survived_pedestals=None,
+            n_survived_pedestals=self.n_survived_pedestals,
+            raised_threshold_fraction=self.raised_threshold_fraction,
             n_triggered_tel1=n_triggered_tel[1],
             n_triggered_tel2=n_triggered_tel[2],
             swat_event_ids_used=getattr(source, "swat_event_ids_available", False),
