@@ -25,11 +25,13 @@ DRIVE_TEL_ID_OFFSET = 20
 STATE_COLUMNS = ("is_tracking", "is_on_source", "is_moving", "is_in_park_position")
 
 
-def read_drive_logs(file, subarray=None):
+def read_drive_logs(file, subarray=None, bending_model=None):
     """
     Position of the telescope measured by its drive system (``current_position_el`` and
     ``current_position_az``, deg) at the time of the drive (``current_time``, ms since 1970,
     in the time system ``TIMESSYS`` of the logs), and state of the drive (`STATE_COLUMNS`).
+    The drive position includes the offsets of the bending model of the telescope, reverted
+    with ``bending_model`` to give the direction pointed to in the sky.
 
     Parameters
     ----------
@@ -37,12 +39,15 @@ def read_drive_logs(file, subarray=None):
         Drive logs (``logs`` table)
     subarray: ctapipe.instrument.SubarrayDescription
         Location of the telescopes, by default the SST-1M subarray (``SUBARRAY_FILE``)
+    bending_model: sst1mpipe.instrument.bending.BendingModel
+        Bending model of the drive. Without it, the pointing is the drive position.
 
     Returns
     -------
     astropy.table.QTable
         ``time``, ``pointing`` (AltAz of the telescope location) and the state columns, with
-        ``tel_id``, ``frame`` and ``equinox`` (sky frame of the drive) in the meta
+        ``tel_id``, ``frame`` and ``equinox`` (sky frame of the drive) and ``bending_reverted``
+        in the meta
     """
     if subarray is None:
         subarray = SubarrayDescription.from_hdf(SUBARRAY_FILE)
@@ -60,16 +65,18 @@ def read_drive_logs(file, subarray=None):
         logger.info("Drive logs of telescope %d from %s to %s", tel_id, t_start.isot, t_stop.isot)
 
         time = Time(data["current_time"] / 1000, format="unix", scale=time_scale)
+        alt = data["current_position_el"].astype(np.float64) * u.deg
+        az = data["current_position_az"].astype(np.float64) * u.deg
+        if bending_model is not None:
+            alt, az = bending_model.revert(tel_id, alt, az)
         pointing = SkyCoord(
-            alt=data["current_position_el"].astype(np.float64) * u.deg,
-            az=data["current_position_az"].astype(np.float64) * u.deg,
-            frame=AltAz(obstime=time, location=subarray.tel_earth_locations[tel_id]),
+            alt=alt, az=az, frame=AltAz(obstime=time, location=subarray.tel_earth_locations[tel_id])
         )
         table = QTable(dict(time=time, pointing=pointing))
         for column in STATE_COLUMNS:
             table[column] = data[column].astype(bool)
 
-    table.meta.update(tel_id=tel_id, frame=frame, equinox=equinox)
+    table.meta.update(tel_id=tel_id, frame=frame, equinox=equinox, bending_reverted=bending_model is not None)
     return table
 
 

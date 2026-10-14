@@ -8,15 +8,20 @@ Pointing of the SST-1M telescopes from the logs of their drive system, while tra
   zoom on each field for each telescope
 
 The pointing given by the TARGET field of zfits runs (``--zfits-files``) is drawn for comparison.
+The bending model of the drives (``--bending-model``, JSON configuration of the BendingModel,
+e.g. ``{"BendingModel": {"IA": [["id", 21, -2.6], ["id", 22, -0.6]]}}``) is reverted to give the
+direction pointed to in the sky.
 
 Usage:
 
 $> sst1mpipe_plot_drive_pointing
 --input-files DriveSystem1_20260120_001.fits DriveSystem2_20260120_002.fits
 --zfits-files SST1M1_20260120_1179.fits.fz
+--bending-model bending_model.json
 --output-dir ./plots
 """
 import argparse
+import json
 import logging
 from pathlib import Path
 
@@ -29,11 +34,15 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.visualization.wcsaxes.frame import EllipticalFrame
 from astropy.wcs import WCS
+from ctapipe.instrument import SubarrayDescription
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import FuncFormatter
+from traitlets.config import Config
 
+from sst1mpipe.instrument.bending import BendingModel
 from sst1mpipe.io.drive import drive_radec, read_drive_logs
 from sst1mpipe.io.sst1m_event_source import parse_target_field
+from sst1mpipe.resources import SUBARRAY_FILE
 
 # telescopes: categorical slots 1 and 2 of the reference palette (blue, orange)
 TEL_COLORS = {21: "#2a78d6", 22: "#eb6834"}
@@ -57,6 +66,10 @@ def parse_args():
     parser.add_argument("--input-files", "-f", nargs="+", required=True, help="Drive logs (DriveSystem*.fits)")
     parser.add_argument(
         "--zfits-files", "-z", nargs="+", default=[], help="zfits runs whose TARGET pointing is drawn for comparison"
+    )
+    parser.add_argument(
+        "--bending-model", "-b", default=None,
+        help="JSON configuration of the BendingModel of the drives, reverted (default: drive positions)",
     )
     parser.add_argument("--output-dir", "-o", default=".", help="Directory of the plots")
     parser.add_argument(
@@ -173,7 +186,7 @@ def style_axes(ax):
     ax.tick_params(colors=TEXT_SECONDARY, labelsize=8, length=3)
 
 
-def plot_radec_vs_time(tracks, fields, targets, radius, path):
+def plot_radec_vs_time(tracks, fields, targets, radius, path, pointing="drive position"):
     """Right ascension and declination of the telescopes while tracking, one column per field"""
     widths = [max((f["stop"] - f["start"]).to_value(u.h), 0.5) for f in fields]
     fig, axes = plt.subplots(
@@ -221,7 +234,9 @@ def plot_radec_vs_time(tracks, fields, targets, radius, path):
     fig.supxlabel("Time (UTC)", color=TEXT_SECONDARY, fontsize=9, y=0.02)
 
     night = min(f["start"] for f in fields).to_datetime().strftime("%Y-%m-%d")
-    fig.suptitle(f"Pointing of the drive while tracking on source, night of {night}", x=0.06, ha="left", fontsize=13, color=TEXT)
+    fig.suptitle(
+        f"Pointing ({pointing}) while tracking on source, night of {night}", x=0.06, ha="left", fontsize=13, color=TEXT
+    )
     handles = [plt.Line2D([], [], color=TEL_COLORS.get(tel_id, TEXT_SECONDARY), linewidth=2) for tel_id in tracks]
     labels = [f"Tel {tel_id}" for tel_id in tracks]
     if targets:
@@ -306,7 +321,7 @@ def nice_spacing(half_width):
     return 10 * u.deg
 
 
-def plot_radec_map(tracks, fields, targets, radius, path):
+def plot_radec_map(tracks, fields, targets, radius, path, pointing="drive position"):
     """Time spent tracking in each direction: whole sky and zoom on each field for each telescope"""
     frame = fields[0]["center"].frame.replicate_without_data()
     tel_ids = list(tracks)
@@ -389,7 +404,10 @@ def plot_radec_map(tracks, fields, targets, radius, path):
         colorbar.outline.set_visible(False)
 
     night = min(f["start"] for f in fields).to_datetime().strftime("%Y-%m-%d")
-    fig.suptitle(f"Sky map of the drive pointing while tracking on source, night of {night}", x=0.06, y=0.995, ha="left", fontsize=13, color=TEXT)
+    fig.suptitle(
+        f"Sky map of the pointing ({pointing}) while tracking on source, night of {night}",
+        x=0.06, y=0.995, ha="left", fontsize=13, color=TEXT,
+    )
     fig.savefig(path, dpi=150, facecolor=SURFACE, bbox_inches="tight")
     plt.close(fig)
     logging.info("Plot saved in %s", path)
@@ -401,9 +419,16 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    subarray = SubarrayDescription.from_hdf(SUBARRAY_FILE)
+    bending_model = None
+    pointing = "drive position"
+    if args.bending_model is not None:
+        with open(args.bending_model) as f:
+            bending_model = BendingModel(subarray, config=Config(json.load(f)))
+        pointing = "bending model reverted"
     tracks = {}
     for file in args.input_files:
-        drive = read_drive_logs(file)
+        drive = read_drive_logs(file, subarray=subarray, bending_model=bending_model)
         tracks[drive.meta["tel_id"]] = tracking_periods(drive, args.min_tracking)
     tracks = dict(sorted(tracks.items()))
     radius = args.field_radius * u.deg
@@ -415,8 +440,8 @@ def main():
             field["start"].isot, field["stop"].isot,
         )
 
-    plot_radec_vs_time(tracks, fields, targets, radius, output_dir / "drive_radec_vs_time.png")
-    plot_radec_map(tracks, fields, targets, radius, output_dir / "drive_radec_map.png")
+    plot_radec_vs_time(tracks, fields, targets, radius, output_dir / "drive_radec_vs_time.png", pointing)
+    plot_radec_map(tracks, fields, targets, radius, output_dir / "drive_radec_map.png", pointing)
 
 
 if __name__ == "__main__":
