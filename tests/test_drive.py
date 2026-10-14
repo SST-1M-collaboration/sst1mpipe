@@ -14,6 +14,10 @@ DRIVE_FILES = {
     22: TEST_DATA_DIR / "drive" / "DriveSystem2_20260120_002.fits",
 }
 MRK421 = SkyCoord(166.1138 * u.deg, 38.2088 * u.deg, frame="icrs")
+# largest separation from Mrk 421 (wobbles at 0.7 deg) of the drive position while tracking it,
+# which includes the bending model of the telescope (azimuth offset of about -2.3 deg for tel 21
+# and -0.6 deg for tel 22)
+MAX_SEPARATION_MRK421 = {21: 1.87 * u.deg, 22: 1.01 * u.deg}
 
 
 @pytest.fixture(scope="module")
@@ -29,7 +33,8 @@ def test_read_drive_logs(drives, tel_id):
     assert drive.meta["equinox"] == "J2000"
     assert isinstance(drive["time"], Time)
     assert isinstance(drive["pointing"].frame, AltAz)
-    # about 1.5% of the rows repeat the current_time of the previous row
+    # about 1.5% of the rows repeat the current_time of the previous row, see
+    # https://github.com/SST-1M-collaboration/sst1mpipe/issues/211
     assert np.all(np.diff(drive["time"].unix) >= 0)
     for column in STATE_COLUMNS:
         assert drive[column].dtype == bool
@@ -38,7 +43,7 @@ def test_read_drive_logs(drives, tel_id):
 
 @pytest.mark.parametrize("tel_id", DRIVE_FILES)
 def test_drive_radec_mrk421(drives, tel_id):
-    """Pointing of the drive while tracking Mrk 421 (wobbles at 0.7 deg) within 2 deg of the source"""
+    """Pointing of the drive while tracking Mrk 421 within MAX_SEPARATION_MRK421 of the source"""
     drive = drives[tel_id]
     mask = (
         drive["is_tracking"]
@@ -46,4 +51,4 @@ def test_drive_radec_mrk421(drives, tel_id):
         & (drive["time"] < Time("2026-01-21T04:30:00"))
     )
     radec = drive_radec(drive[mask][::100])
-    assert np.all(radec.separation(MRK421) < 2 * u.deg)
+    assert np.all(radec.separation(MRK421) < MAX_SEPARATION_MRK421[tel_id])
