@@ -71,14 +71,14 @@ Default config file for MC:
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/data/sst1mpipe_mc_config.json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config.json
        :code: json
 
 Default config file for data:
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/data/sst1mpipe_data_config.json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_data_config.json
        :code: json
 
 

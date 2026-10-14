@@ -8,7 +8,6 @@ from datetime import datetime
 import astropy.units as u
 import numpy as np
 import pandas as pd
-from importlib.resources import files
 import tables
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.io import fits
@@ -22,6 +21,7 @@ from traitlets.config import Config
 
 import sst1mpipe
 from sst1mpipe.io.containers import DL1_info, DL2_info
+from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILE, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
     add_disp,
     add_event_id,
@@ -122,10 +122,9 @@ def load_config(cfg_file, ismc=False):
     if cfg_file is None:
         logging.info('No config file specified, loading default config.')
         if ismc:
-            default_config = 'sst1mpipe_mc_config.json'
+            cfg_file = MC_CONFIG_FILE
         else:
-            default_config = 'sst1mpipe_data_config.json'
-        cfg_file = files('sst1mpipe.data').joinpath(default_config)
+            cfg_file = DATA_CONFIG_FILE
 
     with open(cfg_file) as json_file:
             config = Config(json.load(json_file))
@@ -1519,10 +1518,7 @@ def get_pde_correction_factors():
     """
 
     try:
-        default_pde_corr_file = 'mc_pde_correction_factors.json'
-        pde_corr_file = files('sst1mpipe.data').joinpath(default_pde_corr_file)
-
-        with open(pde_corr_file) as json_file:
+        with open(PDE_CORRECTION_FACTORS_FILE) as json_file:
                 pde_corr = Config(json.load(json_file))
         return pde_corr
     except Exception:

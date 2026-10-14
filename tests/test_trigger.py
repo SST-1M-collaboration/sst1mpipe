@@ -10,6 +10,7 @@ from traitlets import TraitError
 from traitlets.config import Config
 
 from sst1mpipe.instrument.camera import DigiCam
+from sst1mpipe.resources import CONFIG_DIR
 from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator, fixed_point
 from sst1mpipe.trigger.emulator import (
     READOUT_SECTOR_ORDER,
@@ -32,7 +33,7 @@ Q14 = {
 
 
 def example_config(name):
-    with files("sst1mpipe.data").joinpath(f"sst1mpipe_trigger_emulator_{name}.json").open() as f:
+    with (CONFIG_DIR / f"sst1mpipe_trigger_emulator_{name}.json").open() as f:
         return Config(json.load(f))
 
 
