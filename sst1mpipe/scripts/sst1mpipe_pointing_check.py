@@ -36,6 +36,7 @@ import sst1mpipe
 from sst1mpipe.io import (
     load_config,
 )
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import (
     get_location,
@@ -166,9 +167,8 @@ def main():
             tel = event.trigger.tels_with_trigger[0]
 
         r0data = event.r0.tel[tel]
-        event_type = event.r0.tel[tel]._event_type.value
 
-        if event_type == 8:
+        if event.trigger.event_type in PEDESTAL_EVENT_TYPES:
             std_samples.append(np.std(r0data.waveform[0], axis=1))
             time = event.r0.tel[tel].event_time / 10 ** 9
             time_all.append(time)

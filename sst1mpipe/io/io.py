@@ -14,7 +14,6 @@ from astropy.io import fits
 from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
 from astropy.table import QTable, Table, join, vstack
 from astropy.time import Time
-from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import HDF5Merger, read_table, write_table
 from ctapipe.io.hdf5dataformat import DL1_SKY_PEDESTAL_IMAGE_GROUP
 from ctapipe.monitoring.interpolation import PointingInterpolator
@@ -23,7 +22,7 @@ from pyirf.cuts import evaluate_binned_cut
 from traitlets.config import Config
 
 import sst1mpipe
-from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES, DL1_info, DL2_info
+from sst1mpipe.io.containers import DL1_info, DL2_info
 from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
     add_disp,
@@ -1368,67 +1367,6 @@ def write_dl1_info(dl1_file, info):
         for key, value in info.items():
             row[key] = missing[table.coldtypes[key].kind] if value is None else value
         row.append()
-
-
-def compute_dl1_summary(dl1_file):
-    """
-    Counts the events stored in a DL1 file.
-
-    Parameters
-    ----------
-    dl1_file: string
-        Path
-
-    Returns
-    -------
-    dict:
-        n_events: number of events
-        n_triggered: number of triggered events per telescope id
-        n_pedestal: number of pedestal events
-        n_survived_pedestals: number of pedestal events with an image
-        surviving the cleaning (finite hillas intensity) in any telescope
-    """
-    subarray = SubarrayDescription.from_hdf(dl1_file)
-    with tables.open_file(dl1_file) as f:
-        has_events = "/dl1/event/subarray/trigger" in f
-    if not has_events:
-        # no event written, e.g. all the events of the run are skipped
-        return dict(
-            n_events=0,
-            n_triggered={int(tel_id): 0 for tel_id in subarray.tel_ids},
-            n_pedestal=0,
-            n_survived_pedestals=0,
-        )
-    trigger = read_table(dl1_file, "/dl1/event/subarray/trigger")
-
-    tels_with_trigger = np.asarray(trigger["tels_with_trigger"], dtype=bool).reshape(len(trigger), -1)
-    n_triggered = {
-        int(tel_id): int(n) for tel_id, n in zip(subarray.tel_ids, tels_with_trigger.sum(axis=0), strict=True)
-    }
-
-    is_pedestal = np.isin(trigger["event_type"], [event_type.value for event_type in PEDESTAL_EVENT_TYPES])
-    pedestals = {(obs_id, event_id) for obs_id, event_id in trigger["obs_id", "event_id"][is_pedestal]}
-
-    survived = set()
-    with tables.open_file(dl1_file) as f:
-        parameter_tables = [
-            node._v_pathname for node in f.root.dl1.event.telescope.parameters
-        ] if "/dl1/event/telescope/parameters" in f else []
-    for path in parameter_tables:
-        parameters = read_table(dl1_file, path)
-        # camera_frame_ prefix if the parameters are computed in the camera frame
-        intensity = "hillas_intensity" if "hillas_intensity" in parameters.colnames else "camera_frame_hillas_intensity"
-        has_image = np.isfinite(parameters[intensity])
-        survived |= {
-            (obs_id, event_id) for obs_id, event_id in parameters["obs_id", "event_id"][has_image]
-        } & pedestals
-
-    return dict(
-        n_events=len(trigger),
-        n_triggered=n_triggered,
-        n_pedestal=int(is_pedestal.sum()),
-        n_survived_pedestals=len(survived),
-    )
 
 
 def get_dl1_info(file):

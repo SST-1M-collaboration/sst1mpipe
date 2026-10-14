@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import interpolate
 
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
 ## spline aprox NSB : VAR[ADC]->SHIFT[ADC]
@@ -174,7 +175,8 @@ def find_dark_files(data_dir):
     return dark_files
 
 
-def get_dark_baseline(filename,max_evt=500,event_type=8):
+def get_dark_baseline(filename,max_evt=500,event_types=PEDESTAL_EVENT_TYPES):
+        """Mean of the first 50 ADC samples of each pixel, for the events of type event_types (pedestal events)"""
 
         raw_baselines  = [ [] for ii in range(1296)]
 
@@ -184,7 +186,7 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
                     tel = event.trigger.tels_with_trigger[0]
                     r0data = event.r0.tel[tel]
 
-                    if r0data._event_type.value==event_type:
+                    if event.trigger.event_type in event_types:
                         for pix in range(1296):
                             raw_baselines[pix].append(r0data.waveform[0][pix,:50])
         raw_baselines  = np.array(raw_baselines)
@@ -195,43 +197,23 @@ def get_dark_baseline(filename,max_evt=500,event_type=8):
  #### tools to plot data :
 ############
 
-def get_ped_table(file_list):
+def get_ped_table(file_list, low_res=False):
+    """
+    Statistics of the ADC samples of the pedestal events of the files (R0 pedestal tables, see
+    load_r0_pedestals), stacked. low_res: only the last chunk of each file. The files without
+    pedestal table are skipped, None if no file has one.
+    """
     from sst1mpipe.io import load_r0_pedestals
 
-    bline_table = None
-
+    ped_tables = []
     for dl1file in sorted(file_list):
-        if bline_table is None :
-            try:
-                bline_table = load_r0_pedestals(dl1file)
-            except Exception:
-                print(f"pedestal not found in {dl1file}")
-        else :
-            try:
-                bline_table = astropy.table.vstack([bline_table,
-                                                   load_r0_pedestals(dl1file)])
-            except Exception:
-                print(f"pedestal not found in {dl1file}")
-    return bline_table
-
-def get_ped_table_low_res(file_list):
-    from sst1mpipe.io import load_r0_pedestals
-
-    bline_table = None
-
-    for dl1file in sorted(file_list):
-        if bline_table is None :
-            try:
-                bline_table = load_r0_pedestals(dl1file)[-1]
-            except Exception:
-                print(f"pedestal not found in {dl1file}")
-        else :
-            try:
-                bline_table = astropy.table.vstack([bline_table,
-                                                   load_r0_pedestals(dl1file)[-1]])
-            except Exception:
-                print(f"pedestal not found in {dl1file}")
-    return bline_table
+        try:
+            ped_table = load_r0_pedestals(dl1file)
+        except Exception:
+            print(f"pedestal not found in {dl1file}")
+            continue
+        ped_tables.append(ped_table[-1:] if low_res else ped_table)
+    return astropy.table.vstack(ped_tables) if ped_tables else None
 
 
 def mean_pedestal_std(ped_table):

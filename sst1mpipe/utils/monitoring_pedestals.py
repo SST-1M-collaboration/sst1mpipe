@@ -18,10 +18,10 @@ from sst1mpipe.calib import (
     R0R1Calibrator,
     ImageSaturationCorrector,
 )
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import get_subarray
 
-MON_EVT_TYPE = 8
 MASKED_VALUE = -100
 
 
@@ -208,7 +208,7 @@ def load_first_pedestals(r0_monitor, dl1_monitor, input_file, config, max_events
 
     for event in source:
         tel = event.trigger.tels_with_trigger[0]
-        if event.r0.tel[tel]._event_type.value == MON_EVT_TYPE:
+        if event.trigger.event_type in PEDESTAL_EVENT_TYPES:
             r0_monitor.add_event(event, tel)
         if r0_monitor.n_buffered(tel) >= r0_monitor.n_events.tel[tel]:
             break
@@ -233,7 +233,7 @@ def _load_first_images(r0_monitor, dl1_monitor, source, tel, config):
 
     for event in source:
 
-        if event.r0.tel[tel]._event_type.value != MON_EVT_TYPE:
+        if event.trigger.event_type not in PEDESTAL_EVENT_TYPES:
             continue
 
         # here we apply gain drop correction

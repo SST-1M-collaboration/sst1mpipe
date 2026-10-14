@@ -9,7 +9,6 @@ from .io import (
     DL1_PEDESTAL_GROUP,
     R0_PEDESTAL_GROUP,
     R0_PIXEL_STATISTICS_GROUP,
-    compute_dl1_summary,
     get_dl1_info,
     get_pde_correction_factors,
     load_config,

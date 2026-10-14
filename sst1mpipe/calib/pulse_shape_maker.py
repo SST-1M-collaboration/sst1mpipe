@@ -27,6 +27,7 @@ from scipy.interpolate import UnivariateSpline
 from scipy.optimize import minimize
 
 from sst1mpipe.calib import get_default_calibration
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import get_cam_geom
 
@@ -189,7 +190,7 @@ class shape_maker:
                     wfs = (r0data.waveform[0].T - mcdata.pedestal/50.+self.bshift).T
 
                 else:
-                    if r0data._event_type.value==8:
+                    if event.trigger.event_type in PEDESTAL_EVENT_TYPES:
                         if self.dark_baselines is None:
                             Qsum = (r0data.waveform[0].T[20:35]+self.bshift - r0data.pedestal).sum(axis=0)
                             wfs = (r0data.waveform[0].T+self.bshift - r0data.pedestal).T

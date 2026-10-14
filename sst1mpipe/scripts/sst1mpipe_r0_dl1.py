@@ -54,6 +54,7 @@ from sst1mpipe.io import (
     write_extra_parameters,
     write_pixel_charges_table,
 )
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.utils import (
     correct_true_image,
     energy_min_cut,
@@ -298,6 +299,9 @@ def main():
     ) as writer:
         for i, event in enumerate(source):
 
+            # pedestal events of the data (internal triggers of the camera)
+            is_pedestal = not source.is_simulation and event.trigger.event_type in PEDESTAL_EVENT_TYPES
+
             if not source.is_simulation:
 
                 # NOTE: This needs to be changed in the future when event source hopefuly provides events with both telescope data
@@ -323,8 +327,6 @@ def main():
 
                 r0_pedestal_monitor.fill_monitoring(event, tel)
                 calibrator_r0_r1(event, tel)
-
-                event_type = event.r0.tel[tel]._event_type.value
 
                 # NOTE: event.index, event.trigger and event.monitoring.tel[tel].pointing are filled by SST1MEventSource
 
@@ -386,7 +388,7 @@ def main():
                 if not bool(i % 100):
                     logging.info("N pixels interpolated (every 100th event): %d", calibrator_r0_r1.n_bad_pixels[tel])
                 new_pedestal = False
-                if event_type==8:
+                if is_pedestal:
                     r0_pedestal_monitor(event, tel)
                     dl1_pedestal_monitor(event, tel)
                     new_pedestal = True
@@ -411,10 +413,9 @@ def main():
             # Extraction of pixel charge distribution for MC-data tuning
             if pixel_charges:
                 if not source.is_simulation:
-                    event_type = event.r0.tel[tel]._event_type.value
                     if ped_time_start is None:
                         ped_time_start = event.trigger.time
-                    if event_type == 8:
+                    if is_pedestal:
                         image = event.dl1.tel[tel].image
                         hist, bin_edges = np.histogram(image, range=(-10, 40), bins=BINS, density=False)
                         final_histogram += hist
@@ -454,7 +455,7 @@ def main():
             n_triggered.update(event.trigger.tels_with_trigger)
 
             # Counting pedestal events in the file and skipping them for the output file
-            if (not ismc) and event_type == 8:
+            if is_pedestal:
                 n_pedestals += 1
                 n_pedestals_survived += np.isfinite(event.dl1.tel[tel].parameters.hillas.intensity)
                 continue
