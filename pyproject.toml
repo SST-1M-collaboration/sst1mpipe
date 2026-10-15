@@ -37,7 +37,8 @@ sst1mpipe = [
   "resources/calibration/dark_runs/*",
   "resources/instrument/*",
   "resources/test_data/zfits/*",
-  "resources/test_data/simtel/*"
+  "resources/test_data/simtel/*",
+  "resources/test_data/drive/*"
 ]
 
 [project.scripts]
@@ -62,6 +63,7 @@ sst1mpipe_event_classes = "sst1mpipe.scripts.sst1mpipe_event_classes:main"
 sst1mpipe_read_camera_server_logs = "sst1mpipe.scripts.read_camera_server_logs:main"
 sst1mpipe-process = "sst1mpipe.scripts.sst1mpipe_process_tool:main"
 sst1mpipe-trigger = "sst1mpipe.scripts.sst1mpipe_trigger_tool:main"
+sst1mpipe-plot-drive-pointing = "sst1mpipe.scripts.sst1mpipe_plot_drive_pointing_tool:main"
 
 # EventSource implementations found by ctapipe.io.EventSource
 [project.entry-points.ctapipe_io]
