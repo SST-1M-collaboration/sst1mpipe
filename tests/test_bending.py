@@ -12,7 +12,7 @@ from traitlets.config import Config
 from conftest import OBSERVATION_RUNS  # noqa: F401 (no IERS download, as for the other tests)
 from sst1mpipe.instrument.bending import BendingModel, TPointBendingModel
 from sst1mpipe.io import read_drive_logs
-from sst1mpipe.resources import SUBARRAY_FILE, TEST_DATA_DIR
+from sst1mpipe.resources import SST1M_BENDING_MODEL_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR
 
 # arcsec, of the size of the corrections of the SST-1M drives
 COEFFICIENTS = dict(ia=-8360.0, ie=970.0, an=36.0, aw=220.0, ca=-250.0, npae=-180.0, tf=360.0, tx=40.0)
@@ -61,6 +61,11 @@ def test_no_correction_by_default(subarray):
         ("npae", 45, 30, 0, -1),
         ("tf", 60, 30, -0.5, 0),
         ("tx", 45, 30, -1, 0),
+        # centring terms (signs of the SST-1M drives)
+        ("aces", 45, 90, 0, -1),
+        ("acec", 45, 0, 0, 1),
+        ("eces", 30, 30, 0.5, 0),
+        ("ecec", 60, 30, 0.5, 0),
     ],
 )
 def test_tpoint_terms(subarray, term, alt, az, d_alt, d_az):
@@ -128,3 +133,23 @@ def test_plot_drive_pointing_tool(tmp_path, revert_bending):
     assert run_tool(PlotDrivePointingTool(), argv=argv, cwd=tmp_path) == 0
     for name in ("drive_radec_vs_time.png", "drive_radec_map.png"):
         assert (tmp_path / "plots" / name).stat().st_size > 0
+
+
+def test_sst1m_bending_model_2023(subarray):
+    """
+    Coefficients of the SST-1M drives (2023): the pointing of tel 21 on the Mrk 421 wobble W1 (TARGET
+    of the zfits runs) within 1 arcmin. Those of tel 22 changed after the mounting of DigiCam.
+    """
+    bending = TPointBendingModel(subarray, config=Config(json.loads(SST1M_BENDING_MODEL_CONFIG_FILE.read_text())))
+    assert u.isclose(bending.ia.tel[21], -8441.94)
+    assert u.isclose(bending.ie.tel[22], 124.85)
+    drive = read_drive_logs(DRIVE_FILES[0], subarray=subarray)
+    tracking = (
+        drive["is_tracking"] & drive["is_on_source"]
+        & (drive["time"] > Time("2026-01-21T00:30:00")) & (drive["time"] < Time("2026-01-21T04:30:00"))
+    )
+    sky = bending.revert(21, drive["pointing"][tracking]).transform_to("icrs")
+    w1 = SkyCoord(166.9948 * u.deg, 38.1053 * u.deg, frame="icrs")
+    on_w1 = sky.ra > 166.5 * u.deg
+    assert np.count_nonzero(on_w1) > 1000
+    assert np.all(SkyCoord(sky.ra, sky.dec)[on_w1].separation(w1) < 1 * u.arcmin)

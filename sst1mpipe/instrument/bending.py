@@ -76,16 +76,22 @@ class BendingModel(TelescopeComponent):
 
 class TPointBendingModel(BendingModel):
     """
-    Bending model of alt-az mounts with the 8 terms of TPOINT [1]_ (names, signs and units), as
-    implemented in pytelpoint [2]_ (``pytelpoint.transform.azel_model``), corrections of the drive
-    (encoder) position alt, az:
+    Bending model of alt-az mounts with the terms of TPOINT [1]_ (names and units), corrections of
+    the drive (encoder) position alt, az:
 
     - d_az = -IA - AN sin(az) tan(alt) - AW cos(az) tan(alt) - CA / cos(alt) - NPAE tan(alt)
-    - d_alt = IE - AN cos(az) + AW sin(az) - TF cos(alt) - TX / tan(alt)
+      - ACES sin(az) + ACEC cos(az)
+    - d_alt = IE - AN cos(az) + AW sin(az) - TF cos(alt) - TX / tan(alt) + ECES sin(alt)
+      + ECEC cos(alt)
+
+    The terms IA, IE, AN, AW, CA, NPAE, TF and TX have the signs of pytelpoint [2]_
+    (``pytelpoint.transform.azel_model``). The centring terms ACES, ACEC, ECES and ECEC have the
+    signs of the pointing model of the SST-1M drives (``AzElCorrCoefTel<n>.conf``, without TF and
+    TX), in which d_alt has -IE: the drive positions of the night of 2026-01-20 need +IE.
 
     The coefficients are in arcsec, 0 by default (no correction), configured with the TPOINT names
-    in lower case (``ia``, ``ie``, ``an``, ``aw``, ``ca``, ``npae``, ``tf``, ``tx``), e.g.
-    ``{"TPointBendingModel": {"ia": [["type", "*", 0], ["id", 21, -8360], ["id", 22, -2070]]}}``.
+    in lower case, e.g. ``{"TPointBendingModel": {"ia": [["id", 21, -8441.94], ["id", 22, -2074.65]]}}``.
+    ``SST1M_BENDING_MODEL_CONFIG_FILE`` has the coefficients of the SST-1M drives of 2023.
 
     References
     ----------
@@ -113,16 +119,26 @@ class TPointBendingModel(BendingModel):
     ).tag(config=True)
     tf = FloatTelescopeParameter(default_value=0.0, help="TF: tube flexure in cos(alt) (arcsec)").tag(config=True)
     tx = FloatTelescopeParameter(default_value=0.0, help="TX: tube flexure in 1 / tan(alt) (arcsec)").tag(config=True)
+    aces = FloatTelescopeParameter(default_value=0.0, help="ACES: azimuth centring error, sin component (arcsec)").tag(config=True)
+    acec = FloatTelescopeParameter(default_value=0.0, help="ACEC: azimuth centring error, cos component (arcsec)").tag(config=True)
+    eces = FloatTelescopeParameter(default_value=0.0, help="ECES: elevation centring error, sin component (arcsec)").tag(config=True)
+    ecec = FloatTelescopeParameter(default_value=0.0, help="ECEC: elevation centring error, cos component (arcsec)").tag(config=True)
+
+    TERMS = ("ia", "ie", "an", "aw", "ca", "npae", "tf", "tx", "aces", "acec", "eces", "ecec")
 
     def corrections(self, tel_id, alt, az):
         alt = u.Quantity(alt, u.deg).to_value(u.rad)
         az = u.Quantity(az, u.deg).to_value(u.rad)
-        c = {name: getattr(self, name).tel[tel_id] for name in ("ia", "ie", "an", "aw", "ca", "npae", "tf", "tx")}
+        c = {name: getattr(self, name).tel[tel_id] for name in self.TERMS}
         with np.errstate(divide="ignore", invalid="ignore"):
             tan_alt = np.tan(alt)
             d_az = (
                 -c["ia"] - c["an"] * np.sin(az) * tan_alt - c["aw"] * np.cos(az) * tan_alt
                 - c["ca"] / np.cos(alt) - c["npae"] * tan_alt
+                - c["aces"] * np.sin(az) + c["acec"] * np.cos(az)
             )
-            d_alt = c["ie"] - c["an"] * np.cos(az) + c["aw"] * np.sin(az) - c["tf"] * np.cos(alt) - c["tx"] / tan_alt
+            d_alt = (
+                c["ie"] - c["an"] * np.cos(az) + c["aw"] * np.sin(az) - c["tf"] * np.cos(alt) - c["tx"] / tan_alt
+                + c["eces"] * np.sin(alt) + c["ecec"] * np.cos(alt)
+            )
         return d_alt * u.arcsec, d_az * u.arcsec

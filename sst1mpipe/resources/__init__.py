@@ -24,6 +24,7 @@ __all__ = [
     "SUBARRAY_FILE",
     "PIXEL_MAPPING_FILE",
     "CAMERA_CONFIG_FILE",
+    "SST1M_BENDING_MODEL_CONFIG_FILE",
 ]
 
 RESOURCES_DIR = files(__name__)
@@ -38,6 +39,8 @@ TEST_DATA_DIR = RESOURCES_DIR / "test_data"
 DATA_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_data_config.json"
 MC_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_mc_config.json"
 RTA_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_rta_config.json"
+# TPointBendingModel of the SST-1M drives (AzElCorrCoefTel<n>.conf, 2023)
+SST1M_BENDING_MODEL_CONFIG_FILE = CONFIG_DIR / "sst1m_tpoint_bending_model_2023.json"
 
 PDE_CORRECTION_FACTORS_FILE = CALIBRATION_DIR / "mc_pde_correction_factors.json"
 
