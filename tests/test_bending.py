@@ -1,3 +1,5 @@
+import json
+
 import astropy.units as u
 import numpy as np
 import pytest
@@ -8,15 +10,12 @@ from ctapipe.instrument import SubarrayDescription
 from traitlets.config import Config
 
 from conftest import OBSERVATION_RUNS  # noqa: F401 (no IERS download, as for the other tests)
-from sst1mpipe.instrument.bending import BendingModel, MeeksBendingModel
+from sst1mpipe.instrument.bending import BendingModel, TPointBendingModel
 from sst1mpipe.io import read_drive_logs
 from sst1mpipe.resources import SUBARRAY_FILE, TEST_DATA_DIR
 
-# deg, of the size of the pointing errors of the SST-1M drives
-PARAMETERS = dict(
-    azimuth_axis_tilt=0.05, level_axis_azimuth=40.0, elevation_axis_skew=-0.05, collimation=0.07,
-    elevation_coefficient=1e-3, azimuth_bias=-2.3, elevation_bias=0.27,
-)
+# arcsec, of the size of the corrections of the SST-1M drives
+COEFFICIENTS = dict(ia=-8360.0, ie=970.0, an=36.0, aw=220.0, ca=-250.0, npae=-180.0, tf=360.0, tx=40.0)
 DRIVE_FILES = [TEST_DATA_DIR / "drive" / "DriveSystem1_20260120_001.fits", TEST_DATA_DIR / "drive" / "DriveSystem2_20260120_002.fits"]
 
 
@@ -30,85 +29,91 @@ def altaz(subarray, alt, az, tel_id=21):
     return SkyCoord(alt=u.Quantity(alt, u.deg), az=u.Quantity(az, u.deg), frame=frame)
 
 
-def meeks(subarray, **parameters):
-    return MeeksBendingModel(subarray, config=Config({"MeeksBendingModel": parameters}))
+def tpoint(subarray, **coefficients):
+    return TPointBendingModel(subarray, config=Config({"TPointBendingModel": coefficients}))
 
 
 def test_bending_model_is_abstract(subarray):
     with pytest.raises(TypeError):
         BendingModel(subarray)
-    assert isinstance(BendingModel.from_name("MeeksBendingModel", subarray=subarray), MeeksBendingModel)
+    assert isinstance(BendingModel.from_name("TPointBendingModel", subarray=subarray), TPointBendingModel)
 
 
-def test_no_pointing_error_by_default(subarray):
-    model = MeeksBendingModel(subarray)
+def test_no_correction_by_default(subarray):
+    bending = TPointBendingModel(subarray)
     pointing = altaz(subarray, [30, 60, 80], [-250, -100, 10])
-    for coord in (model.apply(21, pointing), model.revert(21, pointing)):
+    for coord in (bending.revert(21, pointing), bending.apply(21, pointing)):
         assert u.allclose(coord.alt, pointing.alt)
         assert u.allclose(coord.az, pointing.az)
 
 
 @pytest.mark.parametrize(
-    "parameters, alt, az, d_alt, d_az",
+    "term, alt, az, d_alt, d_az",
     [
-        # azimuth-axis tilt, eq. 3: tilted toward kappa_A + 90 deg
-        (dict(azimuth_axis_tilt=1.0), 45, 0, 0, -1),
-        (dict(azimuth_axis_tilt=1.0), 45, 90, 1, 0),
-        (dict(azimuth_axis_tilt=1.0, level_axis_azimuth=90.0), 45, 90, 0, -1),
-        (dict(azimuth_axis_tilt=1.0, level_axis_azimuth=90.0), 45, 180, 1, 0),
-        # elevation-axis skew, eq. 5
-        (dict(elevation_axis_skew=1.0), 45, 30, 0, 1),
-        # collimation error, eq. 6
-        (dict(collimation=1.0), 60, 30, 0, -2),
-        # gravitational deflection, eq. 7, h in deg
-        (dict(elevation_coefficient=1e-3), 60, 30, 0.06, 0),
-        # biases of the encoders, eqs. 8 and 9
-        (dict(azimuth_bias=1.0), 45, 30, 0, 1),
-        (dict(elevation_bias=1.0), 45, 30, 1, 0),
+        # TPOINT terms (pytelpoint.transform.azel_model)
+        ("ia", 45, 30, 0, -1),
+        ("ie", 45, 30, 1, 0),
+        ("an", 45, 0, -1, 0),
+        ("an", 45, 90, 0, -1),
+        ("aw", 45, 90, 1, 0),
+        ("aw", 45, 0, 0, -1),
+        ("ca", 60, 30, 0, -2),
+        ("npae", 45, 30, 0, -1),
+        ("tf", 60, 30, -0.5, 0),
+        ("tx", 45, 30, -1, 0),
     ],
 )
-def test_meeks_pointing_errors(subarray, parameters, alt, az, d_alt, d_az):
-    d = meeks(subarray, **parameters).pointing_errors(21, alt * u.deg, az * u.deg)
-    assert u.isclose(d[0], d_alt * u.deg, atol=1e-12 * u.deg)
-    assert u.isclose(d[1], d_az * u.deg, atol=1e-12 * u.deg)
+def test_tpoint_terms(subarray, term, alt, az, d_alt, d_az):
+    bending = tpoint(subarray, **{term: 1.0})
+    corrections = bending.corrections(21, alt * u.deg, az * u.deg)
+    assert u.isclose(corrections[0], d_alt * u.arcsec, atol=1e-9 * u.arcsec)
+    assert u.isclose(corrections[1], d_az * u.arcsec, atol=1e-9 * u.arcsec)
+    # sky = drive + corrections(drive)
+    sky = bending.revert(21, altaz(subarray, alt, az))
+    assert u.isclose(sky.alt, alt * u.deg + d_alt * u.arcsec)
 
 
-def test_revert_inverse_of_apply(subarray):
-    model = meeks(subarray, **PARAMETERS)
-    alt, az = np.meshgrid(np.linspace(20, 80, 13), np.linspace(0, 355, 72))
-    sky = altaz(subarray, alt.ravel(), az.ravel())
-    drive = model.apply(21, sky)
-    assert np.all(drive.separation(sky) > 0.3 * u.deg)
-    assert np.all(model.revert(21, drive).separation(sky) < 1e-2 * u.arcsec)
+def test_apply_inverse_of_revert(subarray, caplog):
+    bending = tpoint(subarray, **COEFFICIENTS)
+    alt, az = np.meshgrid(np.linspace(20, 75, 12), np.linspace(0, 355, 72))
+    drive = altaz(subarray, alt.ravel(), az.ravel())
+    sky = bending.revert(21, drive)
+    assert np.all(sky.separation(drive) > 0.3 * u.deg)
+    # first order inverse: within the tolerance up to 75 deg of altitude for these corrections
+    assert np.all(bending.apply(21, sky).separation(drive) < bending.tolerance * u.arcsec)
+    assert "error above" not in caplog.text
 
 
-def test_parameters_per_telescope(subarray):
-    model = meeks(subarray, azimuth_bias=[["type", "*", 0.0], ["id", 21, 1.0], ["id", 22, 0.5]])
-    for tel_id, d_az in ((21, 1.0), (22, 0.5)):
-        sky = altaz(subarray, 60, 100, tel_id)
-        drive = model.apply(tel_id, sky)
-        assert u.isclose(drive.alt, sky.alt)
-        assert u.isclose((drive.az - sky.az).wrap_at(180 * u.deg), d_az * u.deg)
+def test_apply_tolerance(subarray, caplog):
+    # large tilt of the azimuth axis close to the zenith: the first order inverse is not precise enough
+    bending = tpoint(subarray, an=0.3 * 3600)
+    sky = altaz(subarray, [45, 85], [30, 30])
+    drive = bending.apply(21, sky)
+    assert np.all(np.isfinite(drive.alt))
+    distance = bending.revert(21, drive).separation(sky)
+    assert distance[0] < bending.tolerance * u.arcsec
+    assert distance[1] > bending.tolerance * u.arcsec
+    assert "Bending model of telescope 21: 1 positions inverted with an error above 30.0 arcsec" in caplog.text
 
 
-def test_revert_no_convergence(subarray, caplog):
-    model = meeks(subarray, collimation=5.0, azimuth_axis_tilt=2.0)
-    sky = model.revert(21, altaz(subarray, [45, 89.9], [30, 30]))
-    assert np.isfinite(sky.alt[0])
-    assert model.apply(21, sky[0]).separation(altaz(subarray, 45, 30)) < 1e-2 * u.arcsec
-    assert np.isnan(sky.alt[1])
-    assert "no convergence" in caplog.text
+def test_coefficients_per_telescope(subarray):
+    bending = tpoint(subarray, ia=[["type", "*", 0.0], ["id", 21, 3600.0], ["id", 22, 1800.0]])
+    for tel_id, d_az in ((21, -1.0), (22, -0.5)):
+        drive = altaz(subarray, 60, 100, tel_id)
+        sky = bending.revert(tel_id, drive)
+        assert u.isclose(sky.alt, drive.alt)
+        assert u.isclose((sky.az - drive.az).wrap_at(180 * u.deg), d_az * u.deg)
 
 
 def test_revert_drive_logs(subarray):
-    model = meeks(subarray, azimuth_bias=1.0, elevation_bias=0.2)
+    bending = tpoint(subarray, ia=-3600.0, ie=720.0)
     drive = read_drive_logs(DRIVE_FILES[0], subarray=subarray)
-    sky = model.revert(21, drive["pointing"])
+    sky = bending.revert(21, drive["pointing"])
     assert sky.frame.is_equivalent_frame(drive["pointing"].frame)
     tracking = drive["is_tracking"]
-    assert u.allclose(sky.alt[tracking] - drive["pointing"].alt[tracking], -0.2 * u.deg, atol=1e-6 * u.deg)
+    assert u.allclose(sky.alt[tracking] - drive["pointing"].alt[tracking], 0.2 * u.deg, atol=1e-6 * u.deg)
     d_az = (sky.az - drive["pointing"].az).wrap_at(180 * u.deg)
-    assert u.allclose(d_az[tracking], -1.0 * u.deg, atol=1e-6 * u.deg)
+    assert u.allclose(d_az[tracking], 1.0 * u.deg, atol=1e-6 * u.deg)
 
 
 @pytest.mark.parametrize("revert_bending", [False, True])
@@ -118,7 +123,7 @@ def test_plot_drive_pointing_tool(tmp_path, revert_bending):
     argv = ["-i", str(DRIVE_FILES[0]), "-i", str(DRIVE_FILES[1]), "-o", str(tmp_path / "plots")]
     if revert_bending:
         config = tmp_path / "bending.json"
-        config.write_text('{"MeeksBendingModel": {"azimuth_bias": [["type", "*", 0], ["id", 21, -2.3], ["id", 22, -0.6]]}}')
+        config.write_text(json.dumps({"TPointBendingModel": {"ia": [["type", "*", 0], ["id", 21, -8360], ["id", 22, -2070]]}}))
         argv += ["--revert-bending", "--config", str(config)]
     assert run_tool(PlotDrivePointingTool(), argv=argv, cwd=tmp_path) == 0
     for name in ("drive_radec_vs_time.png", "drive_radec_map.png"):

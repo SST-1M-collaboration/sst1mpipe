@@ -1,7 +1,7 @@
 """
-Bending models of the SST-1M telescopes: pointing errors between the position commanded to the
-drive (direction in the sky) and the position of the drive (encoders), as a function of the
-altitude and azimuth. The drive adds these errors to the position of the target, so its logs
+Bending models of the SST-1M telescopes: corrections between the position of the drive
+(encoders) and the direction pointed to in the sky, as a function of the altitude and azimuth.
+The drive applies its bending model to the position of the target, so its logs
 (`sst1mpipe.io.drive.read_drive_logs`) give the drive position, and `BendingModel.revert` gives
 the direction pointed to in the sky.
 """
@@ -12,117 +12,117 @@ import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
 from ctapipe.core import TelescopeComponent
-from ctapipe.core.traits import Float, FloatTelescopeParameter, Int
+from ctapipe.core.traits import Float, FloatTelescopeParameter
 
-__all__ = ["BendingModel", "MeeksBendingModel"]
+__all__ = ["BendingModel", "TPointBendingModel"]
 
 logger = logging.getLogger(__name__)
 
 
 class BendingModel(TelescopeComponent):
     """
-    Base class of the bending models: pointing errors (d_alt, d_az) of a telescope, drive
-    position = sky position + pointing errors(sky position). A child class defines
-    `pointing_errors`.
+    Base class of the bending models: corrections (d_alt, d_az) of the drive position of a
+    telescope, sky position = drive position + corrections(drive position). A child class
+    defines `corrections`.
+
+    `revert` (drive -> sky) is exact. `apply` (sky -> drive) inverts it once, to first order
+    (corrections taken at the sky position), with a warning if `revert` of the result is farther
+    than ``tolerance`` from the sky position.
     """
 
     tolerance = Float(
-        default_value=1e-6, help="Precision of the sky position found by revert (deg)"
+        default_value=30.0,
+        help="Largest distance (arcsec) between the sky position and revert of the drive position found by apply",
     ).tag(config=True)
-    max_iterations = Int(default_value=50, help="Maximum number of iterations of revert").tag(config=True)
 
     @abstractmethod
-    def pointing_errors(self, tel_id, alt, az):
+    def corrections(self, tel_id, alt, az):
         """
-        Pointing errors (d_alt, d_az) of the telescope tel_id commanded to the sky position
-        alt, az (Quantity, angles)
+        Corrections (d_alt, d_az) of the drive position alt, az (Quantity, angles) of the
+        telescope tel_id
         """
-
-    def apply(self, tel_id, pointing):
-        """
-        Drive position (AltAz SkyCoord) of the telescope tel_id commanded to the sky position
-        ``pointing`` (AltAz SkyCoord). Altitudes beyond +-90 deg are NaN.
-        """
-        d_alt, d_az = self.pointing_errors(tel_id, pointing.alt, pointing.az)
-        alt = (pointing.alt + d_alt).to_value(u.deg)
-        alt = np.where(np.abs(alt) <= 90, alt, np.nan)
-        return SkyCoord(alt=alt * u.deg, az=pointing.az + d_az, frame=pointing.frame)
 
     def revert(self, tel_id, pointing):
         """
         Sky position (AltAz SkyCoord) pointed to by the telescope tel_id at the drive position
-        ``pointing`` (AltAz SkyCoord): inverse of `apply`, by fixed point iteration. The
-        positions where the iteration does not converge (e.g. close to the zenith) are NaN.
+        ``pointing`` (AltAz SkyCoord). Altitudes beyond +-90 deg are NaN.
         """
-        drive_alt, drive_az = pointing.alt.to_value(u.deg), pointing.az.to_value(u.deg)
-        alt, az = drive_alt, drive_az
-        for _ in range(self.max_iterations):
-            d_alt, d_az = self.pointing_errors(tel_id, alt * u.deg, az * u.deg)
-            new_alt, new_az = drive_alt - d_alt.to_value(u.deg), drive_az - d_az.to_value(u.deg)
-            change = np.maximum(np.abs(new_alt - alt), np.abs(new_az - az))
-            alt, az = new_alt, new_az
-            if np.all(change < self.tolerance):
-                break
-        else:
-            failed = ~(change < self.tolerance)
+        return self._add_corrections(tel_id, pointing, 1)
+
+    def apply(self, tel_id, pointing):
+        """
+        Drive position (AltAz SkyCoord) of the telescope tel_id pointing to the sky position
+        ``pointing`` (AltAz SkyCoord): first order inverse of `revert`. A warning is logged if
+        `revert` of the drive position is farther than ``tolerance`` from the sky position.
+        Altitudes beyond +-90 deg are NaN.
+        """
+        drive = self._add_corrections(tel_id, pointing, -1)
+        distance = np.atleast_1d(self.revert(tel_id, drive).separation(pointing).to_value(u.arcsec))
+        above = distance > self.tolerance
+        if np.any(above):
             logger.warning(
-                "Bending model of telescope %d: no convergence after %d iterations for %d positions (set to NaN)",
-                tel_id, self.max_iterations, np.count_nonzero(failed),
+                "Bending model of telescope %d: %d positions inverted with an error above %.1f arcsec (largest %.1f arcsec)",
+                tel_id, np.count_nonzero(above), self.tolerance, np.max(distance[above]),
             )
-            alt, az = np.where(failed, np.nan, alt), np.where(failed, np.nan, az)
+        return drive
+
+    def _add_corrections(self, tel_id, pointing, sign):
+        """``pointing`` + sign * corrections at ``pointing``"""
+        d_alt, d_az = self.corrections(tel_id, pointing.alt, pointing.az)
+        alt = (pointing.alt + sign * d_alt).to_value(u.deg)
         alt = np.where(np.abs(alt) <= 90, alt, np.nan)
-        return SkyCoord(alt=alt * u.deg, az=az * u.deg, frame=pointing.frame)
+        return SkyCoord(alt=alt * u.deg, az=pointing.az + sign * d_az, frame=pointing.frame)
 
 
-class MeeksBendingModel(BendingModel):
+class TPointBendingModel(BendingModel):
     """
-    Bending model of alt-az mounts of Meeks, Ball and Hull [1]_: pointing errors (eq. 1:
-    observed - command, the observed being the drive position) at the commanded position
-    (elevation h, azimuth A) from the tilt of the azimuth axis (eq. 3), the skew of the elevation
-    axis (eq. 5), the collimation error (eq. 6), the gravitational deflection (eq. 7) and the
-    biases of the encoders (eqs. 8 and 9):
+    Bending model of alt-az mounts with the 8 terms of TPOINT [1]_ (names, signs and units), as
+    implemented in pytelpoint [2]_ (``pytelpoint.transform.azel_model``), corrections of the drive
+    (encoder) position alt, az:
 
-    - d_az = -phi cos(kappa_A - A) tan(h) + epsilon tan(h) - delta / cos(h) + K_A
-    - d_alt = -phi sin(kappa_A - A) + beta h + K_h
+    - d_az = -IA - AN sin(az) tan(alt) - AW cos(az) tan(alt) - CA / cos(alt) - NPAE tan(alt)
+    - d_alt = IE - AN cos(az) + AW sin(az) - TF cos(alt) - TX / tan(alt)
 
-    with h in deg in the gravitational deflection beta h + K_h. All the parameters are 0 by
-    default (no pointing error).
+    The coefficients are in arcsec, 0 by default (no correction), configured with the TPOINT names
+    in lower case (``ia``, ``ie``, ``an``, ``aw``, ``ca``, ``npae``, ``tf``, ``tx``), e.g.
+    ``{"TPointBendingModel": {"ia": [["type", "*", 0], ["id", 21, -8360], ["id", 22, -2070]]}}``.
 
     References
     ----------
-    .. [1] M. L. Meeks, J. A. Ball and A. B. Hull, "The pointing calibration of the Haystack
-       antenna", IEEE Transactions on Antennas and Propagation, vol. AP-16, no. 6, pp. 746-751
-       (1968), https://doi.org/10.1109/TAP.1968.1139287
+    .. [1] P. T. Wallace, "TPOINT - Telescope Pointing Analysis System", Starlink User Note 100
+       (1994)
+    .. [2] T. E. Pickering, "pytelpoint: an open-source package for modeling and assessing
+       telescope pointing performance", Proc. SPIE 12189, 121892L (2022),
+       https://doi.org/10.1117/12.2630648
     """
 
-    azimuth_axis_tilt = FloatTelescopeParameter(
-        default_value=0.0, help="phi: amount of the tilt of the azimuth axis (deg)"
+    ia = FloatTelescopeParameter(default_value=0.0, help="IA: azimuth index (arcsec)").tag(config=True)
+    ie = FloatTelescopeParameter(default_value=0.0, help="IE: elevation index (arcsec)").tag(config=True)
+    an = FloatTelescopeParameter(
+        default_value=0.0, help="AN: north-south misalignment of the azimuth axis (arcsec)"
     ).tag(config=True)
-    level_axis_azimuth = FloatTelescopeParameter(
-        default_value=0.0, help="kappa_A: azimuth of the level axis, the azimuth axis is tilted toward kappa_A + 90 deg (deg)"
+    aw = FloatTelescopeParameter(
+        default_value=0.0, help="AW: east-west misalignment of the azimuth axis (arcsec)"
     ).tag(config=True)
-    elevation_axis_skew = FloatTelescopeParameter(
-        default_value=0.0, help="epsilon: skew of the elevation axis (deg)"
+    ca = FloatTelescopeParameter(
+        default_value=0.0,
+        help="CA: left-right collimation, non perpendicularity of the pointing direction and the elevation axis (arcsec)",
     ).tag(config=True)
-    collimation = FloatTelescopeParameter(default_value=0.0, help="delta: collimation error (deg)").tag(config=True)
-    elevation_coefficient = FloatTelescopeParameter(
-        default_value=0.0, help="beta: gravitational deflection per degree of elevation"
+    npae = FloatTelescopeParameter(
+        default_value=0.0, help="NPAE: non perpendicularity of the azimuth and elevation axes (arcsec)"
     ).tag(config=True)
-    azimuth_bias = FloatTelescopeParameter(default_value=0.0, help="K_A: azimuth bias (deg)").tag(config=True)
-    elevation_bias = FloatTelescopeParameter(default_value=0.0, help="K_h: elevation bias (deg)").tag(config=True)
+    tf = FloatTelescopeParameter(default_value=0.0, help="TF: tube flexure in cos(alt) (arcsec)").tag(config=True)
+    tx = FloatTelescopeParameter(default_value=0.0, help="TX: tube flexure in 1 / tan(alt) (arcsec)").tag(config=True)
 
-    def pointing_errors(self, tel_id, alt, az):
-        h = u.Quantity(alt, u.deg).to_value(u.deg)
+    def corrections(self, tel_id, alt, az):
+        alt = u.Quantity(alt, u.deg).to_value(u.rad)
         az = u.Quantity(az, u.deg).to_value(u.rad)
-        phi = self.azimuth_axis_tilt.tel[tel_id]
-        kappa = np.deg2rad(self.level_axis_azimuth.tel[tel_id])
+        c = {name: getattr(self, name).tel[tel_id] for name in ("ia", "ie", "an", "aw", "ca", "npae", "tf", "tx")}
         with np.errstate(divide="ignore", invalid="ignore"):
-            tan_h = np.tan(np.deg2rad(h))
+            tan_alt = np.tan(alt)
             d_az = (
-                -phi * np.cos(kappa - az) * tan_h
-                + self.elevation_axis_skew.tel[tel_id] * tan_h
-                - self.collimation.tel[tel_id] / np.cos(np.deg2rad(h))
-                + self.azimuth_bias.tel[tel_id]
+                -c["ia"] - c["an"] * np.sin(az) * tan_alt - c["aw"] * np.cos(az) * tan_alt
+                - c["ca"] / np.cos(alt) - c["npae"] * tan_alt
             )
-        d_alt = -phi * np.sin(kappa - az) + self.elevation_coefficient.tel[tel_id] * h + self.elevation_bias.tel[tel_id]
-        return d_alt * u.deg, d_az * u.deg
+            d_alt = c["ie"] - c["an"] * np.cos(az) + c["aw"] * np.sin(az) - c["tf"] * np.cos(alt) - c["tx"] / tan_alt
+        return d_alt * u.arcsec, d_az * u.arcsec

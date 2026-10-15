@@ -395,7 +395,7 @@ class PlotDrivePointingTool(Tool):
         "sst1mpipe-plot-drive-pointing -i DriveSystem1_20260120_001.fits -i DriveSystem2_20260120_002.fits "
         "-o plots --revert-bending --config bending_model.json\n"
         "with bending_model.json: "
-        '{"MeeksBendingModel": {"azimuth_bias": [["type", "*", 0], ["id", 21, -2.3], ["id", 22, -0.6]]}}'
+        '{"TPointBendingModel": {"ia": [["type", "*", 0], ["id", 21, -8360], ["id", 22, -2070]]}}'
     )
 
     input_files = List(
@@ -416,7 +416,7 @@ class PlotDrivePointingTool(Tool):
         default_value=False, help="Revert the bending model of the drives (bending_model_type)"
     ).tag(config=True)
     bending_model_type = ComponentName(
-        BendingModel, default_value="MeeksBendingModel", help="Bending model of the drives"
+        BendingModel, default_value="TPointBendingModel", help="Bending model of the drives"
     ).tag(config=True)
 
     aliases = {
