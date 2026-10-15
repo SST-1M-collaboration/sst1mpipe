@@ -91,7 +91,7 @@ class TPointBendingModel(BendingModel):
 
     The coefficients are in arcsec, 0 by default (no correction), configured with the TPOINT names
     in lower case, e.g. ``{"TPointBendingModel": {"ia": [["id", 21, -8441.94], ["id", 22, -2074.65]]}}``.
-    ``SST1M_BENDING_MODEL_CONFIG_FILE`` has the coefficients of the SST-1M drives of 2023.
+    ``SST1M_BENDING_MODEL_CONFIG_FILE`` has the coefficients of the SST-1M drives.
 
     References
     ----------

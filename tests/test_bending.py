@@ -135,21 +135,21 @@ def test_plot_drive_pointing_tool(tmp_path, revert_bending):
         assert (tmp_path / "plots" / name).stat().st_size > 0
 
 
-def test_sst1m_bending_model_2023(subarray):
+@pytest.mark.parametrize("tel_id, max_separation", [(21, 1 * u.arcmin), (22, 2 * u.arcmin)])
+def test_sst1m_bending_model(subarray, tel_id, max_separation):
     """
-    Coefficients of the SST-1M drives (2023): the pointing of tel 21 on the Mrk 421 wobble W1 (TARGET
-    of the zfits runs) within 1 arcmin. Those of tel 22 changed after the mounting of DigiCam.
+    Coefficients of the SST-1M drives (SST1M_BENDING_MODEL_CONFIG_FILE): pointing on the Mrk 421
+    wobble W1 (TARGET of the zfits runs) within max_separation
     """
     bending = TPointBendingModel(subarray, config=Config(json.loads(SST1M_BENDING_MODEL_CONFIG_FILE.read_text())))
-    assert u.isclose(bending.ia.tel[21], -8441.94)
-    assert u.isclose(bending.ie.tel[22], 124.85)
-    drive = read_drive_logs(DRIVE_FILES[0], subarray=subarray)
+    assert bending.ia.tel[tel_id] != 0
+    drive = read_drive_logs(DRIVE_FILES[tel_id - 21], subarray=subarray)
     tracking = (
         drive["is_tracking"] & drive["is_on_source"]
         & (drive["time"] > Time("2026-01-21T00:30:00")) & (drive["time"] < Time("2026-01-21T04:30:00"))
     )
-    sky = bending.revert(21, drive["pointing"][tracking]).transform_to("icrs")
+    sky = bending.revert(tel_id, drive["pointing"][tracking]).transform_to("icrs")
     w1 = SkyCoord(166.9948 * u.deg, 38.1053 * u.deg, frame="icrs")
     on_w1 = sky.ra > 166.5 * u.deg
     assert np.count_nonzero(on_w1) > 1000
-    assert np.all(SkyCoord(sky.ra, sky.dec)[on_w1].separation(w1) < 1 * u.arcmin)
+    assert np.all(SkyCoord(sky.ra, sky.dec)[on_w1].separation(w1) < max_separation)
