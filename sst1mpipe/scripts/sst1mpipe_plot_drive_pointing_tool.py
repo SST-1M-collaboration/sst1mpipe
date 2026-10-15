@@ -1,29 +1,8 @@
-#!/usr/bin/env python
 """
-Pointing of the SST-1M telescopes from the logs of their drive system, while tracking on source:
-
-- right ascension and declination of each telescope as a function of time, one column per field
-  of the night (successive tracking periods closer than ``--field-radius``)
-- map of the time spent tracking in each direction of the sky (2D histogram): whole sky, and
-  zoom on each field for each telescope
-
-The pointing given by the TARGET field of zfits runs (``--zfits-files``) is drawn for comparison.
-The bending model of the drives (``--bending-model``, JSON configuration of the BendingModel,
-e.g. ``{"BendingModel": {"IA": [["id", 21, -2.6], ["id", 22, -0.6]]}}``) is reverted to give the
-direction pointed to in the sky.
-
-Usage:
-
-$> sst1mpipe_plot_drive_pointing
---input-files DriveSystem1_20260120_001.fits DriveSystem2_20260120_002.fits
---zfits-files SST1M1_20260120_1179.fits.fz
---bending-model bending_model.json
---output-dir ./plots
+Plots of the pointing of the SST-1M telescopes from the logs of their drive system (tool
+sst1mpipe-plot-drive-pointing)
 """
-import argparse
-import json
 import logging
-from pathlib import Path
 
 import astropy.units as u
 import matplotlib.dates as mdates
@@ -34,15 +13,18 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.visualization.wcsaxes.frame import EllipticalFrame
 from astropy.wcs import WCS
+from ctapipe.core import Tool
+from ctapipe.core.traits import Bool, ComponentName, Float, List, Path, classes_with_traits, flag
 from ctapipe.instrument import SubarrayDescription
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import FuncFormatter
-from traitlets.config import Config
 
 from sst1mpipe.instrument.bending import BendingModel
 from sst1mpipe.io.drive import drive_radec, read_drive_logs
 from sst1mpipe.io.sst1m_event_source import parse_target_field
 from sst1mpipe.resources import SUBARRAY_FILE
+
+logger = logging.getLogger(__name__)
 
 # telescopes: categorical slots 1 and 2 of the reference palette (blue, orange)
 TEL_COLORS = {21: "#2a78d6", 22: "#eb6834"}
@@ -59,27 +41,6 @@ TIME_CMAP.set_bad(alpha=0)
 
 # longest time between two samples of the drive counted as tracking time (s)
 MAX_SAMPLE_DURATION = 5
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="Pointing of the telescopes from the drive logs")
-    parser.add_argument("--input-files", "-f", nargs="+", required=True, help="Drive logs (DriveSystem*.fits)")
-    parser.add_argument(
-        "--zfits-files", "-z", nargs="+", default=[], help="zfits runs whose TARGET pointing is drawn for comparison"
-    )
-    parser.add_argument(
-        "--bending-model", "-b", default=None,
-        help="JSON configuration of the BendingModel of the drives, reverted (default: drive positions)",
-    )
-    parser.add_argument("--output-dir", "-o", default=".", help="Directory of the plots")
-    parser.add_argument(
-        "--field-radius", type=float, default=10.0,
-        help="Successive tracking periods closer than this (deg) are in the same field",
-    )
-    parser.add_argument(
-        "--min-tracking", type=float, default=30.0, help="Tracking periods shorter than this (s) are not used"
-    )
-    return parser.parse_args()
 
 
 def mean_direction(coords):
@@ -143,7 +104,7 @@ def read_targets(files):
             header = hdul["Events"].header
         target, wobble, ra, dec = parse_target_field(header.get("TARGET"))
         if ra is None:
-            logging.warning("No pointing in the TARGET field (%r) of %s", header.get("TARGET"), file)
+            logger.warning("No pointing in the TARGET field (%r) of %s", header.get("TARGET"), file)
             continue
         targets.append(dict(
             target=target,
@@ -245,7 +206,6 @@ def plot_radec_vs_time(tracks, fields, targets, radius, path, pointing="drive po
     fig.legend(handles, labels, loc="upper right", ncols=len(handles), frameon=False, fontsize=9, labelcolor=TEXT)
     fig.savefig(path, dpi=150, facecolor=SURFACE, bbox_inches="tight")
     plt.close(fig)
-    logging.info("Plot saved in %s", path)
 
 
 def allsky_wcs(fields, frame):
@@ -410,38 +370,109 @@ def plot_radec_map(tracks, fields, targets, radius, path, pointing="drive positi
     )
     fig.savefig(path, dpi=150, facecolor=SURFACE, bbox_inches="tight")
     plt.close(fig)
-    logging.info("Plot saved in %s", path)
+
+
+class PlotDrivePointingTool(Tool):
+    """
+    Pointing of the SST-1M telescopes from the logs of their drive system, while tracking on source:
+
+    - right ascension and declination of each telescope as a function of time, one column per field
+      of the night (successive tracking periods closer than ``field_radius``)
+    - map of the time spent tracking in each direction of the sky (2D histogram): whole sky, and
+      zoom on each field for each telescope
+
+    The pointing given by the TARGET field of zfits runs (``zfits_files``) is drawn for comparison.
+    With ``--revert-bending``, the bending model of the drives (``bending_model_type``, configured
+    per telescope in the configuration file) is reverted to give the direction pointed to in the
+    sky. Otherwise the plots show the drive positions.
+    """
+
+    name = "sst1mpipe-plot-drive-pointing"
+    description = __doc__
+    examples = (
+        "sst1mpipe-plot-drive-pointing -i DriveSystem1_20260120_001.fits -i DriveSystem2_20260120_002.fits "
+        "-z SST1M1_20260120_1179.fits.fz -o plots\n"
+        "sst1mpipe-plot-drive-pointing -i DriveSystem1_20260120_001.fits -i DriveSystem2_20260120_002.fits "
+        "-o plots --revert-bending --config bending_model.json\n"
+        "with bending_model.json: "
+        '{"MeeksBendingModel": {"azimuth_bias": [["type", "*", 0], ["id", 21, -2.3], ["id", 22, -0.6]]}}'
+    )
+
+    input_files = List(
+        Path(exists=True, directory_ok=False), minlen=1, help="Drive logs (DriveSystem*.fits)"
+    ).tag(config=True)
+    zfits_files = List(
+        Path(exists=True, directory_ok=False), default_value=[],
+        help="zfits runs whose TARGET pointing is drawn for comparison",
+    ).tag(config=True)
+    output_dir = Path(default_value=".", file_ok=False, help="Directory of the plots").tag(config=True)
+    field_radius = Float(
+        default_value=10.0, help="Successive tracking periods closer than this (deg) are in the same field"
+    ).tag(config=True)
+    min_tracking = Float(
+        default_value=30.0, help="Tracking periods shorter than this (s) are not used"
+    ).tag(config=True)
+    revert_bending = Bool(
+        default_value=False, help="Revert the bending model of the drives (bending_model_type)"
+    ).tag(config=True)
+    bending_model_type = ComponentName(
+        BendingModel, default_value="MeeksBendingModel", help="Bending model of the drives"
+    ).tag(config=True)
+
+    aliases = {
+        ("i", "input-files"): "PlotDrivePointingTool.input_files",
+        ("z", "zfits-files"): "PlotDrivePointingTool.zfits_files",
+        ("o", "output-dir"): "PlotDrivePointingTool.output_dir",
+        "field-radius": "PlotDrivePointingTool.field_radius",
+        "min-tracking": "PlotDrivePointingTool.min_tracking",
+        "bending-model-type": "PlotDrivePointingTool.bending_model_type",
+    }
+
+    flags = {
+        **flag("revert-bending", "PlotDrivePointingTool.revert_bending",
+               "revert the bending model of the drives", "plot the drive positions"),
+    }
+
+    classes = classes_with_traits(BendingModel)
+
+    def setup(self):
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.subarray = SubarrayDescription.from_hdf(SUBARRAY_FILE)
+        self.bending_model = None
+        if self.revert_bending:
+            self.bending_model = BendingModel.from_name(self.bending_model_type, subarray=self.subarray, parent=self)
+
+    def start(self):
+        tracks = {}
+        for path in self.input_files:
+            drive = read_drive_logs(path, subarray=self.subarray)
+            tel_id = drive.meta["tel_id"]
+            if self.bending_model is not None:
+                drive["pointing"] = self.bending_model.revert(tel_id, drive["pointing"])
+            tracks[tel_id] = tracking_periods(drive, self.min_tracking)
+        tracks = dict(sorted(tracks.items()))
+        radius = self.field_radius * u.deg
+        fields = find_fields(tracks, radius)
+        targets = read_targets(self.zfits_files)
+        for field in fields:
+            self.log.info(
+                "Field %s from %s to %s", field_name(field, field_targets(field, targets, radius)),
+                field["start"].isot, field["stop"].isot,
+            )
+
+        pointing = f"{self.bending_model_type} reverted" if self.bending_model is not None else "drive position"
+        self.plots = [self.output_dir / "drive_radec_vs_time.png", self.output_dir / "drive_radec_map.png"]
+        plot_radec_vs_time(tracks, fields, targets, radius, self.plots[0], pointing)
+        plot_radec_map(tracks, fields, targets, radius, self.plots[1], pointing)
+
+    def finish(self):
+        for path in self.plots:
+            self.log.info("Plot saved in %s", path)
 
 
 def main():
-    args = parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    subarray = SubarrayDescription.from_hdf(SUBARRAY_FILE)
-    bending_model = None
-    pointing = "drive position"
-    if args.bending_model is not None:
-        with open(args.bending_model) as f:
-            bending_model = BendingModel(subarray, config=Config(json.load(f)))
-        pointing = "bending model reverted"
-    tracks = {}
-    for file in args.input_files:
-        drive = read_drive_logs(file, subarray=subarray, bending_model=bending_model)
-        tracks[drive.meta["tel_id"]] = tracking_periods(drive, args.min_tracking)
-    tracks = dict(sorted(tracks.items()))
-    radius = args.field_radius * u.deg
-    fields = find_fields(tracks, radius)
-    targets = read_targets(args.zfits_files)
-    for field in fields:
-        logging.info(
-            "Field %s from %s to %s", field_name(field, field_targets(field, targets, radius)),
-            field["start"].isot, field["stop"].isot,
-        )
-
-    plot_radec_vs_time(tracks, fields, targets, radius, output_dir / "drive_radec_vs_time.png", pointing)
-    plot_radec_map(tracks, fields, targets, radius, output_dir / "drive_radec_map.png", pointing)
+    tool = PlotDrivePointingTool()
+    tool.run()
 
 
 if __name__ == "__main__":
