@@ -20,7 +20,7 @@ Products of automatic processing (all data levels up to DL3) can be found in:
 
 Those are sorted by date, source observed, and the telescope used (``cs1``, ``cs2`` and ``stereo`` for coincident events).
 All data level directories also contain configuration file and log file for each processed run, so 
-user can easily check if the processing went OK and which version of ``sst1mpipe``wasused. Random Forest models used in authomatic analysis 
+user can easily check if the processing went OK and which version of ``sst1mpipe`` was used. Random Forest models used in authomatic analysis 
 can be found in
 
 ``/data/work/analysis/MC/prod_january_2023/``
@@ -67,11 +67,16 @@ There are two slightly different configuration files. One is to be used for MC p
 for real data processing. These contain configuration for all reconstruction/analysis steps 
 from R0 to DL3 (or performance evaluation in case of MC).
 
-Default config file for MC:
+Config files for MC, for the simulations at low and high NSB (they differ by the PDE drop correction factors):
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config.json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_low_nsb.json
+       :code: json
+
+.. toggle:: 
+
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_high_nsb.json
        :code: json
 
 Default config file for data:
@@ -105,9 +110,19 @@ See ``--help`` for possible inputs. Some of them, which might not be obvious:
 
 **Relevant parts of the config file** applied in this analysis step:
 
-* ``telescope_calibration`` - calibration files based on analysis of dark runs. Should be taken relatively close to the date of observation
+* ``R0R1Calibrator`` - R0 -> R1 calibration (``sst1mpipe.calib.R0R1Calibrator``). All settings can be given per telescope, e.g. ``[["type", "*", "global"], ["id", 22, "none"]]``:
 
-* ``window_transmittance`` - files with for camera window transmittance correction (measured in the lab and can be kept default)
+  * ``calibration_file`` - calibration files based on analysis of dark runs (``null``: default file of the telescope). Should be taken relatively close to the date of observation
+  * ``window_transmittance_file`` - camera window transmittance correction factors of the pixels, measured in the lab (``null``: default file of the telescope, can be kept)
+  * ``voltage_drop_correction`` - ``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB
+  * ``flag_bad_calibration_pixels`` and ``flag_dead_pixels`` - pixels set to 0 and interpolated. The dead pixels are the pixels without statistics of the ADC samples of the pedestal events (outliers of ``sst1mpipe-monitoring``)
+  * ``bad_pixels`` - ids of pixels always set to 0 and interpolated (data and MC)
+  * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the R1 waveforms are divided by this factor, which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.json`` and ``sst1mpipe_mc_config_high_nsb.json`` have the factors of the low and high NSB simulations
+
+  Config files with the former ``telescope_calibration``, ``NsbCalibrator.apply_*_Vdrop_correction``, ``analysis.bad_pixels`` and ``window_transmittance`` settings are still read (translated with a warning). ``NsbCalibrator.mc_correction_for_PDE`` must be replaced by ``pde_drop_factor``.
+
+* ``NsbCalibrator.intensity_correction`` - global scale of the Hillas intensity per telescope. It is not applied at this step, but in ``sst1mpipe_dl1_dl2`` with ``--scale-intensities``
+
 
 * ``CameraCalibrator`` - Pulse integration settings
 

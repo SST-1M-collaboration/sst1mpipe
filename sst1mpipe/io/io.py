@@ -21,7 +21,7 @@ from traitlets.config import Config
 
 import sst1mpipe
 from sst1mpipe.io.containers import DL1_info, DL2_info
-from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILE, PDE_CORRECTION_FACTORS_FILE
+from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
     add_disp,
     add_event_id,
@@ -121,15 +121,116 @@ def load_config(cfg_file, ismc=False):
     """
     if cfg_file is None:
         logging.info('No config file specified, loading default config.')
-        if ismc:
-            cfg_file = MC_CONFIG_FILE
-        else:
-            cfg_file = DATA_CONFIG_FILE
+        cfg_file = MC_CONFIG_FILES["low"] if ismc else DATA_CONFIG_FILE
 
     with open(cfg_file) as json_file:
-            config = Config(json.load(json_file))
+        config = json.load(json_file)
 
+    return Config(translate_legacy_calibration_config(config))
+
+
+def translate_legacy_calibration_config(config):
+    """
+    Translates the R0 -> R1 calibration settings of the configuration files written
+    before `sst1mpipe.calib.R0R1Calibrator` (``telescope_calibration``,
+    ``NsbCalibrator.apply_*_Vdrop_correction``, ``analysis.bad_pixels``,
+    ``window_transmittance``) into its ``R0R1Calibrator`` section.
+    ``NsbCalibrator.mc_correction_for_PDE`` can not be translated: if true, the PDE drop
+    factors must be set in ``R0R1Calibrator.pde_drop_factor`` (a ValueError is raised).
+    Nothing is done if the configuration has a ``R0R1Calibrator`` section.
+
+    Parameters
+    ----------
+    config: dict
+
+    Returns
+    -------
+    config: dict
+    """
+    legacy_bad_pixels = config.get("analysis", {}).pop("bad_pixels", None)
+    legacy_windows = config.pop("window_transmittance", None)
+    config = _translate_legacy_r0_r1_settings(config)
+
+    window_files = [
+        ["id", int(key[len("tel_"):]), path] for key, path in (legacy_windows or {}).items() if path is not None
+    ]
+    if len(window_files) > 0:
+        calibrator = config.setdefault("R0R1Calibrator", {})
+        if "window_transmittance_file" in calibrator:
+            logging.warning("Legacy window_transmittance files are ignored, R0R1Calibrator.window_transmittance_file is used.")
+        else:
+            logging.warning(
+                "Legacy window_transmittance files are translated into"
+                " R0R1Calibrator.window_transmittance_file, please update the config file."
+            )
+            calibrator["window_transmittance_file"] = [["type", "*", None]] + window_files
+
+    bad_pixels = [
+        ["id", int(key[len("tel_"):]), list(pixels)]
+        for key, pixels in (legacy_bad_pixels or {}).items() if len(pixels) > 0
+    ]
+    if len(bad_pixels) > 0:
+        calibrator = config.setdefault("R0R1Calibrator", {})
+        if "bad_pixels" in calibrator:
+            logging.warning("Legacy analysis.bad_pixels are ignored, R0R1Calibrator.bad_pixels is used.")
+        else:
+            logging.warning(
+                "Legacy analysis.bad_pixels are translated into R0R1Calibrator.bad_pixels,"
+                " please update the config file."
+            )
+            calibrator["bad_pixels"] = [["type", "*", []]] + bad_pixels
     return config
+
+
+
+def _translate_legacy_r0_r1_settings(config):
+    legacy_calibration = config.pop("telescope_calibration", None)
+    nsb_calibrator = config.get("NsbCalibrator", {})
+    pixelwise = nsb_calibrator.pop("apply_pixelwise_Vdrop_correction", None)
+    global_ = nsb_calibrator.pop("apply_global_Vdrop_correction", None)
+    mc_pde_correction = nsb_calibrator.pop("mc_correction_for_PDE", None)
+    if mc_pde_correction:
+        raise ValueError(
+            "NsbCalibrator.mc_correction_for_PDE is replaced by R0R1Calibrator.pde_drop_factor, which"
+            " must match the PDE files of the simulation: see sst1mpipe_mc_config_low_nsb.json and"
+            " sst1mpipe_mc_config_high_nsb.json"
+        )
+
+    if all(value is None for value in (legacy_calibration, pixelwise, global_, mc_pde_correction)):
+        return config
+    if "R0R1Calibrator" in config:
+        logging.warning(
+            "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction,"
+            " mc_correction_for_PDE) are ignored, the R0R1Calibrator section is used."
+        )
+        return config
+
+    logging.warning(
+        "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction,"
+        " mc_correction_for_PDE) are translated into the R0R1Calibrator section,"
+        " please update the config file."
+    )
+    calibrator = {}
+    if legacy_calibration is not None:
+        calibration_files = [["type", "*", None]]
+        for key, path in legacy_calibration.items():
+            if key.startswith("tel_") and path is not None:
+                calibration_files.append(["id", int(key[len("tel_"):]), path])
+        calibrator["calibration_file"] = calibration_files
+        flag_bad_pixels = legacy_calibration.get("bad_calib_px_interpolation", True)
+        calibrator["flag_bad_calibration_pixels"] = flag_bad_pixels
+        # the dead pixels were only flagged with the pixels with bad calibration
+        calibrator["flag_dead_pixels"] = flag_bad_pixels and legacy_calibration.get(
+            "dynamic_dead_px_interpolation", True
+        )
+    if pixelwise or global_ is not None:
+        # the pixelwise correction was applied if both were set
+        calibrator["voltage_drop_correction"] = (
+            "pixelwise" if pixelwise else "global" if global_ else "none"
+        )
+    config["R0R1Calibrator"] = calibrator
+    return config
+
 
 
 def load_source_catalog(catalog_file):
@@ -1475,41 +1576,11 @@ def load_distributions_sst1m(dist_path=None, dl3_path=None):
     return histograms, histograms_diff, zeniths, obsids_sorted, livetimes, survived_ped, bins
 
 
-def get_used_qe_simtel(source):
-    """
-    Reads the simtel cfg file used to run current MC production and extracts
-    all Quntum efficiency (PDE) files listed there. There are also default (dummy)
-    PDE files there as the proper fields in simtel must be first initialized with
-    something before running. This is not dangerous as long us one does not
-    use one of the real PDE files used for the real production as the dummy file..
-
-    Parameters
-    ----------
-    source: ctapipe.io.EventSource
-
-    Returns
-    -------
-    used_qe: numpy.array
-        Array of used PDEs to produce given simtel file
-
-    """
-
-    used_qe = []
-    stringlist=[x[1].decode('utf-8') for x in source.file_.history]
-    string_array = np.array(stringlist)
-    indices = np.arange(0, len(string_array))
-    index_array_eff = indices[np.char.find(string_array, 'QUANTUM_EFFiciency') != -1]
-    for string in string_array[index_array_eff]:
-        s = string.replace('QUANTUM_EFFiciency ', '').split('%')[0].strip()
-        used_qe.append(s[:s.rfind('.')])
-    return np.array(used_qe)
-
-
 def get_pde_correction_factors():
     """
     Reads the default calibration file containing the PDE
     corrections for different PDE files used in MC production.
-    The file is expected to be stored in ../data/mc_pde_correction_factors.json
+    The file is sst1mpipe/resources/calibration/mc_pde_correction_factors.json
 
     Returns
     -------
