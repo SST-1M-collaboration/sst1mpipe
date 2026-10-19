@@ -49,64 +49,11 @@ in the provenance log of the tool (``<tool>.provenance.log``, ``--provenance-log
         --output SST1M1_20260120_1179.monitoring.h5 \
         --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
 
-The raw data file is read once, and the monitoring file contains:
-
-* **pointing** of the telescope, ``/dl0/monitoring/telescope/pointing/tel_XXX``: altitude and azimuth
-  of the target of the run (TARGET field of the file, or ``--SST1MEventSource.pointing_ra`` and
-  ``--SST1MEventSource.pointing_dec``) every ``--MonitoringTool.pointing_update_interval`` (1 s) from the first to the
-  last event of the run. The runs without pointing (e.g. dark runs) have no pointing table.
-* **statistics of the ADC samples of the pedestal events**,
-  ``/r0/monitoring/telescope/calibration/camera/pixel_statistics/<event type>_waveform/tel_XXX``,
-  in chunks of pedestal events (100 by default): ``mean`` and ``median`` of the baseline (mean of the
-  ADC samples), ``std`` the noise (std of the ADC samples, used for the voltage drop correction and
-  the dead pixels), ``outlier_mask`` (dead pixels: noise below half the camera median) and ``is_valid``.
-* **statistics of the images of the pedestal events**,
-  ``/dl1/monitoring/telescope/calibration/camera/pixel_statistics/<event type>_image/tel_XXX``,
-  in chunks of pedestal events (1000 by default): ``mean``, ``median`` and ``std`` of the charges (p.e.),
-  used by the ``NSBImageCleaner``. The images are calibrated by the ``R0R1Calibrator`` (without voltage
-  drop correction) and the ``CameraCalibrator``.
-* the description of the telescope, the scheduling and observation blocks of the run and the reference
-  metadata.
-
-The pedestal events are the internal triggers of the camera. Their event type, ``<event type>`` in the
-names of the tables, is given by the target of the run:
-
-=====================  =========================  ===================================
-target of the run      event type                 tables
-=====================  =========================  ===================================
-``dark``               ``DARK_PEDESTAL``          ``dark_pedestal_waveform/image``
-``bias``               ``ELECTRONIC_PEDESTAL``    ``electronic_pedestal_waveform/image``
-other targets          ``SKY_PEDESTAL``           ``sky_pedestal_waveform/image``
-=====================  =========================  ===================================
-
-The statistics are computed as in the ``ctapipe-calculate-pixel-statistics`` tool, by the
-``WaveformStatisticsCalculator`` and the ``ImageStatisticsCalculator`` (ctapipe
-``PixelStatisticsCalculator``): aggregation of the pedestal events in chunks, detection of the outlier
-pixels, and validity of the chunks (``faulty_pixels_fraction``). The chunk of the time of an event is
-the chunk from its first to its last pedestal event. Their main settings, in
-``sst1mpipe_monitoring_config.json``:
-
-* ``WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size`` and
-  ``ImageStatisticsCalculator.PlainAggregator.SizeChunking.chunk_size``: number of pedestal events in a
-  chunk. ``chunking_type`` ``TimeChunking`` gives chunks of a duration (``chunk_duration``) instead.
-  ``allow_undersized_tables`` gives a single chunk for the runs with less pedestal events than a chunk.
-* ``stats_aggregator_type`` of the ``ImageStatisticsCalculator``: ``PlainAggregator`` (mean, median and
-  std) or ``SigmaClippingAggregator`` (without the outlier events)
-* ``outlier_detector_list``: ``RangeOutlierDetector`` (``validity_range``), ``MedianOutlierDetector``
-  (``median_range_factors``) or ``StdOutlierDetector`` (``std_range_factors``) applied to the ``mean``,
-  ``median`` or ``std`` of the chunks
-* ``R0R1Calibrator`` and ``CameraCalibrator``: calibration of the images, as for the processing
-
-The monitoring file is a ctapipe monitoring file: it is read by the ctapipe ``HDF5MonitoringSource``
-(pointing and statistics of the images) and its tables with ``ctapipe.io.read_table``:
-
-.. code-block:: python
-
-    from ctapipe.io import read_table
-
-    path = "/dl1/monitoring/telescope/calibration/camera/pixel_statistics/sky_pedestal_image/tel_021"
-    statistics = read_table("SST1M1_20260120_1179.monitoring.h5", path)
-    print(statistics["time_start", "time_end", "n_events"])
+The raw data file is read once, and the monitoring file contains the pointing of the telescope, the
+statistics of the ADC samples of the pedestal events (baseline and noise, for the voltage drop correction
+and the dead pixels) and the statistics of their images (NSB noise, for the ``NSBImageCleaner``), in chunks
+of pedestal events. What the tool does, its settings and the content of the monitoring file are described
+in :ref:`sst1mpipe_monitoring`.
 
 
 .. _process_step:
