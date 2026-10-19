@@ -89,7 +89,7 @@ command_line = "-m pytest tests/"
 source = ["sst1mpipe/"]
 
 [tool.coverage.report]
-fail_under = 18
+fail_under = 25
 show_missing = true
 sort = "Cover"
 
