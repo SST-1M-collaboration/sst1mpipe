@@ -49,7 +49,8 @@ in the provenance log of the tool (``<tool>.provenance.log``, ``--provenance-log
         --output SST1M1_20260120_1179.monitoring.h5 \
         --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
 
-The raw data file is read once, and the monitoring file contains the pointing of the telescope, the
+The raw data file is read twice (the images of the pedestal events are calibrated as the events by
+``sst1mpipe-process``, with the statistics of the ADC samples), and the monitoring file contains the pointing of the telescope, the
 statistics of the ADC samples of the pedestal events (baseline and noise, for the voltage drop correction
 and the dead pixels) and the statistics of their images (NSB noise, for the ``NSBImageCleaner``), in rolling
 chunks of the last pedestal events. What the tool does, its settings and the content of the monitoring file are described

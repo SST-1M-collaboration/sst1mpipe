@@ -36,16 +36,32 @@ processed without monitoring source.
 What the tool does
 ------------------
 
-The raw data file is read once, event by event:
+The raw data file is read twice, so that the images of the pedestal events are calibrated exactly as the
+events by ``sst1mpipe-process``, with the statistics of the ADC samples:
 
-1. the time of the first and of the last event of each telescope is kept, for the pointing table;
-2. the **pedestal events** (internal triggers of the camera) are kept, the other events are only counted.
-   For each pedestal event:
+1. **First pass:** the time of the first and of the last event of each telescope is kept, for the
+   pointing table, and the mean and the std of the ADC samples of each pixel (R0 waveforms) of the
+   **pedestal events** (internal triggers of the camera). The statistics of the ADC samples are then
+   computed (rolling chunks, see below).
+2. **Second pass:** the image of each pedestal event (charge of each pixel in p.e.) is calibrated as the
+   events by ``sst1mpipe-process``:
 
-   * the mean and the std of the ADC samples of each pixel (R0 waveforms);
-   * the image of the event (charge of each pixel in p.e.), calibrated as in ``sst1mpipe-process``
-     by the ``R0R1Calibrator`` and the ``CameraCalibrator``, but without voltage drop correction and without
-     dead pixels, since these need the statistics of the ADC samples which are being computed.
+   * the statistics of the ADC samples of the first pass at the time of the pedestal event (last chunk
+     ended before it, as given by ``SST1MMonitoringSource`` to ``sst1mpipe-process``);
+   * ``R0R1Calibrator``: dc to p.e., **voltage drop correction** and **dead pixels** (outliers of the
+     statistics of the ADC samples) flagged;
+   * ``CameraCalibrator``: integration of the waveforms, the charge of the dead pixels interpolated from
+     their neighbours;
+   * ``ImageSaturationCorrector``.
+
+   The statistics of the images are then computed. The pedestal events without statistics of the ADC
+   samples are not used (warning in the log), as they are skipped by ``sst1mpipe-process``.
+
+The calibration settings (``R0R1Calibrator``, ``CameraCalibrator``, ``ImageSaturationCorrector``) of
+``sst1mpipe_monitoring_config.json`` are those of ``sst1mpipe_data_config.json`` and
+``sst1mpipe_rta_config.json``: if they are changed for the processing, they must be changed for the
+monitoring too (checked by the tests). Reading the file twice takes about 25 % more time than once (43 s
+instead of 35 s for 11.5 s of data of a telescope).
 
 At the end of the run, the tool writes:
 
