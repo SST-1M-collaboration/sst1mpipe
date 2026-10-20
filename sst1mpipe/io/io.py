@@ -12,9 +12,10 @@ import tables
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.io import fits
 from astropy.io.misc.hdf5 import read_table_hdf5, write_table_hdf5
-from astropy.table import QTable, Table, join
+from astropy.table import QTable, Table, join, vstack
 from astropy.time import Time
-from ctapipe.io import read_table
+from ctapipe.io import read_table, write_table
+from ctapipe.io.hdf5dataformat import DL1_SKY_PEDESTAL_IMAGE_GROUP
 from gammapy.data import DataStore
 from pyirf.cuts import evaluate_binned_cut
 from traitlets.config import Config
@@ -1003,31 +1004,88 @@ def load_photon_list_sst1m(input_file, tel=None, config=None, table='astropy', e
     return data
 
 
-def load_dl1_pedestals(input_file):
+R0_PIXEL_STATISTICS_GROUP = "/r0/monitoring/telescope/calibration/camera/pixel_statistics"
+DL1_PEDESTAL_GROUP = DL1_SKY_PEDESTAL_IMAGE_GROUP
+R0_PEDESTAL_GROUP = f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform"
 
+
+def load_pedestals(input_file, group, tel=None):
     """
-    Reads tables with pedestal info from the input HDF DL1 file.
+    Reads the tables of statistics of the pedestal events of the telescopes
+    (``group/tel_XXX``), with the column tel_id
 
     Parameters
     ----------
     input_file: string
         Path
+    group: string
+        R0_PEDESTAL_GROUP or DL1_PEDESTAL_GROUP
+    tel: string
+        e.g. \'tel_021\', all the telescopes if None
+
+    Returns
+    -------
+    pedestals: astropy.table.Table
+    """
+    with tables.open_file(input_file) as f:
+        tels = [node._v_name for node in f.get_node(group)._f_iter_nodes("Table")]
+    if tel is not None:
+        tels = [tel]
+    pedestal_tables = []
+    for name in sorted(tels):
+        table = read_table(input_file, f"{group}/{name}")
+        table["tel_id"] = int(name.split("_")[-1])
+        pedestal_tables.append(table)
+    return vstack(pedestal_tables)
+
+
+def load_dl1_pedestals(input_file, tel=None):
+
+    """
+    Reads the statistics of the calibrated images (p.e.) of the
+    pedestal events from the input HDF DL1 file.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+    tel: string
+        e.g. \'tel_021\', all the telescopes if None
 
     Returns
     -------
     pedestals: astropy.table.Table
 
     """
-
-    pedestals = read_table(input_file, "/dl1/monitoring/telescope/pedestal")
-    return pedestals
+    return load_pedestals(input_file, DL1_PEDESTAL_GROUP, tel=tel)
 
 
-def write_dl1_pedestals(input_file, pedestal_table=None):
+def load_r0_pedestals(input_file, tel=None):
 
     """
-    Write table of pedestal events from DL1 file into
-    another DL1 file. Typical usecase is to propagate
+    Reads the statistics of the ADC samples of the pedestal
+    events from the input HDF DL1 file.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+    tel: string
+        e.g. \'tel_021\', all the telescopes if None
+
+    Returns
+    -------
+    pedestals: astropy.table.Table
+
+    """
+    return load_pedestals(input_file, R0_PEDESTAL_GROUP, tel=tel)
+
+
+def write_pedestals(input_file, pedestal_table=None, group=DL1_PEDESTAL_GROUP):
+
+    """
+    Write the tables of statistics of the pedestal events (see `load_pedestals`)
+    into another DL1 file. Typical usecase is to propagate
     pedestals from mono DL1 to stereo DL1.
 
     Parameters
@@ -1036,16 +1094,28 @@ def write_dl1_pedestals(input_file, pedestal_table=None):
         Path
 
     pedestal_table: astropy.table.Table
+        with the column tel_id
+
+    group: string
+        R0_PEDESTAL_GROUP or DL1_PEDESTAL_GROUP
 
     """
 
     try:
-        write_table_hdf5(pedestal_table, input_file,
-            append=True, path='/dl1/monitoring/telescope/pedestal',
-            serialize_meta=False
-            )
+        for tel_id in np.unique(pedestal_table["tel_id"]):
+            table = pedestal_table[pedestal_table["tel_id"] == tel_id]
+            table.remove_column("tel_id")
+            write_table(table, input_file, f"{group}/tel_{tel_id:03d}", append=True)
     except Exception:
         logging.warning('Writing pedestals into the file failed!')
+
+
+def write_dl1_pedestals(input_file, pedestal_table=None):
+    write_pedestals(input_file, pedestal_table=pedestal_table, group=DL1_PEDESTAL_GROUP)
+
+
+def write_r0_pedestals(input_file, pedestal_table=None):
+    write_pedestals(input_file, pedestal_table=pedestal_table, group=R0_PEDESTAL_GROUP)
 
 
 def load_extra_table(input_file, key=None, remove_column=None):
