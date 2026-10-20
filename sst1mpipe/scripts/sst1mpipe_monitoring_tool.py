@@ -1,18 +1,26 @@
 """
 Monitoring data of a SST-1M run, used afterwards by sst1mpipe-process (monitoring source).
 
-The raw data of the run (R0, SST1MEventSource) are read once:
+The raw data of the run (R0, SST1MEventSource) are read twice:
+
+1. pointing and statistics of the ADC samples of the pedestal events;
+2. statistics of the images of the pedestal events, calibrated exactly as the events by
+   sst1mpipe-process: R0R1Calibrator with the statistics of the ADC samples of the first pass at
+   the time of the pedestal event (voltage drop correction, dead pixels), CameraCalibrator and
+   ImageSaturationCorrector.
+
+Content of the monitoring file:
 
 - pointing of the telescopes: altitude and azimuth of the target of the run (TARGET field of
   the file, or SST1MEventSource.pointing_ra/pointing_dec) every pointing_update_interval
   from the first to the last event of the telescope, in the table
   dl0/monitoring/telescope/pointing/tel_XXX (read by the ctapipe PointingInterpolator)
 - statistics of the ADC samples of the pedestal events (WaveformStatisticsCalculator), in rolling
-  chunks of pedestal events (a chunk of the last chunk_size pedestal events every chunk_shift): mean and median of the baseline, std (noise) of the samples, in the table
+  chunks of pedestal events (a chunk of the last chunk_size pedestal events every chunk_shift):
+  mean and median of the baseline, std (noise) of the samples, in the table
   r0/monitoring/telescope/calibration/camera/pixel_statistics/<event type>_waveform/tel_XXX
-- statistics of the images of the pedestal events (ImageStatisticsCalculator), calibrated by the
-  R0R1Calibrator and the CameraCalibrator, in rolling chunks of pedestal events, in the ctapipe pixel
-  statistics table
+- statistics of the images of the pedestal events (ImageStatisticsCalculator), calibrated as by
+  sst1mpipe-process, in rolling chunks of pedestal events, in the ctapipe pixel statistics table
   dl1/monitoring/telescope/calibration/camera/pixel_statistics/<event type>_image/tel_XXX
 
 The event type of the pedestal events is sky_pedestal, dark_pedestal (dark runs) or
@@ -37,9 +45,10 @@ from ctapipe.monitoring.aggregator import BaseChunking, StatisticsAggregator
 from ctapipe.monitoring.outlier import OutlierDetector
 from tqdm import tqdm
 
-from sst1mpipe.calib import R0R1Calibrator
+from sst1mpipe.calib import ImageSaturationCorrector, R0R1Calibrator
 from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
+from sst1mpipe.io.monitoring_source import statistics_container, waveform_statistics_interpolator
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.monitoring import (
     ImageStatisticsCalculator,
@@ -102,7 +111,10 @@ class MonitoringTool(Tool):
     }
 
     classes = (
-        [R0R1Calibrator, CameraCalibrator, WaveformStatisticsCalculator, ImageStatisticsCalculator]
+        [
+            R0R1Calibrator, CameraCalibrator, ImageSaturationCorrector,
+            WaveformStatisticsCalculator, ImageStatisticsCalculator,
+        ]
         + classes_with_traits(EventSource)
         + classes_with_traits(StatisticsAggregator)
         + classes_with_traits(BaseChunking)
@@ -123,6 +135,7 @@ class MonitoringTool(Tool):
         subarray = self.event_source.subarray
         self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
         self.camera_calibrator = CameraCalibrator(parent=self, subarray=subarray)
+        self.image_saturation_corrector = ImageSaturationCorrector(parent=self, subarray=subarray)
         self.waveform_calculator = WaveformStatisticsCalculator(parent=self, subarray=subarray)
         self.image_calculator = ImageStatisticsCalculator(parent=self, subarray=subarray)
         for calculator in (self.waveform_calculator, self.image_calculator):
@@ -133,46 +146,108 @@ class MonitoringTool(Tool):
 
         # time of the first and last event of each telescope
         self.event_times = {}
-        # quantities of the pedestal events of each (telescope, event type), in the event loop
+        # quantities of the pedestal events of each (telescope, event type), in the event loops
         self.pedestal_waveforms = defaultdict(list)
         self.pedestal_images = defaultdict(list)
+        # statistics of each (telescope, event type)
+        self.waveform_statistics = {}
+        self.image_statistics = {}
+        # pedestal events without statistics of the ADC samples, whose image is not used
+        self.n_pedestals_without_statistics = 0
 
     def start(self):
-        for event in tqdm(
-            self.event_source,
-            desc=self.event_source.__class__.__name__,
-            total=self.event_source.max_events,
-            disable=not self.progress_bar,
-        ):
+        # first pass: times of the events and ADC samples of the pedestal events
+        for event in self.events(self.event_source, "pass 1/2"):
             for tel_id in event.trigger.tels_with_trigger:
                 time = event.trigger.tel[tel_id].time
                 first, _ = self.event_times.get(tel_id, (time, time))
                 self.event_times[tel_id] = (first, time)
+            if event.trigger.event_type in PEDESTAL_EVENT_TYPES:
+                self.add_pedestal_waveforms(event, event.trigger.event_type)
+        self.waveform_statistics = self.compute_statistics(self.pedestal_waveforms, self.waveform_calculator, "waveform")
+        if len(self.waveform_statistics) == 0:
+            return
 
+        # second pass: images of the pedestal events, calibrated with the statistics of the ADC
+        # samples of the first pass, as the events by sst1mpipe-process
+        interpolators = {
+            event_type: waveform_statistics_interpolator({
+                tel_id: table for (tel_id, table_type), table in self.waveform_statistics.items() if table_type == event_type
+            })
+            for event_type in {event_type for _, event_type in self.waveform_statistics}
+        }
+        source = self.enter_context(EventSource(parent=self))
+        for event in self.events(source, "pass 2/2"):
             event_type = event.trigger.event_type
-            if event_type not in PEDESTAL_EVENT_TYPES:
-                continue
-            self.add_pedestal_event(event, event_type)
+            if event_type in interpolators:
+                self.add_pedestal_images(event, event_type, interpolators[event_type])
+        if self.n_pedestals_without_statistics > 0:
+            self.log.warning(
+                "%d pedestal events without statistics of the ADC samples: not used for the statistics of the images",
+                self.n_pedestals_without_statistics,
+            )
+        self.image_statistics = self.compute_statistics(self.pedestal_images, self.image_calculator, "image")
 
-    def add_pedestal_event(self, event, event_type):
-        """
-        Mean and std of the ADC samples of each pixel (R0), and calibrated image (DL1) of a
-        pedestal event. The images are calibrated without the statistics of the ADC samples
-        (no voltage drop correction and no dead pixels).
-        """
+    def events(self, source, description):
+        """Events of the event source, with a progress bar"""
+        return tqdm(
+            source,
+            desc=f"{source.__class__.__name__} ({description})",
+            total=source.max_events,
+            disable=not self.progress_bar,
+        )
+
+    def add_pedestal_waveforms(self, event, event_type):
+        """Mean and std of the ADC samples of each pixel (R0) of a pedestal event"""
         for tel_id, r0 in event.r0.tel.items():
             samples = np.asarray(r0.waveform, dtype=np.float64)
             moments = np.stack([samples.mean(axis=-1), samples.std(axis=-1)]).astype(np.float32)
             self.pedestal_waveforms[tel_id, event_type].append(
                 (event.trigger.tel[tel_id].time, event.index.event_id, moments)
             )
-            self.r0_r1_calibrator(event, tel_id)
 
+    def add_pedestal_images(self, event, event_type, interpolator):
+        """
+        Calibrated image (DL1) of a pedestal event, as the events by sst1mpipe-process: statistics
+        of the ADC samples at the time of the event (last chunk ended before it), R0R1Calibrator
+        (voltage drop correction, dead pixels), CameraCalibrator and ImageSaturationCorrector.
+        The events without statistics of the ADC samples are not used, as in sst1mpipe-process.
+        """
+        for tel_id in event.r0.tel:
+            statistics = event.monitoring.tel[tel_id].camera.pixel_statistics
+            statistics.pedestal_waveform = statistics_container(interpolator(tel_id, event.trigger.time))
+            if statistics.pedestal_waveform.std is None:
+                self.n_pedestals_without_statistics += 1
+                return
+        self.r0_r1_calibrator(event)
         self.camera_calibrator(event)
+        self.image_saturation_corrector(event)
         for tel_id, dl1 in event.dl1.tel.items():
             # shape (n_channels, n_pixels) of the ctapipe pixel statistics
             image = np.asarray(dl1.image, dtype=np.float32)[np.newaxis]
             self.pedestal_images[tel_id, event_type].append((event.trigger.tel[tel_id].time, event.index.event_id, image))
+
+    def compute_statistics(self, pedestal_events, calculator, column):
+        """
+        Statistics of the quantities ``column`` of the pedestal events of each telescope and
+        event type, by (telescope id, event type)
+        """
+        statistics = {}
+        for (tel_id, event_type), rows in sorted(pedestal_events.items(), key=lambda item: (item[0][0], item[0][1].value)):
+            times, event_ids, values = zip(*rows, strict=True)
+            table = Table(dict(time=Time(times), event_id=np.array(event_ids), **{column: np.array(values)}))
+            name = f"{event_type.name.lower()}_{column}"
+            try:
+                statistics[tel_id, event_type] = compute_pixel_statistics(calculator, table, tel_id, column)
+            except ValueError as error:
+                self.log.warning("No statistics %s of telescope %d (%d events): %s", name, tel_id, len(table), error)
+                continue
+            self.log.info(
+                "Statistics %s of telescope %d: %d pedestal events, %d chunks (%d valid)",
+                name, tel_id, len(table), len(statistics[tel_id, event_type]),
+                np.count_nonzero(statistics[tel_id, event_type]["is_valid"]),
+            )
+        return statistics
 
     def finish(self):
         if len(self.event_times) == 0:
@@ -180,12 +255,8 @@ class MonitoringTool(Tool):
             return
         self.write_configuration()
         self.write_pointing_tables()
-        self.write_statistics_tables(
-            self.pedestal_waveforms, self.waveform_calculator, "waveform", R0_PIXEL_STATISTICS_GROUP,
-        )
-        self.write_statistics_tables(
-            self.pedestal_images, self.image_calculator, "image", DL1_PIXEL_STATISTICS_GROUP,
-        )
+        self.write_statistics_tables(self.waveform_statistics, "waveform", R0_PIXEL_STATISTICS_GROUP)
+        self.write_statistics_tables(self.image_statistics, "image", DL1_PIXEL_STATISTICS_GROUP)
         Provenance().add_output_file(str(self.output_path), role="Monitoring")
         self.log.info("Monitoring data written in %s", self.output_path)
 
@@ -233,25 +304,10 @@ class MonitoringTool(Tool):
             write_table(table, self.output_path, f"{DL0_TEL_POINTING_GROUP}/tel_{tel_id:03d}")
             self.log.info("Pointing of telescope %d: %d rows", tel_id, len(table))
 
-    def write_statistics_tables(self, pedestal_events, calculator, column, group):
-        """
-        Statistics of the quantities ``column`` of the pedestal events of each telescope and
-        event type, in the tables ``group/<event type>_<column>/tel_XXX``
-        """
-        for (tel_id, event_type), rows in sorted(pedestal_events.items(), key=lambda item: (item[0][0], item[0][1].value)):
-            times, event_ids, values = zip(*rows, strict=True)
-            table = Table(dict(time=Time(times), event_id=np.array(event_ids), **{column: np.array(values)}))
-            name = f"{event_type.name.lower()}_{column}"
-            try:
-                statistics = compute_pixel_statistics(calculator, table, tel_id, column)
-            except ValueError as error:
-                self.log.warning("No statistics %s of telescope %d (%d events): %s", name, tel_id, len(table), error)
-                continue
-            write_table(statistics, self.output_path, f"{group}/{name}/tel_{tel_id:03d}")
-            self.log.info(
-                "Statistics %s of telescope %d: %d pedestal events, %d chunks (%d valid)",
-                name, tel_id, len(table), len(statistics), np.count_nonzero(statistics["is_valid"]),
-            )
+    def write_statistics_tables(self, statistics, column, group):
+        """Statistics of each telescope and event type, in the tables ``group/<event type>_<column>/tel_XXX``"""
+        for (tel_id, event_type), table in statistics.items():
+            write_table(table, self.output_path, f"{group}/{event_type.name.lower()}_{column}/tel_{tel_id:03d}")
 
 
 def main():
