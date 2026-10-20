@@ -7,12 +7,16 @@ from .pixel_statistics import (
     ImageStatisticsCalculator,
     PedestalWaveformAggregator,
     WaveformStatisticsCalculator,
+    check_chunk_shift,
     compute_pixel_statistics,
+    last_chunk_index,
 )
 
 __all__ = [
     "ImageStatisticsCalculator",
     "PedestalWaveformAggregator",
     "WaveformStatisticsCalculator",
+    "check_chunk_shift",
     "compute_pixel_statistics",
+    "last_chunk_index",
 ]

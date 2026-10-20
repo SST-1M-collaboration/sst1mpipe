@@ -7,11 +7,11 @@ The raw data of the run (R0, SST1MEventSource) are read once:
   the file, or SST1MEventSource.pointing_ra/pointing_dec) every pointing_update_interval
   from the first to the last event of the telescope, in the table
   dl0/monitoring/telescope/pointing/tel_XXX (read by the ctapipe PointingInterpolator)
-- statistics of the ADC samples of the pedestal events (WaveformStatisticsCalculator), in chunks
-  of pedestal events: mean and median of the baseline, std (noise) of the samples, in the table
+- statistics of the ADC samples of the pedestal events (WaveformStatisticsCalculator), in rolling
+  chunks of pedestal events (a chunk of the last chunk_size pedestal events every chunk_shift): mean and median of the baseline, std (noise) of the samples, in the table
   r0/monitoring/telescope/calibration/camera/pixel_statistics/<event type>_waveform/tel_XXX
 - statistics of the images of the pedestal events (ImageStatisticsCalculator), calibrated by the
-  R0R1Calibrator and the CameraCalibrator, in chunks of pedestal events, in the ctapipe pixel
+  R0R1Calibrator and the CameraCalibrator, in rolling chunks of pedestal events, in the ctapipe pixel
   statistics table
   dl1/monitoring/telescope/calibration/camera/pixel_statistics/<event type>_image/tel_XXX
 
@@ -44,6 +44,7 @@ from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.monitoring import (
     ImageStatisticsCalculator,
     WaveformStatisticsCalculator,
+    check_chunk_shift,
     compute_pixel_statistics,
 )
 
@@ -124,6 +125,11 @@ class MonitoringTool(Tool):
         self.camera_calibrator = CameraCalibrator(parent=self, subarray=subarray)
         self.waveform_calculator = WaveformStatisticsCalculator(parent=self, subarray=subarray)
         self.image_calculator = ImageStatisticsCalculator(parent=self, subarray=subarray)
+        for calculator in (self.waveform_calculator, self.image_calculator):
+            try:
+                check_chunk_shift(calculator)
+            except ValueError as error:
+                raise ToolConfigurationError(str(error)) from error
 
         # time of the first and last event of each telescope
         self.event_times = {}

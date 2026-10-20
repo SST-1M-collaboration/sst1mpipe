@@ -22,7 +22,7 @@ N_EVENTS, N_PEDESTALS = OBSERVATION_RUNS[TEL_ID]["n_events"], OBSERVATION_RUNS[T
 
 @pytest.fixture(scope="module")
 def monitoring(observation_monitoring):
-    """monitoring file of the observation of tel 22, chunks of 5 pedestal events"""
+    """monitoring file of the observation of tel 22, rolling chunks of 5 pedestal events"""
     return observation_monitoring[TEL_ID]
 
 
@@ -68,6 +68,27 @@ def test_fill_monitoring_container(monitoring):
             assert u.isclose(monitoring.pointing.azimuth, altaz.az, atol=0.01 * u.deg)
 
 
+def test_statistics_of_the_last_pedestal_events(monitoring):
+    """
+    the statistics at the time of an event are those of the last chunk of pedestal events ended
+    before it (rolling chunks: the last pedestal events), the first chunk before its end
+    """
+    waveform = read_table(monitoring, f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform/tel_{TEL_ID:03d}")
+    assert len(waveform) > 2
+    std = np.where(waveform["outlier_mask"], np.nan, waveform["std"])
+    chunks_used = set()
+    with SST1MEventSource(INPUT_FILE) as source:
+        monitoring_source = SST1MMonitoringSource(subarray=source.subarray, input_files=[monitoring])
+        for event in source:
+            monitoring_source.fill_monitoring_container(event)
+            ended = np.flatnonzero(waveform["time_end"] <= event.trigger.time)
+            chunk = ended[-1] if len(ended) else 0
+            chunks_used.add(chunk)
+            np.testing.assert_array_equal(event.monitoring.tel[TEL_ID].camera.pixel_statistics.pedestal_waveform.std, std[chunk])
+    # all the chunks are used
+    assert chunks_used == set(range(len(waveform)))
+
+
 def test_no_statistics_out_of_the_chunks(monitoring):
     """no statistics without chunk of pedestal events at the time of the event (timestamp_tolerance)"""
     monitoring_source = SST1MMonitoringSource(input_files=[monitoring], timestamp_tolerance=0 * u.s)
@@ -80,6 +101,8 @@ def test_no_statistics_out_of_the_chunks(monitoring):
         return statistics_container(values, channel=0)
 
     assert statistics(image["time_start"][0]).std.shape == (1296, )
+    # the time scale of the time does not matter (TAI in the file)
+    assert statistics(image["time_start"][0].utc).std.shape == (1296, )
     assert statistics(image["time_start"][0] - 1 * u.s).std is None
     assert statistics(image["time_end"][-1] + 1 * u.s).std is None
 

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import tables
 
-from conftest import OBSERVATION_RUNS, WAVEFORM_CHUNK_SIZE, run_monitoring
+from conftest import OBSERVATION_RUNS, WAVEFORM_CHUNK_ARGS, run_monitoring
 from sst1mpipe.io import load_r0_pedestals
 from sst1mpipe.utils.NSB_tools import get_ped_table, mean_pedestal_std
 
@@ -10,14 +10,14 @@ from sst1mpipe.utils.NSB_tools import get_ped_table, mean_pedestal_std
 @pytest.fixture(scope="module")
 def monitoring_files(observation_monitoring, tmp_path_factory):
     """
-    monitoring files of the observation of tel 22 and of its 20 first events, with chunks of
-    WAVEFORM_CHUNK_SIZE pedestal events, and a file without pedestal table
+    monitoring files of the observation of tel 22 and of its 20 first events, with the chunks of
+    WAVEFORM_CHUNK_ARGS, and a file without pedestal table
     """
     directory = tmp_path_factory.mktemp("monitoring")
     first_events = directory / "first_events.monitoring.h5"
     run_monitoring(
         OBSERVATION_RUNS[22]["path"], first_events, "--max-events=20",
-        f"--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size={WAVEFORM_CHUNK_SIZE}",
+        *WAVEFORM_CHUNK_ARGS,
     )
     empty = directory / "empty.h5"
     tables.open_file(empty, "w").close()

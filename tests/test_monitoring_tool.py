@@ -12,11 +12,11 @@ from ctapipe.io import HDF5MonitoringSource, read_table
 from ctapipe.io.hdf5dataformat import DL0_TEL_POINTING_GROUP, DL1_PIXEL_STATISTICS_GROUP
 from ctapipe.io.metadata import read_reference_metadata
 
-from conftest import DARK_FILE, OBSERVATION_RUNS, WAVEFORM_CHUNK_SIZE, run_monitoring
+from conftest import DARK_FILE, OBSERVATION_RUNS, WAVEFORM_CHUNK_SHIFT, WAVEFORM_CHUNK_SIZE, run_monitoring
 from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP
 from sst1mpipe.io.containers import CameraEventType
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.monitoring import PedestalWaveformAggregator
+from sst1mpipe.monitoring import PedestalWaveformAggregator, last_chunk_index
 
 TEL_ID = 22
 OBSERVATION_FILE, N_PEDESTALS = OBSERVATION_RUNS[TEL_ID]["path"], OBSERVATION_RUNS[TEL_ID]["n_pedestals"]
@@ -35,19 +35,23 @@ def read_pedestal_waveforms(path):
 
 @pytest.fixture(scope="module")
 def monitoring_file(observation_monitoring):
-    """monitoring file of the observation of tel 22, chunks of WAVEFORM_CHUNK_SIZE pedestal events"""
+    """monitoring file of the observation of tel 22, rolling chunks of WAVEFORM_CHUNK_SIZE pedestal events"""
     return observation_monitoring[TEL_ID]
 
 
 def test_waveform_statistics(monitoring_file):
-    """statistics of the ADC samples of the pedestal events, in chunks of 5 pedestal events"""
+    """
+    statistics of the ADC samples of the pedestal events, in rolling chunks: the 5 last pedestal
+    events, every 2 pedestal events
+    """
     table = read_table(monitoring_file, f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform/tel_{TEL_ID:03d}")
     times, event_ids, waveforms = read_pedestal_waveforms(OBSERVATION_FILE)
-    assert len(times) == N_PEDESTALS
+    assert len(times) == N_PEDESTALS == 13
 
-    # chunks of 5 events, the last one overlapping the previous one (last_chunk_policy overlap)
-    assert WAVEFORM_CHUNK_SIZE == 5
-    chunks = [slice(0, 5), slice(5, 10), slice(8, 13)]
+    # overlapping chunks of 5 events shifted by 2 events, the last one ending at the last pedestal
+    # event (the last chunk of ctapipe, overlap policy, is the same chunk and is not repeated)
+    assert (WAVEFORM_CHUNK_SIZE, WAVEFORM_CHUNK_SHIFT) == (5, 2)
+    chunks = [slice(start, start + 5) for start in (0, 2, 4, 6, 8)]
     assert len(table) == len(chunks)
     for row, chunk in zip(table, chunks, strict=True):
         assert row["time_start"] == times[chunk][0] and row["time_end"] == times[chunk][-1]
@@ -131,12 +135,39 @@ def test_dark_run(tmp_path):
         assert f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform" not in h5
     waveform = read_table(output, f"{R0_PIXEL_STATISTICS_GROUP}/dark_pedestal_waveform/tel_{TEL_ID:03d}")
     image = read_table(output, f"{DL1_PIXEL_STATISTICS_GROUP}/dark_pedestal_image/tel_{TEL_ID:03d}")
-    # 225 pedestal events: 2 chunks of 100 and an overlapping last chunk, a single chunk of images
-    assert len(waveform) == 3 and len(image) == 1
+    # 225 pedestal events: rolling chunks of the 100 last pedestal events at each pedestal event
+    # (126 chunks from the events 0-99 to 125-224, the last chunk ending at the last pedestal
+    # event), a single chunk of images
+    assert len(waveform) == 126 and len(image) == 1
+    assert np.all(waveform["n_events"] == 100)
+    with SST1MEventSource(DARK_FILE) as source:
+        event_ids = np.array([e.index.event_id for e in source if e.r0.tel[TEL_ID].event_type == CameraEventType.INTERNAL])
+    starts = list(range(126))
+    np.testing.assert_array_equal(waveform["event_id_start"], event_ids[starts])
+    np.testing.assert_array_equal(waveform["event_id_end"], event_ids[np.array(starts) + 99])
     assert np.all(image["n_events"] == 225)
     # no outlier in the dark run (the noise is low in all the pixels)
     assert not np.any(waveform["outlier_mask"]) and np.all(waveform["is_valid"])
     assert np.median(waveform["std"]) < 2.5
+
+
+def test_chunk_shift_larger_than_chunks(tmp_path):
+    """the pedestal events between two chunks would not be used"""
+    with pytest.raises(ToolConfigurationError, match="chunk_shift"):
+        run_monitoring(
+            OBSERVATION_FILE, tmp_path / "monitoring.h5",
+            "--ImageStatisticsCalculator.PlainAggregator.SizeChunking.chunk_shift=2000",
+        )
+
+
+def test_last_chunk_index():
+    """the statistics at a time are those of the last chunk ended before it"""
+    # rolling chunks of 4 pedestal events every 2 pedestal events, pedestal events at 0, 1, ..., 9
+    time_start = np.array([0, 2, 4, 6])
+    time_end = time_start + 3
+    times = [-1, 0, 2.9, 3, 4.5, 5, 6.99, 8, 9, 20]
+    # before the end of the first chunk: the first chunk
+    assert last_chunk_index(time_start, time_end, times).tolist() == [0, 0, 0, 0, 0, 1, 1, 2, 3, 3]
 
 
 def test_output_not_overwritten(tmp_path):
