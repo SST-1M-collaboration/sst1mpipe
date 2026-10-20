@@ -118,6 +118,10 @@
         }
     },
 
+    "DataWriter": {
+      "write_dl2": true
+    },
+
     "ShowerProcessor": {
       "reconstructor_types": ["HillasReconstructor"],
       "HillasReconstructor": {

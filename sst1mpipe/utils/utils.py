@@ -25,6 +25,7 @@ from astropy.coordinates import (
     get_sun,
 )
 from astropy.io import fits
+from astropy.table import join
 from astropy.time import Time
 from astroquery.simbad import Simbad
 from ctapipe.coordinates import CameraFrame
@@ -128,30 +129,28 @@ def get_stereo_method(config):
         return stereo_method
 
 
-def get_wr_timestamp(data):
+def get_trigger_time_ns(data):
     """
-    Reads WR timestamps stored in two columns in the DL1
-    table in seconds, and converts them in nanoseconds
-    with high numerical precission.
+    Trigger times of the DL1 table (trigger_time column, see
+    sst1mpipe.io.load_dl1_sst1m) as integers in ns, without
+    loss of precision, e.g. to match the stereo events.
 
     Parameters
     ----------
-    data: pandas.DataFrame
+    data: pandas.DataFrame or astropy.table.Table
         DL1 table
 
     Returns
     -------
-    numpy.int64
-        Precise timestamp in nanoseconds
+    numpy.ndarray of numpy.int64
+        ns since 1970-01-01 (TAI)
 
     """
 
-    S_TO_NS = np.int64(1e9)
-    t1 = np.array(data['time_wr_full_seconds']).astype(np.int64) * S_TO_NS
-    t2 = np.array(data['time_wr_frac_seconds']).astype(np.float64) * S_TO_NS
-    t = t1 + t2.astype(np.int64)
-    return t
-
+    time = data['trigger_time']
+    if isinstance(time, Time):
+        time = time.to_value('datetime64')
+    return np.asarray(time).astype('datetime64[ns]').astype(np.int64)
 
 
 def get_tel_string(tel, mc=True):
@@ -649,6 +648,16 @@ def correct_number_simulated_showers(
     return simulated_event_info
 
 
+def join_in_order(table, other, keys=("obs_id", "event_id"), join_type="inner"):
+    """Join of two astropy tables on keys, keeping the order of the rows of the first table"""
+    table = table.copy(copy_data=False)
+    table["_row"] = np.arange(len(table))
+    joined = join(table, other, keys=list(keys), join_type=join_type, metadata_conflicts="silent")
+    joined.sort("_row")
+    joined.remove_column("_row")
+    return joined
+
+
 def energy_min_cut(file, config=None):
 
     mc = read_table(file, "/configuration/simulation/run")
@@ -771,33 +780,6 @@ def mix_gamma_proton(params_gammas, params_protons, max_events=None, gp_training
     return mixed
 
 
-def correct_true_image(event):
-    """
-    For an unknown reason, event.simulation.tel[tel].true_image
-    is sometimes None, which kills the rest of the script
-    and simulation histogram is not saved. Here we repace
-    it with an array of zeros.
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    """
-
-    for tel in event.trigger.tels_with_trigger:
-        if event.simulation.tel[tel].true_image is None:
-            event.simulation.tel[tel].true_image = np.zeros(1296, dtype='int32')
-
-    return event
-
-
-
 def check_output_dl1(file):
     """
     Checks if simulated shower distributions
@@ -911,26 +893,29 @@ def add_pointing_mc(
 
     """
 
-    string = "/dl1/monitoring/telescope/pointing/" + tel
-    pointing = read_table(input_file, string)
+    # fixed pointing of the telescope in each simulation run (obs_id)
+    pointing = read_table(input_file, "/configuration/telescope/pointing/" + tel)
+    index = {obs_id: i for i, obs_id in enumerate(pointing['obs_id'])}
+    rows = [index[obs_id] for obs_id in data['obs_id']]
 
     merged_table = data.copy()
 
-    merged_table['true_az_tel'] = np.ones(len(merged_table)) * (pointing['azimuth'][0] * pointing['azimuth'].unit).to(u.deg)
-    merged_table['true_alt_tel'] = np.ones(len(merged_table)) * (pointing['altitude'][0] * pointing['altitude'].unit).to(u.deg)
+    merged_table['true_az_tel'] = pointing['telescope_pointing_azimuth'].quantity[rows].to(u.deg)
+    merged_table['true_alt_tel'] = pointing['telescope_pointing_altitude'].quantity[rows].to(u.deg)
 
     return merged_table
 
 
-def add_disp(paramtable, config=None, telescope=None):
+def add_disp(paramtable, horizon_frame):
     """
     Add DISP parameters in the DL1 MC table.
 
     Parameters
     ----------
     paramtable: astropy.table.Table
-    config: dict
-    telescope: string
+    horizon_frame: astropy.coordinates.AltAz
+        Frame of the true direction of the showers and of the pointing
+        of the telescope (true_alt/true_az, true_alt_tel/true_az_tel)
 
     Returns
     -------
@@ -939,8 +924,6 @@ def add_disp(paramtable, config=None, telescope=None):
     """
 
     merged_table = paramtable
-
-    horizon_frame = get_horizon_frame(config=config, telescope=telescope)
 
     true_coordinates = get_event_pos_in_camera(merged_table, horizon_frame, true_pos=True)
     merged_table['true_camera_x'] = true_coordinates[0]
@@ -1235,7 +1218,13 @@ def get_horizon_frame(config=None, telescope=None, times=None):
     return horizon_frame
 
 
-def get_survived_ped_fraction(dl1_files, logs=None, tel=None):
+def get_survived_ped_fraction(dl1_files, tel=None):
+    """
+    Zenith angle and time of the first event, fraction of the pedestal events which survive the
+    cleaning (/dl1/info), wobble and run number of the DL1 files of a telescope. The files without
+    pointing or without pedestal events are skipped.
+    """
+    from sst1mpipe.io import get_dl1_info, load_dl1_sst1m, pedestal_cleaning_fractions
 
     zenith_angles = []
     times = []
@@ -1245,40 +1234,23 @@ def get_survived_ped_fraction(dl1_files, logs=None, tel=None):
     runs = []
 
     for file in dl1_files:
+        ped_fraction, _ = pedestal_cleaning_fractions(file)
+        if np.isnan(ped_fraction):
+            continue
         try:
-            zenith_angle = 90. - read_table(file, "/dl1/event/telescope/parameters/"+tel)['true_alt_tel'][0]
-
-        except tables.exceptions.NoSuchNodeError:
+            events = load_dl1_sst1m(file, tel=tel)
+        except SystemExit:
+            # load_dl1_sst1m exits without pointing
             print(file, 'No pointing info!')
             continue
 
-        time = read_table(file, "/dl1/event/telescope/parameters/"+tel)['local_time'][0]
-
-        # find log
-        date = file.split('/')[-1].split('.')[0].split('_')[1]
-        run = file.split('/')[-1].split('.')[0].split('_')[2]
-        res = [i for i in logs if date in i]
-        log_file = [i for i in res if run in i][0]
-
-        # find fraction of pedestals in log
-        word = 'Fraction of pedestal'
-        with open(log_file) as fp:
-            # read all lines in a list
-            lines = fp.readlines()
-            for line in lines:
-                # check if string present on a current line
-                if line.find(word) != -1:
-                    ped_fraction = float(line.split(': ')[-1])
-                    zenith_angles.append(zenith_angle)
-                    times.append(time)
-                    runs.append(int(run))
-                    ped_fractions.append(ped_fraction)
-                    filenames.append(file)
-
-                    if "W1" in file:
-                        wobble.append("W1")
-                    elif "W2" in file:
-                        wobble.append("W2")
+        zenith_angles.append(90. - events['true_alt_tel'][0])
+        times.append(events['local_time'][0])
+        ped_fractions.append(ped_fraction)
+        wobble.append(get_dl1_info(file)['wobble'][0])
+        # obs_id: date and run number, e.g. 202601201179
+        runs.append(int(str(events['obs_id'][0])[8:]))
+        filenames.append(file)
 
     zenith_angles = np.array(zenith_angles)
     times = np.array(times)

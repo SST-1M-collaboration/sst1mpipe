@@ -28,12 +28,13 @@ from gammapy.data import DataStore
 
 from sst1mpipe.io import (
     check_outdir,
-    load_dl1_pedestals,
+    load_r0_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
+    pedestal_cleaning_fractions,
 )
 from sst1mpipe.utils import get_telescopes
-from sst1mpipe.utils.NSB_tools import VAR_to_NSB
+from sst1mpipe.utils.NSB_tools import VAR_to_NSB, mean_pedestal_std
 
 
 def parse_args():
@@ -106,8 +107,6 @@ def main():
     if len(files) > 0:
         stereo = True
 
-    logs = glob.glob(data_path_dl1 + "/*.log")
-
     if len(files) == 0:
         files = glob.glob(data_path_dl1 + '/*dl1.h5')
     if len(files) == 0:
@@ -125,7 +124,7 @@ def main():
             break
 
     for tel in tels:
-        dl1_data, ped_fractions, recleaned_fractions, times, nsb = load_data(files, logs, config=None, tel=tel, data_level='dl1')
+        dl1_data, ped_fractions, recleaned_fractions, times, nsb = load_data(files, config=None, tel=tel, data_level='dl1')
 
         # NSB calculated for tel2 in stereo is not correct as only tel1 pedetals are propagated to the stereo DL1 files
         if stereo & (str(tel[-1]) == '2'):
@@ -199,7 +198,7 @@ def get_table(rate, diff_rate, bin_edges=None):
 
     return table
 
-def load_data(files, logs, config=None, tel=None, data_level='dl1'):
+def load_data(files, config=None, tel=None, data_level='dl1'):
     i = 0
     data = None
     ped_fractions = []
@@ -213,28 +212,9 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
                 df = load_dl1_sst1m(input_file, tel=tel, config=config, table='pandas')
                 times.append(df['local_time'][0])
 
-                # find log
-                date = input_file.split('/')[-1].split('.')[0].split('_')[1]
-                run = input_file.split('/')[-1].split('.')[0].split('_')[2]
-                res = [i for i in logs if date in i]
-                log_file = [i for i in res if run in i][0]
-
-                # find fraction of pedestals in log
-                ped = 'Fraction of pedestal'
-                reclean = 'raised picture threshold'
-                with open(log_file) as fp:
-                    # read all lines in a list
-                    lines = fp.readlines()
-                    ped_fraction = 100
-                    recleaned_fraction = 0
-                    for line in lines:
-                        # check if string present on a current line
-                        if line.find(ped) != -1:
-                            ped_fraction = float(line.split(': ')[-1])
-                        if line.find(reclean) != -1:
-                            recleaned_fraction = float(line.split(': ')[-1])
-                    ped_fractions.append(ped_fraction)
-                    recleaned_fractions.append(recleaned_fraction)
+                ped_fraction, recleaned_fraction = pedestal_cleaning_fractions(input_file)
+                ped_fractions.append(ped_fraction)
+                recleaned_fractions.append(recleaned_fraction)
 
             elif data_level == 'dl2':
                 df = load_dl2_sst1m(input_file, tel=tel, config=config, table='pandas')
@@ -242,12 +222,12 @@ def load_data(files, logs, config=None, tel=None, data_level='dl1'):
             print('Broken file: ' + input_file + ', skipping.')
             continue
         try:
-            pt = load_dl1_pedestals(input_file)
+            pt = load_r0_pedestals(input_file)
             if '1' in tel:
                 cs=21
             else:
                 cs=22
-            NSB = VAR_to_NSB(pt['pedestal_charge_std'].mean(axis=1)**2, cs)
+            NSB = VAR_to_NSB(mean_pedestal_std(pt)**2, cs)
             nsb.append(NSB.mean())
         except Exception:
             print('No pedestals in : ' + input_file + '.')
