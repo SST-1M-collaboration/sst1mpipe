@@ -144,6 +144,44 @@ The transition runs between two wobbles are skipped by ``sst1mpipe-process`` (no
 dark runs have no pointing.
 
 
+.. _nsb_level:
+
+NSB level and voltage drop: ``sst1mpipe-nsb``
+---------------------------------------------
+
+The NSB light shifts the baseline of the SiPMs and increases the variance of their ADC samples. The NSB
+current causes a voltage drop on the bias resistor of the SiPMs, which reduces their gain and their PDE
+linearly with the baseline shift (fig. 11.1 of `SiPM behaviour under continuous light
+<https://arxiv.org/abs/1910.00348>`_). The ``SiPMVoltageDropModel`` (``sst1mpipe.utils.nsb_tools``) gives,
+from the variance of the ADC samples of the pedestal events (ADC², square of their std):
+
+* the **baseline shift** (ADC): spline of the variance, fitted for each telescope (``baseline_shift_spline``);
+* the **gain drop** ``1 + gain_drop_slope * shift`` and the **charge drop**
+  ``1 + (gain_drop_slope + pde_drop_slope) * shift``: the voltage drop correction of the ``R0R1Calibrator``
+  divides the charges by the charge drop;
+* the **NSB rate** per pixel: shift / (``pulse_integral`` * gain drop) / duration of a sample (4 ns), and
+  the **NSB photon rate**: with the charge drop and divided by ``photon_detection_efficiency``.
+
+Its parameters are configurable per telescope in the config files (section ``SiPMVoltageDropModel``,
+e.g. ``"gain_drop_slope": [["id", 21, -0.00487], ["id", 22, -0.00118]]``) and on the command line of the
+tools which use it (``sst1mpipe-process``, ``sst1mpipe-monitoring``, ``sst1mpipe-nsb``), with tuples:
+``--SiPMVoltageDropModel.gain_drop_slope='[("id", 21, -0.00487), ("id", 22, -0.00118)]'`` (a single value
+applies to all the telescopes). As for every ctapipe telescope parameter, a value replaces the whole
+default list, so give the values of all the telescopes. The spline is extrapolated out of the range of its
+knots (variance above 74 ADC² for tel 21, 340 ADC² for tel 22).
+
+``sst1mpipe-nsb`` writes, for each chunk of pedestal events of monitoring or DL1 files, the variance, the
+baseline shift, the gain and charge drops and the NSB rates (ECSV, FITS or HDF5 table), and plots the NSB
+rate vs. time:
+
+.. code-block:: bash
+
+    sst1mpipe-nsb -i SST1M1_20260120_1179.monitoring.h5 -i SST1M2_20260120_1102.monitoring.h5 \
+        -o nsb.ecsv --plot nsb.png
+
+(one ``-i`` per input file).
+
+
 .. _merging_step:
 
 3. Merging

@@ -37,6 +37,7 @@ from astropy.table import vstack
 from astropy.time import Time
 from gammapy.maps import MapAxis
 from PIL import Image
+from traitlets.config import Config
 
 import sst1mpipe
 from sst1mpipe.analysis import get_theta2_from_dl3, plot_theta2_dl3
@@ -50,7 +51,7 @@ from sst1mpipe.io import (
     load_source_catalog,
 )
 from sst1mpipe.utils import get_moon_params, get_sources_in_dir, get_trigger_time_ns
-from sst1mpipe.utils.NSB_tools import plot_average_nsb_VS_time
+from sst1mpipe.utils.nsb_tools import default_model, plot_nsb_rate
 
 
 def parse_args():
@@ -252,6 +253,8 @@ def main():
     sources = get_sources_in_dir(base_path + '/' + date + '/')
 
     config = load_config(config_file)
+    # NSB rate from the pedestal events: voltage drop model of the SiPMs, configured by the config file
+    nsb_model = default_model(Config(config))
 
     is_catalog = False
     if len(source_catalog_file):
@@ -399,7 +402,7 @@ def main():
                             h_tot += h1[0]
                             # pedestal table
                             if len(ped_table) > 0:
-                                plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=None)
+                                plot_nsb_rate(ped_table, tt, model=nsb_model, ax=ax3, color=rate_colors[tel], label=None)
                             # CoGs - DL1 mono, survived cleaning
                             if tel == 'tel_021':
                                 h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
@@ -418,7 +421,7 @@ def main():
                     median1.append(np.median(h_tot/10.))
                     # pedestal table
                     if len(ped_table) > 0:
-                        plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=tel)
+                        plot_nsb_rate(ped_table, tt, model=nsb_model, ax=ax3, color=rate_colors[tel], label=tel)
                         # CoGs - DL1 mono, survived cleaning
                     X, Y = np.meshgrid(xedges, yedges)
                     if tel == 'tel_021':

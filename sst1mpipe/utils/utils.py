@@ -34,7 +34,6 @@ from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table
 from gammapy.data import DataStore
 
-from sst1mpipe.io.sst1m_event_source import parse_target_field
 from sst1mpipe.time import camera_clock_to_time
 from sst1mpipe.resources import SUBARRAY_FILE
 
@@ -67,6 +66,9 @@ def get_target(file, force_pointing=False):
     wobble: string
 
     """
+
+    # imported here: sst1mpipe.io imports this module
+    from sst1mpipe.io.sst1m_event_source import parse_target_field
 
     with fits.open(file) as hdul:
 

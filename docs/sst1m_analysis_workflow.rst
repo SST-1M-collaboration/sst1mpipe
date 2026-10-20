@@ -106,7 +106,7 @@ contain any Cherenkov photons), and parametrizes the shower images with Hillas e
 
   * ``calibration_file`` - calibration files based on analysis of dark runs (``null``: default file of the telescope). Should be taken relatively close to the date of observation
   * ``window_transmittance_file`` - camera window transmittance correction factors of the pixels, measured in the lab (``null``: default file of the telescope, can be kept)
-  * ``voltage_drop_correction`` - ``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB
+  * ``voltage_drop_correction`` - ``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB: the charges are divided by the charge drop of the ``SiPMVoltageDropModel`` (see :ref:`nsb_level`)
   * ``flag_bad_calibration_pixels`` and ``flag_dead_pixels`` - pixels set to 0 and interpolated. The dead pixels are the pixels without statistics of the ADC samples of the pedestal events (outliers of ``sst1mpipe-monitoring``)
   * ``bad_pixels`` - ids of pixels always set to 0 and interpolated (data and MC)
   * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the R1 waveforms are divided by this factor, which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.json`` and ``sst1mpipe_mc_config_high_nsb.json`` have the factors of the low and high NSB simulations

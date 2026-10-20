@@ -18,7 +18,7 @@ from ctapipe.core.traits import (
     TelescopeParameter,
 )
 
-from sst1mpipe.utils import VAR_to_Idrop
+from sst1mpipe.utils.nsb_tools import SiPMVoltageDropModel
 from sst1mpipe.resources import CALIBRATION_DIR, WINDOW_DIR
 
 
@@ -165,8 +165,9 @@ class R0R1Calibrator(TelescopeComponent):
 
     1. subtraction of the pedestal computed by DigiCam (``r0.pedestal``)
     2. conversion from ADC to p.e. with the ``dc_to_pe`` of the calibration file
-    3. voltage drop correction (``voltage_drop_correction``), from the std of the ADC
-       samples of the pedestal events in
+    3. voltage drop correction (``voltage_drop_correction``): division by the charge drop of the
+       `~sst1mpipe.utils.nsb_tools.SiPMVoltageDropModel` (configurable child component), from the
+       std of the ADC samples of the pedestal events in
        ``event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform``
        (monitoring data of sst1mpipe-monitoring, see `sst1mpipe.io.monitoring_source.SST1MMonitoringSource`)
     4. window transmittance correction: division by the correction factor of each pixel
@@ -285,6 +286,7 @@ class R0R1Calibrator(TelescopeComponent):
 
     def __init__(self, subarray, config=None, parent=None, **kwargs):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
+        self.voltage_drop_model = SiPMVoltageDropModel(subarray=subarray, parent=self)
         self._calibration = {}
         self._window_transmittance = {}
         self.n_bad_pixels = {}
@@ -348,8 +350,8 @@ class R0R1Calibrator(TelescopeComponent):
             return 1.0
         if correction == "global":
             # without the pixels without statistics (outliers of the monitoring)
-            return VAR_to_Idrop(np.nanmedian(pedestal_std**2), tel_id)
-        return VAR_to_Idrop(pedestal_std**2, tel_id)
+            return self.voltage_drop_model.charge_drop(tel_id, np.nanmedian(pedestal_std**2))
+        return self.voltage_drop_model.charge_drop(tel_id, pedestal_std**2)
 
     def bad_pixel_mask(self, tel_id, pedestal_std):
         """Mask of the pixels set to 0 and flagged"""
