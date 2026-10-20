@@ -5,18 +5,23 @@ import pytest
 import tables
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
+from ctapipe.calib import CameraCalibrator
 from ctapipe.containers import ArrayEventContainer, SchedulingBlockType
 from ctapipe.core.tool import ToolConfigurationError
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import HDF5MonitoringSource, read_table
 from ctapipe.io.hdf5dataformat import DL0_TEL_POINTING_GROUP, DL1_PIXEL_STATISTICS_GROUP
 from ctapipe.io.metadata import read_reference_metadata
+from traitlets.config import Config
 
 from conftest import DARK_FILE, OBSERVATION_RUNS, WAVEFORM_CHUNK_SHIFT, WAVEFORM_CHUNK_SIZE, run_monitoring
-from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP
-from sst1mpipe.io.containers import CameraEventType
+from sst1mpipe.calib import ImageSaturationCorrector, R0R1Calibrator
+from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP, load_config
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES, CameraEventType
+from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.monitoring import PedestalWaveformAggregator, last_chunk_index
+from sst1mpipe.resources import DATA_CONFIG_FILE, MONITORING_CONFIG_FILE, RTA_CONFIG_FILE
 
 TEL_ID = 22
 OBSERVATION_FILE, N_PEDESTALS = OBSERVATION_RUNS[TEL_ID]["path"], OBSERVATION_RUNS[TEL_ID]["n_pedestals"]
@@ -81,6 +86,94 @@ def test_image_statistics(monitoring_file):
     assert np.all(table["n_events"] == N_PEDESTALS)
     assert not np.any(table["outlier_mask"]) and np.all(table["is_valid"])
     assert 0.1 < np.median(table["std"]) < 3
+
+
+def calibrators(config_file, subarray, **r0_r1_settings):
+    """R0R1Calibrator, CameraCalibrator and ImageSaturationCorrector configured by a config file"""
+    config = Config(load_config(config_file, ismc=False))
+    for name, value in r0_r1_settings.items():
+        config.R0R1Calibrator[name] = value
+    return [
+        R0R1Calibrator(subarray=subarray, config=config),
+        CameraCalibrator(subarray=subarray, config=config),
+        ImageSaturationCorrector(subarray=subarray, config=config),
+    ]
+
+
+def calibration_settings(config_file, subarray):
+    """settings of the calibration of the images configured by a config file, per telescope"""
+    settings = {}
+    r0_r1_calibrator, camera_calibrator, saturation_corrector = calibrators(config_file, subarray)
+    components = [r0_r1_calibrator, camera_calibrator, saturation_corrector, *camera_calibrator.image_extractors.values()]
+    for component in components:
+        for name in component.traits(config=True):
+            value = getattr(component, name)
+            if hasattr(value, "tel"):
+                value = {tel_id: value.tel[tel_id] for tel_id in subarray.tel_ids}
+            settings[f"{type(component).__name__}.{name}"] = value
+    return settings
+
+
+@pytest.mark.parametrize("tel_id", sorted(OBSERVATION_RUNS))
+def test_calibration_settings_of_the_processing(tel_id):
+    """the images of the pedestal events are calibrated as the events by sst1mpipe-process"""
+    with SST1MEventSource(OBSERVATION_RUNS[tel_id]["path"]) as source:
+        subarray = source.subarray
+    monitoring = calibration_settings(MONITORING_CONFIG_FILE, subarray)
+    assert monitoring["R0R1Calibrator.voltage_drop_correction"] == {tel_id: "global"}
+    assert monitoring["R0R1Calibrator.flag_dead_pixels"] == {tel_id: True}
+    for config_file in (DATA_CONFIG_FILE, RTA_CONFIG_FILE):
+        assert calibration_settings(config_file, subarray) == monitoring
+
+
+def test_image_statistics_calibrated_as_by_the_processing(monitoring_file):
+    """
+    statistics of the images of the pedestal events calibrated as by sst1mpipe-process with the
+    monitoring file (SST1MMonitoringSource): voltage drop correction and interpolated dead pixels
+    """
+    table = read_table(monitoring_file, f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/tel_{TEL_ID:03d}")
+    waveform = read_table(monitoring_file, f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform/tel_{TEL_ID:03d}")
+    images = {"process": [], "uncorrected": []}
+    voltage_drops = []
+    with SST1MEventSource(OBSERVATION_FILE) as source:
+        monitoring_source = SST1MMonitoringSource(subarray=source.subarray, input_files=[monitoring_file])
+        components = {
+            "process": calibrators(DATA_CONFIG_FILE, source.subarray),
+            "uncorrected": calibrators(
+                DATA_CONFIG_FILE, source.subarray,
+                voltage_drop_correction=[["type", "*", "none"]], flag_dead_pixels=[["type", "*", False]],
+            ),
+        }
+        for event in source:
+            if event.trigger.event_type not in PEDESTAL_EVENT_TYPES:
+                continue
+            monitoring_source.fill_monitoring_container(event)
+            for name, (r0_r1_calibrator, camera_calibrator, saturation_corrector) in components.items():
+                r0_r1_calibrator(event)
+                camera_calibrator(event)
+                saturation_corrector(event)
+                images[name].append(np.array(event.dl1.tel[TEL_ID].image, dtype=np.float32))
+            std = event.monitoring.tel[TEL_ID].camera.pixel_statistics.pedestal_waveform.std
+            voltage_drops.append(components["process"][0].voltage_drop(TEL_ID, std))
+    process, uncorrected = (np.array(images[name]) for name in ("process", "uncorrected"))
+    assert len(process) == N_PEDESTALS
+
+    # a single chunk of images: statistics of the images calibrated as by sst1mpipe-process
+    assert len(table) == 1
+    np.testing.assert_allclose(table["mean"][0, 0], process.mean(axis=0), rtol=1e-5, atol=1e-6)
+    np.testing.assert_allclose(table["median"][0, 0], np.median(process, axis=0), rtol=1e-5, atol=1e-6)
+    np.testing.assert_allclose(table["std"][0, 0], process.std(axis=0), rtol=1e-5, atol=1e-6)
+
+    # the charges are divided by the voltage drop (< 1), the same for all the pedestal events here
+    assert np.ptp(voltage_drops) < 1e-3 and 0.5 < np.mean(voltage_drops) < 1
+    # dead pixels: outliers in all the chunks; the pixels outliers in some chunks only are
+    # interpolated in the events of these chunks
+    dead = np.all(waveform["outlier_mask"][:, 0], axis=0)
+    alive = ~np.any(waveform["outlier_mask"][:, 0], axis=0)
+    np.testing.assert_allclose(process[:, alive], uncorrected[:, alive] / np.mean(voltage_drops), rtol=2e-3, atol=1e-4)
+    # the charges of the dead pixels are interpolated from their neighbours
+    assert dead.sum() > 0
+    assert not np.allclose(process[:, dead], uncorrected[:, dead] / np.mean(voltage_drops))
 
 
 def test_pointing_table(monitoring_file):

@@ -13,7 +13,7 @@ from ctapipe.monitoring import StatisticsInterpolator
 from sst1mpipe.io.io import R0_PIXEL_STATISTICS_GROUP
 from sst1mpipe.monitoring import last_chunk_index
 
-__all__ = ["LastChunkStatisticsInterpolator", "SST1MMonitoringSource"]
+__all__ = ["LastChunkStatisticsInterpolator", "SST1MMonitoringSource", "statistics_container", "waveform_statistics_interpolator"]
 
 
 class LastChunkStatisticsInterpolator(StatisticsInterpolator):
@@ -89,14 +89,10 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
                 return
             names = [group._v_name for group in h5file.get_node(R0_PIXEL_STATISTICS_GROUP)._f_iter_nodes("Group")]
         for name in names:
-            interpolator = LastChunkStatisticsInterpolator()
-            for tel_id in self.subarray.tel_ids:
-                table = read_table(file, f"{R0_PIXEL_STATISTICS_GROUP}/{name}/tel_{tel_id:03d}")
-                # the outliers (e.g. the dead pixels) are NaN, as in the HDF5MonitoringSource
-                for column in ("mean", "median", "std"):
-                    table[column][table["outlier_mask"].data] = np.nan
-                interpolator.add_table(tel_id, table)
-            self._waveform_interpolators[name] = interpolator
+            self._waveform_interpolators[name] = waveform_statistics_interpolator({
+                tel_id: read_table(file, f"{R0_PIXEL_STATISTICS_GROUP}/{name}/tel_{tel_id:03d}")
+                for tel_id in self.subarray.tel_ids
+            })
 
     def fill_monitoring_container(self, event):
         """
@@ -125,6 +121,23 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
                 except ValueError:
                     # out of the time range of the pointing table
                     monitoring.pointing = TelescopePointingContainer()
+
+
+def waveform_statistics_interpolator(tables):
+    """
+    Interpolator of the statistics of the ADC samples of the pedestal events (R0 tables
+    ``<event type>_waveform`` of sst1mpipe-monitoring) of the telescopes, ``tables`` by telescope id:
+    the last chunk ended before the time (`LastChunkStatisticsInterpolator`), the outliers (e.g. the
+    dead pixels) NaN, as in the HDF5MonitoringSource. Used by SST1MMonitoringSource and by
+    sst1mpipe-monitoring to calibrate the images of the pedestal events.
+    """
+    interpolator = LastChunkStatisticsInterpolator()
+    for tel_id, table in tables.items():
+        table = table.copy()
+        for column in ("mean", "median", "std"):
+            table[column][table["outlier_mask"].data] = np.nan
+        interpolator.add_table(tel_id, table)
+    return interpolator
 
 
 def statistics_container(values, channel=None):
