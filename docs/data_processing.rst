@@ -51,8 +51,8 @@ in the provenance log of the tool (``<tool>.provenance.log``, ``--provenance-log
 
 The raw data file is read once, and the monitoring file contains the pointing of the telescope, the
 statistics of the ADC samples of the pedestal events (baseline and noise, for the voltage drop correction
-and the dead pixels) and the statistics of their images (NSB noise, for the ``NSBImageCleaner``), in chunks
-of pedestal events. What the tool does, its settings and the content of the monitoring file are described
+and the dead pixels) and the statistics of their images (NSB noise, for the ``NSBImageCleaner``), in rolling
+chunks of the last pedestal events. What the tool does, its settings and the content of the monitoring file are described
 in :ref:`sst1mpipe_monitoring`.
 
 
@@ -81,9 +81,12 @@ monitoring containers of each event with the monitoring data at its time, before
 * the statistics of the images of the pedestal events (``pixel_statistics.pedestal_image``), used by the
   ``NSBImageCleaner``
 
-The statistics of an event are those of the chunk of pedestal events at its time, or at most
-``--SST1MMonitoringSource.timestamp_tolerance`` (1 s) before or after it. The events without monitoring
-data (no chunk at their time, or out of the pointing table) cannot be calibrated: they are skipped, and
+The statistics of an event are those of the last chunk of pedestal events ended before it: with the
+rolling chunks of ``sst1mpipe-monitoring``, the statistics of the last 100 (ADC samples) and 1000
+(images) pedestal events before the event, updated at each pedestal event. The events before
+the end of the first chunk use the first chunk. The events out of the time range of the chunks, by more
+than ``--SST1MMonitoringSource.timestamp_tolerance`` (1 s), or out of the pointing table, have no
+monitoring data and cannot be calibrated: they are skipped, and
 their number is given in the log. The pedestal events are calibrated and cleaned but not written:
 they are used to count the fraction of pedestal events which survive the cleaning.
 

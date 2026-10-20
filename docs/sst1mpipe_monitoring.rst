@@ -54,13 +54,13 @@ At the end of the run, the tool writes:
   The target is read from the TARGET field of the file, or given with ``--SST1MEventSource.pointing_ra``
   and ``--SST1MEventSource.pointing_dec``. The runs without target (e.g. dark runs, transitions between
   two wobbles) have no pointing table, with a warning.
-* the **statistics of the ADC samples of the pedestal events**, in chunks of pedestal events
-  (``WaveformStatisticsCalculator``, 100 events by default): ``mean`` and ``median`` of the baseline (mean
+* the **statistics of the ADC samples of the pedestal events**, in rolling chunks of pedestal events
+  (``WaveformStatisticsCalculator``, the last 100 pedestal events, at each pedestal event, by default): ``mean`` and ``median`` of the baseline (mean
   of the ADC samples), ``std`` the noise (mean of the std of the ADC samples, used for the voltage drop
   correction and the dead pixels), ``outlier_mask`` (dead pixels: noise below half of the median of the
   camera) and ``is_valid``.
-* the **statistics of the images of the pedestal events**, in chunks of pedestal events
-  (``ImageStatisticsCalculator``, 1000 events by default): ``mean``, ``median`` and ``std`` of the charges
+* the **statistics of the images of the pedestal events**, in rolling chunks of pedestal events
+  (``ImageStatisticsCalculator``, the last 1000 pedestal events, at each pedestal event, by default): ``mean``, ``median`` and ``std`` of the charges
   (p.e.). The ``std`` is the NSB noise used by the ``NSBImageCleaner`` to raise the picture threshold of
   the pixels, and the ``mean`` gives ``meanQ`` of the DL1 parameters.
 * the description of the telescope, the scheduling and observation blocks of the run and the reference
@@ -81,28 +81,71 @@ A run without pedestal events has no statistics tables (warning in the log), and
 gives no output file.
 
 
-Statistics in chunks of pedestal events
----------------------------------------
+Rolling chunks of the last pedestal events
+------------------------------------------
 
-The statistics are computed as in the ``ctapipe-calculate-pixel-statistics`` tool, by the ctapipe
-``PixelStatisticsCalculator`` (``sst1mpipe.monitoring``):
+The statistics are computed in **rolling chunks**: a chunk of ``chunk_size`` pedestal events starts every
+``chunk_shift`` pedestal events, so that consecutive chunks overlap. For each event, ``sst1mpipe-process``
+uses the **last chunk ended before the event**: the statistics of the last ``chunk_size`` pedestal events
+before it, updated every ``chunk_shift`` pedestal events. By default ``chunk_shift`` is 1: a new chunk at
+each pedestal event, so that the statistics of an event are always those of the ``chunk_size`` pedestal
+events just before it (100 for the ADC samples, 1000 for the images). For example, with ``chunk_size`` 4
+and ``chunk_shift`` 1:
 
-* the pedestal events are aggregated in chunks, and the statistics of each pixel are computed for each
-  chunk. A chunk covers the time from its first to its last pedestal event: ``sst1mpipe-process`` uses
-  for each event the chunk containing its time (within ``SST1MMonitoringSource.timestamp_tolerance``);
-* the outlier pixels of each chunk are flagged by the outlier detectors (``outlier_mask``);
-* a chunk is not valid (``is_valid``) if more than ``faulty_pixels_fraction`` (10 %) of its pixels are
-  outliers. With overlapping chunks (``chunk_shift``), the time ranges of the invalid chunks are computed
-  again with the overlapping chunks (second pass of ctapipe).
+.. code-block:: text
+
+    pedestal events   p0  p1  p2  p3  p4  p5  p6  p7
+    chunk 0           [p0 ........... p3]
+    chunk 1               [p1 ........... p4]
+    chunk 2                   [p2 ........... p5]
+    chunk 3                       [p3 ........... p6]
+    chunk 4                           [p4 ........... p7]
+
+    event between p3 and p4  ->  chunk 0  (p0-p3)
+    event between p4 and p5  ->  chunk 1  (p1-p4)
+    event between p6 and p7  ->  chunk 3  (p3-p6)
+    event after p7           ->  chunk 4  (p4-p7)
+
+With ``chunk_shift`` 2, there would be the chunks 0, 2 and 4 only: the events between p5 and p7 would
+use chunk 2 (p2-p5).
+
+* The events before the end of the first chunk (the first ``chunk_size`` pedestal events of the run) use
+  the first chunk: there are not yet ``chunk_size`` pedestal events before them.
+* The last chunk always ends at the last pedestal event of the run (``last_chunk_policy`` ``overlap``),
+  and is not repeated if the last rolling chunk already ends there.
+* The events before the first pedestal event or after the last one, by more than
+  ``SST1MMonitoringSource.timestamp_tolerance`` (1 s), have no statistics and are skipped by
+  ``sst1mpipe-process``.
+* A run with less pedestal events than ``chunk_size`` has a single chunk of all its pedestal events
+  (``allow_undersized_tables``).
+
+A run of n pedestal events has n - ``chunk_size`` + 1 chunks: with about 100 pedestal events per second,
+a run of 40 s has about 4000 pedestal events, about 3900 chunks of ADC samples (the last second of
+pedestal events) and 3000 chunks of images (the last 10 s). A larger ``chunk_shift`` gives less rows in
+the monitoring and DL1 files, but updates the statistics less often.
+
+For each chunk, as in the ``ctapipe-calculate-pixel-statistics`` tool (ctapipe
+``PixelStatisticsCalculator``, ``sst1mpipe.monitoring``):
+
+* the statistics of each pixel are computed over the pedestal events of the chunk;
+* the outlier pixels are flagged by the outlier detectors (``outlier_mask``), and are NaN in the
+  statistics given to the events;
+* the chunk is not valid (``is_valid``) if more than ``faulty_pixels_fraction`` (10 %) of its pixels are
+  outliers.
+
+Unlike the ``ctapipe-calculate-pixel-statistics`` tool, whose first pass ignores ``chunk_shift``, all the
+chunks are rolling, and the chunk of an event is the last one ended before it, not the last one started
+before it (which would contain the pedestal events after the event).
 
 The main settings, in ``sst1mpipe_monitoring_config.json``:
 
-* ``WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size`` and
-  ``ImageStatisticsCalculator.PlainAggregator.SizeChunking.chunk_size``: number of pedestal events in a
-  chunk. ``chunking_type`` ``TimeChunking`` gives chunks of a duration (``chunk_duration``) instead.
+* ``WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking`` and
+  ``ImageStatisticsCalculator.PlainAggregator.SizeChunking``: ``chunk_size`` the number of pedestal
+  events in a chunk, ``chunk_shift`` the number of pedestal events between the starts of two chunks (at
+  most ``chunk_size``, ``null`` for chunks which do not overlap). ``chunking_type`` ``TimeChunking``
+  gives chunks of a duration instead (``chunk_duration`` and ``chunk_shift`` in seconds).
   ``allow_undersized_tables`` gives a single chunk for the runs with less pedestal events than a chunk,
-  and ``last_chunk_policy`` ``overlap`` makes the last chunk overlap the previous one instead of being
-  smaller.
+  and ``last_chunk_policy`` ``overlap`` makes the last chunk end at the last pedestal event.
 * ``stats_aggregator_type`` of the ``ImageStatisticsCalculator``: ``PlainAggregator`` (mean, median and
   std) or ``SigmaClippingAggregator`` (without the outlier events, ``max_sigma`` and ``iterations``)
 * ``outlier_detector_list``: ``RangeOutlierDetector`` (``validity_range``), ``MedianOutlierDetector``
@@ -113,7 +156,8 @@ The main settings, in ``sst1mpipe_monitoring_config.json``:
   which are put back in place when the events are read
 
 Every setting can also be given on the command line, e.g.
-``--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size=50``.
+``--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_shift=10`` (a new chunk every
+10 pedestal events).
 
 
 Content of the monitoring file

@@ -7,12 +7,15 @@ from copy import deepcopy
 import astropy.units as u
 import numpy as np
 import pytest
+from astropy.table import Table
+from astropy.time import Time
 from ctapipe.instrument import SubarrayDescription
-from ctapipe.io import read_table
+from ctapipe.io import read_table, write_table
 from ctapipe.io.hdf5dataformat import DL1_PIXEL_STATISTICS_GROUP
 
 from conftest import OBSERVATION_RUNS, monitoring_source_args, run_process
 from sst1mpipe.io import load_config, load_dl1_sst1m, read_trigger_time
+from sst1mpipe.io.io import pedestal_mean_charge
 from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, TEST_DATA_DIR
 
 TEL_ID = 21
@@ -108,3 +111,19 @@ def test_simulation_parameters(simulation_dl1):
         data["true_tel_impact_distance"],
         np.hypot(np.asarray(data["true_core_x"]) - position[0].to_value(u.m), np.asarray(data["true_core_y"]) - position[1].to_value(u.m)),
     )
+
+
+def test_mean_charge_of_the_last_pedestal_events(tmp_path):
+    """meanQ: mean charge of the last chunk of pedestal images ended before the event (rolling chunks)"""
+    # rolling chunks of 4 pedestal events every 2 pedestal events, a pedestal event every second
+    start = Time("2026-01-20T22:00:00")
+    time_start = start + np.array([0, 2, 4, 6]) * u.s
+    mean = np.arange(1, 5, dtype=np.float32)[:, np.newaxis, np.newaxis] * np.ones((1, 1, 1296), dtype=np.float32)
+    chunks = Table(dict(time_start=time_start, time_end=time_start + 3 * u.s, mean=mean))
+    path = tmp_path / "events.dl1.h5"
+    write_table(chunks, path, f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/{TEL}")
+
+    # times in UTC, the chunks in TAI in the file
+    times = start + np.array([1, 3, 4.5, 5, 7, 9, 30]) * u.s
+    # the first chunk before its end, then the last chunk ended before the time
+    np.testing.assert_allclose(pedestal_mean_charge(path, TEL, times), [1, 1, 1, 2, 3, 4, 4])

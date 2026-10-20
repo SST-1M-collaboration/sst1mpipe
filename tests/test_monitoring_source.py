@@ -155,8 +155,9 @@ def test_process_without_attached_monitoring(monitoring, tmp_path):
 
 def test_events_without_monitoring(tmp_path):
     """
-    monitoring of the 20 first events, without timestamp tolerance: the events out of the chunks
-    of pedestal events or of the pointing table are skipped
+    monitoring of the 20 first events, without timestamp tolerance: the events out of the time range
+    of the chunks of pedestal events (from the start of the first chunk to the end of the last one)
+    or of the pointing table are skipped
     """
     monitoring = tmp_path / "run.monitoring.h5"
     run_monitoring(INPUT_FILE, monitoring, "--max-events=20")
@@ -167,7 +168,7 @@ def test_events_without_monitoring(tmp_path):
     pointing = read_table(monitoring, f"/dl0/monitoring/telescope/pointing/tel_{TEL_ID:03d}")
 
     def has_monitoring(time):
-        in_chunks = all(np.any((table["time_start"] <= time) & (time <= table["time_end"])) for table in chunks)
+        in_chunks = all(table["time_start"][0] <= time <= table["time_end"][-1] for table in chunks)
         return in_chunks and pointing["time"][0] <= time <= pointing["time"][-1]
 
     with SST1MEventSource(INPUT_FILE) as source:

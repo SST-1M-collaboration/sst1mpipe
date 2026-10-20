@@ -24,6 +24,7 @@ from traitlets.config import Config
 
 import sst1mpipe
 from sst1mpipe.io.containers import DL1_info, DL2_info
+from sst1mpipe.monitoring import last_chunk_index
 from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
     add_disp,
@@ -617,14 +618,16 @@ def add_dl1_extra_parameters(events, input_file, tel):
 def pedestal_mean_charge(input_file, tel, times):
     """
     Mean over the pixels of the mean charge of the pedestal images (p.e.) at the given times:
-    statistics of the chunk of pedestal events started before each time (the first chunk for the
-    times before it), from the DL1 monitoring data of the file (sst1mpipe-monitoring)
+    statistics of the last chunk of pedestal events ended before each time, i.e. of the last
+    pedestal events (the first chunk for the times before its end), as for the calibration
+    (SST1MMonitoringSource), from the DL1 monitoring data of the file (sst1mpipe-monitoring)
     """
     chunks = read_table(input_file, f"{DL1_PEDESTAL_GROUP}/{tel}")
+    chunks.sort("time_start")
     mean = np.asarray(chunks["mean"], dtype=np.float64)
     mean = np.nanmean(mean.reshape(len(mean), -1), axis=1)
-    index = np.searchsorted(chunks["time_start"].mjd, Time(times).mjd, side="right") - 1
-    return mean[np.clip(index, 0, len(mean) - 1)]
+    # same time scale for the chunks (TAI in the files) and the times
+    return mean[last_chunk_index(chunks["time_start"].tai.mjd, chunks["time_end"].tai.mjd, Time(times).tai.mjd)]
 
 
 def load_dl1_sst1m(
