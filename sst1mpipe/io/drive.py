@@ -30,8 +30,8 @@ def read_drive_logs(file, subarray=None):
     Position of the telescope measured by its drive system (``current_position_el`` and
     ``current_position_az``, deg) at the time of the drive (``current_time``, ms since 1970,
     in the time system ``TIMESSYS`` of the logs), and state of the drive (`STATE_COLUMNS`).
-    The drive position includes the bending model of the drive: the direction pointed to in the
-    sky is given by `sst1mpipe.instrument.bending.BendingModel.revert`.
+    The drive position includes the pointing model of the drive: the direction pointed to in the
+    sky is given by `sst1mpipe.instrument.pointing_model.PointingModel.revert`.
 
     Parameters
     ----------

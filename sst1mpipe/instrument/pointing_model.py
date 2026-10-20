@@ -1,8 +1,8 @@
 """
-Bending models of the SST-1M telescopes: corrections between the position of the drive
+Pointing models of the SST-1M telescopes: corrections between the position of the drive
 (encoders) and the direction pointed to in the sky, as a function of the altitude and azimuth.
-The drive applies its bending model to the position of the target, so its logs
-(`sst1mpipe.io.drive.read_drive_logs`) give the drive position, and `BendingModel.revert` gives
+The drive applies its pointing model to the position of the target, so its logs
+(`sst1mpipe.io.drive.read_drive_logs`) give the drive position, and `PointingModel.revert` gives
 the direction pointed to in the sky.
 """
 import logging
@@ -14,14 +14,14 @@ from astropy.coordinates import SkyCoord
 from ctapipe.core import TelescopeComponent
 from ctapipe.core.traits import Float, FloatTelescopeParameter
 
-__all__ = ["BendingModel", "TPointBendingModel"]
+__all__ = ["PointingModel", "TPointPointingModel"]
 
 logger = logging.getLogger(__name__)
 
 
-class BendingModel(TelescopeComponent):
+class PointingModel(TelescopeComponent):
     """
-    Base class of the bending models: corrections (d_alt, d_az) of the drive position of a
+    Base class of the pointing models: corrections (d_alt, d_az) of the drive position of a
     telescope, sky position = drive position + corrections(drive position). A child class
     defines `corrections`.
 
@@ -61,7 +61,7 @@ class BendingModel(TelescopeComponent):
         above = distance > self.tolerance
         if np.any(above):
             logger.warning(
-                "Bending model of telescope %d: %d positions inverted with an error above %.1f arcsec (largest %.1f arcsec)",
+                "Pointing model of telescope %d: %d positions inverted with an error above %.1f arcsec (largest %.1f arcsec)",
                 tel_id, np.count_nonzero(above), self.tolerance, np.max(distance[above]),
             )
         return drive
@@ -74,9 +74,9 @@ class BendingModel(TelescopeComponent):
         return SkyCoord(alt=alt * u.deg, az=pointing.az + sign * d_az, frame=pointing.frame)
 
 
-class TPointBendingModel(BendingModel):
+class TPointPointingModel(PointingModel):
     """
-    Bending model of alt-az mounts with the terms of TPOINT [1]_ (names and units), corrections of
+    Pointing model of alt-az mounts with the terms of TPOINT [1]_ (names and units), corrections of
     the drive (encoder) position alt, az:
 
     - d_az = -IA - AN sin(az) tan(alt) - AW cos(az) tan(alt) - CA / cos(alt) - NPAE tan(alt)
@@ -90,8 +90,8 @@ class TPointBendingModel(BendingModel):
     TX), in which d_alt has -IE: the drive positions of the night of 2026-01-20 need +IE.
 
     The coefficients are in arcsec, 0 by default (no correction), configured with the TPOINT names
-    in lower case, e.g. ``{"TPointBendingModel": {"ia": [["id", 21, -8441.94], ["id", 22, -2074.65]]}}``.
-    ``SST1M_BENDING_MODEL_CONFIG_FILE`` has the coefficients of the SST-1M drives.
+    in lower case, e.g. ``{"TPointPointingModel": {"ia": [["id", 21, -8441.94], ["id", 22, -2074.65]]}}``.
+    ``SST1M_POINTING_MODEL_CONFIG_FILE`` has the coefficients of the SST-1M drives.
 
     References
     ----------

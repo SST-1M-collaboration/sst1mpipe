@@ -15,7 +15,7 @@ DRIVE_FILES = {
 }
 MRK421 = SkyCoord(166.1138 * u.deg, 38.2088 * u.deg, frame="icrs")
 # largest separation from Mrk 421 (wobbles at 0.7 deg) of the drive position while tracking it,
-# which includes the bending model of the telescope (azimuth offset of about -2.3 deg for tel 21
+# which includes the pointing model of the telescope (azimuth offset of about -2.3 deg for tel 21
 # and -0.6 deg for tel 22)
 MAX_SEPARATION_MRK421 = {21: 1.87 * u.deg, 22: 1.01 * u.deg}
 

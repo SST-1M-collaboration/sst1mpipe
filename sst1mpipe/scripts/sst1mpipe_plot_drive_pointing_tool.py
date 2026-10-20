@@ -19,7 +19,7 @@ from ctapipe.instrument import SubarrayDescription
 from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.ticker import FuncFormatter
 
-from sst1mpipe.instrument.bending import BendingModel
+from sst1mpipe.instrument.pointing_model import PointingModel
 from sst1mpipe.io.drive import drive_radec, read_drive_logs
 from sst1mpipe.io.sst1m_event_source import parse_target_field
 from sst1mpipe.resources import SUBARRAY_FILE
@@ -382,7 +382,7 @@ class PlotDrivePointingTool(Tool):
       zoom on each field for each telescope
 
     The pointing given by the TARGET field of zfits runs (``zfits_files``) is drawn for comparison.
-    With ``--revert-bending``, the bending model of the drives (``bending_model_type``, configured
+    With ``--revert-pointing-model``, the pointing model of the drives (``pointing_model_type``, configured
     per telescope in the configuration file) is reverted to give the direction pointed to in the
     sky. Otherwise the plots show the drive positions.
     """
@@ -393,9 +393,9 @@ class PlotDrivePointingTool(Tool):
         "sst1mpipe-plot-drive-pointing -i DriveSystem1_20260120_001.fits -i DriveSystem2_20260120_002.fits "
         "-z SST1M1_20260120_1179.fits.fz -o plots\n"
         "sst1mpipe-plot-drive-pointing -i DriveSystem1_20260120_001.fits -i DriveSystem2_20260120_002.fits "
-        "-o plots --revert-bending --config bending_model.json\n"
-        "with bending_model.json: "
-        '{"TPointBendingModel": {"ia": [["type", "*", 0], ["id", 21, -8360], ["id", 22, -2070]]}}'
+        "-o plots --revert-pointing-model --config pointing_model.json\n"
+        "with pointing_model.json: "
+        '{"TPointPointingModel": {"ia": [["type", "*", 0], ["id", 21, -8360], ["id", 22, -2070]]}}'
     )
 
     input_files = List(
@@ -412,11 +412,11 @@ class PlotDrivePointingTool(Tool):
     min_tracking = Float(
         default_value=30.0, help="Tracking periods shorter than this (s) are not used"
     ).tag(config=True)
-    revert_bending = Bool(
-        default_value=False, help="Revert the bending model of the drives (bending_model_type)"
+    revert_pointing_model = Bool(
+        default_value=False, help="Revert the pointing model of the drives (pointing_model_type)"
     ).tag(config=True)
-    bending_model_type = ComponentName(
-        BendingModel, default_value="TPointBendingModel", help="Bending model of the drives"
+    pointing_model_type = ComponentName(
+        PointingModel, default_value="TPointPointingModel", help="Pointing model of the drives"
     ).tag(config=True)
 
     aliases = {
@@ -425,30 +425,30 @@ class PlotDrivePointingTool(Tool):
         ("o", "output-dir"): "PlotDrivePointingTool.output_dir",
         "field-radius": "PlotDrivePointingTool.field_radius",
         "min-tracking": "PlotDrivePointingTool.min_tracking",
-        "bending-model-type": "PlotDrivePointingTool.bending_model_type",
+        "pointing-model-type": "PlotDrivePointingTool.pointing_model_type",
     }
 
     flags = {
-        **flag("revert-bending", "PlotDrivePointingTool.revert_bending",
-               "revert the bending model of the drives", "plot the drive positions"),
+        **flag("revert-pointing-model", "PlotDrivePointingTool.revert_pointing_model",
+               "revert the pointing model of the drives", "plot the drive positions"),
     }
 
-    classes = classes_with_traits(BendingModel)
+    classes = classes_with_traits(PointingModel)
 
     def setup(self):
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.subarray = SubarrayDescription.from_hdf(SUBARRAY_FILE)
-        self.bending_model = None
-        if self.revert_bending:
-            self.bending_model = BendingModel.from_name(self.bending_model_type, subarray=self.subarray, parent=self)
+        self.pointing_model = None
+        if self.revert_pointing_model:
+            self.pointing_model = PointingModel.from_name(self.pointing_model_type, subarray=self.subarray, parent=self)
 
     def start(self):
         tracks = {}
         for path in self.input_files:
             drive = read_drive_logs(path, subarray=self.subarray)
             tel_id = drive.meta["tel_id"]
-            if self.bending_model is not None:
-                drive["pointing"] = self.bending_model.revert(tel_id, drive["pointing"])
+            if self.pointing_model is not None:
+                drive["pointing"] = self.pointing_model.revert(tel_id, drive["pointing"])
             tracks[tel_id] = tracking_periods(drive, self.min_tracking)
         tracks = dict(sorted(tracks.items()))
         radius = self.field_radius * u.deg
@@ -460,7 +460,7 @@ class PlotDrivePointingTool(Tool):
                 field["start"].isot, field["stop"].isot,
             )
 
-        pointing = f"{self.bending_model_type} reverted" if self.bending_model is not None else "drive position"
+        pointing = f"{self.pointing_model_type} reverted" if self.pointing_model is not None else "drive position"
         self.plots = [self.output_dir / "drive_radec_vs_time.png", self.output_dir / "drive_radec_map.png"]
         plot_radec_vs_time(tracks, fields, targets, radius, self.plots[0], pointing)
         plot_radec_map(tracks, fields, targets, radius, self.plots[1], pointing)
