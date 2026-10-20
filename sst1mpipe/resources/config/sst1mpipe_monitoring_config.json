@@ -57,13 +57,13 @@
       "chunking_type": "SizeChunking",
       "SizeChunking": {
         "chunk_size": 100,
-        "chunk_shift": null,
+        "chunk_shift": 1,
         "last_chunk_policy": "overlap",
         "allow_undersized_tables": true
       },
       "TimeChunking": {
         "chunk_duration": "1 s",
-        "chunk_shift": "0 s",
+        "chunk_shift": "0.1 s",
         "last_chunk_policy": "overlap",
         "allow_undersized_tables": true
       }
@@ -78,13 +78,13 @@
       "chunking_type": "SizeChunking",
       "SizeChunking": {
         "chunk_size": 1000,
-        "chunk_shift": null,
+        "chunk_shift": 1,
         "last_chunk_policy": "overlap",
         "allow_undersized_tables": true
       },
       "TimeChunking": {
         "chunk_duration": "10 s",
-        "chunk_shift": "0 s",
+        "chunk_shift": "1 s",
         "last_chunk_policy": "overlap",
         "allow_undersized_tables": true
       }
@@ -95,7 +95,7 @@
       "chunking_type": "SizeChunking",
       "SizeChunking": {
         "chunk_size": 1000,
-        "chunk_shift": null,
+        "chunk_shift": 1,
         "last_chunk_policy": "overlap",
         "allow_undersized_tables": true
       }

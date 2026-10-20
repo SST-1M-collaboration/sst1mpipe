@@ -9,21 +9,26 @@ The statistics are computed with the ctapipe `~ctapipe.monitoring.PixelStatistic
   aggregated by the `PedestalWaveformAggregator`
 - `ImageStatisticsCalculator`: statistics of the calibrated images of the pedestal events (DL1)
 
+The chunks are rolling with ``chunk_shift``: a new chunk every ``chunk_shift`` pedestal events, each
+of the last ``chunk_size`` pedestal events (`compute_pixel_statistics`). At the time of an event, the
+statistics are those of the last chunk ended before it (`last_chunk_index`).
+
 The two calculators are distinct classes, so that they are configured separately,
 e.g. ``{"WaveformStatisticsCalculator": {"PedestalWaveformAggregator": {"SizeChunking": {"chunk_size": 100}}}}``.
 """
 import numpy as np
-from astropy.table import vstack
 from ctapipe.containers import ChunkStatisticsContainer
 from ctapipe.core.traits import ComponentName, TelescopeParameter
-from ctapipe.monitoring.aggregator import StatisticsAggregator
+from ctapipe.monitoring.aggregator import SizeChunking, StatisticsAggregator, TimeChunking
 from ctapipe.monitoring.calculator import PixelStatisticsCalculator
 
 __all__ = [
     "PedestalWaveformAggregator",
     "WaveformStatisticsCalculator",
     "ImageStatisticsCalculator",
+    "check_chunk_shift",
     "compute_pixel_statistics",
+    "last_chunk_index",
 ]
 
 
@@ -70,9 +75,15 @@ class ImageStatisticsCalculator(PixelStatisticsCalculator):
 
 def compute_pixel_statistics(calculator, table, tel_id, col_name):
     """
-    Statistics of the column ``col_name`` of ``table`` in chunks of events, as in the
-    ``ctapipe-calculate-pixel-statistics`` tool: a first pass with non-overlapping chunks, and
-    a second pass with overlapping chunks (``chunk_shift``) over the faulty chunks.
+    Statistics of the column ``col_name`` of ``table`` in chunks of events, with the outlier
+    detection and the validity of the chunks of the ``ctapipe-calculate-pixel-statistics`` tool.
+
+    The chunks follow the chunking of the aggregator: with ``chunk_shift``, the chunks are
+    rolling, i.e. a new chunk every ``chunk_shift`` events (or duration), each of ``chunk_size``
+    events (or ``chunk_duration``), overlapping the previous ones; without ``chunk_shift``, the
+    chunks do not overlap. The last chunk ends at the last event (``last_chunk_policy``
+    ``overlap``). Unlike the first pass of ctapipe, ``chunk_shift`` is used for all the
+    chunks.
 
     Parameters
     ----------
@@ -86,17 +97,64 @@ def compute_pixel_statistics(calculator, table, tel_id, col_name):
     Returns
     -------
     astropy.table.Table
-        statistics of the chunks: time_start, time_end, event_id_start, event_id_end,
-        n_events, mean, median, std, outlier_mask, is_valid
+        statistics of the chunks, sorted by time: time_start, time_end, event_id_start,
+        event_id_end, n_events, mean, median, std, outlier_mask, is_valid
     """
-    statistics = calculator.first_pass(table=table, tel_id=tel_id, col_name=col_name)
     aggregator = calculator.stats_aggregators[calculator.stats_aggregator_type.tel[tel_id]]
-    chunk_shift = getattr(aggregator.chunking, "chunk_shift", None)
-    has_shift = chunk_shift is not None and np.any(chunk_shift > 0)
-    if has_shift and np.any(~statistics["is_valid"].data):
-        second_pass = calculator.second_pass(
-            table=table, valid_chunks=statistics["is_valid"].data, tel_id=tel_id, col_name=col_name,
-        )
-        statistics = vstack([statistics, second_pass])
-        statistics.sort(["time_start"])
+    statistics = aggregator(table=table, col_name=col_name)
+    # with a shift smaller than the chunks, the last chunk of ctapipe (overlap policy) can be
+    # the previous chunk again
+    duplicate = np.zeros(len(statistics), dtype=bool)
+    duplicate[1:] = (statistics["event_id_start"][1:] == statistics["event_id_start"][:-1]) & (
+        statistics["event_id_end"][1:] == statistics["event_id_end"][:-1]
+    )
+    statistics = statistics[~duplicate]
+    calculator._find_and_append_outliers(statistics)
+    statistics["is_valid"] = calculator._get_valid_chunks(statistics["outlier_mask"])
     return statistics
+
+
+def check_chunk_shift(calculator):
+    """
+    Raise a ValueError if the chunks of the aggregators of ``calculator`` are shifted by more than
+    their size: the pedestal events between two chunks would not be used
+    """
+    for name, aggregator in calculator.stats_aggregators.items():
+        chunking = aggregator.chunking
+        if isinstance(chunking, SizeChunking):
+            size, shift = chunking.chunk_size, chunking.chunk_shift
+        elif isinstance(chunking, TimeChunking):
+            size, shift = chunking.chunk_duration, chunking.chunk_shift
+        else:
+            continue
+        if isinstance(chunking, SizeChunking) and shift is not None and shift < 1:
+            raise ValueError(f"{type(calculator).__name__}.{name}.SizeChunking: chunk_shift ({shift}) must be at least 1")
+        if size is not None and shift is not None and shift > size:
+            raise ValueError(
+                f"{type(calculator).__name__}.{name}.{type(chunking).__name__}: chunk_shift ({shift}) "
+                f"larger than the chunks ({size})"
+            )
+
+
+def last_chunk_index(time_start, time_end, times):
+    """
+    Index of the chunk of pedestal events to use at each time: the last chunk ended at or before
+    the time, i.e. the statistics of the last pedestal events before it. The times before the
+    end of the first chunk use the first chunk.
+
+    Parameters
+    ----------
+    time_start, time_end: array
+        start and end of the chunks (MJD), sorted by time
+    times: array
+        times (MJD)
+
+    Returns
+    -------
+    numpy.ndarray of int
+        index of the chunk at each time
+    """
+    # the end of the chunks increases with their start, except if the chunks have different sizes
+    time_end = np.maximum.accumulate(np.asarray(time_end))
+    index = np.searchsorted(time_end, np.asarray(times), side="right") - 1
+    return np.clip(index, 0, len(time_start) - 1)

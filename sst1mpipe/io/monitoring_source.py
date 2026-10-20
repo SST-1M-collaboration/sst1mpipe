@@ -2,6 +2,7 @@
 Monitoring source of the monitoring files of sst1mpipe-monitoring, used by sst1mpipe-process
 (``--monitoring-source SST1MMonitoringSource --SST1MMonitoringSource.input_files=<file>``).
 """
+import astropy.units as u
 import numpy as np
 import tables
 from ctapipe.containers import StatisticsContainer, TelescopePointingContainer
@@ -10,8 +11,38 @@ from ctapipe.io.monitoringtypes import MonitoringType
 from ctapipe.monitoring import StatisticsInterpolator
 
 from sst1mpipe.io.io import R0_PIXEL_STATISTICS_GROUP
+from sst1mpipe.monitoring import last_chunk_index
 
-__all__ = ["SST1MMonitoringSource"]
+__all__ = ["LastChunkStatisticsInterpolator", "SST1MMonitoringSource"]
+
+
+class LastChunkStatisticsInterpolator(StatisticsInterpolator):
+    """
+    Statistics of the last chunk of pedestal events ended at or before the requested time
+    (`~sst1mpipe.monitoring.last_chunk_index`): with rolling chunks, the statistics of the last
+    ``chunk_size`` pedestal events before the event. The ctapipe `~ctapipe.monitoring.ChunkInterpolator`
+    takes instead the last chunk started before the time, which contains the pedestal events
+    after it. The times before the end of the first chunk use the first chunk. Out of the time
+    range of the chunks (within ``timestamp_tolerance``), the statistics are NaN.
+    """
+
+    def add_table(self, tel_id, input_table):
+        super().add_table(tel_id, input_table)
+        if not hasattr(self, "time_scale"):
+            self.time_scale = {}
+        self.time_scale[tel_id] = input_table["time_start"].scale
+
+    def _interpolate_chunk(self, tel_id, column, time, timestamp_tolerance=0 * u.s):
+        time_start, time_end = self.time_start[tel_id], self.time_end[tel_id]
+        values = self.values[tel_id][column]
+        # same time scale as the chunks (TAI in the monitoring files)
+        mjd = np.atleast_1d(getattr(time, self.time_scale[tel_id]).mjd)
+        tolerance = timestamp_tolerance.to_value("day")
+        index = last_chunk_index(time_start, time_end, mjd)
+        in_range = (time_start[0] - tolerance <= mjd) & (mjd <= np.max(time_end) + tolerance)
+        no_value = np.nan if np.isscalar(values[0]) else np.full_like(values[0], np.nan)
+        interpolated = [values[i] if ok else no_value for i, ok in zip(index, in_range, strict=True)]
+        return interpolated[0] if len(interpolated) == 1 else interpolated
 
 
 class SST1MMonitoringSource(HDF5MonitoringSource):
@@ -27,15 +58,27 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
       ``camera.pixel_statistics.pedestal_image``, of shape (n_pixels,) as the images (DigiCam
       has a single channel), for the NSBImageCleaner
 
-    The statistics are interpolated with the chunks of pedestal events containing the time of the
-    event, within ``timestamp_tolerance``. Without such a chunk, the statistics are not filled
-    (``std`` is None). The outlier pixels of the statistics (e.g. the dead pixels) are NaN.
+    The statistics at the time of the event are those of the last chunk of pedestal events ended
+    before it (`LastChunkStatisticsInterpolator`): with the rolling chunks of sst1mpipe-monitoring,
+    the statistics of the last pedestal events. Out of the time range of the chunks, within
+    ``timestamp_tolerance``, the statistics are not filled (``std`` is None). The outlier pixels of
+    the statistics (e.g. the dead pixels) are NaN.
     Out of the time range of the pointing table, the pointing is NaN.
     """
 
     def _process_single_file(self, file):
         super()._process_single_file(file)
+        self._process_image_statistics()
         self._process_waveform_statistics(file)
+
+    def _process_image_statistics(self):
+        """Statistics of the images of the pedestal events: last chunk ended before the event"""
+        for name in list(getattr(self, "pixel_stats_dict", {})):
+            interpolator = LastChunkStatisticsInterpolator()
+            for tel_id in self.subarray.tel_ids:
+                # the outliers are already NaN (HDF5MonitoringSource)
+                interpolator.add_table(tel_id, self._pixel_statistics[tel_id][name])
+            self.pixel_stats_dict[name] = interpolator
 
     def _process_waveform_statistics(self, file):
         """Statistics of the ADC samples of the pedestal events (R0 pixel statistics tables)"""
@@ -46,7 +89,7 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
                 return
             names = [group._v_name for group in h5file.get_node(R0_PIXEL_STATISTICS_GROUP)._f_iter_nodes("Group")]
         for name in names:
-            interpolator = StatisticsInterpolator()
+            interpolator = LastChunkStatisticsInterpolator()
             for tel_id in self.subarray.tel_ids:
                 table = read_table(file, f"{R0_PIXEL_STATISTICS_GROUP}/{name}/tel_{tel_id:03d}")
                 # the outliers (e.g. the dead pixels) are NaN, as in the HDF5MonitoringSource
