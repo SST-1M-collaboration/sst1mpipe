@@ -204,3 +204,16 @@ def test_sst1m_pointing_model(subarray, caplog, tel_id, ie):
     assert np.count_nonzero(on_w1) > 1000
     assert np.all(SkyCoord(sky.ra, sky.dec)[on_w1].separation(w1) < 1 * u.arcmin)
     assert "outside of its periods" not in caplog.text
+
+
+@pytest.mark.parametrize("tel_id, night, known", [
+    (21, "2023-04-19", False), (21, "2023-04-20", True), (21, "2023-06-12", True), (21, "2026-10-20", True),
+    (22, "2024-04-29", False), (22, "2024-04-30", True), (22, "2026-03-13", True), (22, "2026-03-15", False),
+    (22, "2026-03-17", True),
+])
+def test_sst1m_pointing_model_periods(subarray, caplog, tel_id, night, known):
+    """Nights (from noon to noon UTC) with the coefficients of the SST-1M drives known"""
+    model = TPointPointingModel(subarray, config=Config(json.loads(SST1M_POINTING_MODEL_CONFIG_FILE.read_text())))
+    times = Time(f"{night}T12:00:00") + np.linspace(0, 23.99, 25) * u.hour
+    model.coefficients(tel_id, times)
+    assert ("outside of its periods" not in caplog.text) == known
