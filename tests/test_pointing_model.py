@@ -110,6 +110,55 @@ def test_coefficients_per_telescope(subarray):
         assert u.isclose((sky.az - drive.az).wrap_at(180 * u.deg), d_az * u.deg)
 
 
+PERIODS = [
+    {"tel_id": 22, "start": "2026-01-01T12:00:00", "stop": "2026-02-01T12:00:00", "ia": 3600.0},
+    {"tel_id": 22, "start": "2026-02-01T12:00:00", "stop": None, "ia": 1800.0, "ie": 360.0},
+]
+
+
+@pytest.mark.parametrize("time, ia, ie, outside", [
+    ("2025-12-31T00:00:00", 7200.0, 0.0, True),
+    ("2026-01-01T12:00:00", 3600.0, 0.0, False),
+    ("2026-02-01T11:59:59", 3600.0, 0.0, False),
+    ("2026-02-01T12:00:00", 1800.0, 360.0, False),
+    ("2026-09-01T00:00:00", 1800.0, 360.0, False),
+])
+def test_periods(subarray, caplog, time, ia, ie, outside):
+    model = tpoint(subarray, ia=[["type", "*", 7200.0]], periods=PERIODS)
+    coefficients = model.coefficients(22, Time(time))
+    assert coefficients["ia"] == ia
+    assert coefficients["ie"] == ie
+    assert ("positions outside of its periods" in caplog.text) == outside
+    # the telescopes without periods use the parameters
+    assert model.coefficients(21, Time(time))["ia"] == 7200.0
+
+
+def test_revert_with_periods(subarray, caplog):
+    """Coefficients of each position from the obstime of its frame"""
+    model = tpoint(subarray, periods=PERIODS)
+    frame = AltAz(obstime=Time(["2026-01-15T00:00", "2026-03-01T00:00"]), location=subarray.tel_earth_locations[22])
+    drive = SkyCoord(alt=[60, 60] * u.deg, az=[100, 100] * u.deg, frame=frame)
+    sky = model.revert(22, drive)
+    assert u.allclose((sky.az - drive.az).wrap_at(180 * u.deg), [-1.0, -0.5] * u.deg)
+    assert u.allclose(sky.alt - drive.alt, [0.0, 0.1] * u.deg, atol=1e-9 * u.deg)
+    assert "outside of its periods" not in caplog.text
+    # without time: coefficients of the parameters
+    assert model.coefficients(22)["ia"] == 0.0
+    assert "no time, coefficients of the parameters used" in caplog.text
+
+
+@pytest.mark.parametrize("periods", [
+    [{"start": "2026-01-01", "ia": 1.0}],
+    [{"tel_id": 22, "IA": 1.0}],
+    [{"tel_id": 22, "start": "2026-02-01", "stop": "2026-01-01"}],
+    [{"tel_id": 22, "start": "2026-01-01", "stop": "2026-03-01"}, {"tel_id": 22, "start": "2026-02-01", "stop": None}],
+    [{"tel_id": 22, "start": None, "stop": None}, {"tel_id": 22, "start": "2026-02-01", "stop": None}],
+])
+def test_invalid_periods(subarray, periods):
+    with pytest.raises(ValueError):
+        tpoint(subarray, periods=periods)
+
+
 def test_revert_drive_logs(subarray):
     model = tpoint(subarray, ia=-3600.0, ie=720.0)
     drive = read_drive_logs(DRIVE_FILES[0], subarray=subarray)
@@ -135,14 +184,15 @@ def test_plot_drive_pointing_tool(tmp_path, revert_pointing_model):
         assert (tmp_path / "plots" / name).stat().st_size > 0
 
 
-@pytest.mark.parametrize("tel_id, max_separation", [(21, 1 * u.arcmin), (22, 2 * u.arcmin)])
-def test_sst1m_pointing_model(subarray, tel_id, max_separation):
+@pytest.mark.parametrize("tel_id, ie", [(21, -574.57), (22, -29.98)])
+def test_sst1m_pointing_model(subarray, caplog, tel_id, ie):
     """
-    Coefficients of the SST-1M drives (SST1M_POINTING_MODEL_CONFIG_FILE): pointing on the Mrk 421
-    wobble W1 (TARGET of the zfits runs) within max_separation
+    Coefficients of the SST-1M drives (SST1M_POINTING_MODEL_CONFIG_FILE) of the night of 2026-01-20
+    (tel 22: period from 20240430 to 20260313): pointing on the Mrk 421 wobble W1 (TARGET of the
+    zfits runs) within 1 arcmin
     """
     model = TPointPointingModel(subarray, config=Config(json.loads(SST1M_POINTING_MODEL_CONFIG_FILE.read_text())))
-    assert model.ia.tel[tel_id] != 0
+    assert model.coefficients(tel_id, Time("2026-01-21T03:00:00"))["ie"] == ie
     drive = read_drive_logs(DRIVE_FILES[tel_id - 21], subarray=subarray)
     tracking = (
         drive["is_tracking"] & drive["is_on_source"]
@@ -152,4 +202,5 @@ def test_sst1m_pointing_model(subarray, tel_id, max_separation):
     w1 = SkyCoord(166.9948 * u.deg, 38.1053 * u.deg, frame="icrs")
     on_w1 = sky.ra > 166.5 * u.deg
     assert np.count_nonzero(on_w1) > 1000
-    assert np.all(SkyCoord(sky.ra, sky.dec)[on_w1].separation(w1) < max_separation)
+    assert np.all(SkyCoord(sky.ra, sky.dec)[on_w1].separation(w1) < 1 * u.arcmin)
+    assert "outside of its periods" not in caplog.text
