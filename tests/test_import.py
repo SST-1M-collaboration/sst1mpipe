@@ -30,4 +30,7 @@ def test_import_scipy():
     module, version = get_module_and_version("scipy")
     assert version is not None
 
+def test_import_sklearn():
+    module, version = get_module_and_version("sklearn")
+    assert version is not None
 
