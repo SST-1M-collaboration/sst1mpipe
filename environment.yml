@@ -18,6 +18,7 @@ dependencies:
   - astropy<7 # astropy.coordinates.get_moon is removed in astropy 7 (sst1mpipe_obsplan)
   - numpy<2 # astropy 6.1 fails to import with numpy 2.4 (np.in1d removed)
   - nbmake # used to pytest jupyter notebooks
+  - pandas
   - pytables
   - pytest
   - ruff
@@ -35,6 +36,7 @@ dependencies:
   - numpydoc
   - vitables # to visualize hdf5 tables
   - wheel
+  - wrapt
   - pip:
       - ctaplot~=0.6.2
       - pyirf~=0.8.0
