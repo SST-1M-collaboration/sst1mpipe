@@ -179,7 +179,7 @@ def get_dark_baseline(filename, max_evt=500, event_types=None, n_samples=50):
     from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
     event_types = PEDESTAL_EVENT_TYPES if event_types is None else event_types
-    baseline_sum = None
+    baseline_sum = 0
     n_events = 0
     n_used_samples = 0
     with SST1MEventSource(input_url=filename, max_events=max_evt) as source:
@@ -188,8 +188,7 @@ def get_dark_baseline(filename, max_evt=500, event_types=None, n_samples=50):
                 continue
             tel_id = event.trigger.tels_with_trigger[0]
             samples = np.asarray(event.r0.tel[tel_id].waveform[0][:, :n_samples], dtype=np.float64)
-            sums = samples.sum(axis=1)
-            baseline_sum = sums if baseline_sum is None else baseline_sum + sums
+            baseline_sum += samples.sum(axis=1)
             n_events += 1
             n_used_samples = samples.shape[1]
     if n_events == 0:
