@@ -38,6 +38,9 @@ dependencies:
   - wheel
   - wrapt
   - pip:
+      # pip ignores the conda pins: without it, pip upgrades numpy to 2.x for pandas 3.1 (dependency
+      # of ctaplot), and astropy 6.1 fails to import (np.in1d removed in numpy 2.4)
+      - numpy<2
       - ctaplot~=0.6.2
       - pyirf~=0.8.0
       - cts @ git+https://github.com/SST-1M-collaboration/CTS.git
