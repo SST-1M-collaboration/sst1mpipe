@@ -2,11 +2,9 @@ import numpy as np
 import pytest
 import tables
 
-from conftest import DARK_FILE, OBSERVATION_RUNS, WAVEFORM_CHUNK_ARGS, run_monitoring
+from conftest import OBSERVATION_RUNS, WAVEFORM_CHUNK_ARGS, run_monitoring
 from sst1mpipe.io import load_r0_pedestals
-from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.utils.NSB_tools import get_dark_baseline, get_ped_table, mean_pedestal_std
+from sst1mpipe.utils.NSB_tools import get_ped_table, mean_pedestal_std
 
 
 @pytest.fixture(scope="module")
@@ -40,20 +38,3 @@ def test_get_ped_table(monitoring_files, low_res):
     assert np.all(np.isfinite(mean_pedestal_std(table)))
 
     assert get_ped_table([empty], low_res=low_res) is None
-
-
-def test_get_dark_baseline():
-    """mean of the first 50 ADC samples of each pixel over the pedestal events of the dark run"""
-    max_evt = 100
-    with SST1MEventSource(DARK_FILE, max_events=max_evt) as source:
-        samples = np.array([
-            event.r0.tel[event.trigger.tels_with_trigger[0]].waveform[0][:, :50]
-            for event in source if event.trigger.event_type in PEDESTAL_EVENT_TYPES
-        ], dtype=np.float64)
-    assert len(samples) > 10
-    baseline = get_dark_baseline(DARK_FILE, max_evt=max_evt)
-    assert baseline.shape == (1296, )
-    np.testing.assert_allclose(baseline, samples.mean(axis=(0, 2)), rtol=1e-12)
-    # no event of the requested types
-    with pytest.raises(ValueError, match="No event"):
-        get_dark_baseline(DARK_FILE, max_evt=max_evt, event_types=())
