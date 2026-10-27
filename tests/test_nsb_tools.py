@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 import tables
 
-from conftest import OBSERVATION_RUNS, WAVEFORM_CHUNK_ARGS, run_monitoring
+from conftest import DARK_FILE, OBSERVATION_RUNS, WAVEFORM_CHUNK_ARGS, run_monitoring
 from sst1mpipe.io import load_r0_pedestals
-from sst1mpipe.utils.NSB_tools import get_ped_table, mean_pedestal_std
+from sst1mpipe.utils.NSB_tools import get_dark_baseline, get_ped_table, mean_pedestal_std
 
 
 @pytest.fixture(scope="module")
@@ -38,3 +38,12 @@ def test_get_ped_table(monitoring_files, low_res):
     assert np.all(np.isfinite(mean_pedestal_std(table)))
 
     assert get_ped_table([empty], low_res=low_res) is None
+
+
+def test_get_dark_baseline():
+    """mean of the first 50 ADC samples of each pixel over the pedestal events of the dark run"""
+    baseline = get_dark_baseline(DARK_FILE, max_evt=100)
+    assert baseline.shape == (1296, )
+    # no event of the requested types
+    with pytest.raises(ValueError, match="No event"):
+        get_dark_baseline(DARK_FILE, max_evt=100, event_types=())
