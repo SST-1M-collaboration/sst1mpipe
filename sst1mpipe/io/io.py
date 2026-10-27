@@ -626,8 +626,7 @@ def pedestal_mean_charge(input_file, tel, times):
     chunks.sort("time_start")
     mean = np.asarray(chunks["mean"], dtype=np.float64)
     mean = np.nanmean(mean.reshape(len(mean), -1), axis=1)
-    # same time scale for the chunks (TAI in the files) and the times
-    return mean[last_chunk_index(chunks["time_start"].tai.mjd, chunks["time_end"].tai.mjd, Time(times).tai.mjd)]
+    return mean[last_chunk_index(chunks["time_end"], Time(times))]
 
 
 def load_dl1_sst1m(
