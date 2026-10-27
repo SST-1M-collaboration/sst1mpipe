@@ -38,6 +38,7 @@ from scipy import interpolate
 __all__ = [
     "BASELINE_SHIFT_SPLINES",
     "SiPMVoltageDropModel",
+    "get_dark_baseline",
     "mean_pedestal_std",
     "pedestal_time",
     "plot_nsb_rate",
@@ -163,6 +164,37 @@ def default_model(config=None):
     from sst1mpipe.utils.utils import get_subarray
 
     return SiPMVoltageDropModel(subarray=get_subarray(), config=config)
+
+
+def get_dark_baseline(filename, max_evt=500, event_types=None, n_samples=50):
+    """
+    Mean of the first ``n_samples`` ADC samples of each pixel, over the events of type
+    ``event_types`` (the pedestal events by default) among the ``max_evt`` first events of the file.
+
+    The sum of the samples of each pixel is accumulated during the event loop and divided at the
+    end by the number of events times the number of samples: the samples are not stored.
+    """
+    # imported here: sst1mpipe.io imports sst1mpipe.utils
+    from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
+    from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+
+    event_types = PEDESTAL_EVENT_TYPES if event_types is None else event_types
+    baseline_sum = None
+    n_events = 0
+    n_used_samples = 0
+    with SST1MEventSource(input_url=filename, max_events=max_evt) as source:
+        for event in source:
+            if event.trigger.event_type not in event_types:
+                continue
+            tel_id = event.trigger.tels_with_trigger[0]
+            samples = np.asarray(event.r0.tel[tel_id].waveform[0][:, :n_samples], dtype=np.float64)
+            sums = samples.sum(axis=1)
+            baseline_sum = sums if baseline_sum is None else baseline_sum + sums
+            n_events += 1
+            n_used_samples = samples.shape[1]
+    if n_events == 0:
+        raise ValueError(f"No event of the types {event_types} in the {max_evt} first events of {filename}")
+    return baseline_sum / (n_events * n_used_samples)
 
 
 def read_pedestal_tables(files, last_chunk_only=False):
