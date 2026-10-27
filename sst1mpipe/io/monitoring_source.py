@@ -3,6 +3,7 @@ Monitoring source of the monitoring files of sst1mpipe-monitoring, used by sst1m
 (``--monitoring-source SST1MMonitoringSource --SST1MMonitoringSource.input_files=<file>``).
 """
 import astropy.units as u
+from astropy.time import Time
 import numpy as np
 import tables
 from ctapipe.containers import StatisticsContainer, TelescopePointingContainer
@@ -27,19 +28,21 @@ class LastChunkStatisticsInterpolator(StatisticsInterpolator):
     """
 
     def add_table(self, tel_id, input_table):
-        super().add_table(tel_id, input_table)
-        if not hasattr(self, "time_scale"):
-            self.time_scale = {}
-        self.time_scale[tel_id] = input_table["time_start"].scale
+        """As the ctapipe ChunkInterpolator, but the start and end of the chunks are kept as astropy times"""
+        self._check_tables(input_table)
+        table = input_table.copy()
+        table.sort("time_start")
+        self.time_start[tel_id] = Time(table["time_start"])
+        self.time_end[tel_id] = Time(table["time_end"])
+        self.values[tel_id] = {column: table[column] for column in self.columns}
 
     def _interpolate_chunk(self, tel_id, column, time, timestamp_tolerance=0 * u.s):
         time_start, time_end = self.time_start[tel_id], self.time_end[tel_id]
         values = self.values[tel_id][column]
-        # same time scale as the chunks (TAI in the monitoring files)
-        mjd = np.atleast_1d(getattr(time, self.time_scale[tel_id]).mjd)
-        tolerance = timestamp_tolerance.to_value("day")
-        index = last_chunk_index(time_start, time_end, mjd)
-        in_range = (time_start[0] - tolerance <= mjd) & (mjd <= np.max(time_end) + tolerance)
+        times = time.reshape(-1)
+        index = last_chunk_index(time_end, times)
+        # astropy times: compared in a common time scale
+        in_range = (times >= time_start[0] - timestamp_tolerance) & (times <= time_end.max() + timestamp_tolerance)
         no_value = np.nan if np.isscalar(values[0]) else np.full_like(values[0], np.nan)
         interpolated = [values[i] if ok else no_value for i, ok in zip(index, in_range, strict=True)]
         return interpolated[0] if len(interpolated) == 1 else interpolated
