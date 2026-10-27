@@ -1,12 +1,16 @@
 """
-Shared test data: the SST-1M runs of the test data and a reader of the events of the zfits files.
+Shared test data: the SST-1M runs of the test data, the monitoring tool run on them
+(sst1mpipe-monitoring) and a reader of the events of the zfits files.
 The constants and functions are imported by the test modules (``from conftest import ...``).
 """
 import numpy as np
+import pytest
 from astropy.utils import iers
+from ctapipe.core import run_tool
 from protozfits import File
 
-from sst1mpipe.resources import TEST_DATA_DIR
+from sst1mpipe.resources import MONITORING_CONFIG_FILE, TEST_DATA_DIR
+from sst1mpipe.scripts.sst1mpipe_monitoring_tool import MonitoringTool
 
 # the tests do not download the IERS tables (Earth orientation): the alt/az of the pointing
 # are computed with the tables of astropy, precise enough for the tests (< 1 arcmin), without
@@ -31,6 +35,27 @@ TRANSITION_FILES = {
     22: ZFITS_DIR / "SST1M2_20260121_0585.fits.fz",
 }
 
+# rolling chunks of pedestal events of the statistics of the ADC samples, in the monitoring files
+# of the tests: chunks of the last 5 pedestal events, every 2 pedestal events
+WAVEFORM_CHUNK_SIZE, WAVEFORM_CHUNK_SHIFT = 5, 2
+WAVEFORM_CHUNK_ARGS = [
+    f"--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size={WAVEFORM_CHUNK_SIZE}",
+    f"--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_shift={WAVEFORM_CHUNK_SHIFT}",
+]
+
+
+def run_monitoring(input_file, output, *args):
+    """sst1mpipe-monitoring with the monitoring config, returns the tool"""
+    tool = MonitoringTool()
+    run_tool(tool, argv=[
+        f"--input={input_file}",
+        f"--output={output}",
+        f"--config={MONITORING_CONFIG_FILE}",
+        "--no-progress",
+        *args,
+    ], raises=True)
+    return tool
+
 
 def read_zfits_events(path, events=slice(None)):
     """
@@ -51,3 +76,19 @@ def read_zfits_events(path, events=slice(None)):
     )
 
 
+@pytest.fixture(scope="session")
+def observation_monitoring(tmp_path_factory):
+    """
+    monitoring files of the observation runs (OBSERVATION_RUNS) by telescope id,
+    with rolling chunks of WAVEFORM_CHUNK_SIZE pedestal events (WAVEFORM_CHUNK_ARGS)
+    """
+    directory = tmp_path_factory.mktemp("observation_monitoring")
+    paths = {}
+    for tel_id, run in OBSERVATION_RUNS.items():
+        paths[tel_id] = directory / f"{run['path'].name.split('.')[0]}.monitoring.h5"
+        run_monitoring(
+            run["path"], paths[tel_id],
+            f"--max-events={run['n_events']}",
+            *WAVEFORM_CHUNK_ARGS,
+        )
+    return paths

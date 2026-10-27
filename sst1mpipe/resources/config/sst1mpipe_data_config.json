@@ -23,16 +23,32 @@
       ]
     },
 
-    "telescope_calibration": {
-      "tel_021": null,
-      "tel_022": null,
-      "bad_calib_px_interpolation": true,
-      "dynamic_dead_px_interpolation": true
+    "ImageSaturationCorrector": {
+      "integration_level": 0.2,
+      "peak_time_level": 2500
     },
 
-    "window_transmittance": {
-      "tel_021": null,
-      "tel_022": null
+    "R0R1Calibrator": {
+      "calibration_file": [
+        ["type", "*", null]
+      ],
+      "window_transmittance_file": [
+        ["type", "*", null]
+      ],
+      "voltage_drop_correction": "global",
+      "flag_bad_calibration_pixels": true,
+      "flag_dead_pixels": true,
+      "saturation_threshold": 3000,
+      "saturation_width_level": 2500,
+      "saturation_width_threshold": 5,
+      "bad_pixels": [
+        ["type", "*", []]
+      ],
+      "pde_drop_factor": [
+        ["type", "*", null],
+        ["id", 21, null],
+        ["id", 22, null]
+      ]
     },
 
     "telescope_equivalent_focal_length": {
@@ -74,10 +90,6 @@
       "stereo_reco_weights": "camera_frame_hillas_intensity",
       "observation_time_h": 50,
       "off_regions": 5,
-      "bad_pixels": {
-        "tel_021": [],
-        "tel_022": []
-      },
       "ped_time_window": 10
     },
 
@@ -99,8 +111,6 @@
     },
 
     "NsbCalibrator": {
-        "apply_pixelwise_Vdrop_correction": false,
-        "apply_global_Vdrop_correction": true,
         "intensity_correction": {
           "tel_021": 1.0,
           "tel_022": 1.0
@@ -108,7 +118,7 @@
     },
 
     "ImageProcessor": {
-        "image_cleaner_type": "ImageCleanerSST",
+        "image_cleaner_type": "NSBImageCleaner",
         "use_telescope_frame": false,
         "TailcutsImageCleaner": {
             "picture_threshold_pe": [
@@ -124,54 +134,25 @@
               ["id", 22, 2]
             ]
           },
-        "ImageCleanerSST": {
-            "min_number_pedestals": 100,
-            "telescope_defaults": {
-                "tel_021": [
-                {
-                    "min_nsb_level": 0,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }, {
-                    "min_nsb_level": 2.3554,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }],
-                "tel_022": [
-                {
-                    "min_nsb_level": 0,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }, {
-                    "min_nsb_level": 2.4287,
-                    "stdev_scaling": 2.5,
-                    "picture_threshold_pe": 8,
-                    "boundary_threshold_pe": 4,
-                    "min_picture_neighbors": 2,
-                    "keep_isolated": false,
-                    "min_time_neighbors" : 1,
-                    "time_limit_ns" : 8,
-                    "only_main_island" : false
-                }]
-            }
+        "NSBImageCleaner": {
+            "picture_threshold_pe": [
+              ["id", 21, 8],
+              ["id", 22, 8]
+            ],
+            "boundary_threshold_pe": [
+              ["id", 21, 4],
+              ["id", 22, 4]
+            ],
+            "min_picture_neighbors": [
+              ["id", 21, 2],
+              ["id", 22, 2]
+            ],
+            "keep_isolated_pixels": false,
+            "time_limit": 8,
+            "time_num_neighbors": 1,
+            "largest_island_only": false,
+            "pedestal_factor": 2.5,
+            "bright_cleaning_threshold": null
         }
     },
 
