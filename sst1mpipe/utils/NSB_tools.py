@@ -175,23 +175,30 @@ def find_dark_files(data_dir):
     return dark_files
 
 
-def get_dark_baseline(filename,max_evt=500,event_types=PEDESTAL_EVENT_TYPES):
-        """Mean of the first 50 ADC samples of each pixel, for the events of type event_types (pedestal events)"""
+def get_dark_baseline(filename, max_evt=500, event_types=PEDESTAL_EVENT_TYPES, n_samples=50):
+    """
+    Mean of the first ``n_samples`` ADC samples of each pixel, over the events of type
+    ``event_types`` (pedestal events) among the ``max_evt`` first events of the file.
 
-        raw_baselines  = [ [] for ii in range(1296)]
-
-        data_stream = SST1MEventSource(input_url=filename,
-                                       max_events=max_evt)
-        for _,event in enumerate(data_stream):
-                    tel = event.trigger.tels_with_trigger[0]
-                    r0data = event.r0.tel[tel]
-
-                    if event.trigger.event_type in event_types:
-                        for pix in range(1296):
-                            raw_baselines[pix].append(r0data.waveform[0][pix,:50])
-        raw_baselines  = np.array(raw_baselines)
-
-        return raw_baselines.mean(axis=(1,2))
+    The sum of the samples of each pixel is accumulated during the event loop and divided at the
+    end by the number of events times the number of samples: the samples are not stored.
+    """
+    baseline_sum = None
+    n_events = 0
+    n_used_samples = 0
+    with SST1MEventSource(input_url=filename, max_events=max_evt) as source:
+        for event in source:
+            if event.trigger.event_type not in event_types:
+                continue
+            tel_id = event.trigger.tels_with_trigger[0]
+            samples = np.asarray(event.r0.tel[tel_id].waveform[0][:, :n_samples], dtype=np.float64)
+            sums = samples.sum(axis=1)
+            baseline_sum = sums if baseline_sum is None else baseline_sum + sums
+            n_events += 1
+            n_used_samples = samples.shape[1]
+    if n_events == 0:
+        raise ValueError(f"No event of the types {event_types} in the {max_evt} first events of {filename}")
+    return baseline_sum / (n_events * n_used_samples)
 
 ############
  #### tools to plot data :
