@@ -258,12 +258,20 @@ def test_chunk_shift_larger_than_chunks(tmp_path):
 
 def test_last_chunk_index():
     """the statistics at a time are those of the last chunk ended before it"""
-    # rolling chunks of 4 pedestal events every 2 pedestal events, pedestal events at 0, 1, ..., 9
-    time_start = np.array([0, 2, 4, 6])
-    time_end = time_start + 3
-    times = [-1, 0, 2.9, 3, 4.5, 5, 6.99, 8, 9, 20]
-    # before the end of the first chunk: the first chunk
-    assert last_chunk_index(time_start, time_end, times).tolist() == [0, 0, 0, 0, 0, 1, 1, 2, 3, 3]
+    # rolling chunks of 4 pedestal events every 2 pedestal events, pedestal events every second
+    start = Time("2026-01-20T22:00:00", scale="tai")
+    time_end = start + np.array([3, 5, 7, 9]) * u.s
+    seconds = np.array([-1, 0, 2.9, 3, 4.5, 5, 6.99, 8, 9, 20])
+    # before the end of the first chunk: the first chunk; at the end of a chunk: that chunk
+    expected = [0, 0, 0, 0, 0, 1, 1, 2, 3, 3]
+    assert last_chunk_index(time_end, start + seconds * u.s).tolist() == expected
+    # the times in another time scale (UTC) than the chunks (TAI)
+    assert last_chunk_index(time_end, (start + seconds * u.s).utc).tolist() == expected
+    # a scalar time
+    assert last_chunk_index(time_end, start + 5.5 * u.s) == 1
+    # the chunks must be sorted by their end
+    with pytest.raises(ValueError, match="increasing order"):
+        last_chunk_index(time_end[::-1], start)
 
 
 def test_output_not_overwritten(tmp_path):
