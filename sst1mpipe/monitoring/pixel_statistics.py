@@ -16,6 +16,7 @@ statistics are those of the last chunk ended before it (`last_chunk_index`).
 The two calculators are distinct classes, so that they are configured separately,
 e.g. ``{"WaveformStatisticsCalculator": {"PedestalWaveformAggregator": {"SizeChunking": {"chunk_size": 100}}}}``.
 """
+import astropy.units as u
 import numpy as np
 from ctapipe.containers import ChunkStatisticsContainer
 from ctapipe.core.traits import ComponentName, TelescopeParameter
@@ -136,7 +137,7 @@ def check_chunk_shift(calculator):
             )
 
 
-def last_chunk_index(time_start, time_end, times):
+def last_chunk_index(time_end, times):
     """
     Index of the chunk of pedestal events to use at each time: the last chunk ended at or before
     the time, i.e. the statistics of the last pedestal events before it. The times before the
@@ -144,17 +145,29 @@ def last_chunk_index(time_start, time_end, times):
 
     Parameters
     ----------
-    time_start, time_end: array
-        start and end of the chunks (MJD), sorted by time
-    times: array
-        times (MJD)
+    time_end: astropy.time.Time
+        end of the chunks (time of their last pedestal event), in increasing order, as the
+        chunks of `compute_pixel_statistics`
+    times: astropy.time.Time
+        times, in any time scale
 
     Returns
     -------
     numpy.ndarray of int
-        index of the chunk at each time
+        index of the chunk at each time (shape of ``times``)
+
+    Raises
+    ------
+    ValueError
+        if the chunks are not in increasing order of their end
     """
-    # the end of the chunks increases with their start, except if the chunks have different sizes
-    time_end = np.maximum.accumulate(np.asarray(time_end))
-    index = np.searchsorted(time_end, np.asarray(times), side="right") - 1
-    return np.clip(index, 0, len(time_start) - 1)
+    # seconds since the end of the first chunk: differences of astropy times, exact (two
+    # doubles) and in a common time scale
+    end = (time_end - time_end[0]).to_value(u.s)
+    if np.any(np.diff(end) < 0):
+        raise ValueError("The chunks must be in increasing order of their end time")
+    offset = (times - time_end[0]).to_value(u.s)
+    # number of chunks ended at or before each time (side="right": a chunk ending exactly at
+    # the time counts), minus one
+    index = np.searchsorted(end, offset, side="right") - 1
+    return np.clip(index, 0, len(end) - 1)
