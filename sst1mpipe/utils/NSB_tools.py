@@ -213,11 +213,11 @@ def get_ped_table(file_list, low_res=False):
     from sst1mpipe.io import load_r0_pedestals
 
     ped_tables = []
-    for dl1file in sorted(file_list):
+    for file in sorted(file_list):
         try:
-            ped_table = load_r0_pedestals(dl1file)
+            ped_table = load_r0_pedestals(file)
         except Exception:
-            print(f"pedestal not found in {dl1file}")
+            print(f"pedestal not found in {file}")
             continue
         ped_tables.append(ped_table[-1:] if low_res else ped_table)
     return astropy.table.vstack(ped_tables) if ped_tables else None
