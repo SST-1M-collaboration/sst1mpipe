@@ -157,7 +157,7 @@ class MonitoringTool(Tool):
 
     def start(self):
         # first pass: times of the events and ADC samples of the pedestal events
-        for event in self.events(self.event_source, "pass 1/2"):
+        for event in self.with_progress_bar(self.event_source, "pass 1/2"):
             for tel_id in event.trigger.tels_with_trigger:
                 time = event.trigger.tel[tel_id].time
                 first, _ = self.event_times.get(tel_id, (time, time))
@@ -177,7 +177,7 @@ class MonitoringTool(Tool):
             for event_type in {event_type for _, event_type in self.waveform_statistics}
         }
         source = self.enter_context(EventSource(parent=self))
-        for event in self.events(source, "pass 2/2"):
+        for event in self.with_progress_bar(source, "pass 2/2"):
             event_type = event.trigger.event_type
             if event_type in interpolators:
                 self.add_pedestal_images(event, event_type, interpolators[event_type])
@@ -188,7 +188,7 @@ class MonitoringTool(Tool):
             )
         self.image_statistics = self.compute_statistics(self.pedestal_images, self.image_calculator, "image")
 
-    def events(self, source, description):
+    def with_progress_bar(self, source, description):
         """Events of the event source, with a progress bar"""
         return tqdm(
             source,
