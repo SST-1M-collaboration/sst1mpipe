@@ -104,20 +104,5 @@
         "allow_undersized_tables": true
       }
     }
-  },
-
-  "Contact": {
-    "name": "SST-1M collaboration",
-    "email": "unknown",
-    "organization": "SST-1M"
-  },
-
-  "Instrument": {
-    "site": "Other",
-    "class_": "Subarray",
-    "type_": "SST-1M",
-    "subtype": "unspecified",
-    "version": "unspecified",
-    "id_": "SST1M_miniarray"
   }
 }
