@@ -7,6 +7,7 @@ from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
 from ctapipe.calib import CameraCalibrator
 from ctapipe.containers import ArrayEventContainer, SchedulingBlockType
+from ctapipe.core import run_tool
 from ctapipe.core.tool import ToolConfigurationError
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import HDF5MonitoringSource, read_table
@@ -22,6 +23,7 @@ from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.monitoring import PedestalWaveformAggregator, last_chunk_index
 from sst1mpipe.resources import DATA_CONFIG_FILE, MONITORING_CONFIG_FILE, RTA_CONFIG_FILE
+from sst1mpipe.scripts.sst1mpipe_monitoring_tool import MonitoringTool
 
 TEL_ID = 22
 OBSERVATION_FILE, N_PEDESTALS = OBSERVATION_RUNS[TEL_ID]["path"], OBSERVATION_RUNS[TEL_ID]["n_pedestals"]
@@ -272,6 +274,13 @@ def test_last_chunk_index():
     # the chunks must be sorted by their end
     with pytest.raises(ValueError, match="increasing order"):
         last_chunk_index(time_end[::-1], start)
+
+
+def test_output_required():
+    """the output file is given by the user: the config has no default"""
+    tool = MonitoringTool()
+    with pytest.raises(ToolConfigurationError, match="output file is required"):
+        run_tool(tool, argv=[f"--input={OBSERVATION_FILE}", f"--config={MONITORING_CONFIG_FILE}"], raises=True)
 
 
 def test_output_not_overwritten(tmp_path):

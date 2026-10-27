@@ -1,6 +1,5 @@
 {
   "MonitoringTool": {
-    "output_path": "monitoring.h5",
     "overwrite": false,
     "progress_bar": true,
     "pointing_update_interval": 1.0
