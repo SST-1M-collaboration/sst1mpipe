@@ -164,9 +164,7 @@ class ProcessorTool(Tool):
         # fails before, it is closed when the tool exits.
         self.writer = DataWriter(event_source=self.event_source, parent=self)
         # reconstruction of the shower geometry, written in the DL2
-        self.shower_processor = None
-        if self.writer.write_dl2:
-            self.shower_processor = ShowerProcessor(parent=self, subarray=self.event_source.subarray)
+        self.shower_processor = ShowerProcessor(parent=self, subarray=self.event_source.subarray)
         self._sb_types = {}
         self.n_skipped_events = 0
         self.n_events_without_monitoring = 0
@@ -216,7 +214,7 @@ class ProcessorTool(Tool):
                     np.isfinite(dl1.parameters.hillas.intensity) for dl1 in event.dl1.tel.values()
                 )
                 continue
-            if self.shower_processor is not None:
+            if self.writer.write_dl2:
                 self.shower_processor(event)
             self.writer(event)
 
