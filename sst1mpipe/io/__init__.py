@@ -1,6 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
 
+from .drive import drive_radec, read_drive_logs
 from .io import (
     add_wr_dl1_stereo,
     check_outdir,
