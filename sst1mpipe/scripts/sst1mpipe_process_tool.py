@@ -9,14 +9,13 @@ from ctapipe.core import Tool
 from ctapipe.core.traits import Bool, ComponentName, List, UseEnum, classes_with_traits, flag
 from ctapipe.image import ImageProcessor
 from ctapipe.image.cleaning import NSBImageCleaner
-from ctapipe.io import EventSource, DataWriter, MonitoringSource, SimTelEventSource
+from ctapipe.io import EventSource, DataWriter, MonitoringSource
 from ctapipe.reco import ShowerProcessor
 
 from sst1mpipe.calib import R0R1Calibrator, ImageSaturationCorrector
 from sst1mpipe.io import attach_monitoring_file, write_dl1_info
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
-from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
 
@@ -42,8 +41,10 @@ class ProcessorTool(Tool):
     calibrated without these statistics, and the output file has no pointing.
 
     The charges and peak times of the saturated pixels are corrected by the ImageSaturationCorrector.
-    For the simulations (SimTelEventSource), the R1 waveforms are corrected for the
-    PDE drop by the R0R1Calibrator (pde_drop_factor).
+    How each telescope is calibrated is set in the configuration: for the simulated telescopes
+    1 and 2, the R1 waveforms of the simulation are kept and corrected for the PDE drop
+    (R0R1Calibrator.calibrate_r0 false, pde_drop_factor), without saturation correction
+    (ImageSaturationCorrector.apply_correction false).
     Only the events of the runs with an allowed scheduling block type (allowed_sb_types)
     are processed, e.g. the observations but not the transitions between two wobbles.
 
@@ -153,23 +154,10 @@ class ProcessorTool(Tool):
             for name in self.monitoring_source_list
         ]
         self._monitoring_pointing = any(getattr(source, "has_pointings", False) for source in self.monitoring_sources)
-        # R0 -> R1 calibration of the SST-1M raw data, PDE drop correction of the simulations
-        self.r0_r1_calibrator = None
-        self.image_saturation_corrector = None
-        # the SST-1M raw data (R0) of the files or of the ZMQ stream (DigiCam camera events);
-        # for the R1 events of a stream, the R0 -> R1 calibration does nothing
-        self.raw_data = isinstance(self.event_source, SST1MEventSource | ZMQEventSource)
-        if self.raw_data:
-            self.image_saturation_corrector = ImageSaturationCorrector(parent=self, subarray=subarray)
-            self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
-            if len(self.monitoring_sources) == 0:
-                self.log.warning(
-                    "No monitoring source: the raw data are calibrated without the statistics of the"
-                    " pedestal events (no voltage drop correction and no dead pixels, picture thresholds"
-                    " of the NSBImageCleaner not raised), and the output file has no pointing"
-                )
-        elif isinstance(self.event_source, SimTelEventSource):
-            self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
+        # R0 -> R1 calibration of the raw data, PDE drop correction of the simulations: set per
+        # telescope in the configuration (R0R1Calibrator.calibrate_r0)
+        self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
+        self.image_saturation_corrector = ImageSaturationCorrector(parent=self, subarray=subarray)
         self.camera_calibrator = CameraCalibrator(parent=self, subarray=self.event_source.subarray)
         self.image_processor = ImageProcessor(parent=self, subarray=self.event_source.subarray)
         # the writer is closed in finish(), to read back the output file. If the processing
@@ -216,12 +204,10 @@ class ProcessorTool(Tool):
 
             # R0 -> R1 calibration with the statistics of the monitoring sources (raw data),
             # PDE drop correction of the R1 waveforms (simulations)
-            if self.r0_r1_calibrator is not None:
-                self.r0_r1_calibrator(event)
+            self.r0_r1_calibrator(event)
             self.camera_calibrator(event)
             # the saturated pixels are corrected with the R0 waveforms
-            if self.image_saturation_corrector is not None and len(event.r0.tel) > 0:
-                self.image_saturation_corrector(event)
+            self.image_saturation_corrector(event)
             self.image_processor(event)
             self.add_raised_threshold_fraction(event)
             # the pedestal events are not written: fraction of them which survive the cleaning
@@ -332,9 +318,10 @@ class ProcessorTool(Tool):
         pointing_manual = getattr(source, "pointing_manual", False)
         self.log.info("Target: %s, wobble: %s, pointing: %s (manual: %s)", target, wobble, pointing, pointing_manual)
 
+        # files of the telescopes calibrated from R0 (none for the simulations)
         calibration_files, window_files = None, None
-        if self.raw_data:  # observed data
-            tel_ids = [tel_id for tel_id, n in n_triggered.items() if n > 0]
+        tel_ids = [tel_id for tel_id, n in n_triggered.items() if n > 0 and self.r0_r1_calibrator.calibrate_r0.tel[tel_id]]
+        if len(tel_ids) > 0:
             calibration_files = ",".join(str(self.r0_r1_calibrator.calibration_file_path(t)) for t in tel_ids)
             window_files = ",".join(str(self.r0_r1_calibrator.window_transmittance_file_path(t)) for t in tel_ids)
 
@@ -350,10 +337,7 @@ class ProcessorTool(Tool):
             ra=None if pointing is None else pointing.ra.deg,
             dec=None if pointing is None else pointing.dec.deg,
             manual_coords=pointing_manual,
-            n_saturated=(
-                None if self.image_saturation_corrector is None
-                else sum(self.image_saturation_corrector.n_saturated_events.values())
-            ),
+            n_saturated=sum(self.image_saturation_corrector.n_saturated_events.values()),
             n_pedestal=self.n_pedestal,
             n_survived_pedestals=self.n_survived_pedestals,
             raised_threshold_fraction=self.raised_threshold_fraction,
