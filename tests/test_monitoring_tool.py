@@ -106,7 +106,10 @@ def calibration_settings(config_file, subarray):
     """settings of the calibration of the images configured by a config file, per telescope"""
     settings = {}
     r0_r1_calibrator, camera_calibrator, saturation_corrector = calibrators(config_file, subarray)
-    components = [r0_r1_calibrator, camera_calibrator, saturation_corrector, *camera_calibrator.image_extractors.values()]
+    components = [
+        r0_r1_calibrator, r0_r1_calibrator.voltage_drop_model, camera_calibrator, saturation_corrector,
+        *camera_calibrator.image_extractors.values(),
+    ]
     for component in components:
         for name in component.traits(config=True):
             value = getattr(component, name)

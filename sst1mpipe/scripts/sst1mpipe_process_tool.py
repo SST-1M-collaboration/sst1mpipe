@@ -17,6 +17,7 @@ from sst1mpipe.io import attach_monitoring_file, write_dl1_info
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
+from sst1mpipe.utils.nsb_tools import SiPMVoltageDropModel
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
 
 
@@ -134,7 +135,7 @@ class ProcessorTool(Tool):
     classes = (
         [
             CameraCalibrator, ImageProcessor, DataWriter, DBSCANImageCleaner, TimeDBSCANImageCleaner,
-            R0R1Calibrator, ImageSaturationCorrector, ShowerProcessor,
+            R0R1Calibrator, SiPMVoltageDropModel, ImageSaturationCorrector, ShowerProcessor,
             SST1MMonitoringSource,
         ]
         + classes_with_traits(EventSource)
