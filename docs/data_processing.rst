@@ -23,18 +23,105 @@ The DL1 files of the runs can then be merged, see :ref:`merging_step`.
                                           ▼
                             SST1M1_20260120_1179_W1.dl1.h5  ──►  ctapipe-merge
 
-**Installation**: ``sst1mpipe`` needs ``ctapipe`` 0.32 and Python 3.12, see ``environment.yml``:
+The command line tools ``sst1mpipe-monitoring`` and ``sst1mpipe-process`` are installed with
+``sst1mpipe`` (see :ref:`introduction`).
 
-.. code-block:: bash
 
-    mamba env create -f environment.yml
-    mamba activate sst1m-dev
-    pip install -e .
+.. _processing_config:
+
+Configuration
+-------------
 
 All the tools take a configuration file (``--config``, JSON or YAML), and every setting can also be given
 on the command line, e.g. ``--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size=50``.
 ``--help`` lists the main options and ``--help-all`` all the settings. The configuration used is stored
 in the provenance log of the tool (``<tool>.provenance.log``, ``--provenance-log``).
+
+The configuration files of ``sst1mpipe`` are in ``sst1mpipe/resources/config``:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
+
+   * - File
+     - Used by
+   * - ``sst1mpipe_monitoring_config.json``
+     - ``sst1mpipe-monitoring``
+   * - ``sst1mpipe_data_config.json``
+     - ``sst1mpipe-process`` for the real data, and the analysis steps after DL1
+   * - ``sst1mpipe_mc_config_low_nsb.json``, ``sst1mpipe_mc_config_high_nsb.json``
+     - ``sst1mpipe-process`` for the simulations at low and high NSB, and the analysis steps after DL1
+   * - ``sst1mpipe_rta_config.json``
+     - ``sst1mpipe-process`` for the ZMQ streams of the real-time analysis
+
+Each section of a file configures a component (a ctapipe class) by its name. The settings of a
+telescope component can be given per telescope, as a list of rules: ``["type", "*", value]`` for all the
+telescopes, ``["id", 21, value]`` for telescope 21. When several rules match a telescope, the last one
+wins. A plain value applies to all the telescopes.
+
+**Calibration** (``sst1mpipe_data_config.json``): ``null`` files are the default files of the telescope
+(``sst1mpipe/resources/calibration``: averaged calibration parameters of 2023-2024, and the window
+transmittance measured in the lab).
+
+.. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_data_config.json
+   :language: json
+   :start-at: "R0R1Calibrator": {
+   :end-before: "telescope_equivalent_focal_length"
+   :dedent: 4
+
+**Cleaning** (``sst1mpipe_data_config.json``): the ``NSBImageCleaner`` with the thresholds of each telescope.
+The picture threshold of a pixel is raised to ``pedestal_factor`` times the std of its pedestal images
+when this is above ``picture_threshold_pe``.
+
+.. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_data_config.json
+   :language: json
+   :start-at: "ImageProcessor": {
+   :end-before: "DataWriter"
+   :dedent: 4
+
+**Rolling chunks of the monitoring** (``sst1mpipe_monitoring_config.json``): statistics of the last 100
+pedestal events, updated at each pedestal event (see :ref:`sst1mpipe_monitoring`).
+
+.. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
+   :language: json
+   :start-at: "WaveformStatisticsCalculator": {
+   :end-before: "ImageStatisticsCalculator"
+   :dedent: 2
+
+**Overriding some settings**: ``--config`` can be given several times; each file overrides the
+settings it gives, and a list (e.g. the rules of a telescope parameter) is replaced as a whole. E.g. the
+calibration parameters of dark runs of the two telescopes, and chunks of 50 pedestal events, in
+``my_config.yaml``:
+
+.. code-block:: yaml
+
+    R0R1Calibrator:
+      calibration_file:
+        - [id, 21, sst1mpipe/resources/calibration/dark_runs/20230917_0528_0529_Tel1_fitted_parameters.h5]
+        - [id, 22, sst1mpipe/resources/calibration/dark_runs/20230921_0149_0150_Tel2_fitted_parameters.h5]
+    WaveformStatisticsCalculator:
+      PedestalWaveformAggregator:
+        SizeChunking:
+          chunk_size: 50
+
+.. code-block:: bash
+
+    sst1mpipe-monitoring --input SST1M1_20260120_1179.fits.fz --output SST1M1_20260120_1179.monitoring.h5 \
+        --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.json --config my_config.yaml
+
+The full configuration files:
+
+.. toggle::
+
+    .. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
+       :language: json
+       :caption: sst1mpipe_monitoring_config.json
+
+.. toggle::
+
+    .. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_data_config.json
+       :language: json
+       :caption: sst1mpipe_data_config.json
 
 
 .. _monitoring_step:
