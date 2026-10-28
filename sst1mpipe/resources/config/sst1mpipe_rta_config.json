@@ -34,9 +34,7 @@
     "window_transmittance_file": [
       ["type", "*", null]
     ],
-    "voltage_drop_correction": "global",
     "flag_bad_calibration_pixels": true,
-    "flag_dead_pixels": true,
     "saturation_threshold": 3000,
     "saturation_width_level": 2500,
     "saturation_width_threshold": 5,

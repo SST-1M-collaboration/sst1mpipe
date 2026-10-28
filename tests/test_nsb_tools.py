@@ -11,7 +11,7 @@ from ctapipe.io import read_table
 from traitlets.config import Config
 
 from conftest import DARK_FILE, OBSERVATION_RUNS, WAVEFORM_CHUNK_ARGS, run_monitoring
-from sst1mpipe.calib import R0R1Calibrator
+from sst1mpipe.monitoring import CameraCoefficientsCalculator
 from sst1mpipe.io import load_r0_pedestals
 from sst1mpipe.scripts.sst1mpipe_nsb_tool import HDF5_TABLE, NSBTool
 from sst1mpipe.utils import get_subarray
@@ -107,31 +107,31 @@ def test_telescope_without_parameters(subarray):
         model.charge_drop(22, 10.0)
 
 
-def test_voltage_drop_of_the_calibrator(subarray):
-    """the voltage drop correction of the R0R1Calibrator uses the configured model"""
+def test_voltage_drop_of_the_coefficients(subarray):
+    """the voltage drop correction of the camera calibration coefficients uses the configured model"""
     pedestal_std = np.full((1, 1296), 5.0)
     pedestal_std[0, :10] = np.nan
-    default = R0R1Calibrator(subarray=subarray)
+    default = CameraCoefficientsCalculator(subarray=subarray)
     model = SiPMVoltageDropModel(subarray=subarray)
-    np.testing.assert_allclose(default.voltage_drop(21, pedestal_std), model.charge_drop(21, 25.0))
+    np.testing.assert_allclose(default.charge_drop(21, pedestal_std), model.charge_drop(21, 25.0))
 
     config = Config({
-        "R0R1Calibrator": {"voltage_drop_correction": "pixelwise"},
+        "CameraCoefficientsCalculator": {"voltage_drop_correction": "pixelwise"},
         "SiPMVoltageDropModel": {"pde_drop_slope": [["id", 21, 0.0], ["id", 22, 0.0]]},
     })
-    calibrator = R0R1Calibrator(subarray=subarray, config=config)
-    np.testing.assert_allclose(calibrator.voltage_drop(21, pedestal_std)[0, 10:], model.gain_drop(21, 25.0))
+    calculator = CameraCoefficientsCalculator(subarray=subarray, config=config)
+    np.testing.assert_allclose(calculator.charge_drop(21, pedestal_std)[0, 10:], model.gain_drop(21, 25.0))
 
 
 def test_voltage_drop_model_configured_on_the_command_line(tmp_path):
-    """the model of the calibrator of the tools is configured from the command line"""
+    """the model of the coefficients of sst1mpipe-monitoring is configured from the command line"""
     # telescope parameters on the command line: tuples
     slopes = '[("id", 21, -0.001), ("id", 22, -0.002)]'
     tool = run_monitoring(
         OBSERVATION_RUNS[22]["path"], tmp_path / "monitoring.h5", "--max-events=5",
         f"--SiPMVoltageDropModel.pde_drop_slope={slopes}",
     )
-    assert tool.r0_r1_calibrator.voltage_drop_model.pde_drop_slope.tel[22] == -0.002
+    assert tool.coefficients_calculator.voltage_drop_model.pde_drop_slope.tel[22] == -0.002
     assert "SiPMVoltageDropModel" in {cls.__name__ for cls in tool.classes}
 
 

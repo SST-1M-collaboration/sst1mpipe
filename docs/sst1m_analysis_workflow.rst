@@ -102,14 +102,15 @@ contain any Cherenkov photons), and parametrizes the shower images with Hillas e
 
 **Relevant parts of the config file** applied in this analysis step:
 
-* ``R0R1Calibrator`` - R0 -> R1 calibration (``sst1mpipe.calib.R0R1Calibrator``). All settings can be given per telescope, e.g. ``[["type", "*", "global"], ["id", 22, "none"]]``:
+* ``R0R1Calibrator`` - R0 -> R1 calibration (``sst1mpipe.calib.R0R1Calibrator``): the corrections which do not need the pedestal events. All settings can be given per telescope, e.g. ``[["type", "*", []], ["id", 22, [3, 1201]]]``:
 
   * ``calibration_file`` - calibration files based on analysis of dark runs (``null``: default file of the telescope). Should be taken relatively close to the date of observation
   * ``window_transmittance_file`` - camera window transmittance correction factors of the pixels, measured in the lab (``null``: default file of the telescope, can be kept)
-  * ``voltage_drop_correction`` - ``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB: the charges are divided by the charge drop of the ``SiPMVoltageDropModel`` (see :ref:`nsb_level`)
-  * ``flag_bad_calibration_pixels`` and ``flag_dead_pixels`` - pixels set to 0 and interpolated. The dead pixels are the pixels without statistics of the ADC samples of the pedestal events (outliers of ``sst1mpipe-monitoring``)
-  * ``bad_pixels`` - ids of pixels always set to 0 and interpolated (data and MC)
-  * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the R1 waveforms are divided by this factor, which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.json`` and ``sst1mpipe_mc_config_high_nsb.json`` have the factors of the low and high NSB simulations
+  * ``flag_bad_calibration_pixels`` - the pixels with bad calibration parameters are flagged as outliers and interpolated
+  * ``bad_pixels`` - ids of pixels always flagged as outliers and interpolated (data and MC)
+  * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the charges are divided by this factor (``factor`` of the camera calibration coefficients), which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.json`` and ``sst1mpipe_mc_config_high_nsb.json`` have the factors of the low and high NSB simulations
+
+  The corrections which need the pedestal events are the camera calibration coefficients computed by ``sst1mpipe-monitoring`` (``CameraCoefficientsCalculator`` of the monitoring config, see :ref:`sst1mpipe_monitoring`): ``voltage_drop_correction`` (``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB: the charges are divided by the charge drop of the ``SiPMVoltageDropModel``, see :ref:`nsb_level`) and ``flag_dead_pixels`` (the pixels without statistics of the ADC samples of the pedestal events are flagged as outliers and interpolated).
 
   Config files with the former ``telescope_calibration``, ``NsbCalibrator.apply_*_Vdrop_correction``, ``analysis.bad_pixels`` and ``window_transmittance`` settings are still read (translated with a warning). ``NsbCalibrator.mc_correction_for_PDE`` must be replaced by ``pde_drop_factor``.
 

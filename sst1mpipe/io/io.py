@@ -75,7 +75,9 @@ def translate_legacy_calibration_config(config):
     Translates the R0 -> R1 calibration settings of the configuration files written
     before `sst1mpipe.calib.R0R1Calibrator` (``telescope_calibration``,
     ``NsbCalibrator.apply_*_Vdrop_correction``, ``analysis.bad_pixels``,
-    ``window_transmittance``) into its ``R0R1Calibrator`` section.
+    ``window_transmittance``) into its ``R0R1Calibrator`` section, and the voltage drop
+    correction and dead pixels into the ``CameraCoefficientsCalculator`` section (camera
+    calibration coefficients of sst1mpipe-monitoring).
     ``NsbCalibrator.mc_correction_for_PDE`` can not be translated: if true, the PDE drop
     factors must be set in ``R0R1Calibrator.pde_drop_factor`` (a ValueError is raised).
     Nothing is done if the configuration has a ``R0R1Calibrator`` section.
@@ -147,10 +149,11 @@ def _translate_legacy_r0_r1_settings(config):
 
     logging.warning(
         "Legacy calibration settings (telescope_calibration, apply_*_Vdrop_correction,"
-        " mc_correction_for_PDE) are translated into the R0R1Calibrator section,"
-        " please update the config file."
+        " mc_correction_for_PDE) are translated into the R0R1Calibrator and CameraCoefficientsCalculator"
+        " sections, please update the config file."
     )
     calibrator = {}
+    coefficients = {}
     if legacy_calibration is not None:
         calibration_files = [["type", "*", None]]
         for key, path in legacy_calibration.items():
@@ -160,15 +163,17 @@ def _translate_legacy_r0_r1_settings(config):
         flag_bad_pixels = legacy_calibration.get("bad_calib_px_interpolation", True)
         calibrator["flag_bad_calibration_pixels"] = flag_bad_pixels
         # the dead pixels were only flagged with the pixels with bad calibration
-        calibrator["flag_dead_pixels"] = flag_bad_pixels and legacy_calibration.get(
+        coefficients["flag_dead_pixels"] = flag_bad_pixels and legacy_calibration.get(
             "dynamic_dead_px_interpolation", True
         )
     if pixelwise or global_ is not None:
         # the pixelwise correction was applied if both were set
-        calibrator["voltage_drop_correction"] = (
+        coefficients["voltage_drop_correction"] = (
             "pixelwise" if pixelwise else "global" if global_ else "none"
         )
     config["R0R1Calibrator"] = calibrator
+    if len(coefficients) > 0:
+        config["CameraCoefficientsCalculator"] = coefficients
     return config
 
 
