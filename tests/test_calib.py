@@ -8,6 +8,7 @@ from ctapipe.calib import CameraCalibrator
 from ctapipe.containers import (
     PixelStatus,
     ArrayEventContainer,
+    R0CameraContainer,
     R1CameraContainer,
     SimulatedCameraContainer,
     SimulatedEventContainer,
@@ -596,6 +597,44 @@ def test_saturation_settings(event):
     corrector = ImageSaturationCorrector(subarray=get_subarray())
 
     assert flagged_saturated(saturated_event) == []
+    assert not corrector(saturated_event, TEL_ID)
+    np.testing.assert_array_equal(saturated_event.dl1.tel[TEL_ID].image, image_before)
+    assert corrector.n_saturated_events == {}
+
+
+# calibration of each telescope set in the configuration (calibrate_r0, apply_correction)
+
+
+def test_calibrate_r0_default_per_telescope(mc_subarray):
+    """the R0 waveforms of the real telescopes are calibrated, not those of the simulated telescopes 1 and 2"""
+    assert calibrator().calibrate_r0.tel[TEL_ID]
+    assert not any(mc_calibrator(mc_subarray).calibrate_r0.tel[tel_id] for tel_id in (1, 2))
+    assert ImageSaturationCorrector(subarray=get_subarray()).apply_correction.tel[TEL_ID]
+    assert not any(ImageSaturationCorrector(subarray=mc_subarray).apply_correction.tel[tel_id] for tel_id in (1, 2))
+
+
+def test_calibrate_r0_false_keeps_r1(event):
+    """without R0 calibration, the R1 waveforms of the event are kept and corrected for the PDE drop"""
+    observed = deepcopy(event)
+    observed.r1.tel[TEL_ID] = R1CameraContainer(waveform=np.ones((1, 1296, 50), dtype=np.float32))
+    calibrator(calibrate_r0=False, pde_drop_factor=0.5)(observed)
+    np.testing.assert_allclose(observed.r1.tel[TEL_ID].waveform, 2)
+
+
+def test_calibrate_r0_of_simulation(mc_subarray):
+    """the R0 waveforms of the simulations have no DigiCam pedestal: they cannot be calibrated"""
+    event = simulated_event()
+    event.r0.tel[1] = R0CameraContainer(waveform=np.ones((1, 1296, 50)))
+    with pytest.raises(ValueError, match="calibrate_r0"):
+        mc_calibrator(mc_subarray, calibrate_r0=True)(event)
+
+
+def test_saturation_correction_disabled(saturated_event):
+    """apply_correction false: the saturated pixels are not corrected"""
+    image_before = saturated_event.dl1.tel[TEL_ID].image.copy()
+    corrector = ImageSaturationCorrector(
+        subarray=get_subarray(), config=Config({"ImageSaturationCorrector": {"apply_correction": False}})
+    )
     assert not corrector(saturated_event, TEL_ID)
     np.testing.assert_array_equal(saturated_event.dl1.tel[TEL_ID].image, image_before)
     assert corrector.n_saturated_events == {}

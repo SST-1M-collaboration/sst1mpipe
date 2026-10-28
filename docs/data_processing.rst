@@ -208,7 +208,11 @@ reconstructed in DL2 by ``sst1mpipe_dl1_dl2``. This is used for the ZMQ streams 
 (``sst1mpipe_rta_config.json``); a monitoring file can be given to the stream as well.
 
 **Simulations** (``.simtel.gz`` files) are processed without monitoring source, with the MC
-configuration files (``sst1mpipe_mc_config_low_nsb.json``, ``sst1mpipe_mc_config_high_nsb.json``):
+configuration files (``sst1mpipe_mc_config_low_nsb.json``, ``sst1mpipe_mc_config_high_nsb.json``). How
+each telescope is calibrated is set in the configuration: for the simulated telescopes 1 and 2, the R1
+waveforms of the simulation are kept and corrected for the PDE drop (``R0R1Calibrator.calibrate_r0``
+false, ``pde_drop_factor``), without saturation correction (``ImageSaturationCorrector.apply_correction``
+false):
 
 .. code-block:: bash
 

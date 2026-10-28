@@ -97,7 +97,7 @@ def test_process_without_monitoring_source(tmp_path, nsb_cleaner_pedestal_stds):
     tel_id, run = 22, OBSERVATION_RUNS[22]
     output, log_file = tmp_path / "events.dl1.h5", tmp_path / "process.log"
     tool = process(run, output, f"--log-file={log_file}")
-    assert "No monitoring source" in log_file.read_text()
+    assert "Telescope 22: no statistics of the pedestal events" in log_file.read_text()
     assert tool.monitoring_sources == []
 
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")
