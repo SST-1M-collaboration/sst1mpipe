@@ -59,7 +59,20 @@
         "invalid_pixel_handler_type": "NeighborAverage"
     },
 
+    "ImageSaturationCorrector": {
+      "apply_correction": [
+        ["type", "*", true],
+        ["id", 1, false],
+        ["id", 2, false]
+      ]
+    },
+
     "R0R1Calibrator": {
+      "calibrate_r0": [
+        ["type", "*", true],
+        ["id", 1, false],
+        ["id", 2, false]
+      ],
       "bad_pixels": [
         ["type", "*", []]
       ],
