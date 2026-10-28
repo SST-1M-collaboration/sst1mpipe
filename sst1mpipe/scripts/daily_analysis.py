@@ -67,10 +67,11 @@ def r0_dl1_1file(arg):
         """
         python binding of sst1mpipe_r0_dl1
         """
+        # TODO: sst1mpipe_r0_dl1 is removed, replace it by sst1mpipe-monitoring and sst1mpipe-process
 
         cmd = f'sst1mpipe_r0_dl1 --input-file {arg.input_file} \
                --config {arg.config_file} \
-               --output-dir {arg.out_dir} --precise-timestamps'
+               --output-dir {arg.out_dir}'
         logging.info(cmd)
         os.system(cmd)
 

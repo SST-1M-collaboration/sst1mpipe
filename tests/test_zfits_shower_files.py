@@ -3,12 +3,14 @@ from collections import Counter
 import astropy.units as u
 import numpy as np
 import pytest
+import tables
 from astropy.time import Time
 from ctapipe.containers import CoordinateFrameType, EventType, ObservingMode, PointingMode, SchedulingBlockType
 from ctapipe.core import Provenance
 from ctapipe.io import DataWriter, EventSource, read_table
 
-from conftest import DARK_FILE, TRANSITION_FILES
+from conftest import DARK_FILE, TRANSITION_FILES, run_process
+from sst1mpipe.io import get_dl1_info
 from sst1mpipe.io.containers import CameraEventType
 import sst1mpipe.io.sst1m_event_source as sst1m_event_source
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
@@ -143,6 +145,30 @@ def test_cherenkov_signal_in_waveforms(zfits_file):
     assert np.mean(showers > max(max_signal[EventType.SKY_PEDESTAL])) > 0.1
 
 
+def test_process_zfits_file(zfits_file, tmp_path):
+    """sst1mpipe-process from R0 up to the DL1 parameters"""
+    tel_id = zfits_file["tel_id"]
+    output = tmp_path / "events.dl1.h5"
+    # runs of the transition between two wobbles
+    run_process(zfits_file["path"], output, "--ProcessorTool.allowed_sb_types=UNKNOWN")
+
+    n_events = zfits_file["n_showers"] + zfits_file["n_pedestals"]
+    trigger = read_table(output, "/dl1/event/subarray/trigger")
+    parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")
+    # the pedestal events are not written as events
+    assert len(trigger) == len(parameters) == zfits_file["n_showers"]
+    assert np.all(trigger["event_type"] == EventType.SUBARRAY.value)
+
+    info = get_dl1_info(output)
+    assert info["n_pedestal"][0] == zfits_file["n_pedestals"]
+    assert info[f"n_triggered_tel{tel_id - 20}"][0] == n_events
+
+    # images of Cherenkov events survive the cleaning
+    intensity = parameters["camera_frame_hillas_intensity"]
+    assert np.isfinite(intensity).sum() > 0
+    assert np.all(intensity[np.isfinite(intensity)] > 0)
+
+
 # ---------------------------------------------------------------------------
 # scheduling and observation blocks of the run
 # ---------------------------------------------------------------------------
@@ -213,6 +239,33 @@ def test_blocks_written_in_the_output(zfits_file, tmp_path):
 # ---------------------------------------------------------------------------
 # runs which are not processed
 # ---------------------------------------------------------------------------
+
+
+def test_process_skips_transition_runs(zfits_file, tmp_path):
+    """only the runs of the allowed scheduling block types (OBSERVATION by default) are processed"""
+    output = tmp_path / "events.dl1.h5"
+    tool = run_process(zfits_file["path"], output)
+
+    n_events = zfits_file["n_showers"] + zfits_file["n_pedestals"]
+    assert tool.n_skipped_events == n_events
+    with tables.open_file(output) as h5:
+        assert "/dl1/event" not in h5
+    # the blocks and the production info are written
+    scheduling_blocks = read_table(output, "/configuration/observation/scheduling_block")
+    assert list(scheduling_blocks["sb_type"]) == [SchedulingBlockType.UNKNOWN.value]
+    info = get_dl1_info(output)
+    assert info["target"][0] == "Transition"
+    assert info[f"n_triggered_tel{zfits_file['tel_id'] - 20}"][0] == 0
+
+
+def test_allowed_sb_types_list(tmp_path):
+    tool = run_process(
+        TRANSITION_FILES[21], tmp_path / "events.dl1.h5", "--max-events=5",
+        "--ProcessorTool.allowed_sb_types", "OBSERVATION", "--ProcessorTool.allowed_sb_types", "UNKNOWN",
+    )
+
+    assert tool.allowed_sb_types == [SchedulingBlockType.OBSERVATION, SchedulingBlockType.UNKNOWN]
+    assert tool.n_skipped_events == 0
 
 
 def test_dark_run_events(capsys):

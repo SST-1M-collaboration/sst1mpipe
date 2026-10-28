@@ -24,6 +24,8 @@ Github `repository <https://github.com/SST-1M-collaboration/sst1mpipe>`_
    :caption: Contents:
 
    introduction
+   data_processing
+   sst1mpipe_monitoring
    sst1m_analysis_workflow
 
 

@@ -1,16 +1,19 @@
 """
-SST1MMonitoringSource (monitoring files of sst1mpipe-monitoring)
+SST1MMonitoringSource (monitoring files of sst1mpipe-monitoring) and sst1mpipe-process with
+a monitoring source
 """
 import astropy.units as u
 import numpy as np
 import pytest
+import tables
 from astropy.coordinates import AltAz
-from ctapipe.io import MonitoringSource, read_table
+from ctapipe.io import HDF5EventSource, MonitoringSource, read_table
 from ctapipe.io.hdf5dataformat import DL1_PIXEL_STATISTICS_GROUP
 from ctapipe.io.monitoringtypes import MonitoringType
 
-from conftest import OBSERVATION_RUNS
-from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP
+from conftest import OBSERVATION_RUNS, monitoring_source_args, run_monitoring, run_process
+from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP, get_dl1_info, load_dl1_sst1m
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource, statistics_container
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
@@ -107,3 +110,77 @@ def test_no_statistics_out_of_the_chunks(monitoring):
     assert statistics(image["time_end"][-1] + 1 * u.s).std is None
 
 
+def test_process_with_monitoring_source(monitoring, tmp_path):
+    """the monitoring data are used for the calibration and attached to the DL1 file"""
+    output = tmp_path / "events.dl1.h5"
+    tool = run_process(INPUT_FILE, output, *monitoring_source_args(monitoring))
+    assert tool.n_events_without_monitoring == 0
+
+    parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{TEL_ID:03d}")
+    assert len(parameters) == N_EVENTS - N_PEDESTALS
+    intensity = parameters["camera_frame_hillas_intensity"]
+    assert np.isfinite(intensity).sum() > 0
+
+    info = get_dl1_info(output)
+    assert info["n_pedestal"][0] == N_PEDESTALS
+    assert info[f"n_triggered_tel{TEL_ID - 20}"][0] == N_EVENTS
+
+    # the monitoring data are copied into the DL1 file, the pointing is read by load_dl1_sst1m
+    with tables.open_file(monitoring) as source, tables.open_file(output) as dl1:
+        monitoring_tables = [t._v_pathname for t in source.walk_nodes("/", "Table") if "monitoring" in t._v_pathname]
+        assert len(monitoring_tables) == 3
+        for path in monitoring_tables:
+            np.testing.assert_array_equal(dl1.get_node(path).read(), source.get_node(path).read())
+    # the pointing of the events is interpolated by ctapipe (HDF5EventSource) and by load_dl1_sst1m
+    with SST1MEventSource(INPUT_FILE) as source:
+        times = {e.index.event_id: e.trigger.time for e in source}
+        altaz = {event_id: pointing_altaz(source, time) for event_id, time in times.items()}
+    with HDF5EventSource(output) as source:
+        interpolated = {e.index.event_id: e.monitoring.tel[TEL_ID].pointing for e in source}
+    assert len(interpolated) == N_EVENTS - N_PEDESTALS
+    for event_id, pointing in interpolated.items():
+        assert u.isclose(pointing.altitude, altaz[event_id].alt, atol=0.01 * u.deg)
+        assert u.isclose(pointing.azimuth, altaz[event_id].az, atol=0.01 * u.deg)
+    data = load_dl1_sst1m(str(output), tel=f"tel_{TEL_ID:03d}")
+    np.testing.assert_allclose(data["true_alt_tel"], [interpolated[e].altitude.to_value(u.deg) for e in data["event_id"]])
+    np.testing.assert_allclose(data["true_az_tel"], [interpolated[e].azimuth.to_value(u.deg) for e in data["event_id"]])
+
+
+def test_process_without_attached_monitoring(monitoring, tmp_path):
+    output = tmp_path / "events.dl1.h5"
+    run_process(INPUT_FILE, output, *monitoring_source_args(monitoring), "--ProcessorTool.attach_monitoring=False")
+    with tables.open_file(output) as dl1:
+        assert "/dl0/monitoring" not in dl1 and "/r0/monitoring" not in dl1 and "/dl1/monitoring" not in dl1
+
+
+def test_events_without_monitoring(tmp_path):
+    """
+    monitoring of the 20 first events, without timestamp tolerance: the events out of the time range
+    of the chunks of pedestal events (from the start of the first chunk to the end of the last one)
+    or of the pointing table are skipped
+    """
+    monitoring = tmp_path / "run.monitoring.h5"
+    run_monitoring(INPUT_FILE, monitoring, "--max-events=20")
+    chunks = [
+        read_table(monitoring, f"{group}/tel_{TEL_ID:03d}")
+        for group in (f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform", f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image")
+    ]
+    pointing = read_table(monitoring, f"/dl0/monitoring/telescope/pointing/tel_{TEL_ID:03d}")
+
+    def has_monitoring(time):
+        in_chunks = all(table["time_start"][0] <= time <= table["time_end"][-1] for table in chunks)
+        return in_chunks and pointing["time"][0] <= time <= pointing["time"][-1]
+
+    with SST1MEventSource(INPUT_FILE) as source:
+        events = [(e.trigger.time, e.trigger.event_type) for e in source]
+    n_without = sum(not has_monitoring(time) for time, event_type in events if event_type not in PEDESTAL_EVENT_TYPES)
+    assert n_without > 0
+
+    output = tmp_path / "events.dl1.h5"
+    tool = run_process(
+        INPUT_FILE, output, *monitoring_source_args(monitoring), "--SST1MMonitoringSource.timestamp_tolerance=0 s",
+    )
+    assert tool.n_events_without_monitoring == n_without
+    parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{TEL_ID:03d}")
+    assert len(parameters) == N_EVENTS - N_PEDESTALS - n_without
+    assert get_dl1_info(output)[f"n_triggered_tel{TEL_ID - 20}"][0] == N_EVENTS
