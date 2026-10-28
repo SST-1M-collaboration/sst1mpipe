@@ -880,10 +880,24 @@ R0_PEDESTAL_GROUP = f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform"
 
 def attach_monitoring_file(monitoring_file, output_file):
     """
-    Attach the monitoring data of a monitoring file of sst1mpipe-monitoring to a file of the
-    same run, e.g. its DL1 file: the ctapipe monitoring data (pointing, statistics of the images
-    of the pedestal events) with the ctapipe HDF5Merger (merge strategy monitoring-only), and the
-    statistics of the ADC samples of the pedestal events (R0_PIXEL_STATISTICS_GROUP)
+    Copy the monitoring data of a run (file of sst1mpipe-monitoring) into another file of the
+    same run, so that this file is self-contained. sst1mpipe-process calls it at the end of the
+    processing to attach the monitoring file to the DL1 file (``ProcessorTool.attach_monitoring``,
+    true by default).
+
+    The next steps read the monitoring data from the DL1 file:
+
+    - pointing of the telescope: alt/az of the events (``load_dl1_sst1m``, DL2 reconstruction)
+    - statistics of the images of the pedestal events (p.e.): ``meanQ`` of the events
+    - statistics of the ADC samples of the pedestal events: NSB rate (night summary,
+      ``sst1mpipe_extract_dl1_distributions``), stereo DL1 files
+
+    They are copied in two steps:
+
+    1. the data known by ctapipe (pointing, statistics of the images), with the ctapipe HDF5Merger
+       (as ``ctapipe-merge --merge-strategy monitoring-only``)
+    2. the statistics of the ADC samples (``R0_PIXEL_STATISTICS_GROUP``), ignored by the
+       HDF5Merger: the whole group is copied. A run without pedestal events has none.
 
     Parameters
     ----------
@@ -892,18 +906,18 @@ def attach_monitoring_file(monitoring_file, output_file):
     output_file: string
         Path
     """
+    # 1. pointing and statistics of the images
     with HDF5Merger(output_path=output_file, append=True, merge_strategy="monitoring-only") as merger:
         merger(monitoring_file)
 
+    # 2. statistics of the ADC samples
     with tables.open_file(monitoring_file) as source, tables.open_file(output_file, mode="a") as output:
         if R0_PIXEL_STATISTICS_GROUP not in source:
             return
-        for table in source.get_node(R0_PIXEL_STATISTICS_GROUP)._f_walknodes("Table"):
-            parent = table._v_parent._v_pathname
-            if parent not in output:
-                where, name = parent.rsplit("/", 1)
-                output.create_group(where, name, createparents=True)
-            table._f_copy(newparent=output.get_node(parent), overwrite=True)
+        parent = R0_PIXEL_STATISTICS_GROUP.rsplit("/", 1)[0]
+        if parent not in output:
+            output.create_group(*parent.rsplit("/", 1), createparents=True)
+        source.copy_node(R0_PIXEL_STATISTICS_GROUP, newparent=output.get_node(parent), recursive=True, overwrite=True)
 
 
 def load_pedestals(input_file, group, tel=None):
