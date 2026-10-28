@@ -91,7 +91,7 @@ R0 to DL1
 ~~~~~~~~~
 
 The raw data (R0) are monitored with the ctapipe tool ``sst1mpipe-monitoring`` (statistics of the
-pedestal events and pointing of each run, see :ref:`sst1mpipe_monitoring`), then the raw data and the
+pedestal events and pointing of each run, see :ref:`sst1mpipe_monitoring`), then the raw data (R0) and the
 simulations (R1) are processed to DL1 with ``sst1mpipe-process``, see :ref:`data_processing`. The output is a ``HDF5`` file with a table of DL1
 parameters, one output file per run (about 40 seconds of data) and per telescope (DL1 files from individual
 telescopes searched for coincidences and merged for stereoscopic reconstruction in the next step
