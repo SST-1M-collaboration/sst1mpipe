@@ -19,18 +19,18 @@ def process(run, output, *args, **kwargs):
 
 
 @pytest.mark.parametrize("tel_id", sorted(OBSERVATION_RUNS))
-@pytest.mark.parametrize("voltage_drop_correction", ["global", "none"])
-def test_process_r0_file(tmp_path, observation_monitoring, tel_id, voltage_drop_correction):
+@pytest.mark.parametrize("flag_bad_calibration_pixels", [True, False])
+def test_process_r0_file(tmp_path, observation_monitoring, tel_id, flag_bad_calibration_pixels):
     """regular processing of an observation run with its monitoring file, from R0 up to the DL1 parameters"""
     run = OBSERVATION_RUNS[tel_id]
     tool = process(
         run, tmp_path / "events.dl1.h5",
         *monitoring_source_args(observation_monitoring[tel_id]),
-        f"--R0R1Calibrator.voltage_drop_correction={voltage_drop_correction}",
+        f"--R0R1Calibrator.flag_bad_calibration_pixels={flag_bad_calibration_pixels}",
         wobble_in_output_name=True,
     )
     # the R0 -> R1 calibration is configured from the config file and the command line
-    assert tool.r0_r1_calibrator.voltage_drop_correction.tel[tel_id] == voltage_drop_correction
+    assert tool.r0_r1_calibrator.flag_bad_calibration_pixels.tel[tel_id] == flag_bad_calibration_pixels
     assert tool.n_skipped_events == 0
     assert tool.n_events_without_monitoring == 0
 
@@ -97,7 +97,7 @@ def test_process_without_monitoring_source(tmp_path, nsb_cleaner_pedestal_stds):
     tel_id, run = 22, OBSERVATION_RUNS[22]
     output, log_file = tmp_path / "events.dl1.h5", tmp_path / "process.log"
     tool = process(run, output, f"--log-file={log_file}")
-    assert "Telescope 22: no statistics of the pedestal events" in log_file.read_text()
+    assert "Telescope 22: no camera calibration coefficients" in log_file.read_text()
     assert tool.monitoring_sources == []
 
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")

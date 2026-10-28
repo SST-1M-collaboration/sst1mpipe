@@ -4,7 +4,7 @@ the pedestal events of monitoring files (sst1mpipe-monitoring) or DL1 files (sst
 
 For each chunk of pedestal events and telescope, from the variance of the ADC samples (mean over
 the pixels of their std, squared), with the SiPMVoltageDropModel: baseline shift, gain drop,
-charge drop (voltage drop correction of the R0R1Calibrator), NSB rate and NSB photon rate per
+charge drop (voltage drop correction of the camera calibration coefficients), NSB rate and NSB photon rate per
 pixel. The table is written in an ECSV, FITS or HDF5 file (by the extension of the output file),
 and optionally plotted vs. time.
 """

@@ -11,8 +11,8 @@ the square of their std, see sst1mpipe-monitoring):
 
 - the baseline shift (ADC), with a spline fitted for each telescope;
 - the gain drop and the charge drop (gain and PDE), the factors by which the gain and the charges
-  are reduced (the voltage drop correction of the `~sst1mpipe.calib.R0R1Calibrator` divides the
-  charges by the charge drop);
+  are reduced (the voltage drop correction, factor of the camera calibration coefficients of
+  `~sst1mpipe.monitoring.CameraCoefficientsCalculator`, divides the charges by the charge drop);
 - the NSB rate per pixel, in p.e. and in photons.
 
 All its parameters are configurable per telescope, in the config files (lists, e.g.

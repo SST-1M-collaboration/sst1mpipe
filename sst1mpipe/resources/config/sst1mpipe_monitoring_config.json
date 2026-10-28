@@ -23,14 +23,17 @@
   "R0R1Calibrator": {
     "calibration_file": [["type", "*", null]],
     "window_transmittance_file": [["type", "*", null]],
-    "voltage_drop_correction": [["type", "*", "global"]],
     "pde_drop_factor": [["type", "*", null]],
     "flag_bad_calibration_pixels": [["type", "*", true]],
-    "flag_dead_pixels": [["type", "*", true]],
     "bad_pixels": [["type", "*", []], ["id", 21, []], ["id", 22, []]],
     "saturation_threshold": [["type", "*", 3000]],
     "saturation_width_level": [["type", "*", 2500]],
     "saturation_width_threshold": [["type", "*", 5]]
+  },
+
+  "CameraCoefficientsCalculator": {
+    "voltage_drop_correction": [["type", "*", "global"]],
+    "flag_dead_pixels": [["type", "*", true]]
   },
 
   "ImageSaturationCorrector": {
