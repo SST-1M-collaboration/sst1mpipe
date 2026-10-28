@@ -1,16 +1,4 @@
 {
-    "telescope_coords": {
-      "tel_001": {
-        "long_deg": 14.782924,
-        "lat_deg": 49.911800,
-        "height_m": 510
-      },
-      "tel_002": {
-        "long_deg": 14.782078,
-        "lat_deg": 49.913084,
-        "height_m": 510
-      }
-    },
     "allowed_tels": null,
 
     "analysis": {

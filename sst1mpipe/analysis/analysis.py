@@ -4,16 +4,13 @@ import math
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.coordinates import Angle, SkyCoord, SkyOffsetFrame
+from astropy.coordinates import AltAz, Angle, SkyCoord, SkyOffsetFrame
 from astropy.time import Time
 from ctapipe.coordinates import CameraFrame
 from gammapy.data import DataStore
 from gammapy.stats import WStatCountsStatistic
 
 from sst1mpipe.performance import get_theta
-from sst1mpipe.utils import (
-    get_horizon_frame,
-)
 
 
 def add_reco_ra_dec(data, horizon_frame=None):
@@ -77,14 +74,14 @@ def add_source_altaz(data, source=None, horizon_frame=None):
     return data
 
 
-def get_camera_frame(data, config=None, telescope=None):
+def get_camera_frame(data, location=None):
     """
 
     Parameters
     ----------
     data: pandas.DataFrame with DL1 or DL2 table
-    config: dict
-    telescope: str (tel_021/tel_022)
+    location: astropy.coordinates.EarthLocation
+        position of the telescope, ``SubarrayDescription.from_hdf(input_file).tel_earth_locations[tel_id]``
 
     Returns
     -------
@@ -92,11 +89,7 @@ def get_camera_frame(data, config=None, telescope=None):
 
     """
 
-    horizon_frame = get_horizon_frame(
-        config=config,
-        telescope=telescope,
-        times=Time(data.local_time, format='unix', scale='utc')
-        )
+    horizon_frame = AltAz(location=location, obstime=Time(data.local_time, format='unix', scale='utc'))
     focal = np.array(data["equivalent_focal_length"])[0] * u.m
     logging.info('Focal length used: {}'.format(np.array(data["equivalent_focal_length"])[0]))
     ponting_coords = SkyCoord(

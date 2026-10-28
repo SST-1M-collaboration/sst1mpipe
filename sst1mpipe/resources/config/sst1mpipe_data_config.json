@@ -1,21 +1,4 @@
-{   "array_center_coords": {
-      "long_deg": 14.7825010,
-      "lat_deg": 49.9124420,
-      "height_m": 511.195000
-    },
-    "telescope_coords": {
-      "tel_021": {
-        "long_deg": 14.782924,
-        "lat_deg": 49.911800,
-        "height_m": 510
-      },
-      "tel_022": {
-        "long_deg": 14.782078,
-        "lat_deg": 49.913084,
-        "height_m": 510
-      }
-    },
-
+{
     "SST1MEventSource": {
       "swapped_modules": [
         {"tel_id": 22, "start": "2023-09-01T00:00:00", "stop": "2024-07-18T00:00:00", "modules": [59, 88]},
