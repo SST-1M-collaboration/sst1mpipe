@@ -123,6 +123,7 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
                 df = load_dl1_sst1m(input_file, tel=tel, config=config, table='pandas', stereo=stereo)
                 if not stereo:
                     try:
+                        # std of the ADC samples of the pedestal events (R0 statistics), needed by VAR_to_NSB
                         pt = load_r0_pedestals(input_file)
                     except Exception:
                         pass
