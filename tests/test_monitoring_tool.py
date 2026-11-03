@@ -153,9 +153,9 @@ def test_image_statistics_calibrated_as_by_the_processing(monitoring_file):
                     event.monitoring.tel[TEL_ID].camera.coefficients = CameraCalibrationContainer()
                 else:
                     voltage_drops.append(np.median(1 / event.monitoring.tel[TEL_ID].camera.coefficients.factor))
-                r0_r1_calibrator(event)
+                r0_r1_calibrator(event, TEL_ID)
                 camera_calibrator(event)
-                saturation_corrector(event)
+                saturation_corrector(event, TEL_ID)
                 images[name].append(np.array(event.dl1.tel[TEL_ID].image, dtype=np.float32))
     process, uncorrected = (np.array(images[name]) for name in ("process", "uncorrected"))
     assert len(process) == N_PEDESTALS

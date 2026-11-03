@@ -100,12 +100,14 @@ def test_r0_r1_dl1_calibration():
         assert not ImageSaturationCorrector(subarray=source.subarray, config=CONFIG)(event, TEL_ID)
 
 
-def test_all_telescopes_with_r0_data_are_calibrated(event):
+def test_telescope_without_r0_data_is_not_calibrated(event):
+    """the R1 events of a ZMQ stream have no R0 waveforms: their R1 waveforms are kept"""
+    stream_event = deepcopy(event)
+    stream_event.r0.tel.clear()
+    stream_event.r1.tel[TEL_ID] = R1CameraContainer(waveform=np.ones((1, 1296, 50), dtype=np.float32))
+    calibrator()(stream_event, TEL_ID)
 
-    event.r1.tel.clear()
-    calibrator()(event)
-
-    assert list(event.r1.tel.keys()) == [TEL_ID]
+    np.testing.assert_array_equal(stream_event.r1.tel[TEL_ID].waveform, 1)
 
 
 def test_pedestal_subtraction_and_dc_to_pe(event):
@@ -319,7 +321,8 @@ def test_pde_drop_correction(mc_subarray):
 
     event = simulated_event()
     calibrator_r0_r1 = mc_calibrator(mc_subarray, pde_drop_factor=[["id", 1, 0.5], ["id", 2, 0.8]])
-    calibrator_r0_r1(event)
+    for tel_id in (1, 2):
+        calibrator_r0_r1(event, tel_id)
 
     # the charges are divided by the PDE drop: factor of the coefficients, the R1 waveforms are kept
     np.testing.assert_allclose(event.monitoring.tel[1].camera.coefficients.factor, 2)
@@ -343,7 +346,7 @@ def test_no_pde_drop_correction(mc_subarray, settings):
 
     event = simulated_event(tel_ids=[2])
     calibrator_r0_r1 = mc_calibrator(mc_subarray, **settings)
-    calibrator_r0_r1(event)
+    calibrator_r0_r1(event, 2)
 
     assert calibrator_r0_r1.pde_drop(2) is None
     assert event.monitoring.tel[2].camera.coefficients.factor is None
@@ -422,7 +425,8 @@ def test_static_bad_pixels_of_simulations(mc_subarray):
     for tel_id in (1, 2):
         event.simulation.tel[tel_id] = SimulatedCameraContainer(true_image=np.ones(1296, dtype=np.int32))
     calibrator_r0_r1 = mc_calibrator(mc_subarray, bad_pixels=[["type", "*", []], ["id", 1, BAD_PIXELS]])
-    calibrator_r0_r1(event)
+    for tel_id in (1, 2):
+        calibrator_r0_r1(event, tel_id)
 
     flagged = event.monitoring.tel[1].camera.coefficients.outlier_mask[0]
     assert np.flatnonzero(flagged).tolist() == BAD_PIXELS
@@ -498,7 +502,7 @@ def test_window_transmittance_file_per_telescope(window_file_of_ones):
 def test_window_transmittance_not_applied_to_simulations(mc_subarray):
 
     event = simulated_event(tel_ids=[1])
-    mc_calibrator(mc_subarray)(event)
+    mc_calibrator(mc_subarray)(event, 1)
 
     np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
 
@@ -644,7 +648,7 @@ def test_calibrate_r0_false_keeps_r1(event):
     """without R0 calibration, the R1 waveforms of the event are kept, the PDE drop is in the factor"""
     observed = without_coefficients(deepcopy(event))
     observed.r1.tel[TEL_ID] = R1CameraContainer(waveform=np.ones((1, 1296, 50), dtype=np.float32))
-    calibrator(calibrate_r0=False, pde_drop_factor=0.5)(observed)
+    calibrator(calibrate_r0=False, pde_drop_factor=0.5)(observed, TEL_ID)
     np.testing.assert_array_equal(observed.r1.tel[TEL_ID].waveform, 1)
     np.testing.assert_allclose(observed.monitoring.tel[TEL_ID].camera.coefficients.factor, 2)
 
@@ -654,7 +658,7 @@ def test_calibrate_r0_of_simulation(mc_subarray):
     event = simulated_event()
     event.r0.tel[1] = R0CameraContainer(waveform=np.ones((1, 1296, 50)))
     with pytest.raises(ValueError, match="calibrate_r0"):
-        mc_calibrator(mc_subarray, calibrate_r0=True)(event)
+        mc_calibrator(mc_subarray, calibrate_r0=True)(event, 1)
 
 
 @pytest.mark.parametrize("level", ["integration_level", "peak_time_level"])
