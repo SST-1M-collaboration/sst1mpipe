@@ -99,15 +99,11 @@ class ImageSaturationCorrector(TelescopeComponent):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
         self.n_saturated_events = {}
 
-    def __call__(self, event, tel_id):
-        """
-        Correct the saturated pixels of the telescope ``tel_id`` of the event.
-        Returns True if saturated pixels were corrected.
-        """
-        saturated = self._correct_telescope(event, tel_id)
-        if saturated:
-            self.n_saturated_events[tel_id] = self.n_saturated_events.get(tel_id, 0) + 1
-        return saturated
+    def __call__(self, event):
+        """Correct the saturated pixels of the telescopes of the event, as the ctapipe CameraCalibrator"""
+        for tel_id in event.dl1.tel.keys():
+            if self._correct_telescope(event, tel_id):
+                self.n_saturated_events[tel_id] = self.n_saturated_events.get(tel_id, 0) + 1
 
     @staticmethod
     def saturated_pixels(event, tel_id):
@@ -366,24 +362,31 @@ class R0R1Calibrator(TelescopeComponent):
         except KeyError:
             return None
 
-    def __call__(self, event, tel_id):
+    def __call__(self, event):
         """
-        Calibrate the telescope ``tel_id`` of the event: from its R0 waveforms if ``calibrate_r0``,
-        otherwise the R1 waveforms of the event source are kept. The bad pixels are added to the
-        outliers and the PDE drop to the factor of the camera calibration coefficients.
+        Calibrate the telescopes of the event, as the ctapipe CameraCalibrator: from their R0
+        waveforms if ``calibrate_r0``, otherwise the R1 waveforms of the event source are kept. The
+        bad pixels are added to the outliers and the PDE drop to the factor of the camera
+        calibration coefficients.
         """
+        for tel_id in sorted(event.r0.tel.keys() | event.r1.tel.keys()):
+            self._calibrate_telescope_event(event, tel_id)
+        return event
+
+    def _calibrate_telescope_event(self, event, tel_id):
         if self.calibrate_r0.tel[tel_id]:
             # the R1 events of a ZMQ stream have no R0 waveforms: nothing to calibrate
             if tel_id not in event.r0.tel:
-                return event
+                return
             self._calibrate_telescope(event, tel_id)
+        elif tel_id not in event.r1.tel:
+            return
         n_pixels = event.r1.tel[tel_id].waveform.shape[1]
         mask_bad = self.bad_pixel_mask(tel_id, n_pixels)
         self.n_bad_pixels[tel_id] = int(mask_bad.sum())
         self._update_coefficients(event, tel_id, mask_bad)
         if event.simulation is not None and event.simulation.tel[tel_id].true_image is not None:
             event.simulation.tel[tel_id].true_image[mask_bad] = 0
-        return event
 
     def _update_coefficients(self, event, tel_id, mask_bad):
         """
