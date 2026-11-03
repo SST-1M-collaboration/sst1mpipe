@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from astropy.table import QTable
 from astropy.time import Time
+from ctapipe.core import Provenance
 from ctapipe.io import DataWriter, HDF5EventSource
 from ctapipe.reco import ShowerProcessor
 from ctaplot.ana import angular_separation_altaz, logbin_mean
@@ -20,9 +21,11 @@ from sst1mpipe.io import (
     check_outdir,
     get_dl1_info,
     load_dl1_pedestals,
+    load_r0_pedestals,
     load_dl1_sst1m,
     load_more_dl1_tables_mono,
     write_dl1_pedestals,
+    write_r0_pedestals,
 )
 from sst1mpipe.utils import (
     camera_to_altaz,
@@ -34,7 +37,7 @@ from sst1mpipe.utils import (
     get_horizon_frame,
     get_stereo_method,
     get_telescopes,
-    get_wr_timestamp,
+    get_trigger_time_ns,
     mix_gamma_proton,
     remove_stereo,
 )
@@ -1265,15 +1268,17 @@ def make_dl1_stereo(
 
     if stereo_method == "WhiteRabbitClosest":
         dl1_data_tel1 = load_dl1_sst1m(dl1_file_tel1, tel='tel_021', table='pandas')
-        t_t1_all = get_wr_timestamp(dl1_data_tel1)
-        t_t2 = get_wr_timestamp(dl1_data_tel2)
+        t_t1_all = get_trigger_time_ns(dl1_data_tel1)
+        t_t2 = get_trigger_time_ns(dl1_data_tel2)
 
+    # the DataWriter writes the provenance of the current activity in the output file
+    Provenance().start_activity("sst1mpipe_dl1_stereo")
     with DataWriter(source,
                     output_path=output_path,
                     overwrite        = True,
-                    write_showers    = True,
-                    write_parameters = True,
-                    write_images     = True,
+                    write_dl2         = True,
+                    write_dl1_parameters = True,
+                    write_dl1_images         = True,
                     ) as writer:
 
 
@@ -1293,7 +1298,7 @@ def make_dl1_stereo(
 
             elif stereo_method == "WhiteRabbitClosest":
 
-                # Read ns timestamps from dl1 tab in tel1 file, which are not provided by HDF5EventSource()
+                # ns trigger times of the tel1 events (trigger_time, read from the DL1 trigger table by load_dl1_sst1m)
                 event_tel1_mask = dl1_data_tel1['event_id'] == evt.index.event_id
 
                 t_t1 = t_t1_all[event_tel1_mask]
@@ -1362,8 +1367,7 @@ def make_dl1_stereo(
                     evt.dl1.tel[tel_2] = evt_t2.dl1.tel[tel_2]
 
                     evt.trigger.tel[tel_2].time = evt_t2.trigger.tel[tel_2].time
-                    evt.pointing.tel[tel_2].azimuth  = evt_t2.pointing.tel[tel_2].azimuth
-                    evt.pointing.tel[tel_2].altitude = evt_t2.pointing.tel[tel_2].altitude
+                    evt.monitoring.tel[tel_2].pointing = evt_t2.monitoring.tel[tel_2].pointing
 
                     # add units to hillas parameters (important for stereo reconstruction with shower_processor)
                     evt = event_hillas_add_units(evt)
@@ -1393,7 +1397,12 @@ def make_dl1_stereo(
     # table is not compatible with ctapipe readers
     logging.info('Propagating pedestals from mono tel1 DL1 to stereo DL1..')
     try:
+        pedestals = load_r0_pedestals(dl1_file_tel1)
+        write_r0_pedestals(output_path, pedestal_table=pedestals)
+    except Exception:
+        logging.warning('No pedestals found in tel1 DL1 file!')
+    try:
         pedestals = load_dl1_pedestals(dl1_file_tel1)
         write_dl1_pedestals(output_path, pedestal_table=pedestals)
     except Exception:
-        logging.warning('No pedestals found in tel1 DL1 file!')
+        logging.warning('No pedestal images found in tel1 DL1 file!')

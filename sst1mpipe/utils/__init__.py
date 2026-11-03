@@ -1,7 +1,7 @@
 # Licensed under a 3-clause BSD style license - see LICENSE
 
 
-from .cleaning import ImageCleanerSST, image_cleaner_setup
+from . import cleaning  # registers the custom ImageCleaners in ctapipe
 from .NSB_tools import (
     VAR_to_Idrop,
     VAR_to_NSB,
@@ -29,7 +29,6 @@ from .utils import (
     check_same_shower_fraction,
     clip_alt,
     correct_number_simulated_showers,
-    correct_true_image,
     disp,
     disp_to_pos,
     disp_vector,
@@ -57,16 +56,11 @@ from .utils import (
     get_target_pos,
     get_tel_string,
     get_telescopes,
-    get_wr_timestamp,
+    get_trigger_time_ns,
     mc_correct_shower_reuse,
     mix_gamma_proton,
     polar_to_cartesian,
-    remove_bad_pixels,
     remove_stereo,
     simbad_query,
     stereo_var_cuts,
 )
-
-#from .monitoring_pedestals import (
-#    sliding_pedestals,
-#)

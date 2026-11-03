@@ -28,7 +28,7 @@ import sys
 
 import sst1mpipe
 from sst1mpipe.io import (
-    add_wr_dl1_stereo,
+    add_pointing_dl1_stereo,
     check_outdir,
     load_config,
     load_dl1_sst1m,
@@ -153,9 +153,9 @@ def main():
     # Write additional params in the DL1 file
     write_extra_parameters(output_file, config=config, ismc=False)
 
-    # Write WR timestamps and pointing back in the DL1 file
+    # Write pointing back in the DL1 file
     if stereo_method == "WhiteRabbitClosest":
-        add_wr_dl1_stereo(output_file, dl1_data_tabs=[dl1_data_t1, dl1_data_t2])
+        add_pointing_dl1_stereo(output_file, dl1_data_tabs=[dl1_data_t1, dl1_data_t2])
 
 if __name__ == '__main__':
     main()

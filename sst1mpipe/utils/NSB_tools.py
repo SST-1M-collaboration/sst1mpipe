@@ -9,10 +9,9 @@ import astropy
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.time import Time
-from ctapipe.io import read_table
 from scipy import interpolate
 
+from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 
 ## spline aprox NSB : VAR[ADC]->SHIFT[ADC]
@@ -176,71 +175,67 @@ def find_dark_files(data_dir):
     return dark_files
 
 
-def get_dark_baseline(filename,max_evt=500,event_type=8):
+def get_dark_baseline(filename, max_evt=500, event_types=PEDESTAL_EVENT_TYPES, n_samples=50):
+    """
+    Mean of the first ``n_samples`` ADC samples of each pixel, over the events of type
+    ``event_types`` (pedestal events) among the ``max_evt`` first events of the file.
 
-        raw_baselines  = [ [] for ii in range(1296)]
-
-        data_stream = SST1MEventSource([filename],
-                                       max_events=max_evt)
-        for _,event in enumerate(data_stream):
-                    tel = event.sst1m.r0.tels_with_data[0]
-                    r0data = event.sst1m.r0.tel[tel]
-
-                    if r0data._camera_event_type.value==event_type:
-                        for pix in range(1296):
-                            raw_baselines[pix].append(r0data.adc_samples[pix,:50])
-        raw_baselines  = np.array(raw_baselines)
-
-        return raw_baselines.mean(axis=(1,2))
+    The sum of the samples of each pixel is accumulated during the event loop and divided at the
+    end by the number of events times the number of samples: the samples are not stored.
+    """
+    baseline_sum = 0
+    n_events = 0
+    n_used_samples = 0
+    with SST1MEventSource(input_url=filename, max_events=max_evt) as source:
+        for event in source:
+            if event.trigger.event_type not in event_types:
+                continue
+            tel_id = event.trigger.tels_with_trigger[0]
+            samples = np.asarray(event.r0.tel[tel_id].waveform[0][:, :n_samples], dtype=np.float64)
+            baseline_sum += samples.sum(axis=1)
+            n_events += 1
+            n_used_samples = samples.shape[1]
+    if n_events == 0:
+        raise ValueError(f"No event of the types {event_types} in the {max_evt} first events of {filename}")
+    return baseline_sum / (n_events * n_used_samples)
 
 ############
  #### tools to plot data :
 ############
 
-def get_ped_table(file_list):
+def get_ped_table(file_list, low_res=False):
+    """
+    Statistics of the ADC samples of the pedestal events of the files (R0 pedestal tables, see
+    load_r0_pedestals), stacked. low_res: only the last chunk of each file. The files without
+    pedestal table are skipped, None if no file has one.
+    """
+    from sst1mpipe.io import load_r0_pedestals
 
-    bline_table = None
+    ped_tables = []
+    for file in sorted(file_list):
+        try:
+            ped_table = load_r0_pedestals(file)
+        except Exception:
+            print(f"pedestal not found in {file}")
+            continue
+        ped_tables.append(ped_table[-1:] if low_res else ped_table)
+    return astropy.table.vstack(ped_tables) if ped_tables else None
 
-    for dl1file in sorted(file_list):
-        if bline_table is None :
-            try:
-                bline_table = read_table(dl1file,
-                                         '/dl1/monitoring/telescope/pedestal')
-            except Exception:
-                print(f"pedestal not found in {dl1file}")
-        else :
-            try:
-                bline_table = astropy.table.vstack([bline_table,
-                                                   read_table(dl1file,
-                                                              '/dl1/monitoring/telescope/pedestal')])
-            except Exception:
-                print(f"pedestal not found in {dl1file}")
-    return bline_table
 
-def get_ped_table_low_res(file_list):
+def mean_pedestal_std(ped_table):
+    """Mean over the camera pixels of the std of the ADC samples of the pedestal events (one per row)"""
+    std = np.asarray(ped_table['std'])
+    return np.nanmean(std.reshape(len(std), -1), axis=1)
 
-    bline_table = None
 
-    for dl1file in sorted(file_list):
-        if bline_table is None :
-            try:
-                bline_table = read_table(dl1file,
-                                         '/dl1/monitoring/telescope/pedestal')[-1]
-            except Exception:
-                print(f"pedestal not found in {dl1file}")
-        else :
-            try:
-                bline_table = astropy.table.vstack([bline_table,
-                                                   read_table(dl1file,
-                                                              '/dl1/monitoring/telescope/pedestal')[-1]])
-            except Exception:
-                print(f"pedestal not found in {dl1file}")
-    return bline_table
+def pedestal_time(ped_table):
+    """Time of the statistics of the pedestal events: middle of the chunk of events (one per row)"""
+    return ped_table['time_start'] + (ped_table['time_end'] - ped_table['time_start']) / 2
 
 
 def plot_average_nsb_VS_time(ped_table,ntel,ax=None, color='blue',label='label'):
-    NSB = VAR_to_NSB(ped_table['pedestal_charge_std'].mean(axis=1)**2,ntel)
-    Dates = [Time(t,scale='utc',format='unix').to_datetime() for t in  ped_table['pedestal_sample_time']]
+    NSB = VAR_to_NSB(mean_pedestal_std(ped_table)**2,ntel)
+    Dates = pedestal_time(ped_table).utc.to_datetime()
     if ax is None:
         f,ax = plt.subplots(figsize=(10,5))
     ax.plot(Dates,NSB,'.',label=label, color=color)
@@ -249,8 +244,8 @@ def plot_average_nsb_VS_time(ped_table,ntel,ax=None, color='blue',label='label')
     return ax
 
 def plot_average_nsb_photon_rate_VS_time(ped_table,ntel,ax=None):
-    NSB = VAR_to_NSB_photon_rate(ped_table['pedestal_charge_std'].mean(axis=1)**2,ntel)
-    Dates = [Time(t,scale='utc',format='unix').to_datetime() for t in  ped_table['pedestal_sample_time']]
+    NSB = VAR_to_NSB_photon_rate(mean_pedestal_std(ped_table)**2,ntel)
+    Dates = pedestal_time(ped_table).utc.to_datetime()
     if ax is None:
         f,ax = plt.subplots(figsize=(10,5))
     ax.plot(Dates,NSB,'.',label=f'tel {ntel%20}')

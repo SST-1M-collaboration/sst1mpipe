@@ -5,8 +5,10 @@ of the test files: the run of tel 22 (35 events) is taken during the run of tel 
 import numpy as np
 import pytest
 
-from conftest import OBSERVATION_RUNS, read_zfits_events
+from conftest import OBSERVATION_RUNS, read_zfits_events, run_process
+from sst1mpipe.io import read_trigger_time
 from sst1mpipe.io.containers import CameraEventType
+from sst1mpipe.utils import get_trigger_time_ns
 
 FILE_TEL_1, FILE_TEL_2 = OBSERVATION_RUNS[21]["path"], OBSERVATION_RUNS[22]["path"]
 # events of tel 21 around the run of tel 22
@@ -73,3 +75,13 @@ def test_coincident_events_trigger_time(events_tel_1, events_tel_2):
     assert np.all(np.abs(time_diff[~coincident]) > 100_000)
 
 
+def test_coincident_events_dl1(events_tel_1, tmp_path):
+    """the trigger times of the DL1 file of tel 22 give the same coincident events"""
+    output = tmp_path / "events.dl1.h5"
+    run_process(FILE_TEL_2, output)
+    trigger_time = read_trigger_time(output, "tel_022")
+
+    ids_1, time_1, _ = events_tel_1
+    matched, time_diff = match_closest_in_time(time_1, get_trigger_time_ns(trigger_time), MAX_TIME_DIFF_NS)
+    coincident = matched >= 0
+    assert dict(zip(trigger_time["event_id"][coincident], time_diff[coincident], strict=True)) == COINCIDENT_EVENTS

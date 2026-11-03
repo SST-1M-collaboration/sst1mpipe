@@ -45,10 +45,8 @@ sst1mpipe_dl1_dl2 = "sst1mpipe.scripts.sst1mpipe_dl1_dl2:main"
 sst1mpipe_data_dl1_dl1_stereo = "sst1mpipe.scripts.sst1mpipe_data_dl1_dl1_stereo:main"
 sst1mpipe_data_get_photon_list = "sst1mpipe.scripts.sst1mpipe_data_get_photon_list:main"
 sst1mpipe_data_dl2_dl3 = "sst1mpipe.scripts.sst1mpipe_data_dl2_dl3:main"
-sst1mpipe_get_tunning_params = "sst1mpipe.scripts.sst1mpipe_get_tunning_params:main"
 sst1mpipe_mc_performance = "sst1mpipe.scripts.sst1mpipe_mc_performance:main"
 sst1mpipe_mc_make_irfs = "sst1mpipe.scripts.sst1mpipe_mc_make_irfs:main"
-sst1mpipe_r0_dl1 = "sst1mpipe.scripts.sst1mpipe_r0_dl1:main"
 sst1mpipe_mc_train_rfs = "sst1mpipe.scripts.sst1mpipe_mc_train_rfs:main"
 sst1mpipe_merge_hdf5 = "sst1mpipe.scripts.sst1mpipe_merge_hdf5:main"
 sst1mpipe_pointing_check = "sst1mpipe.scripts.sst1mpipe_pointing_check:main"
@@ -62,10 +60,15 @@ sst1mpipe_event_classes = "sst1mpipe.scripts.sst1mpipe_event_classes:main"
 sst1mpipe_read_camera_server_logs = "sst1mpipe.scripts.read_camera_server_logs:main"
 sst1mpipe-process = "sst1mpipe.scripts.sst1mpipe_process_tool:main"
 sst1mpipe-trigger = "sst1mpipe.scripts.sst1mpipe_trigger_tool:main"
+sst1mpipe-monitoring = "sst1mpipe.scripts.sst1mpipe_monitoring_tool:main"
 
 # EventSource implementations found by ctapipe.io.EventSource
 [project.entry-points.ctapipe_io]
 SST1MEventSource = "sst1mpipe.io.sst1m_event_source:SST1MEventSource"
+
+# MonitoringSource implementations found by ctapipe.io.MonitoringSource
+[project.entry-points.ctapipe_monitoring]
+SST1MMonitoringSource = "sst1mpipe.io.monitoring_source:SST1MMonitoringSource"
 
 [tool.ruff]
 target-version = "py314"
@@ -86,7 +89,7 @@ command_line = "-m pytest"
 source = ["sst1mpipe/"]
 
 [tool.coverage.report]
-fail_under = 6
+fail_under = 25
 show_missing = true
 sort = "Cover"
 
