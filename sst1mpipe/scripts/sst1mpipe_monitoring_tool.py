@@ -220,11 +220,9 @@ class MonitoringTool(Tool):
             if statistics.pedestal_waveform.std is None:
                 self.n_pedestals_without_statistics += 1
                 return
-        for tel_id in event.trigger.tels_with_trigger:
-            self.r0_r1_calibrator(event, tel_id)
+        self.r0_r1_calibrator(event)
         self.camera_calibrator(event)
-        for tel_id in event.trigger.tels_with_trigger:
-            self.image_saturation_corrector(event, tel_id)
+        self.image_saturation_corrector(event)
         for tel_id, dl1 in event.dl1.tel.items():
             # shape (n_channels, n_pixels) of the ctapipe pixel statistics
             image = np.asarray(dl1.image, dtype=np.float32)[np.newaxis]

@@ -61,7 +61,7 @@ def test_r0_r1_dl1_calibration():
     for event in source:
         r0_waveform = event.r0.tel[TEL_ID].waveform.copy()
 
-        calibrator_r0_r1(event, TEL_ID)
+        calibrator_r0_r1(event)
         r1 = event.r1.tel[TEL_ID]
 
         # ctapipe shape: (n_channels, n_pixels, n_samples)
@@ -76,7 +76,7 @@ def test_r0_r1_dl1_calibration():
         r1_dl1_calibrator(event)
         assert event.dl1.tel[TEL_ID].image.shape == (n_pixels, )
         # no saturated pixels in the dark run of the test file
-        assert not ImageSaturationCorrector(subarray=source.subarray, config=CONFIG)(event, TEL_ID)
+        assert not ImageSaturationCorrector(subarray=source.subarray, config=CONFIG)(event)
 
 
 def test_telescope_without_r0_data_is_not_calibrated(event):
@@ -84,7 +84,7 @@ def test_telescope_without_r0_data_is_not_calibrated(event):
     stream_event = deepcopy(event)
     stream_event.r0.tel.clear()
     stream_event.r1.tel[TEL_ID] = R1CameraContainer(waveform=np.ones((1, 1296, 50), dtype=np.float32))
-    calibrator()(stream_event, TEL_ID)
+    calibrator()(stream_event)
 
     np.testing.assert_array_equal(stream_event.r1.tel[TEL_ID].waveform, 1)
 
@@ -92,7 +92,7 @@ def test_telescope_without_r0_data_is_not_calibrated(event):
 def test_pedestal_subtraction_and_dc_to_pe(event):
 
     calibrator_r0_r1 = calibrator(voltage_drop_correction="none", flag_bad_calibration_pixels=False)
-    calibrator_r0_r1(with_pedestal_std(event, None), TEL_ID)
+    calibrator_r0_r1(with_pedestal_std(event, None))
 
     r0 = event.r0.tel[TEL_ID]
     dc_to_pe, _ = calibrator_r0_r1.calibration_parameters(TEL_ID)
@@ -107,11 +107,11 @@ def test_voltage_drop_correction(event, correction):
 
     pedestal_std = np.linspace(3, 6, 1296)
     no_correction = calibrator(voltage_drop_correction="none", flag_dead_pixels=False)
-    no_correction(with_pedestal_std(event, pedestal_std), TEL_ID)
+    no_correction(with_pedestal_std(event, pedestal_std))
     waveform = event.r1.tel[TEL_ID].waveform.copy()
 
     calibrator_r0_r1 = calibrator(voltage_drop_correction=correction, flag_dead_pixels=False)
-    calibrator_r0_r1(with_pedestal_std(event, pedestal_std), TEL_ID)
+    calibrator_r0_r1(with_pedestal_std(event, pedestal_std))
 
     voltage_drop = np.broadcast_to(calibrator_r0_r1.voltage_drop(TEL_ID, pedestal_std), (1296, ))
     if correction == "none":
@@ -144,7 +144,7 @@ def test_bad_pixels(event, flag_bad_calibration, flag_dead):
         flag_bad_calibration_pixels=flag_bad_calibration,
         flag_dead_pixels=flag_dead,
     )
-    calibrator_r0_r1(with_pedestal_std(event, pedestal_std), TEL_ID)
+    calibrator_r0_r1(with_pedestal_std(event, pedestal_std))
 
     _, mask_bad_calibration = calibrator_r0_r1.calibration_parameters(TEL_ID)
     flagged = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
@@ -162,7 +162,7 @@ def test_pixels_without_statistics(event):
     pedestal_std = np.full((1, 1296), 4.0)
     pedestal_std[0, :10] = np.nan
     calibrator_r0_r1 = calibrator(voltage_drop_correction="global")
-    calibrator_r0_r1(with_pedestal_std(event, pedestal_std), TEL_ID)
+    calibrator_r0_r1(with_pedestal_std(event, pedestal_std))
 
     flagged = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
     assert np.all(flagged[:10])
@@ -292,8 +292,7 @@ def test_pde_drop_correction(mc_subarray):
 
     event = simulated_event()
     calibrator_r0_r1 = mc_calibrator(mc_subarray, pde_drop_factor=[["id", 1, 0.5], ["id", 2, 0.8]])
-    for tel_id in (1, 2):
-        calibrator_r0_r1(event, tel_id)
+    calibrator_r0_r1(event)
 
     np.testing.assert_allclose(event.r1.tel[1].waveform, 2)
     np.testing.assert_allclose(event.r1.tel[2].waveform, 1.25)
@@ -303,10 +302,10 @@ def test_pde_drop_correction(mc_subarray):
 
 def test_pde_drop_correction_single_telescope(mc_subarray):
 
-    event = simulated_event()
-    mc_calibrator(mc_subarray, pde_drop_factor=0.5)(event, 2)
+    event = simulated_event(tel_ids=[2])
+    mc_calibrator(mc_subarray, pde_drop_factor=0.5)(event)
 
-    np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
+    assert list(event.r1.tel) == [2]
     np.testing.assert_allclose(event.r1.tel[2].waveform, 2)
 
 
@@ -315,7 +314,7 @@ def test_no_pde_drop_correction(mc_subarray, settings):
 
     event = simulated_event(tel_ids=[2])
     calibrator_r0_r1 = mc_calibrator(mc_subarray, **settings)
-    calibrator_r0_r1(event, 2)
+    calibrator_r0_r1(event)
 
     assert calibrator_r0_r1.pde_drop(2) is None
     np.testing.assert_array_equal(event.r1.tel[2].waveform, 1)
@@ -357,7 +356,7 @@ def test_pde_drop_correction_of_data(event):
     pdes = []
     for factor in (None, 0.5):
         event.r1.tel.clear()
-        calibrator(voltage_drop_correction="none", pde_drop_factor=factor)(with_pedestal_std(event, None), TEL_ID)
+        calibrator(voltage_drop_correction="none", pde_drop_factor=factor)(with_pedestal_std(event, None))
         pdes.append(event.r1.tel[TEL_ID].waveform.copy())
 
     np.testing.assert_allclose(pdes[1], pdes[0] / 0.5)
@@ -373,7 +372,7 @@ def test_static_bad_pixels_of_data(event):
         flag_bad_calibration_pixels=False, flag_dead_pixels=False,
         bad_pixels=[["type", "*", []], ["id", TEL_ID, BAD_PIXELS]],
     )
-    calibrator_r0_r1(with_pedestal_std(event, None), TEL_ID)
+    calibrator_r0_r1(with_pedestal_std(event, None))
 
     flagged = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
     assert np.flatnonzero(flagged).tolist() == BAD_PIXELS
@@ -385,10 +384,10 @@ def test_static_bad_pixels_of_data(event):
 def test_static_bad_pixels_added_to_the_other_bad_pixels(event):
 
     flags = dict(flag_dead_pixels=False, voltage_drop_correction="none")
-    calibrator(**flags)(with_pedestal_std(event, None), TEL_ID)
+    calibrator(**flags)(with_pedestal_std(event, None))
     bad_calibration = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0].copy()
 
-    calibrator(**flags, bad_pixels=[["id", TEL_ID, BAD_PIXELS]])(event, TEL_ID)
+    calibrator(**flags, bad_pixels=[["id", TEL_ID, BAD_PIXELS]])(event)
     flagged = event.monitoring.tel[TEL_ID].camera.coefficients.outlier_mask[0]
 
     assert bad_calibration.any()
@@ -402,8 +401,7 @@ def test_static_bad_pixels_of_simulations(mc_subarray):
         event.simulation.tel[tel_id] = SimulatedCameraContainer(true_image=np.ones(1296, dtype=np.int32))
     status = event.monitoring.tel[2].camera.coefficients.outlier_mask
     calibrator_r0_r1 = mc_calibrator(mc_subarray, bad_pixels=[["type", "*", []], ["id", 1, BAD_PIXELS]])
-    for tel_id in (1, 2):
-        calibrator_r0_r1(event, tel_id)
+    calibrator_r0_r1(event)
 
     flagged = event.monitoring.tel[1].camera.coefficients.outlier_mask[0]
     assert np.flatnonzero(flagged).tolist() == BAD_PIXELS
@@ -457,7 +455,7 @@ def test_window_transmittance_correction(event, window_file_of_ones):
     for name, settings in [("default", {}), ("ones", {"window_transmittance_file": window_file_of_ones})]:
         event.r1.tel.clear()
         calibrator(voltage_drop_correction="none", flag_bad_calibration_pixels=False, **settings)(
-            with_pedestal_std(event, None), TEL_ID,
+            with_pedestal_std(event, None),
         )
         waveforms[name] = event.r1.tel[TEL_ID].waveform.copy()
 
@@ -480,7 +478,7 @@ def test_window_transmittance_file_per_telescope(window_file_of_ones):
 def test_window_transmittance_not_applied_to_simulations(mc_subarray):
 
     event = simulated_event(tel_ids=[1])
-    mc_calibrator(mc_subarray)(event, 1)
+    mc_calibrator(mc_subarray)(event)
 
     np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
 
@@ -546,7 +544,7 @@ def add_saturated_pulses(event, **calibrator_settings):
     waveform[0, NARROW_PULSE, 20:23] = pedestal[NARROW_PULSE] + 3600
 
     calibrator(voltage_drop_correction="none", flag_dead_pixels=False, **calibrator_settings)(
-        with_pedestal_std(event, None), TEL_ID,
+        with_pedestal_std(event, None),
     )
     CameraCalibrator(subarray=get_subarray(), config=CONFIG)(event)
     return event
@@ -575,7 +573,8 @@ def test_image_saturation_corrector_as_before(saturated_event):
 
     corrector = ImageSaturationCorrector(subarray=get_subarray())
     image_before = saturated_event.dl1.tel[TEL_ID].image.copy()
-    assert corrector(saturated_event, TEL_ID)
+    corrector(saturated_event)
+    assert corrector.n_saturated_events == {TEL_ID: 1}
 
     dl1 = saturated_event.dl1.tel[TEL_ID]
     np.testing.assert_array_equal(dl1.image, reference.dl1.tel[TEL_ID].image)
@@ -586,7 +585,7 @@ def test_image_saturation_corrector_as_before(saturated_event):
 
 def test_image_saturation_corrector_peak_time(saturated_event):
 
-    ImageSaturationCorrector(subarray=get_subarray())(saturated_event, TEL_ID)
+    ImageSaturationCorrector(subarray=get_subarray())(saturated_event)
 
     # middle of the samples above the width level, 4 ns per sample
     for pixel, (start, stop) in BROAD_PULSES.items():
@@ -601,7 +600,7 @@ def test_saturation_settings(event):
     corrector = ImageSaturationCorrector(subarray=get_subarray())
 
     assert flagged_saturated(saturated_event) == []
-    assert not corrector(saturated_event, TEL_ID)
+    corrector(saturated_event)
     np.testing.assert_array_equal(saturated_event.dl1.tel[TEL_ID].image, image_before)
     assert corrector.n_saturated_events == {}
 
@@ -621,7 +620,7 @@ def test_calibrate_r0_false_keeps_r1(event):
     """without R0 calibration, the R1 waveforms of the event are kept and corrected for the PDE drop"""
     observed = deepcopy(event)
     observed.r1.tel[TEL_ID] = R1CameraContainer(waveform=np.ones((1, 1296, 50), dtype=np.float32))
-    calibrator(calibrate_r0=False, pde_drop_factor=0.5)(observed, TEL_ID)
+    calibrator(calibrate_r0=False, pde_drop_factor=0.5)(observed)
     np.testing.assert_allclose(observed.r1.tel[TEL_ID].waveform, 2)
 
 
@@ -630,7 +629,7 @@ def test_calibrate_r0_of_simulation(mc_subarray):
     event = simulated_event()
     event.r0.tel[1] = R0CameraContainer(waveform=np.ones((1, 1296, 50)))
     with pytest.raises(ValueError, match="calibrate_r0"):
-        mc_calibrator(mc_subarray, calibrate_r0=True)(event, 1)
+        mc_calibrator(mc_subarray, calibrate_r0=True)(event)
 
 
 def test_saturation_correction_disabled(saturated_event):
@@ -639,6 +638,6 @@ def test_saturation_correction_disabled(saturated_event):
     corrector = ImageSaturationCorrector(
         subarray=get_subarray(), config=Config({"ImageSaturationCorrector": {"apply_correction": False}})
     )
-    assert not corrector(saturated_event, TEL_ID)
+    corrector(saturated_event)
     np.testing.assert_array_equal(saturated_event.dl1.tel[TEL_ID].image, image_before)
     assert corrector.n_saturated_events == {}
