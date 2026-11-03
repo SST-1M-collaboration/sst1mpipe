@@ -210,9 +210,7 @@ class ProcessorTool(Tool):
             self.add_raised_threshold_fraction(event)
             # the pedestal events are not written: fraction of them which survive the cleaning
             if is_pedestal:
-                self.n_survived_pedestals += any(
-                    np.isfinite(dl1.parameters.hillas.intensity) for dl1 in event.dl1.tel.values()
-                )
+                self.n_survived_pedestals += any(np.any(dl1.image_mask) for dl1 in event.dl1.tel.values())
                 continue
             if self.writer.write_dl2:
                 self.shower_processor(event)
