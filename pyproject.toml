@@ -82,7 +82,7 @@ testpaths = ['tests/', 'notebooks/sst1m_raw_r0_r1.ipynb']
 
 [tool.coverage.run]
 branch = true
-command_line = "-m pytest tests/"
+command_line = "-m pytest"
 source = ["sst1mpipe/"]
 
 [tool.coverage.report]
