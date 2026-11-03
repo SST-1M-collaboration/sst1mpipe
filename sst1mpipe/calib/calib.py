@@ -96,15 +96,11 @@ class ImageSaturationCorrector(TelescopeComponent):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
         self.n_saturated_events = {}
 
-    def __call__(self, event, tel_id):
-        """
-        Correct the saturated pixels of the telescope ``tel_id`` of the event.
-        Returns True if saturated pixels were corrected.
-        """
-        saturated = self._correct_telescope(event, tel_id)
-        if saturated:
-            self.n_saturated_events[tel_id] = self.n_saturated_events.get(tel_id, 0) + 1
-        return saturated
+    def __call__(self, event):
+        """Correct the saturated pixels of the telescopes of the event, as the ctapipe CameraCalibrator"""
+        for tel_id in event.dl1.tel.keys():
+            if self._correct_telescope(event, tel_id):
+                self.n_saturated_events[tel_id] = self.n_saturated_events.get(tel_id, 0) + 1
 
     @staticmethod
     def saturated_pixels(event, tel_id):
@@ -395,18 +391,21 @@ class R0R1Calibrator(TelescopeComponent):
         except KeyError:
             return None
 
-    def __call__(self, event, tel_id):
+    def __call__(self, event):
         """
-        Calibrate the telescope ``tel_id`` of the event: from its R0 waveforms if ``calibrate_r0``,
-        otherwise from the R1 waveforms of the event source
+        Calibrate the telescopes of the event, as the ctapipe CameraCalibrator: from their R0
+        waveforms if ``calibrate_r0``, otherwise from the R1 waveforms of the event source
         """
-        if self.calibrate_r0.tel[tel_id]:
-            self._calibrate_telescope(event, tel_id)
-        else:
-            self._correct_r1_telescope(event, tel_id)
+        for tel_id in sorted(event.r0.tel.keys() | event.r1.tel.keys()):
+            if self.calibrate_r0.tel[tel_id]:
+                self._calibrate_telescope(event, tel_id)
+            else:
+                self._correct_r1_telescope(event, tel_id)
         return event
 
     def _correct_r1_telescope(self, event, tel_id):
+        if tel_id not in event.r1.tel:
+            return
         r1 = event.r1.tel[tel_id]
         pde_drop = self.pde_drop(tel_id)
         if pde_drop is not None:

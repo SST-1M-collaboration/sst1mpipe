@@ -151,9 +151,9 @@ def test_image_statistics_calibrated_as_by_the_processing(monitoring_file):
                 continue
             monitoring_source.fill_monitoring_container(event)
             for name, (r0_r1_calibrator, camera_calibrator, saturation_corrector) in components.items():
-                r0_r1_calibrator(event, TEL_ID)
+                r0_r1_calibrator(event)
                 camera_calibrator(event)
-                saturation_corrector(event, TEL_ID)
+                saturation_corrector(event)
                 images[name].append(np.array(event.dl1.tel[TEL_ID].image, dtype=np.float32))
             std = event.monitoring.tel[TEL_ID].camera.pixel_statistics.pedestal_waveform.std
             voltage_drops.append(components["process"][0].voltage_drop(TEL_ID, std))
