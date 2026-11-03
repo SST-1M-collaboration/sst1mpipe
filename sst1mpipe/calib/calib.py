@@ -96,17 +96,14 @@ class ImageSaturationCorrector(TelescopeComponent):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
         self.n_saturated_events = {}
 
-    def __call__(self, event, tel_id=None):
+    def __call__(self, event, tel_id):
         """
-        Correct the saturated pixels of the telescope ``tel_id``, or of all the telescopes
-        with DL1 data. Returns True if saturated pixels were corrected.
+        Correct the saturated pixels of the telescope ``tel_id`` of the event.
+        Returns True if saturated pixels were corrected.
         """
-        tel_ids = list(event.dl1.tel.keys()) if tel_id is None else [tel_id]
-        saturated = False
-        for tel in tel_ids:
-            if self._correct_telescope(event, tel):
-                self.n_saturated_events[tel] = self.n_saturated_events.get(tel, 0) + 1
-                saturated = True
+        saturated = self._correct_telescope(event, tel_id)
+        if saturated:
+            self.n_saturated_events[tel_id] = self.n_saturated_events.get(tel_id, 0) + 1
         return saturated
 
     @staticmethod
@@ -400,21 +397,15 @@ class R0R1Calibrator(TelescopeComponent):
         except KeyError:
             return None
 
-    def __call__(self, event, tel_id=None):
+    def __call__(self, event, tel_id):
         """
-        Calibrate the telescope ``tel_id`` of the event, or all its telescopes: from their R0
-        waveforms if ``calibrate_r0``, otherwise from the R1 waveforms of the event source
+        Calibrate the telescope ``tel_id`` of the event: from its R0 waveforms if ``calibrate_r0``,
+        otherwise from the R1 waveforms of the event source
         """
-        if tel_id is None:
-            tel_ids = [tel for tel in event.r0.tel if self.calibrate_r0.tel[tel]]
-            tel_ids += [tel for tel in event.r1.tel if not self.calibrate_r0.tel[tel]]
+        if self.calibrate_r0.tel[tel_id]:
+            self._calibrate_telescope(event, tel_id)
         else:
-            tel_ids = [tel_id]
-        for tel in tel_ids:
-            if self.calibrate_r0.tel[tel]:
-                self._calibrate_telescope(event, tel)
-            else:
-                self._correct_r1_telescope(event, tel)
+            self._correct_r1_telescope(event, tel_id)
         return event
 
     def _correct_r1_telescope(self, event, tel_id):
@@ -439,6 +430,9 @@ class R0R1Calibrator(TelescopeComponent):
         event.monitoring.tel[tel_id].camera.coefficients.outlier_mask = mask_bad[np.newaxis]
 
     def _calibrate_telescope(self, event, tel_id):
+        # the R1 events of a ZMQ stream have no R0 waveforms: nothing to calibrate
+        if tel_id not in event.r0.tel:
+            return
         r0 = event.r0.tel[tel_id]
         if getattr(r0, "pedestal", None) is None:
             raise ValueError(

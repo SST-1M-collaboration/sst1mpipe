@@ -203,10 +203,12 @@ class ProcessorTool(Tool):
 
             # R0 -> R1 calibration with the statistics of the monitoring sources (raw data),
             # PDE drop correction of the R1 waveforms (simulations)
-            self.r0_r1_calibrator(event)
+            for tel_id in event.trigger.tels_with_trigger:
+                self.r0_r1_calibrator(event, tel_id)
             self.camera_calibrator(event)
             # the saturated pixels are corrected with the R0 waveforms
-            self.image_saturation_corrector(event)
+            for tel_id in event.trigger.tels_with_trigger:
+                self.image_saturation_corrector(event, tel_id)
             self.image_processor(event)
             self.add_raised_threshold_fraction(event)
             # the pedestal events are not written: fraction of them which survive the cleaning
