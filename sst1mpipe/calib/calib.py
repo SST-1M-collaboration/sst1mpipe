@@ -100,7 +100,7 @@ class ImageSaturationCorrector(TelescopeComponent):
         self.n_saturated_events = {}
 
     def __call__(self, event):
-        """Correct the saturated pixels of the telescopes of the event, as the ctapipe CameraCalibrator"""
+        """Correct the saturated pixels of the telescopes of the event"""
         for tel_id in event.dl1.tel.keys():
             if self._correct_telescope(event, tel_id):
                 self.n_saturated_events[tel_id] = self.n_saturated_events.get(tel_id, 0) + 1
@@ -364,10 +364,9 @@ class R0R1Calibrator(TelescopeComponent):
 
     def __call__(self, event):
         """
-        Calibrate the telescopes of the event, as the ctapipe CameraCalibrator: from their R0
-        waveforms if ``calibrate_r0``, otherwise the R1 waveforms of the event source are kept. The
-        bad pixels are added to the outliers and the PDE drop to the factor of the camera
-        calibration coefficients.
+        Calibrate the telescopes of the event: from their R0 waveforms if ``calibrate_r0``,
+        otherwise the R1 waveforms of the event source are kept. The bad pixels are added to the
+        outliers and the PDE drop to the factor of the camera calibration coefficients.
         """
         for tel_id in sorted(event.r0.tel.keys() | event.r1.tel.keys()):
             self._calibrate_telescope_event(event, tel_id)
