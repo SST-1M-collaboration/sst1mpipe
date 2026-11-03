@@ -84,22 +84,23 @@ class ImageSaturationCorrector(TelescopeComponent):
         ),
     ).tag(config=True)
 
+    apply_correction = BoolTelescopeParameter(
+        default_value=[("type", "*", True), ("id", 1, False), ("id", 2, False)],
+        help=(
+            "Correct the saturated pixels of the telescope. False by default for the simulated"
+            " telescopes 1 and 2, whose pixels are not flagged as saturated"
+        ),
+    ).tag(config=True)
+
     def __init__(self, subarray, config=None, parent=None, **kwargs):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
         self.n_saturated_events = {}
 
-    def __call__(self, event, tel_id=None):
-        """
-        Correct the saturated pixels of the telescope ``tel_id``, or of all the telescopes
-        with DL1 data. Returns True if saturated pixels were corrected.
-        """
-        tel_ids = list(event.dl1.tel.keys()) if tel_id is None else [tel_id]
-        saturated = False
-        for tel in tel_ids:
-            if self._correct_telescope(event, tel):
-                self.n_saturated_events[tel] = self.n_saturated_events.get(tel, 0) + 1
-                saturated = True
-        return saturated
+    def __call__(self, event):
+        """Correct the saturated pixels of the telescopes of the event"""
+        for tel_id in event.dl1.tel.keys():
+            if self._correct_telescope(event, tel_id):
+                self.n_saturated_events[tel_id] = self.n_saturated_events.get(tel_id, 0) + 1
 
     @staticmethod
     def saturated_pixels(event, tel_id):
@@ -110,6 +111,9 @@ class ImageSaturationCorrector(TelescopeComponent):
         return np.flatnonzero(pixel_status & PixelStatus.SATURATED)
 
     def _correct_telescope(self, event, tel_id):
+        # the peak times are computed from the R0 waveforms: none for the R1 events of a stream
+        if not self.apply_correction.tel[tel_id] or tel_id not in event.r0.tel:
+            return False
         saturated = self.saturated_pixels(event, tel_id)
         if len(saturated) == 0:
             return False
@@ -185,11 +189,11 @@ class R0R1Calibrator(TelescopeComponent):
        `ImageSaturationCorrector`.
 
     The steps using the pedestal statistics (3 and the dead pixels of 5) are not applied
-    if the statistics of the ADC samples of the pedestal events are not filled.
+    if the statistics of the ADC samples of the pedestal events are not filled (warning).
 
-    For the simulated events (``event.simulation`` filled), the R1 waveforms are given by the
-    event source. They are only corrected for the PDE drop due to the NSB, and the
-    ``bad_pixels`` are set to 0 and flagged (also in the true image).
+    ``calibrate_r0`` false (by default for the simulated telescopes 1 and 2): the R1 waveforms
+    given by the event source are kept. They are only corrected for the PDE drop due to the NSB,
+    and the ``bad_pixels`` are set to 0 and flagged (also in the true image of the simulations).
 
     PDE drop correction (``pde_drop_factor``): the R1 waveforms are divided by this factor.
     The simulations use PDE files which include the drop for a given NSB level, while the
@@ -201,6 +205,14 @@ class R0R1Calibrator(TelescopeComponent):
     All the parameters can be set per telescope,
     e.g. ``"voltage_drop_correction": [["type", "*", "global"], ["id", 22, "none"]]``.
     """
+
+    calibrate_r0 = BoolTelescopeParameter(
+        default_value=[("type", "*", True), ("id", 1, False), ("id", 2, False)],
+        help=(
+            "Calibrate the R0 waveforms of the telescope (raw data). False: the R1 waveforms of the"
+            " event source are kept (simulations, by default for the telescopes 1 and 2)"
+        ),
+    ).tag(config=True)
 
     calibration_file = TelescopeParameter(
         trait=Path(exists=True, directory_ok=False, allow_none=True),
@@ -288,6 +300,7 @@ class R0R1Calibrator(TelescopeComponent):
         self._calibration = {}
         self._window_transmittance = {}
         self.n_bad_pixels = {}
+        self._without_statistics = set()
 
     def calibration_file_path(self, tel_id):
         """Calibration file used for the telescope ``tel_id``"""
@@ -378,23 +391,21 @@ class R0R1Calibrator(TelescopeComponent):
         except KeyError:
             return None
 
-    def __call__(self, event, tel_id=None):
+    def __call__(self, event):
         """
-        Calibrate the telescope ``tel_id`` of the event, or all its telescopes
-        (with R0 data for the observed data, with R1 data for the simulations)
+        Calibrate the telescopes of the event: from their R0 waveforms if ``calibrate_r0``,
+        otherwise from the R1 waveforms of the event source
         """
-        if event.simulation is not None:
-            tel_ids = list(event.r1.tel.keys()) if tel_id is None else [tel_id]
-            for tel in tel_ids:
-                self._calibrate_simulated_telescope(event, tel)
-            return event
-
-        tel_ids = list(event.r0.tel.keys()) if tel_id is None else [tel_id]
-        for tel in tel_ids:
-            self._calibrate_telescope(event, tel)
+        for tel_id in sorted(event.r0.tel.keys() | event.r1.tel.keys()):
+            if self.calibrate_r0.tel[tel_id]:
+                self._calibrate_telescope(event, tel_id)
+            else:
+                self._correct_r1_telescope(event, tel_id)
         return event
 
-    def _calibrate_simulated_telescope(self, event, tel_id):
+    def _correct_r1_telescope(self, event, tel_id):
+        if tel_id not in event.r1.tel:
+            return
         r1 = event.r1.tel[tel_id]
         pde_drop = self.pde_drop(tel_id)
         if pde_drop is not None:
@@ -405,7 +416,7 @@ class R0R1Calibrator(TelescopeComponent):
             mask_bad = np.zeros(r1.waveform.shape[1], dtype=bool)
             mask_bad[bad_pixels] = True
             r1.waveform[:, mask_bad] = 0
-            if event.simulation.tel[tel_id].true_image is not None:
+            if event.simulation is not None and event.simulation.tel[tel_id].true_image is not None:
                 event.simulation.tel[tel_id].true_image[mask_bad] = 0
             self._flag_pixels(event, tel_id, mask_bad)
             self.n_bad_pixels[tel_id] = int(mask_bad.sum())
@@ -416,9 +427,23 @@ class R0R1Calibrator(TelescopeComponent):
         event.monitoring.tel[tel_id].camera.coefficients.outlier_mask = mask_bad[np.newaxis]
 
     def _calibrate_telescope(self, event, tel_id):
+        # the R1 events of a ZMQ stream have no R0 waveforms: nothing to calibrate
+        if tel_id not in event.r0.tel:
+            return
         r0 = event.r0.tel[tel_id]
+        if getattr(r0, "pedestal", None) is None:
+            raise ValueError(
+                f"Telescope {tel_id}: no DigiCam pedestal in the R0 data (simulation?),"
+                " set R0R1Calibrator.calibrate_r0 to false for it"
+            )
         dc_to_pe, _ = self.calibration_parameters(tel_id)
         pedestal_std = event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform.std
+        if pedestal_std is None and tel_id not in self._without_statistics:
+            self._without_statistics.add(tel_id)
+            self.log.warning(
+                "Telescope %d: no statistics of the pedestal events (no monitoring source?): no"
+                " voltage drop correction and no dead pixels", tel_id,
+            )
 
         voltage_drop = np.asarray(self.voltage_drop(tel_id, pedestal_std))
         waveform = (r0.waveform - r0.pedestal[:, np.newaxis]) / dc_to_pe[:, np.newaxis]
