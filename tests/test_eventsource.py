@@ -12,7 +12,7 @@ from ctapipe.io import EventSource, HDF5TableWriter, read_table
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from ctapipe.containers import CoordinateFrameType, EventType, ObservingMode, PointingMode, SchedulingBlockType
 
 from conftest import DARK_FILE, OBSERVATION_RUNS, TRANSITION_FILES, ZFITS_DIR
@@ -495,6 +495,9 @@ def test_digicam_config(input_file, first_sn, digicam_time, fadc_type):
         assert np.sum(card_type == DigicamCardType.TRIGGER) == 8
         assert np.sum(card_type == fadc_type) == 26
     assert (config.digicam_time_sec, config.digicam_time_nanosec) == digicam_time
+    # TimeDelta with ns precision
+    assert isinstance(config.digicam_time, TimeDelta)
+    assert round((config.digicam_time - TimeDelta(digicam_time[0], format="sec")).to_value(u.ns)) == digicam_time[1]
     assert (config.operation_id, config.operation_data) == (0, 0)
 
 

@@ -8,6 +8,7 @@ from enum import Flag, IntEnum
 from functools import partial
 
 import numpy as np
+from astropy.time import TimeDelta
 from ctapipe.containers import (
     ArrayEventContainer,
     CameraMonitoringContainer,
@@ -192,6 +193,14 @@ class DigicamConfigContainer(Container):
     operation_data = Field(-1, "Operation data (reserved)")
     digicam_time_sec = Field(-1, "DigiCam internal clock, seconds")
     digicam_time_nanosec = Field(-1, "DigiCam internal clock, nanoseconds")
+
+    @property
+    def digicam_time(self):
+        """
+        DigiCam internal clock as an astropy `~astropy.time.TimeDelta`, with ns precision:
+        a duration since the origin of the clock, without absolute reference
+        """
+        return TimeDelta(self.digicam_time_sec, self.digicam_time_nanosec / 1e9, format="sec")
 
 
 class StreamCameraConfigContainer(Container):
