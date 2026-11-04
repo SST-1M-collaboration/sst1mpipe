@@ -29,7 +29,9 @@ from sst1mpipe.io.sst1m_event_source import (
     scheduling_block_type,
     tel_id_from_file_name,
 )
+from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.time import camera_clock_to_time
+from sst1mpipe.trigger.emulator import READOUT_SECTOR_ORDER, module_swap_order, readout_to_patch_order
 from sst1mpipe.io.containers import CameraEventType, DigicamConfigContainer, SST1MR0CameraContainer
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE
 
@@ -404,6 +406,68 @@ def test_swap_modules():
             np.testing.assert_array_equal(value[pixels_2], value_ref[pixels_1])
             np.testing.assert_array_equal(value[others], value_ref[others])
         assert not np.array_equal(event["waveform"], event_ref["waveform"])
+
+
+def patch7_trigger_pixels(event, tel_id, swapped_pixels=()):
+    """
+    pixels of the patches fired in the patch7 trigger output, in patch order as in the
+    trigger emulator (readout order of the telescope, module swaps undone)
+    """
+    output = event.r0.tel[tel_id].trigger_output_patch7
+    output = output[readout_to_patch_order(READOUT_SECTOR_ORDER[tel_id], signal="output")]
+    fired = np.any(output[module_swap_order(swapped_pixels)] > 0, axis=1)
+    return np.sort(DigiCam.patch_matrix[fired].indices)
+
+
+@pytest.mark.parametrize("tel_id", [21, 22])
+def test_trigger_pixels(tel_id):
+    """pixels of the patches whose patch7 trigger output is 1 at least once"""
+    source = SST1MEventSource(input_url=OBSERVATION_RUNS[tel_id]["path"], max_events=30)
+    for event in source:
+        trigger = event.trigger.tel[tel_id]
+        np.testing.assert_array_equal(trigger.trigger_pixels, patch7_trigger_pixels(event, tel_id))
+        assert trigger.n_trigger_pixels == len(trigger.trigger_pixels)
+        if event.trigger.event_type == EventType.SUBARRAY:
+            # at least one patch of 3 pixels
+            assert trigger.n_trigger_pixels >= 3
+        else:
+            assert trigger.n_trigger_pixels == 0
+
+
+def test_trigger_pixels_with_swapped_modules():
+    """the trigger pixels follow the pixels of the wrongly connected modules"""
+    tel_id = 21
+    path = OBSERVATION_RUNS[tel_id]["path"]
+    swapped_modules = [{"tel_id": tel_id, "start": "2026-01-20T00:00:00", "stop": "2026-01-22T00:00:00", "modules": [8, 9]}]
+    # the event 51 of the run has a triggered patch in the swapped modules
+    n_events = 60
+    not_swapped = [
+        event.trigger.tel[tel_id].trigger_pixels.copy() for event in SST1MEventSource(input_url=path, max_events=n_events)
+    ]
+    source = SST1MEventSource(input_url=path, max_events=n_events, swapped_modules=swapped_modules)
+
+    n_moved = 0
+    for event, pixels_ref in zip(source, not_swapped, strict=True):
+        swapped = source.swapped_pixels(tel_id, event.trigger.time)
+        [(pixels_1, pixels_2)] = swapped
+        new_position = np.arange(1296)
+        new_position[pixels_1], new_position[pixels_2] = pixels_2, pixels_1
+        pixels = event.trigger.tel[tel_id].trigger_pixels
+        np.testing.assert_array_equal(pixels, np.sort(new_position[pixels_ref]))
+        np.testing.assert_array_equal(pixels, patch7_trigger_pixels(event, tel_id, swapped))
+        n_moved += not np.array_equal(pixels, pixels_ref)
+    assert n_moved > 0
+
+
+def test_no_trigger_pixels_without_trigger_output():
+    output = np.zeros((432, 50))
+    output[0, 10] = 1
+    pixel_ids = np.arange(1296)
+
+    assert len(sst1m_event_source.trigger_pixels(output, 21, pixel_ids)) == 3
+    assert sst1m_event_source.trigger_pixels(np.full((432, 50), np.nan), 21, pixel_ids) is None
+    # telescope without readout order of the trigger output
+    assert sst1m_event_source.trigger_pixels(output, 23, pixel_ids) is None
 
 
 def test_swapped_modules_period():

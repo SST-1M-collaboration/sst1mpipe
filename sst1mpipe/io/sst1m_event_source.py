@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import warnings
+from functools import cache
 from itertools import islice
 
 import numpy as np
@@ -41,7 +42,9 @@ from sst1mpipe.io.containers import (
     CameraEventType,
     SST1MArrayEventContainer,
 )
+from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.time import local_time_to_time
+from sst1mpipe.trigger.emulator import READOUT_SECTOR_ORDER, readout_to_patch_order
 
 logger = logging.getLogger(__name__)
 
@@ -318,10 +321,44 @@ def read_trigger_traces(traces, prepare, name, n_samples):
     return np.full((432, n_samples), np.nan)
 
 
+@cache
+def _patch7_output_order(tel_id):
+    """Indices putting the rows of ``trigger_output_patch7`` in patch order (patch_sw_id)"""
+    return readout_to_patch_order(READOUT_SECTOR_ORDER[tel_id], signal="output")
+
+
+def trigger_pixels(trigger_output_patch7, tel_id, pixel_ids):
+    """
+    Pixels of the patches whose patch7 trigger output is 1 at least once in the readout window.
+
+    Parameters
+    ----------
+    trigger_output_patch7: numpy.ndarray
+        ``trigger_output_patch7`` of the R0 data (432, n_samples), NaN if not in the file
+    tel_id: int
+    pixel_ids: numpy.ndarray
+        DigiCam pixel id of each pixel of the camera, in the order of the R0 waveforms (with
+        the wrongly connected modules swapped back): the trigger patches are made of DigiCam
+        pixel ids, as recorded
+
+    Returns
+    -------
+    numpy.ndarray or None
+        sorted indices of the pixels in the camera; None without trigger output or without
+        readout order for the telescope (`READOUT_SECTOR_ORDER`)
+    """
+    output = np.asarray(trigger_output_patch7)
+    if tel_id not in READOUT_SECTOR_ORDER or not np.all(np.isfinite(output)):
+        return None
+    fired = np.any(output[_patch7_output_order(tel_id)] > 0, axis=1)
+    triggered_ids = DigiCam.patch_matrix[fired].indices
+    return np.flatnonzero(np.isin(pixel_ids, triggered_ids))
+
+
 def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType.SKY_PEDESTAL):
     """
     Fill the R0 data of the telescope (``event.r0``) and the trigger (time, telescope,
-    event type) of ``array_event`` with a DigiCam camera event (``DataModel.CameraEvent``
+    event type, trigger pixels) of ``array_event`` with a DigiCam camera event (``DataModel.CameraEvent``
     protobuf message, converted by `protozfits.make_namedtuple` as in the zfits files).
     The event index is not filled.
 
@@ -368,6 +405,10 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
     array_event.trigger.time = local_time
     array_event.trigger.tel[tel_id].time = local_time
     array_event.trigger.tels_with_trigger = [tel_id]
+    pixels = trigger_pixels(r0.trigger_output_patch7, tel_id, pixel_ids[sort_ids])
+    if pixels is not None:
+        array_event.trigger.tel[tel_id].trigger_pixels = pixels
+        array_event.trigger.tel[tel_id].n_trigger_pixels = len(pixels)
     event_type = camera_event_type_to_event_type(r0.event_type, pedestal_type=pedestal_type)
     array_event.trigger.event_type = event_type
     array_event.trigger.tel[tel_id].event_type = event_type

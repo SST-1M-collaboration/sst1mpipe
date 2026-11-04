@@ -373,6 +373,9 @@ def assert_same_r0_events(stream_events, file_source):
         assert stream_event.trigger.time == file_event.trigger.time
         assert stream_event.trigger.event_type == file_event.trigger.event_type
         assert stream_event.trigger.tels_with_trigger == file_event.trigger.tels_with_trigger
+        np.testing.assert_array_equal(
+            stream_event.trigger.tel[ZFITS_TEL_ID].trigger_pixels, file_event.trigger.tel[ZFITS_TEL_ID].trigger_pixels,
+        )
         for name in R0_FIELDS:
             np.testing.assert_array_equal(
                 getattr(stream_event.r0.tel[ZFITS_TEL_ID], name), getattr(file_event.r0.tel[ZFITS_TEL_ID], name),
