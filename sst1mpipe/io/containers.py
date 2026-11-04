@@ -173,17 +173,12 @@ class SST1MMonitoringContainer(MonitoringContainer):
 
 
 class DigicamConfigContainer(Container):
-    """
-    Configuration of the DigiCam boards of the camera (``DigicamConfig`` table of the
-    raw data file). The arrays have one entry per board slot (n_boards, 39). The
-    empty slots have a serial number ``sn`` of 0, and their other entries are not
-    meaningful (e.g. a card type 0 or 1): select the boards with ``sn > 0``.
-    """
+    """Configuration of the DigiCam"""
 
     default_prefix = "digicam"
 
     protocol_vers = Field(None, "Protocol version of each board (n_boards)")
-    sn = Field(None, "Serial number of each board (n_boards)")
+    sn = Field(None, "Serial number of each board (n_boards), 0 for the empty board slots")
     hv = Field(None, "Hardware version of each board (n_boards)")
     gateware_rev = Field(None, "Gateware revision of each board (n_boards)")
     gateware_vers = Field(None, "Gateware version of each board (n_boards)")
