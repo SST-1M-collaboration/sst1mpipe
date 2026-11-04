@@ -4,7 +4,7 @@ Containers of the SST-1M data. The events are ctapipe `~ctapipe.containers.Array
 the ADC samples of the pedestal events in the camera monitoring. The other data levels follow ctapipe.
 The PyTables descriptions are those of the tables written by sst1mpipe in the DL1/DL2 files.
 """
-from enum import Flag
+from enum import Flag, IntEnum
 from functools import partial
 
 import numpy as np
@@ -32,6 +32,7 @@ from tables import (
 
 __all__ = [
     "CameraEventType",
+    "DigicamCardType",
     "PEDESTAL_EVENT_TYPES",
     "SST1MR0CameraContainer",
     "SST1MR0Container",
@@ -61,6 +62,14 @@ class CameraEventType(Flag):
     CONTINUOUS = 0x80  # continuous readout marker
     MUON_DETECT = 0x10000  # camera server detected muon
     HILLAS = 0x20000  # camera server computed Hillas parametrs
+
+
+class DigicamCardType(IntEnum):
+    """Type of a DigiCam board (``DigicamCardType`` enum of the ``DigicamConfig`` protobuf message)"""
+
+    TRIGGER = 0
+    FADC_ANALOG = 1
+    FADC_INTERSIL = 2
 
 
 # ctapipe event types of the SST-1M pedestal events: SKY_PEDESTAL, DARK_PEDESTAL in the dark runs
@@ -166,8 +175,9 @@ class SST1MMonitoringContainer(MonitoringContainer):
 class DigicamConfigContainer(Container):
     """
     Configuration of the DigiCam boards of the camera (``DigicamConfig`` table of the
-    raw data file). The arrays have one entry per board slot (n_boards, 39), 0 for
-    the empty slots.
+    raw data file). The arrays have one entry per board slot (n_boards, 39). The
+    empty slots have a serial number ``sn`` of 0, and their other entries are not
+    meaningful (e.g. a card type 0 or 1): select the boards with ``sn > 0``.
     """
 
     default_prefix = "digicam"
@@ -178,15 +188,11 @@ class DigicamConfigContainer(Container):
     gateware_rev = Field(None, "Gateware revision of each board (n_boards)")
     gateware_vers = Field(None, "Gateware version of each board (n_boards)")
     gateware_code = Field(None, "Gateware code of each board (n_boards)")
-    gateware_card_type = Field(
-        None, "Gateware card type of each board (n_boards): 0 = TRIGGER, 1 = FADC_ANALOG, 2 = FADC_INTERSIL"
-    )
+    gateware_card_type = Field(None, "Gateware card type of each board, `DigicamCardType` (n_boards)")
     firmware_rev = Field(None, "Firmware revision of each board (n_boards)")
     firmware_vers = Field(None, "Firmware version of each board (n_boards)")
     firmware_code = Field(None, "Firmware code of each board (n_boards)")
-    firmware_card_type = Field(
-        None, "Firmware card type of each board (n_boards): 0 = TRIGGER, 1 = FADC_ANALOG, 2 = FADC_INTERSIL"
-    )
+    firmware_card_type = Field(None, "Firmware card type of each board, `DigicamCardType` (n_boards)")
     operation_id = Field(-1, "Operation id (reserved)")
     operation_data = Field(-1, "Operation data (reserved)")
     digicam_time_sec = Field(-1, "DigiCam internal clock, seconds")
