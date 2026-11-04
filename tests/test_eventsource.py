@@ -12,7 +12,7 @@ from ctapipe.io import EventSource, HDF5TableWriter, read_table
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from ctapipe.containers import CoordinateFrameType, EventType, ObservingMode, PointingMode, SchedulingBlockType
 
 from conftest import DARK_FILE, OBSERVATION_RUNS, TRANSITION_FILES, ZFITS_DIR
@@ -30,7 +30,7 @@ from sst1mpipe.io.sst1m_event_source import (
     tel_id_from_file_name,
 )
 from sst1mpipe.time import camera_clock_to_time
-from sst1mpipe.io.containers import CameraEventType, DigicamConfigContainer, SST1MR0CameraContainer
+from sst1mpipe.io.containers import CameraEventType, DigicamCardType, DigicamConfigContainer, SST1MR0CameraContainer
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE
 
 ZFITS_FILES = glob.glob(str(ZFITS_DIR / "*fits.fz"))
@@ -468,12 +468,12 @@ def test_no_warning_pointing_in_file(monkeypatch, caplog):
     assert "pointing" not in caplog.text.lower()
 
 
-@pytest.mark.parametrize("input_file, first_sn, digicam_time", [
-    (DARK_FILE, 1120024, (626, 367976660)),
-    (OBSERVATION_RUNS[21]["path"], 2110003, (5122, 938643252)),
-    (TRANSITION_FILES[22], 1120024, (6865, 247889788)),
+@pytest.mark.parametrize("input_file, first_sn, digicam_time, fadc_type", [
+    (DARK_FILE, 1120024, (626, 367976660), DigicamCardType.FADC_ANALOG),
+    (OBSERVATION_RUNS[21]["path"], 2110003, (5122, 938643252), DigicamCardType.FADC_INTERSIL),
+    (TRANSITION_FILES[22], 1120024, (6865, 247889788), DigicamCardType.FADC_ANALOG),
 ])
-def test_digicam_config(input_file, first_sn, digicam_time):
+def test_digicam_config(input_file, first_sn, digicam_time, fadc_type):
     """configuration of the DigiCam boards, from the DigicamConfig table of the file"""
     source = SST1MEventSource(input_url=input_file, max_events=1)
     config = source.digicam_config
@@ -490,7 +490,14 @@ def test_digicam_config(input_file, first_sn, digicam_time):
     assert np.all(config.protocol_vers[boards] == 1)
     assert set(config.firmware_rev[boards]) == {39, 46, 48}
     assert set(config.gateware_rev[boards]) == {23, 25}
+    # 8 trigger boards and 26 FADC boards
+    for card_type in (config.gateware_card_type[boards], config.firmware_card_type[boards]):
+        assert np.sum(card_type == DigicamCardType.TRIGGER) == 8
+        assert np.sum(card_type == fadc_type) == 26
     assert (config.digicam_time_sec, config.digicam_time_nanosec) == digicam_time
+    # TimeDelta with ns precision
+    assert isinstance(config.digicam_time, TimeDelta)
+    assert round((config.digicam_time - TimeDelta(digicam_time[0], format="sec")).to_value(u.ns)) == digicam_time[1]
     assert (config.operation_id, config.operation_data) == (0, 0)
 
 

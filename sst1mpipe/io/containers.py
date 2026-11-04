@@ -4,10 +4,11 @@ Containers of the SST-1M data. The events are ctapipe `~ctapipe.containers.Array
 the ADC samples of the pedestal events in the camera monitoring. The other data levels follow ctapipe.
 The PyTables descriptions are those of the tables written by sst1mpipe in the DL1/DL2 files.
 """
-from enum import Flag
+from enum import Flag, IntEnum
 from functools import partial
 
 import numpy as np
+from astropy.time import TimeDelta
 from ctapipe.containers import (
     ArrayEventContainer,
     CameraMonitoringContainer,
@@ -32,6 +33,7 @@ from tables import (
 
 __all__ = [
     "CameraEventType",
+    "DigicamCardType",
     "PEDESTAL_EVENT_TYPES",
     "SST1MR0CameraContainer",
     "SST1MR0Container",
@@ -63,6 +65,14 @@ class CameraEventType(Flag):
     HILLAS = 0x20000  # camera server computed Hillas parametrs
 
 
+class DigicamCardType(IntEnum):
+    """Type of a DigiCam board (``DigicamCardType`` enum of the ``DigicamConfig`` protobuf message)"""
+
+    TRIGGER = 0
+    FADC_ANALOG = 1
+    FADC_INTERSIL = 2
+
+
 # ctapipe event types of the SST-1M pedestal events: SKY_PEDESTAL, DARK_PEDESTAL in the dark runs
 # and ELECTRONIC_PEDESTAL in the bias runs
 PEDESTAL_EVENT_TYPES = (EventType.SKY_PEDESTAL, EventType.DARK_PEDESTAL, EventType.ELECTRONIC_PEDESTAL)
@@ -83,9 +93,8 @@ class SST1MR0CameraContainer(R0CameraContainer):
     pixel_flags = Field(None, "numpy array containing pixel flags (n_pixels)")
     pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels)")
     camera_event_number = Field(None, "event number within the first trigger of operation")
-    event_time = Field(None, "timestamp from the internal DigiCam clock (ns, TAI)")
+    event_time = Field(None, "White Rabbit timestamp of the event (ns, TAI)")
     gps_time = Field(None, "timestamp from a precise external clock (ns)")
-    white_rabbit_time = Field(None, "precise White Rabbit based timestamp")
     _event_type = Field(None, "camera event type")
     trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples)")
     trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples)")
@@ -164,29 +173,33 @@ class SST1MMonitoringContainer(MonitoringContainer):
 
 
 class DigicamConfigContainer(Container):
-    """
-    Configuration of the DigiCam boards of the camera (``DigicamConfig`` table of the
-    raw data file). The arrays have one entry per board slot (n_boards, 39), 0 for
-    the empty slots.
-    """
+    """Configuration of the DigiCam"""
 
     default_prefix = "digicam"
 
     protocol_vers = Field(None, "Protocol version of each board (n_boards)")
-    sn = Field(None, "Serial number of each board (n_boards)")
-    hv = Field(None, "High voltage status of each board (n_boards)")
+    sn = Field(None, "Serial number of each board (n_boards), 0 for the empty board slots")
+    hv = Field(None, "Hardware version of each board (n_boards)")
     gateware_rev = Field(None, "Gateware revision of each board (n_boards)")
     gateware_vers = Field(None, "Gateware version of each board (n_boards)")
     gateware_code = Field(None, "Gateware code of each board (n_boards)")
-    gateware_card_type = Field(None, "Card type of the gateware of each board (n_boards)")
+    gateware_card_type = Field(None, "Gateware card type of each board, `DigicamCardType` (n_boards)")
     firmware_rev = Field(None, "Firmware revision of each board (n_boards)")
     firmware_vers = Field(None, "Firmware version of each board (n_boards)")
     firmware_code = Field(None, "Firmware code of each board (n_boards)")
-    firmware_card_type = Field(None, "Card type of the firmware of each board (n_boards)")
-    operation_id = Field(-1, "Id of the operation of DigiCam")
-    operation_data = Field(-1, "Data of the operation of DigiCam")
-    digicam_time_sec = Field(-1, "DigiCam time of the configuration, seconds")
-    digicam_time_nanosec = Field(-1, "DigiCam time of the configuration, nanoseconds")
+    firmware_card_type = Field(None, "Firmware card type of each board, `DigicamCardType` (n_boards)")
+    operation_id = Field(-1, "Operation id (reserved)")
+    operation_data = Field(-1, "Operation data (reserved)")
+    digicam_time_sec = Field(-1, "DigiCam internal clock, seconds")
+    digicam_time_nanosec = Field(-1, "DigiCam internal clock, nanoseconds")
+
+    @property
+    def digicam_time(self):
+        """
+        DigiCam internal clock as an astropy `~astropy.time.TimeDelta`, with ns precision:
+        a duration since the origin of the clock, without absolute reference
+        """
+        return TimeDelta(self.digicam_time_sec, self.digicam_time_nanosec / 1e9, format="sec")
 
 
 class StreamCameraConfigContainer(Container):
