@@ -12,14 +12,8 @@ from conftest import TRANSITION_FILES
 from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.resources import CONFIG_DIR
 from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator, fixed_point
-from sst1mpipe.trigger.emulator import (
-    READOUT_SECTOR_ORDER,
-    fadc,
-    module_swap_order,
-    neighbor_matrix,
-    readout_to_patch_order,
-    score_quantizer,
-)
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.trigger.emulator import fadc, neighbor_matrix, score_quantizer
 from sst1mpipe.utils import get_subarray
 
 Q14 = {
@@ -111,34 +105,22 @@ def test_trigger_geometry():
     assert (neighbors + np.eye(432, dtype=np.int64) != DigiCam.cluster_7_matrix).sum() == 0
 
 
-def test_readout_order():
-    for signal in ("input", "output"):
-        # Sectors in the order sst1mpipe's reader assumes: nothing to reorder.
-        assert np.array_equal(readout_to_patch_order((1, 2, 3), signal), np.arange(432))
-        # Telescope 2: same layout inside each sector, sectors shifted by one.
-        tel2 = readout_to_patch_order(READOUT_SECTOR_ORDER[22], signal)
-        assert sorted(tel2.tolist()) == list(range(432))
-        assert not np.array_equal(tel2, np.arange(432))
-
-
-def test_module_swap_moves_trigger_traces_with_pixels():
-    from astropy.io import ascii
-
-    from sst1mpipe.resources import PIXEL_MAPPING_FILE
-
-    # Telescope 2, 2023-09-01 to 2024-07-18: modules 59 and 88 connected in each other's place.
-    pix_maps = ascii.read(PIXEL_MAPPING_FILE)
-    pixels = [np.sort(np.asarray(pix_maps[pix_maps["module"] == module]["pixel_sw_id"])) for module in (59, 88)]
-    order = module_swap_order([pixels])
-
-    rng = np.random.default_rng(0)
-    waveform, baseline = rng.integers(0, 100, (1296, 50)), np.full(1296, 50.0)
-    corrected = waveform.copy()  # what SST1MEventSource does to the pixels
-    corrected[pixels[0]], corrected[pixels[1]] = waveform[pixels[1]], waveform[pixels[0]]
-
-    assert np.array_equal(fadc(waveform, baseline)[order], fadc(corrected, baseline))
-    assert np.count_nonzero(order != np.arange(432)) == 8
-    assert np.array_equal(module_swap_order([]), np.arange(432))
+@pytest.mark.parametrize("tel_id", sorted(TRANSITION_FILES))
+def test_trigger_traces_follow_the_pixels(tel_id):
+    # the trigger input traces of the camera (FPGA) are the patches rebuilt from the pixel waveforms:
+    # checks the sector order of the telescope and the patch order of the reader
+    emu = TriggerPatch7Emulator(subarray=get_subarray())
+    source = SST1MEventSource(input_url=TRANSITION_FILES[tel_id], max_events=20)
+    camera, rebuilt = [], []
+    for event in source:
+        r0 = event.r0.tel[tel_id]
+        camera.append(emu.trigger_traces(event, tel_id))
+        rebuilt.append(fadc(r0.waveform[0], r0.pedestal))
+        # the patch7 output of the camera is the emulated one
+        output, _ = emu(event, tel_id)
+        assert np.count_nonzero(output != emu.hardware_output(event, tel_id)) <= 0.001 * output.size
+    camera, rebuilt = np.ravel(camera), np.ravel(rebuilt)
+    assert np.corrcoef(camera, rebuilt)[0, 1] > 0.99
 
 
 def test_patch7_sums_clusters():

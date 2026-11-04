@@ -29,10 +29,16 @@ from ctapipe.io.datalevels import DataLevel
 from protozfits import File
 
 from sst1mpipe.constants import (
+    DEFAULT_PATCH_ID_INPUT_SORT_IDS,
+    DEFAULT_PATCH_ID_OUTPUT_SORT_IDS,
+    N_PATCHES,
+    N_TRIGGER_SECTORS,
     PATCH_ID_INPUT_SORT_IDS,
     PATCH_ID_OUTPUT_SORT_IDS,
+    PATCHES_PER_SECTOR,
     SUBARRAY_DESCRIPTION
 )
+from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.resources import PIXEL_MAPPING_FILE
 from sst1mpipe.io.containers import (
     DigicamConfigContainer,
@@ -292,29 +298,83 @@ def pixel_order(pixel_swaps, tel_id, pixel_ids, time):
 
 
 def prepare_trigger_input(traces):
-    A, B = 3, 192
-    cut = 144
-    traces = traces.reshape(-1, A)
-    traces = traces.reshape(-1, A, B)
-    traces = traces[..., :cut]
+    """
+    ``trigger_input_traces`` of a camera event (n_samples x 3 sectors x 192 channels, the first
+    144 used) as (432, n_samples), in the readout order (blocks of 144 patches, one per sector)
+    """
+    n_channels = 192  # per sector
+    traces = traces.reshape(-1, N_TRIGGER_SECTORS, n_channels)
+    traces = traces[..., :PATCHES_PER_SECTOR]
     traces = traces.reshape(traces.shape[0], -1)
-    traces = traces.T
-    return traces[PATCH_ID_INPUT_SORT_IDS]
+    return traces.T
 
 
 def prepare_trigger_output(traces):
-    A, B, C = 3, 18, 8
-    traces = np.unpackbits(traces.reshape(-1, A, B, 1), axis=-1)
+    """
+    Trigger output of a camera event (n_samples x 3 sectors x 18 bytes, one bit per cluster,
+    least significant bit first) as (432, n_samples), in the readout order (blocks of 144 clusters,
+    one per sector)
+    """
+    n_bytes = PATCHES_PER_SECTOR // 8  # per sector
+    traces = np.unpackbits(traces.reshape(-1, N_TRIGGER_SECTORS, n_bytes, 1), axis=-1)
     traces = traces[..., ::-1]
-    traces = traces.reshape(-1, A * B * C).T
-    return traces[PATCH_ID_OUTPUT_SORT_IDS]
+    traces = traces.reshape(-1, N_PATCHES)
+    return traces.T
 
 
-def read_trigger_traces(traces, prepare, name, n_samples):
-    if len(traces) > 0:
-        return prepare(traces)
-    warnings.warn(f'{name} does not exist: --> nan', stacklevel=3)
-    return np.full((432, n_samples), np.nan)
+# trigger traces of the camera events: R0 field, conversion to (432, n_samples) in readout order,
+# and tel_id -> indices putting them in patch_sw_id order (default for the other telescopes)
+TRIGGER_TRACES = (
+    ("trigger_input_traces", prepare_trigger_input, PATCH_ID_INPUT_SORT_IDS, DEFAULT_PATCH_ID_INPUT_SORT_IDS),
+    ("trigger_output_patch7", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS, DEFAULT_PATCH_ID_OUTPUT_SORT_IDS),
+    ("trigger_output_patch19", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS, DEFAULT_PATCH_ID_OUTPUT_SORT_IDS),
+    ("trigger_output_muon", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS, DEFAULT_PATCH_ID_OUTPUT_SORT_IDS),
+)
+
+
+def trigger_patch_order(recorded_pixel_ids, patch_matrix=DigiCam.patch_matrix):
+    """
+    Order of the trigger patches following the pixels, for the wrongly connected modules.
+
+    For some periods two modules were connected in each other's place: the pixels are moved back
+    (see `pixel_order`), but the trigger traces computed by the FPGA stay as recorded.
+    ``traces[order]`` puts each patch back on its pixels.
+
+    Parameters
+    ----------
+    recorded_pixel_ids: np.ndarray
+        (n_pixels): pixel id, as recorded, of each pixel of the waveform (np.arange without swap)
+    patch_matrix: scipy.sparse.csr_matrix
+        (n_patches, n_pixels): 1 for the 3 pixels of each patch (`DigiCam.patch_matrix`)
+
+    Returns
+    -------
+    np.ndarray or None: None if the patches are not moved
+    """
+    if np.array_equal(recorded_pixel_ids, np.arange(len(recorded_pixel_ids))):
+        return None
+    n_patches = patch_matrix.shape[0]
+    # row p of the CSR patch matrix holds the 3 pixels of the patch p
+    triplets = patch_matrix.indices.reshape(n_patches, -1)
+    patch_of_pixel = np.empty(patch_matrix.shape[1], dtype=int)
+    patch_of_pixel[triplets] = np.arange(n_patches)[:, None]
+    source_patches = patch_of_pixel[recorded_pixel_ids[triplets]]  # one patch per row if whole modules move
+    if np.any(source_patches != source_patches[:, :1]):
+        raise ValueError("Swapped modules split a trigger patch, the trigger traces cannot follow the pixels")
+    return source_patches[:, 0]
+
+
+def read_trigger_traces(traces, prepare, name, n_samples, sort_ids, patch_order=None):
+    """
+    Trigger traces of a camera event (432, n_samples) in patch_sw_id order: ``sort_ids`` puts the
+    readout order in patch_sw_id order, ``patch_order`` (see `trigger_patch_order`) moves the
+    patches of the wrongly connected modules. nan if the traces are not in the camera event.
+    """
+    if len(traces) == 0:
+        warnings.warn(f'{name} does not exist: --> nan', stacklevel=3)
+        return np.full((N_PATCHES, n_samples), np.nan)
+    traces = prepare(traces)[sort_ids]
+    return traces if patch_order is None else traces[patch_order]
 
 
 def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType.SKY_PEDESTAL):
@@ -323,6 +383,10 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
     event type) of ``array_event`` with a DigiCam camera event (``DataModel.CameraEvent``
     protobuf message, converted by `protozfits.make_namedtuple` as in the zfits files).
     The event index is not filled.
+
+    The pixels are in pixel id order and the trigger traces in patch_sw_id order (sectors of
+    the telescope in `sst1mpipe.constants.TRIGGER_SECTOR_ORDER`), with the wrongly connected
+    modules moved back (``order``) in both.
 
     Parameters
     ----------
@@ -356,13 +420,13 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
     if camera_event.trig is not None:
         r0.gps_time = local_time_to_time(camera_event.trig.timeSec, camera_event.trig.timeNanoSec)
     r0.event_type = camera_event.event_type
-    for name, prepare in [
-        ("trigger_input_traces", prepare_trigger_input),
-        ("trigger_output_patch7", prepare_trigger_output),
-        ("trigger_output_patch19", prepare_trigger_output),
-        ("trigger_output_muon", prepare_trigger_output),
-    ]:
-        setattr(r0, name, read_trigger_traces(getattr(camera_event, name), prepare, name, n_samples))
+    patch_order = trigger_patch_order(np.asarray(pixel_ids)[sort_ids])
+    for name, prepare, sort_ids_of_tel, default_sort_ids in TRIGGER_TRACES:
+        traces = read_trigger_traces(
+            getattr(camera_event, name), prepare, name, n_samples,
+            sort_ids=sort_ids_of_tel.get(tel_id, default_sort_ids), patch_order=patch_order,
+        )
+        setattr(r0, name, traces)
 
     array_event.trigger.time = local_time
     array_event.trigger.tel[tel_id].time = local_time

@@ -28,6 +28,7 @@ from sst1mpipe.io.sst1m_event_source import (
     parse_target_field,
     scheduling_block_type,
     tel_id_from_file_name,
+    trigger_patch_order,
 )
 from sst1mpipe.time import camera_clock_to_time
 from sst1mpipe.io.containers import CameraEventType, DigicamCardType, DigicamConfigContainer, SST1MR0CameraContainer
@@ -404,6 +405,53 @@ def test_swap_modules():
             np.testing.assert_array_equal(value[pixels_2], value_ref[pixels_1])
             np.testing.assert_array_equal(value[others], value_ref[others])
         assert not np.array_equal(event["waveform"], event_ref["waveform"])
+
+
+TRIGGER_TRACES = ("trigger_input_traces", "trigger_output_patch7", "trigger_output_patch19", "trigger_output_muon")
+
+
+def test_trigger_patch_order_follows_the_pixels():
+    from sst1mpipe.instrument.camera import DigiCam
+    from sst1mpipe.trigger.emulator import fadc
+
+    source = SST1MEventSource(input_url=DARK_FILE, max_events=1, swapped_modules=SWAPPED_MODULES)
+    [(pixels_1, pixels_2)] = source.swapped_pixels(DARK_TEL_ID, DARK_EVENT_TIME[0])
+    recorded_pixel_ids = np.arange(1296)
+    recorded_pixel_ids[pixels_1], recorded_pixel_ids[pixels_2] = pixels_2, pixels_1
+    order = trigger_patch_order(recorded_pixel_ids)
+
+    # the patches rebuilt from the corrected pixels are the recorded patches moved by the order
+    rng = np.random.default_rng(0)
+    waveform, baseline = rng.integers(0, 100, (1296, 50)), np.full(1296, 50.0)
+    corrected = waveform[recorded_pixel_ids]
+    assert np.array_equal(fadc(waveform, baseline)[order], fadc(corrected, baseline))
+    # 2 modules of 4 patches
+    assert np.count_nonzero(order != np.arange(432)) == 8
+    assert trigger_patch_order(np.arange(1296)) is None
+
+    # a swap splitting a patch is refused
+    split = np.arange(1296)
+    patch = DigiCam.patch_matrix[0].indices
+    split[patch[0]], split[1295] = 1295, patch[0]
+    with pytest.raises(ValueError, match="split a trigger patch"):
+        trigger_patch_order(split)
+
+
+def test_swap_modules_trigger_traces():
+
+    swapped = SST1MEventSource(input_url=DARK_FILE, max_events=3, swapped_modules=SWAPPED_MODULES)
+    not_swapped = SST1MEventSource(input_url=DARK_FILE, max_events=3)
+    [(pixels_1, pixels_2)] = swapped.swapped_pixels(DARK_TEL_ID, DARK_EVENT_TIME[0])
+    recorded_pixel_ids = np.arange(1296)
+    recorded_pixel_ids[pixels_1], recorded_pixel_ids[pixels_2] = pixels_2, pixels_1
+    order = trigger_patch_order(recorded_pixel_ids)
+
+    # the trigger traces are moved with the pixels
+    for event, event_ref in zip(swapped, not_swapped, strict=True):
+        r0, r0_ref = event.r0.tel[DARK_TEL_ID], event_ref.r0.tel[DARK_TEL_ID]
+        for name in TRIGGER_TRACES:
+            np.testing.assert_array_equal(getattr(r0, name), getattr(r0_ref, name)[order])
+        assert not np.array_equal(r0.trigger_input_traces, r0_ref.trigger_input_traces)
 
 
 def test_swapped_modules_period():
