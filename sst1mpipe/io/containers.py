@@ -174,19 +174,23 @@ class DigicamConfigContainer(Container):
 
     protocol_vers = Field(None, "Protocol version of each board (n_boards)")
     sn = Field(None, "Serial number of each board (n_boards)")
-    hv = Field(None, "High voltage status of each board (n_boards)")
+    hv = Field(None, "Hardware version of each board (n_boards)")
     gateware_rev = Field(None, "Gateware revision of each board (n_boards)")
     gateware_vers = Field(None, "Gateware version of each board (n_boards)")
     gateware_code = Field(None, "Gateware code of each board (n_boards)")
-    gateware_card_type = Field(None, "Card type of the gateware of each board (n_boards)")
+    gateware_card_type = Field(
+        None, "Gateware card type of each board (n_boards): 0 = TRIGGER, 1 = FADC_ANALOG, 2 = FADC_INTERSIL"
+    )
     firmware_rev = Field(None, "Firmware revision of each board (n_boards)")
     firmware_vers = Field(None, "Firmware version of each board (n_boards)")
     firmware_code = Field(None, "Firmware code of each board (n_boards)")
-    firmware_card_type = Field(None, "Card type of the firmware of each board (n_boards)")
-    operation_id = Field(-1, "Id of the operation of DigiCam")
-    operation_data = Field(-1, "Data of the operation of DigiCam")
-    digicam_time_sec = Field(-1, "DigiCam time of the configuration, seconds")
-    digicam_time_nanosec = Field(-1, "DigiCam time of the configuration, nanoseconds")
+    firmware_card_type = Field(
+        None, "Firmware card type of each board (n_boards): 0 = TRIGGER, 1 = FADC_ANALOG, 2 = FADC_INTERSIL"
+    )
+    operation_id = Field(-1, "Operation id (reserved)")
+    operation_data = Field(-1, "Operation data (reserved)")
+    digicam_time_sec = Field(-1, "DigiCam internal clock, seconds")
+    digicam_time_nanosec = Field(-1, "DigiCam internal clock, nanoseconds")
 
 
 class StreamCameraConfigContainer(Container):
