@@ -1,18 +1,7 @@
 import numpy as np
-from astropy import units as u
-
-
-
-from ctapipe.instrument.subarray import EarthLocation, SubarrayDescription
+from ctapipe.instrument.subarray import SubarrayDescription
 from sst1mpipe.instrument.camera import Camera
 from sst1mpipe.resources import SUBARRAY_FILE
-
-# Should be SST1M position - #TODO
-REFERENCE_LOCATION = EarthLocation(
-    lon=0 * u.deg,
-    lat=0 * u.deg,
-    height=0 * u.m,  # MC obs-level
-)
 
 SUBARRAY_DESCRIPTION = SubarrayDescription.from_hdf(SUBARRAY_FILE)
 

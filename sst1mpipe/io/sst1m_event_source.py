@@ -31,7 +31,6 @@ from protozfits import File
 from sst1mpipe.constants import (
     PATCH_ID_INPUT_SORT_IDS,
     PATCH_ID_OUTPUT_SORT_IDS,
-    REFERENCE_LOCATION,
     SUBARRAY_DESCRIPTION
 )
 from sst1mpipe.resources import PIXEL_MAPPING_FILE
@@ -381,28 +380,6 @@ class SST1MEventSource(EventSource):
 
     Reimplementation of CTAPIPE_IO_LST for SST1M which also uses fits input files which are not readable by a default ctapipe
     """
-
-    reference_position_lon = Float(
-        default_value = REFERENCE_LOCATION.lon.deg,
-        help = (
-            "Longitude of the reference location for telescope GroundFrame coordinates."
-        )
-    ).tag(config = True)
-
-    reference_position_lat = Float(
-        default_value = REFERENCE_LOCATION.lat.deg,
-        help = (
-            "Latitude of the reference location for telescope GroundFrame coordinates."
-        )
-    ).tag(config = True)
-
-    reference_position_height = Float(
-        default_value = REFERENCE_LOCATION.height.to_value(u.m),
-        help = (
-            "Height of the reference location for telescope GroundFrame coordinates."
-            " Default is current MC obslevel."
-        )
-    ).tag(config = True)
 
     pointing_ra = Float(
         default_value=None,
