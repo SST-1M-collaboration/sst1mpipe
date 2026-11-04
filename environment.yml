@@ -33,6 +33,7 @@ dependencies:
   - sphinx-togglebutton
   - sphinxcontrib-mermaid
   - nbsphinx
+  - pandoc # used by nbsphinx to convert the markdown cells of the notebooks
   - numpydoc
   - vitables # to visualize hdf5 tables
   - wheel
