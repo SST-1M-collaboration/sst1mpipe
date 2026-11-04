@@ -85,7 +85,6 @@ class SST1MR0CameraContainer(R0CameraContainer):
     camera_event_number = Field(None, "event number within the first trigger of operation")
     event_time = Field(None, "timestamp from the internal DigiCam clock (ns, TAI)")
     gps_time = Field(None, "timestamp from a precise external clock (ns)")
-    white_rabbit_time = Field(None, "precise White Rabbit based timestamp")
     _event_type = Field(None, "camera event type")
     trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples)")
     trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples)")
