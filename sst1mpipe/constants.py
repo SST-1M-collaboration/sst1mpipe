@@ -25,10 +25,10 @@ N_CHANNELS = 1
 # - ``trigger_output_patch7``, ``trigger_output_patch19`` and ``trigger_output_muon`` (one bit per
 #   cluster, 18 bytes per sector): position 144 * (micro_crate - 1) + patch_trig_out
 
-N_TRIGGER_SECTORS = 3
+N_SECTORS = 3
 PATCHES_PER_SECTOR = 144
 N_TRACES_PER_SECTOR = 192  # trigger input traces sent per sector, the first PATCHES_PER_SECTOR are the patches
-N_PATCHES = N_TRIGGER_SECTORS * PATCHES_PER_SECTOR  # 432
+N_PATCHES = N_SECTORS * PATCHES_PER_SECTOR  # 432
 
 # columns of the camera configuration file (one row per pixel) used for the trigger patches
 CAMERA_CONFIG_TRIGGER_COLUMNS = {
@@ -124,7 +124,7 @@ def patch_sort_ids(patch_ids, sector_order):
     sector_order: tuple
         Sector (micro_crate) of each block of 144 patches of the traces of the telescope
     """
-    blocks = np.reshape(patch_ids, (N_TRIGGER_SECTORS, PATCHES_PER_SECTOR))
+    blocks = np.reshape(patch_ids, (N_SECTORS, PATCHES_PER_SECTOR))
     return np.argsort(blocks[np.subtract(sector_order, 1)].ravel())
 
 

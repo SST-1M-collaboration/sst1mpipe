@@ -31,7 +31,7 @@ from protozfits import File
 from sst1mpipe.constants import (
     N_PATCHES,
     N_TRACES_PER_SECTOR,
-    N_TRIGGER_SECTORS,
+    N_SECTORS,
     PATCH_SORT_IDS,
     PATCHES_PER_SECTOR,
     SUBARRAY_DESCRIPTION,
@@ -301,7 +301,7 @@ def prepare_trigger_input(traces):
     ``trigger_input_traces`` of a camera event (n_samples x 3 sectors x 192 channels, the first
     144 used) as (432, n_samples), in the readout order (blocks of 144 patches, one per sector)
     """
-    traces = traces.reshape(-1, N_TRIGGER_SECTORS, N_TRACES_PER_SECTOR)
+    traces = traces.reshape(-1, N_SECTORS, N_TRACES_PER_SECTOR)
     traces = traces[..., :PATCHES_PER_SECTOR]
     traces = traces.reshape(traces.shape[0], -1)
     return traces.T
@@ -314,7 +314,7 @@ def prepare_trigger_output(traces):
     one per sector)
     """
     n_bytes = PATCHES_PER_SECTOR // 8  # per sector
-    traces = np.unpackbits(traces.reshape(-1, N_TRIGGER_SECTORS, n_bytes, 1), axis=-1)
+    traces = np.unpackbits(traces.reshape(-1, N_SECTORS, n_bytes, 1), axis=-1)
     traces = traces[..., ::-1]
     traces = traces.reshape(-1, N_PATCHES)
     return traces.T
