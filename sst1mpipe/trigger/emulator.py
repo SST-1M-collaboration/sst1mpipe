@@ -44,24 +44,6 @@ from sst1mpipe.trigger import fixed_point
 BASELINE_SAMPLE = 6
 
 
-def fadc(waveform, baseline, patch_matrix=DigiCam.patch_matrix, pixel_flags=None):
-    """Triplet traces (432, T) from the raw waveforms (1296, T), like the FADC gateware.
-
-    Each pixel: sample - floor(baseline), signed, clipped above at 4095 only; 0 for the pixels
-    with a ``pixel_flags`` of 0 (pixels without data, real data only).
-    Each triplet: sum of its 3 pixels, clipped to [0, 255].
-
-    The DigiCam baseline is updated continuously by the FPGA: with the baseline stored in the
-    camera event (``r0.pedestal``), the traces are those of the camera exactly at the sample
-    `BASELINE_SAMPLE`, and within a few ADC elsewhere.
-    """
-    pixels = waveform.astype(np.int64) - np.floor(baseline).astype(np.int64)[:, None]
-    pixels = np.minimum(pixels, 4095)
-    if pixel_flags is not None:
-        pixels[np.asarray(pixel_flags) == 0] = 0
-    return np.clip(patch_matrix.dot(pixels), 0, 255)
-
-
 def score_quantizer(traces, edges):
     """Code of each sample = number of edges it reaches (value >= edge)."""
     return np.searchsorted(edges, traces, side="right")
@@ -82,6 +64,24 @@ class TriggerEmulator(TelescopeComponent):
     def __init__(self, subarray, config=None, parent=None, **kwargs):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
 
+    @classmethod
+    def _compute_trigger_traces(cls, waveform, baseline, pixel_flags=None, patch_matrix=DigiCam.patch_matrix):
+        """Triplet traces (432, T) from the raw waveforms (1296, T), like the FADC gateware.
+
+        Each pixel: sample - floor(baseline), signed, clipped above at 4095 only; 0 for the pixels
+        with a ``pixel_flags`` of 0 (pixels without data, real data only).
+        Each triplet: sum of its 3 pixels, clipped to [0, 255].
+
+        The DigiCam baseline is updated continuously by the FPGA: with the baseline stored in the
+        camera event (``r0.pedestal``), the traces are those of the camera exactly at the sample
+        `BASELINE_SAMPLE`, and within a few ADC elsewhere.
+        """
+        pixels = waveform.astype(np.int64) - np.floor(baseline).astype(np.int64)[:, None]
+        pixels = np.minimum(pixels, 4095)
+        if pixel_flags is not None:
+            pixels[np.asarray(pixel_flags) == 0] = 0
+        return np.clip(patch_matrix.dot(pixels), 0, 255)
+
     def trigger_traces(self, event, tel_id, pedestal=None):
         """
         Triplet traces (432, T), the FADC output, in patch_sw_id order.
@@ -92,7 +92,7 @@ class TriggerEmulator(TelescopeComponent):
         """
         if event.simulation is not None:
             waveform = event.r0.tel[tel_id].waveform[0]
-            return fadc(waveform, pedestal[0])
+            return self._compute_trigger_traces(waveform, pedestal[0])
 
         traces = np.asarray(event.r0.tel[tel_id].trigger_input_traces)
         if not np.all(np.isfinite(traces)):

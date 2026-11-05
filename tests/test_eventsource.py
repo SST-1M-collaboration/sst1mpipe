@@ -412,7 +412,7 @@ TRIGGER_TRACES = ("trigger_input_traces", "trigger_output_patch7", "trigger_outp
 
 def test_trigger_patch_order_follows_the_pixels():
     from sst1mpipe.instrument.camera import DigiCam
-    from sst1mpipe.trigger.emulator import fadc
+    from sst1mpipe.trigger.emulator import TriggerEmulator
 
     source = SST1MEventSource(input_url=DARK_FILE, max_events=1, swapped_modules=SWAPPED_MODULES)
     [(pixels_1, pixels_2)] = source.swapped_pixels(DARK_TEL_ID, DARK_EVENT_TIME[0])
@@ -424,7 +424,8 @@ def test_trigger_patch_order_follows_the_pixels():
     rng = np.random.default_rng(0)
     waveform, baseline = rng.integers(0, 100, (1296, 50)), np.full(1296, 50.0)
     corrected = waveform[recorded_pixel_ids]
-    assert np.array_equal(fadc(waveform, baseline)[order], fadc(corrected, baseline))
+    compute_traces = TriggerEmulator._compute_trigger_traces
+    assert np.array_equal(compute_traces(waveform, baseline)[order], compute_traces(corrected, baseline))
     # 2 modules of 4 patches
     assert np.count_nonzero(order != np.arange(432)) == 8
     assert trigger_patch_order(np.arange(1296)) is None
