@@ -45,6 +45,7 @@ class Camera(camera.Camera):
         self.patch_matrix = csr_matrix(self.patch_matrix)
         self.cluster_7_matrix = geometry.compute_cluster_matrix_7(camera=self)
         self.cluster_7_matrix = csr_matrix(self.cluster_7_matrix)
+        self.neighbor_patch_matrix = geometry.compute_neighbor_patch_matrix(self.cluster_7_matrix)
         self.cluster_19_matrix = geometry.compute_cluster_matrix_19(
             camera=self)
         self.cluster_19_matrix = csr_matrix(self.cluster_19_matrix)

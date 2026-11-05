@@ -12,7 +12,7 @@ from ctapipe.io import EventSource, HDF5TableWriter, read_table
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from ctapipe.containers import CoordinateFrameType, EventType, ObservingMode, PointingMode, SchedulingBlockType
 
 from conftest import DARK_FILE, OBSERVATION_RUNS, TRANSITION_FILES, ZFITS_DIR
@@ -28,9 +28,10 @@ from sst1mpipe.io.sst1m_event_source import (
     parse_target_field,
     scheduling_block_type,
     tel_id_from_file_name,
+    trigger_patch_order,
 )
 from sst1mpipe.time import camera_clock_to_time
-from sst1mpipe.io.containers import CameraEventType, DigicamConfigContainer, SST1MR0CameraContainer
+from sst1mpipe.io.containers import CameraEventType, DigicamCardType, DigicamConfigContainer, SST1MR0CameraContainer
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE
 
 ZFITS_FILES = glob.glob(str(ZFITS_DIR / "*fits.fz"))
@@ -406,6 +407,54 @@ def test_swap_modules():
         assert not np.array_equal(event["waveform"], event_ref["waveform"])
 
 
+TRIGGER_TRACES = ("trigger_input_traces", "trigger_output_patch7", "trigger_output_patch19", "trigger_output_muon")
+
+
+def test_trigger_patch_order_follows_the_pixels():
+    from sst1mpipe.instrument.camera import DigiCam
+    from sst1mpipe.trigger.emulator import TriggerEmulator
+
+    source = SST1MEventSource(input_url=DARK_FILE, max_events=1, swapped_modules=SWAPPED_MODULES)
+    [(pixels_1, pixels_2)] = source.swapped_pixels(DARK_TEL_ID, DARK_EVENT_TIME[0])
+    recorded_pixel_ids = np.arange(1296)
+    recorded_pixel_ids[pixels_1], recorded_pixel_ids[pixels_2] = pixels_2, pixels_1
+    order = trigger_patch_order(recorded_pixel_ids)
+
+    # the patches rebuilt from the corrected pixels are the recorded patches moved by the order
+    rng = np.random.default_rng(0)
+    waveform, baseline = rng.integers(0, 100, (1296, 50)), np.full(1296, 50.0)
+    corrected = waveform[recorded_pixel_ids]
+    compute_traces = TriggerEmulator._compute_trigger_traces
+    assert np.array_equal(compute_traces(waveform, baseline)[order], compute_traces(corrected, baseline))
+    # 2 modules of 4 patches
+    assert np.count_nonzero(order != np.arange(432)) == 8
+    assert trigger_patch_order(np.arange(1296)) is None
+
+    # a swap splitting a patch is refused
+    split = np.arange(1296)
+    patch = DigiCam.patch_matrix[0].indices
+    split[patch[0]], split[1295] = 1295, patch[0]
+    with pytest.raises(ValueError, match="split a trigger patch"):
+        trigger_patch_order(split)
+
+
+def test_swap_modules_trigger_traces():
+
+    swapped = SST1MEventSource(input_url=DARK_FILE, max_events=3, swapped_modules=SWAPPED_MODULES)
+    not_swapped = SST1MEventSource(input_url=DARK_FILE, max_events=3)
+    [(pixels_1, pixels_2)] = swapped.swapped_pixels(DARK_TEL_ID, DARK_EVENT_TIME[0])
+    recorded_pixel_ids = np.arange(1296)
+    recorded_pixel_ids[pixels_1], recorded_pixel_ids[pixels_2] = pixels_2, pixels_1
+    order = trigger_patch_order(recorded_pixel_ids)
+
+    # the trigger traces are moved with the pixels
+    for event, event_ref in zip(swapped, not_swapped, strict=True):
+        r0, r0_ref = event.r0.tel[DARK_TEL_ID], event_ref.r0.tel[DARK_TEL_ID]
+        for name in TRIGGER_TRACES:
+            np.testing.assert_array_equal(getattr(r0, name), getattr(r0_ref, name)[order])
+        assert not np.array_equal(r0.trigger_input_traces, r0_ref.trigger_input_traces)
+
+
 def test_swapped_modules_period():
 
     source = SST1MEventSource(input_url=DARK_FILE, max_events=1, swapped_modules=SWAPPED_MODULES)
@@ -468,12 +517,12 @@ def test_no_warning_pointing_in_file(monkeypatch, caplog):
     assert "pointing" not in caplog.text.lower()
 
 
-@pytest.mark.parametrize("input_file, first_sn, digicam_time", [
-    (DARK_FILE, 1120024, (626, 367976660)),
-    (OBSERVATION_RUNS[21]["path"], 2110003, (5122, 938643252)),
-    (TRANSITION_FILES[22], 1120024, (6865, 247889788)),
+@pytest.mark.parametrize("input_file, first_sn, digicam_time, fadc_type", [
+    (DARK_FILE, 1120024, (626, 367976660), DigicamCardType.FADC_ANALOG),
+    (OBSERVATION_RUNS[21]["path"], 2110003, (5122, 938643252), DigicamCardType.FADC_INTERSIL),
+    (TRANSITION_FILES[22], 1120024, (6865, 247889788), DigicamCardType.FADC_ANALOG),
 ])
-def test_digicam_config(input_file, first_sn, digicam_time):
+def test_digicam_config(input_file, first_sn, digicam_time, fadc_type):
     """configuration of the DigiCam boards, from the DigicamConfig table of the file"""
     source = SST1MEventSource(input_url=input_file, max_events=1)
     config = source.digicam_config
@@ -490,7 +539,14 @@ def test_digicam_config(input_file, first_sn, digicam_time):
     assert np.all(config.protocol_vers[boards] == 1)
     assert set(config.firmware_rev[boards]) == {39, 46, 48}
     assert set(config.gateware_rev[boards]) == {23, 25}
+    # 8 trigger boards and 26 FADC boards
+    for card_type in (config.gateware_card_type[boards], config.firmware_card_type[boards]):
+        assert np.sum(card_type == DigicamCardType.TRIGGER) == 8
+        assert np.sum(card_type == fadc_type) == 26
     assert (config.digicam_time_sec, config.digicam_time_nanosec) == digicam_time
+    # TimeDelta with ns precision
+    assert isinstance(config.digicam_time, TimeDelta)
+    assert round((config.digicam_time - TimeDelta(digicam_time[0], format="sec")).to_value(u.ns)) == digicam_time[1]
     assert (config.operation_id, config.operation_data) == (0, 0)
 
 
@@ -552,3 +608,25 @@ def test_observation_run(input_file, tel_id, caplog):
         assert np.isnan(event.monitoring.tel[tel_id].pointing.altitude)
         n_events += 1
     assert n_events == 20
+
+
+def test_no_trigger_sector_order():
+    """a telescope without known trigger sector order cannot be read"""
+    from protozfits import File
+    from sst1mpipe.io.containers import SST1MArrayEventContainer
+
+    with File(str(DARK_FILE)) as f:
+        camera_event = next(iter(f.Events))._replace(telescopeID=23)
+    with pytest.raises(ValueError, match="No trigger sector order for telescope 23"):
+        sst1m_event_source.fill_r0_event(SST1MArrayEventContainer(), camera_event)
+
+
+def test_pedestal_of_pixels_without_data():
+    """the pixels without data (dead modules of tel 21: pixel_flags 0) have a baseline of 0, not negative"""
+    event = next(iter(SST1MEventSource(input_url=TRANSITION_FILES[21], max_events=1)))
+    r0 = event.r0.tel[21]
+    without_data = r0.pixel_flags == 0
+    assert without_data.sum() == 48
+    assert np.all(r0.waveform[0][without_data] == 0)
+    assert np.all(r0.pedestal[without_data] == 0)
+    assert np.all(r0.pedestal >= 0)

@@ -8,18 +8,12 @@ from scipy.sparse import csr_matrix
 from traitlets import TraitError
 from traitlets.config import Config
 
-from conftest import TRANSITION_FILES
+from conftest import OBSERVATION_RUNS, TRANSITION_FILES
 from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.resources import CONFIG_DIR
 from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator, fixed_point
-from sst1mpipe.trigger.emulator import (
-    READOUT_SECTOR_ORDER,
-    fadc,
-    module_swap_order,
-    neighbor_matrix,
-    readout_to_patch_order,
-    score_quantizer,
-)
+from sst1mpipe.io.sst1m_event_source import SST1MEventSource
+from sst1mpipe.trigger.emulator import BASELINE_SAMPLE, TriggerEmulator, score_quantizer
 from sst1mpipe.utils import get_subarray
 
 Q14 = {
@@ -83,15 +77,17 @@ def test_fixed_point_formats():
     assert codes.tolist() == [31, -32, 63]
 
 
-def test_fadc_keeps_negative_pixels():
+def test_compute_trigger_traces_keeps_negative_pixels():
     patch_matrix = csr_matrix(np.ones((1, 3), dtype=np.int64))  # one patch of 3 pixels
     baseline = np.array([10.7, 10.0, 10.0])
     waveform = np.array([[5, 10, 300], [13, 12, 300], [14, 1000, 300]])  # 3 pixels, 3 samples
     # sample 0: (5-10) + (13-10) + (14-10) = 2, the negative pixel is not clipped to 0
     # sample 1: (10-10) + (12-10) + (1000-10) = 992 -> 255
     # sample 2: (300-10) * 3 -> 255
-    assert fadc(waveform, baseline, patch_matrix).tolist() == [[2, 255, 255]]
-    assert fadc(np.zeros((3, 1)), baseline, patch_matrix).tolist() == [[0]]
+    assert TriggerEmulator._compute_trigger_traces(waveform, baseline, patch_matrix=patch_matrix).tolist() == [[2, 255, 255]]
+    assert TriggerEmulator._compute_trigger_traces(np.zeros((3, 1)), baseline, patch_matrix=patch_matrix).tolist() == [[0]]
+    # pixels without data (pixel_flags 0) do not contribute: (5-10) + (13-10) = -2 -> 0, 0 + 2 = 2, 290 + 290 -> 255
+    assert TriggerEmulator._compute_trigger_traces(waveform, baseline, pixel_flags=[1, 1, 0], patch_matrix=patch_matrix).tolist() == [[0, 2, 255]]
 
 
 def test_score_quantizer():
@@ -104,45 +100,58 @@ def test_trigger_geometry():
     assert np.array_equal(DigiCam.patch_matrix.indptr, np.arange(0, 1297, 3))
     assert sorted(DigiCam.patch_matrix.indices.tolist()) == list(range(1296))
 
-    neighbors = neighbor_matrix()
+    neighbors = DigiCam.neighbor_patch_matrix
     assert (neighbors != neighbors.T).nnz == 0                  # symmetric
     assert neighbors.diagonal().sum() == 0                      # a patch is not its own neighbour
     assert set(np.asarray(neighbors.sum(axis=1)).ravel()) <= {3, 4, 6}  # 6 inside, fewer at the edge
     assert (neighbors + np.eye(432, dtype=np.int64) != DigiCam.cluster_7_matrix).sum() == 0
 
 
-def test_readout_order():
-    for signal in ("input", "output"):
-        # Sectors in the order sst1mpipe's reader assumes: nothing to reorder.
-        assert np.array_equal(readout_to_patch_order((1, 2, 3), signal), np.arange(432))
-        # Telescope 2: same layout inside each sector, sectors shifted by one.
-        tel2 = readout_to_patch_order(READOUT_SECTOR_ORDER[22], signal)
-        assert sorted(tel2.tolist()) == list(range(432))
-        assert not np.array_equal(tel2, np.arange(432))
+@pytest.mark.parametrize("tel_id", sorted(TRANSITION_FILES))
+def test_trigger_input_traces_match_the_waveforms(tel_id):
+    """
+    the trigger input traces of the camera (FPGA) are the patches rebuilt from the pixel waveforms:
+    checks the sector order of the telescope and the patch order of the reader. The FPGA updates its
+    baseline continuously: the traces are identical at the sample of the stored baseline, and close
+    elsewhere (mean squared error 4.4 ADC^2 per trace for tel 21, 6.3 for tel 22, ~5000 to 10000
+    with a wrong order of the traces)
+    """
+    squared_error, n_traces = 0, 0
+    for event in SST1MEventSource(input_url=TRANSITION_FILES[tel_id]):
+        r0 = event.r0.tel[tel_id]
+        camera = np.asarray(r0.trigger_input_traces).astype(np.int64)
+        rebuilt = TriggerEmulator._compute_trigger_traces(r0.waveform[0], r0.pedestal, pixel_flags=r0.pixel_flags)
+        np.testing.assert_array_equal(camera[:, BASELINE_SAMPLE], rebuilt[:, BASELINE_SAMPLE])
+        squared_error += np.sum((camera - rebuilt) ** 2)
+        n_traces += len(camera)
+    assert squared_error / n_traces < 10
 
 
-def test_module_swap_moves_trigger_traces_with_pixels():
-    from astropy.io import ascii
+# patch7 threshold of the camera in the test files: the only threshold for which the emulated patch7
+# output of the trigger_input_traces is the camera output, on all the events of the file
+PATCH7_THRESHOLD_OF_FILES = [
+    (21, TRANSITION_FILES[21], 210),
+    (22, TRANSITION_FILES[22], 280),
+    (21, OBSERVATION_RUNS[21]["path"], 185),
+    (22, OBSERVATION_RUNS[22]["path"], 240),
+]
 
-    from sst1mpipe.resources import PIXEL_MAPPING_FILE
 
-    # Telescope 2, 2023-09-01 to 2024-07-18: modules 59 and 88 connected in each other's place.
-    pix_maps = ascii.read(PIXEL_MAPPING_FILE)
-    pixels = [np.sort(np.asarray(pix_maps[pix_maps["module"] == module]["pixel_sw_id"])) for module in (59, 88)]
-    order = module_swap_order([pixels])
-
-    rng = np.random.default_rng(0)
-    waveform, baseline = rng.integers(0, 100, (1296, 50)), np.full(1296, 50.0)
-    corrected = waveform.copy()  # what SST1MEventSource does to the pixels
-    corrected[pixels[0]], corrected[pixels[1]] = waveform[pixels[1]], waveform[pixels[0]]
-
-    assert np.array_equal(fadc(waveform, baseline)[order], fadc(corrected, baseline))
-    assert np.count_nonzero(order != np.arange(432)) == 8
-    assert np.array_equal(module_swap_order([]), np.arange(432))
+@pytest.mark.parametrize("tel_id, path, threshold", PATCH7_THRESHOLD_OF_FILES, ids=lambda v: getattr(v, "name", v))
+def test_patch7_output_from_camera_input(tel_id, path, threshold):
+    """the patch7 output emulated from the trigger input traces of the camera is the camera output"""
+    emu = TriggerPatch7Emulator(subarray=get_subarray(), threshold=threshold)
+    n_events = 0
+    for event in SST1MEventSource(input_url=path, max_events=500):
+        r0 = event.r0.tel[tel_id]
+        output, _ = emu.trigger_output(np.asarray(r0.trigger_input_traces).astype(np.int64), tel_id)
+        np.testing.assert_array_equal(output, np.asarray(r0.trigger_output_patch7).astype(bool))
+        n_events += 1
+    assert n_events > 0
 
 
 def test_patch7_sums_clusters():
-    emu = TriggerPatch7Emulator(subarray=get_subarray())
+    emu = TriggerPatch7Emulator(subarray=get_subarray(), threshold=242)
     traces = np.zeros((432, 50), dtype=np.int64)
     patch, sample = 200, 20
     traces[patch, sample] = 100
@@ -173,7 +182,7 @@ def test_tdscan_single_impulse():
     assert np.count_nonzero(scores[patch]) == 5
 
     # A neighbour sees the ring-1 weights: floor(code / 32) of -1, -4, -16, 8, 32.
-    neighbor = neighbor_matrix()[patch].indices[0]
+    neighbor = DigiCam.neighbor_patch_matrix[patch].indices[0]
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0, -0.25, -0.25, -0.25]
 
 
@@ -187,7 +196,7 @@ def test_tdscan_single_impulse_floating_point():
 
     # Without quantization the scores are the weights themselves, tap 4 first.
     assert scores[patch, 18:23].tolist() == [0.5, 0.5, -0.5, -0.5, 0.5]
-    neighbor = neighbor_matrix()[patch].indices[0]
+    neighbor = DigiCam.neighbor_patch_matrix[patch].indices[0]
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0625, -0.125, -0.03125, -0.0078125]
 
 
