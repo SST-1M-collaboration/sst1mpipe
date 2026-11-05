@@ -106,12 +106,11 @@ PATCH_ID_INPUT, PATCH_ID_OUTPUT = build_patch_ids()
 # Order of the sectors in the blocks of the trigger traces of each telescope. Measured by comparing
 # trigger_input_traces with the patches rebuilt from the pixel waveforms (correlation 0.997 for
 # tel 21, 0.999 for tel 22), and confirmed on trigger_output_patch7 (identical to the emulated
-# patch7 output, sample by sample, on both telescopes). The other telescopes: (1, 2, 3).
-DEFAULT_TRIGGER_SECTOR_ORDER = (1, 2, 3)
+# patch7 output, sample by sample, on both telescopes).
 TRIGGER_SECTOR_ORDER = {21: (1, 2, 3), 22: (2, 3, 1)}
 
 
-def patch_sort_ids(patch_ids, sector_order=DEFAULT_TRIGGER_SECTOR_ORDER):
+def patch_sort_ids(patch_ids, sector_order):
     """
     Indices putting trigger traces in patch_sw_id order: ``traces[sort_ids][p]`` is the patch ``p``.
 
@@ -127,13 +126,10 @@ def patch_sort_ids(patch_ids, sector_order=DEFAULT_TRIGGER_SECTOR_ORDER):
     return np.argsort(blocks[np.subtract(sector_order, 1)].ravel())
 
 
-# tel_id -> indices putting the trigger traces of the telescope in patch_sw_id order,
-# DEFAULT_* for the telescopes without a measured sector order
+# tel_id -> indices putting the trigger traces of the telescope in patch_sw_id order
 PATCH_ID_INPUT_SORT_IDS = {
     tel_id: patch_sort_ids(PATCH_ID_INPUT, order) for tel_id, order in TRIGGER_SECTOR_ORDER.items()
 }
 PATCH_ID_OUTPUT_SORT_IDS = {
     tel_id: patch_sort_ids(PATCH_ID_OUTPUT, order) for tel_id, order in TRIGGER_SECTOR_ORDER.items()
 }
-DEFAULT_PATCH_ID_INPUT_SORT_IDS = patch_sort_ids(PATCH_ID_INPUT)
-DEFAULT_PATCH_ID_OUTPUT_SORT_IDS = patch_sort_ids(PATCH_ID_OUTPUT)

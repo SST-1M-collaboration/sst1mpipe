@@ -29,14 +29,13 @@ from ctapipe.io.datalevels import DataLevel
 from protozfits import File
 
 from sst1mpipe.constants import (
-    DEFAULT_PATCH_ID_INPUT_SORT_IDS,
-    DEFAULT_PATCH_ID_OUTPUT_SORT_IDS,
     N_PATCHES,
     N_TRIGGER_SECTORS,
     PATCH_ID_INPUT_SORT_IDS,
     PATCH_ID_OUTPUT_SORT_IDS,
     PATCHES_PER_SECTOR,
-    SUBARRAY_DESCRIPTION
+    SUBARRAY_DESCRIPTION,
+    TRIGGER_SECTOR_ORDER,
 )
 from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.resources import PIXEL_MAPPING_FILE
@@ -323,12 +322,12 @@ def prepare_trigger_output(traces):
 
 
 # trigger traces of the camera events: R0 field, conversion to (432, n_samples) in readout order,
-# and tel_id -> indices putting them in patch_sw_id order (default for the other telescopes)
+# and tel_id -> indices putting them in patch_sw_id order
 TRIGGER_TRACES = (
-    ("trigger_input_traces", prepare_trigger_input, PATCH_ID_INPUT_SORT_IDS, DEFAULT_PATCH_ID_INPUT_SORT_IDS),
-    ("trigger_output_patch7", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS, DEFAULT_PATCH_ID_OUTPUT_SORT_IDS),
-    ("trigger_output_patch19", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS, DEFAULT_PATCH_ID_OUTPUT_SORT_IDS),
-    ("trigger_output_muon", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS, DEFAULT_PATCH_ID_OUTPUT_SORT_IDS),
+    ("trigger_input_traces", prepare_trigger_input, PATCH_ID_INPUT_SORT_IDS),
+    ("trigger_output_patch7", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS),
+    ("trigger_output_patch19", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS),
+    ("trigger_output_muon", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS),
 )
 
 
@@ -420,11 +419,13 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
     if camera_event.trig is not None:
         r0.gps_time = local_time_to_time(camera_event.trig.timeSec, camera_event.trig.timeNanoSec)
     r0.event_type = camera_event.event_type
+    if tel_id not in TRIGGER_SECTOR_ORDER:
+        raise ValueError(f"No trigger sector order for telescope {tel_id}, see TRIGGER_SECTOR_ORDER")
     patch_order = trigger_patch_order(np.asarray(pixel_ids)[sort_ids])
-    for name, prepare, sort_ids_of_tel, default_sort_ids in TRIGGER_TRACES:
+    for name, prepare, sort_ids_of_tel in TRIGGER_TRACES:
         traces = read_trigger_traces(
             getattr(camera_event, name), prepare, name, n_samples,
-            sort_ids=sort_ids_of_tel.get(tel_id, default_sort_ids), patch_order=patch_order,
+            sort_ids=sort_ids_of_tel[tel_id], patch_order=patch_order,
         )
         setattr(r0, name, traces)
 

@@ -607,3 +607,14 @@ def test_observation_run(input_file, tel_id, caplog):
         assert np.isnan(event.monitoring.tel[tel_id].pointing.altitude)
         n_events += 1
     assert n_events == 20
+
+
+def test_no_trigger_sector_order():
+    """a telescope without known trigger sector order cannot be read"""
+    from protozfits import File
+    from sst1mpipe.io.containers import SST1MArrayEventContainer
+
+    with File(str(DARK_FILE)) as f:
+        camera_event = next(iter(f.Events))._replace(telescopeID=23)
+    with pytest.raises(ValueError, match="No trigger sector order for telescope 23"):
+        sst1m_event_source.fill_r0_event(SST1MArrayEventContainer(), camera_event)

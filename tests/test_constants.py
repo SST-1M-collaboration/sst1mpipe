@@ -6,7 +6,6 @@ from cts_core.camera import Camera
 
 from sst1mpipe.constants import (N_PIXELS, CAMERA, SUBARRAY_DESCRIPTION, N_CHANNELS, N_PATCHES, PATCHES_PER_SECTOR,
                                  PATCH_ID_INPUT, PATCH_ID_INPUT_SORT_IDS, PATCH_ID_OUTPUT, PATCH_ID_OUTPUT_SORT_IDS,
-                                 DEFAULT_PATCH_ID_INPUT_SORT_IDS, DEFAULT_PATCH_ID_OUTPUT_SORT_IDS,
                                  TRIGGER_SECTOR_ORDER, CAMERA_CONFIG_TRIGGER_COLUMNS,
                                  build_patch_ids, patch_sort_ids, read_trigger_patches)
 
@@ -135,12 +134,10 @@ def test_read_trigger_patches_refuses_inconsistent_patches(tmp_path):
 
 def test_patch_sort_ids_of_the_telescopes():
     patches = read_trigger_patches()
-    for patch_ids, sort_ids, default in [
-        (PATCH_ID_INPUT, PATCH_ID_INPUT_SORT_IDS, DEFAULT_PATCH_ID_INPUT_SORT_IDS),
-        (PATCH_ID_OUTPUT, PATCH_ID_OUTPUT_SORT_IDS, DEFAULT_PATCH_ID_OUTPUT_SORT_IDS),
-    ]:
+    for patch_ids, sort_ids in [(PATCH_ID_INPUT, PATCH_ID_INPUT_SORT_IDS), (PATCH_ID_OUTPUT, PATCH_ID_OUTPUT_SORT_IDS)]:
+        # sectors (1, 2, 3), as tel 21: the sorted patch ids
+        default = patch_sort_ids(patch_ids, (1, 2, 3))
         assert set(sort_ids) == set(TRIGGER_SECTOR_ORDER) == {21, 22}
-        # sectors (1, 2, 3): the sorted patch ids
         assert np.array_equal(np.asarray(patch_ids)[default], np.arange(N_PATCHES))
         assert np.array_equal(sort_ids[21], default)
         for tel_id, sector_order in TRIGGER_SECTOR_ORDER.items():
@@ -152,5 +149,5 @@ def test_patch_sort_ids_of_the_telescopes():
             assert np.array_equal(position // PATCHES_PER_SECTOR, block)
             assert np.array_equal(position % PATCHES_PER_SECTOR, default % PATCHES_PER_SECTOR)
     # telescope 2: sectors shifted by one
-    assert not np.array_equal(PATCH_ID_INPUT_SORT_IDS[22], DEFAULT_PATCH_ID_INPUT_SORT_IDS)
+    assert not np.array_equal(PATCH_ID_INPUT_SORT_IDS[22], PATCH_ID_INPUT_SORT_IDS[21])
     assert np.array_equal(patch_sort_ids(PATCH_ID_INPUT, (2, 3, 1)), PATCH_ID_INPUT_SORT_IDS[22])
