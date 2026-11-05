@@ -126,13 +126,6 @@ class TriggerPatch7Emulator(TriggerEmulator):
     def scores(self, traces):
         return DigiCam.cluster_7_matrix.dot(traces)
 
-    def hardware_output(self, event, tel_id):
-        """patch7 output recorded by the camera (432, T) bool, in patch_sw_id order (real data)."""
-        output = np.asarray(event.r0.tel[tel_id].trigger_output_patch7)
-        if not np.all(np.isfinite(output)):
-            raise ValueError(f"Telescope {tel_id}: no trigger_output_patch7 in this file")
-        return output.astype(bool)
-
 
 class TriggerTDSCANEmulator(TriggerEmulator):
     """TDSCAN: 4-bit codes filtered in space (patch + neighbours) and time.

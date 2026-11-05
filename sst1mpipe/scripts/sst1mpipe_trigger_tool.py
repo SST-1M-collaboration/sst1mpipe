@@ -140,7 +140,7 @@ class TriggerTool(Tool):
         self.counts[tel_id, "tdscan"] += result.tdscan
 
         if self.compare_camera:
-            camera_output = self.patch7.hardware_output(event, tel_id)
+            camera_output = np.asarray(event.r0.tel[tel_id].trigger_output_patch7).astype(bool)
             result.camera_patch7 = bool(camera_output.any())
             result.camera_patch7_mismatches = int(np.sum(camera_output != patch7_output))
             self.counts[tel_id, "camera_patch7"] += result.camera_patch7
