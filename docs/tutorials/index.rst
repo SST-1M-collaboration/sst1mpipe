@@ -31,3 +31,15 @@ waveforms and camera images, and the underlying ``protozfits`` data.
    :maxdepth: 1
 
    sst1m_read_zfits_event_source
+
+The DigiCam trigger
+-------------------
+
+The trigger traces recorded by the camera (trigger input traces of the patches, patch7 output), how the
+patch7 trigger works, and how to emulate it from the raw data and from simulations with
+``sst1mpipe.trigger`` (patch7, patch19, TDSCAN).
+
+.. toctree::
+   :maxdepth: 1
+
+   sst1m_trigger_traces
