@@ -32,8 +32,7 @@ from sst1mpipe.constants import (
     N_PATCHES,
     N_TRACES_PER_SECTOR,
     N_TRIGGER_SECTORS,
-    PATCH_ID_INPUT_SORT_IDS,
-    PATCH_ID_OUTPUT_SORT_IDS,
+    PATCH_SORT_IDS,
     PATCHES_PER_SECTOR,
     SUBARRAY_DESCRIPTION,
     TRIGGER_SECTOR_ORDER,
@@ -324,10 +323,10 @@ def prepare_trigger_output(traces):
 # trigger traces of the camera events: R0 field, conversion to (432, n_samples) in readout order,
 # and tel_id -> indices putting them in patch_sw_id order
 TRIGGER_TRACES = (
-    ("trigger_input_traces", prepare_trigger_input, PATCH_ID_INPUT_SORT_IDS),
-    ("trigger_output_patch7", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS),
-    ("trigger_output_patch19", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS),
-    ("trigger_output_muon", prepare_trigger_output, PATCH_ID_OUTPUT_SORT_IDS),
+    ("trigger_input_traces", prepare_trigger_input, PATCH_SORT_IDS["input"]),
+    ("trigger_output_patch7", prepare_trigger_output, PATCH_SORT_IDS["output"]),
+    ("trigger_output_patch19", prepare_trigger_output, PATCH_SORT_IDS["output"]),
+    ("trigger_output_muon", prepare_trigger_output, PATCH_SORT_IDS["output"]),
 )
 
 

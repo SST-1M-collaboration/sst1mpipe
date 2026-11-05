@@ -15,8 +15,8 @@ N_CHANNELS = 1
 # ---------------------------------------------------------------------------
 # The camera is read by three sectors (micro_crate in camera_config.cfg) of 144 trigger patches
 # (patch of 3 pixels, patch_sw_id). The trigger traces of the camera events are made of three
-# blocks of 144 patches, one per sector: ``PATCH_ID_INPUT`` and ``PATCH_ID_OUTPUT`` give the
-# patch_sw_id of each position of the traces when the blocks are the sectors (1, 2, 3).
+# blocks of 144 patches, one per sector: ``PATCH_IDS["input"]`` and ``PATCH_IDS["output"]`` give
+# the patch_sw_id of each position of the traces when the blocks are the sectors (1, 2, 3).
 # They are built from the camera configuration file read by CTS (camera_config.cfg):
 #
 # - ``trigger_input_traces`` (FADC output of the patches, 192 channels per sector of which the
@@ -80,7 +80,7 @@ def build_patch_ids(patches=None):
 
     Returns
     -------
-    (list, list): ``PATCH_ID_INPUT``, ``PATCH_ID_OUTPUT``
+    dict: ``PATCH_IDS``, kind of trigger traces ("input", "output") -> list (n_patches)
     """
     patches = read_trigger_patches() if patches is None else patches
     sector_start = PATCHES_PER_SECTOR * (patches["micro_crate"] - 1)
@@ -99,10 +99,12 @@ def build_patch_ids(patches=None):
 
     input_position = sector_start + patches_per_module * module_rank + patches["patch_in_mod_fw"]
     output_position = sector_start + patches["patch_trig_out"]
-    return patch_ids(input_position), patch_ids(output_position)
+    return {"input": patch_ids(input_position), "output": patch_ids(output_position)}
 
 
-PATCH_ID_INPUT, PATCH_ID_OUTPUT = build_patch_ids()
+# kind of trigger traces ("input": trigger_input_traces, "output": the trigger outputs) ->
+# patch_sw_id of each position of the traces for the sectors (1, 2, 3)
+PATCH_IDS = build_patch_ids()
 
 # Order of the sectors in the blocks of the trigger traces of each telescope. Measured by comparing
 # trigger_input_traces with the patches rebuilt from the pixel waveforms (correlation 0.997 for
@@ -118,8 +120,7 @@ def patch_sort_ids(patch_ids, sector_order):
     Parameters
     ----------
     patch_ids: list
-        patch_sw_id of each position of the traces for the sectors (1, 2, 3):
-        ``PATCH_ID_INPUT`` or ``PATCH_ID_OUTPUT``
+        patch_sw_id of each position of the traces for the sectors (1, 2, 3), see ``PATCH_IDS``
     sector_order: tuple
         Sector (micro_crate) of each block of 144 patches of the traces of the telescope
     """
@@ -127,10 +128,8 @@ def patch_sort_ids(patch_ids, sector_order):
     return np.argsort(blocks[np.subtract(sector_order, 1)].ravel())
 
 
-# tel_id -> indices putting the trigger traces of the telescope in patch_sw_id order
-PATCH_ID_INPUT_SORT_IDS = {
-    tel_id: patch_sort_ids(PATCH_ID_INPUT, order) for tel_id, order in TRIGGER_SECTOR_ORDER.items()
-}
-PATCH_ID_OUTPUT_SORT_IDS = {
-    tel_id: patch_sort_ids(PATCH_ID_OUTPUT, order) for tel_id, order in TRIGGER_SECTOR_ORDER.items()
+# kind of trigger traces -> tel_id -> indices putting the traces of the telescope in patch_sw_id order
+PATCH_SORT_IDS = {
+    kind: {tel_id: patch_sort_ids(patch_ids, order) for tel_id, order in TRIGGER_SECTOR_ORDER.items()}
+    for kind, patch_ids in PATCH_IDS.items()
 }

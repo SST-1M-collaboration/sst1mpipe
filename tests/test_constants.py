@@ -5,7 +5,7 @@ from ctapipe.instrument import SubarrayDescription
 from cts_core.camera import Camera
 
 from sst1mpipe.constants import (N_PIXELS, CAMERA, SUBARRAY_DESCRIPTION, N_CHANNELS, N_PATCHES, PATCHES_PER_SECTOR,
-                                 PATCH_ID_INPUT, PATCH_ID_INPUT_SORT_IDS, PATCH_ID_OUTPUT, PATCH_ID_OUTPUT_SORT_IDS,
+                                 PATCH_IDS, PATCH_SORT_IDS,
                                  TRIGGER_SECTOR_ORDER, CAMERA_CONFIG_TRIGGER_COLUMNS,
                                  build_patch_ids, patch_sort_ids, read_trigger_patches)
 
@@ -15,10 +15,9 @@ def test_constants():
     assert isinstance(CAMERA, Camera)
     assert isinstance(SUBARRAY_DESCRIPTION, SubarrayDescription)
     assert isinstance(N_CHANNELS, int)
-    assert isinstance(PATCH_ID_INPUT,list)
-    assert isinstance(PATCH_ID_OUTPUT, list)
-    assert isinstance(PATCH_ID_OUTPUT_SORT_IDS, dict)
-    assert isinstance(PATCH_ID_INPUT_SORT_IDS, dict)
+    assert set(PATCH_IDS) == set(PATCH_SORT_IDS) == {"input", "output"}
+    assert all(isinstance(patch_ids, list) for patch_ids in PATCH_IDS.values())
+    assert all(isinstance(sort_ids, dict) for sort_ids in PATCH_SORT_IDS.values())
 
 
 def test_subarray_reference_location():
@@ -30,7 +29,7 @@ def test_subarray_reference_location():
     assert np.isclose(location.height.to_value(u.m), 511.2, atol=1)
 
 
-# PATCH_ID_INPUT and PATCH_ID_OUTPUT before they were built from the camera configuration file:
+# PATCH_IDS (PATCH_ID_INPUT and PATCH_ID_OUTPUT) before they were built from the camera configuration file:
 # patch_sw_id of each position of the trigger traces, sectors in the order (1, 2, 3)
 EXPECTED_PATCH_ID_INPUT = [
     204, 216, 180, 192, 229, 241, 205, 217, 254, 266, 230, 242,
@@ -105,10 +104,9 @@ def test_patch_ids_from_camera_config():
     assert set(patches["patch_in_mod_fw"]) == {0, 1, 2, 3}
     assert set(patches["patch_trig_out"]) == set(range(PATCHES_PER_SECTOR))
 
-    assert isinstance(PATCH_ID_INPUT, list) and isinstance(PATCH_ID_OUTPUT, list)
-    assert PATCH_ID_INPUT == EXPECTED_PATCH_ID_INPUT
-    assert PATCH_ID_OUTPUT == EXPECTED_PATCH_ID_OUTPUT
-    assert build_patch_ids(patches) == (PATCH_ID_INPUT, PATCH_ID_OUTPUT)
+    assert PATCH_IDS["input"] == EXPECTED_PATCH_ID_INPUT
+    assert PATCH_IDS["output"] == EXPECTED_PATCH_ID_OUTPUT
+    assert build_patch_ids(patches) == PATCH_IDS
 
 
 def test_build_patch_ids_refuses_two_patches_at_the_same_position():
@@ -134,7 +132,8 @@ def test_read_trigger_patches_refuses_inconsistent_patches(tmp_path):
 
 def test_patch_sort_ids_of_the_telescopes():
     patches = read_trigger_patches()
-    for patch_ids, sort_ids in [(PATCH_ID_INPUT, PATCH_ID_INPUT_SORT_IDS), (PATCH_ID_OUTPUT, PATCH_ID_OUTPUT_SORT_IDS)]:
+    for kind, patch_ids in PATCH_IDS.items():
+        sort_ids = PATCH_SORT_IDS[kind]
         # sectors (1, 2, 3), as tel 21: the sorted patch ids
         default = patch_sort_ids(patch_ids, (1, 2, 3))
         assert set(sort_ids) == set(TRIGGER_SECTOR_ORDER) == {21, 22}
@@ -149,5 +148,5 @@ def test_patch_sort_ids_of_the_telescopes():
             assert np.array_equal(position // PATCHES_PER_SECTOR, block)
             assert np.array_equal(position % PATCHES_PER_SECTOR, default % PATCHES_PER_SECTOR)
     # telescope 2: sectors shifted by one
-    assert not np.array_equal(PATCH_ID_INPUT_SORT_IDS[22], PATCH_ID_INPUT_SORT_IDS[21])
-    assert np.array_equal(patch_sort_ids(PATCH_ID_INPUT, (2, 3, 1)), PATCH_ID_INPUT_SORT_IDS[22])
+    assert not np.array_equal(PATCH_SORT_IDS["input"][22], PATCH_SORT_IDS["input"][21])
+    assert np.array_equal(patch_sort_ids(PATCH_IDS["input"], (2, 3, 1)), PATCH_SORT_IDS["input"][22])
