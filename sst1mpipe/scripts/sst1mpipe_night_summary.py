@@ -35,6 +35,7 @@ import pandas as pd
 from astropy.coordinates import SkyCoord
 from astropy.table import vstack
 from astropy.time import Time
+from ctapipe.instrument import SubarrayDescription
 from gammapy.maps import MapAxis
 from PIL import Image
 from traitlets.config import Config
@@ -517,7 +518,7 @@ def main():
 
                     # moon
                     if (not moon_done) and (len(dl2) > 0):
-                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
+                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, location=SubarrayDescription.from_hdf(dl2_files[0]).tel_earth_locations[int(tel.split('_')[-1])], thinning=100)
                         time_all.append(np.array(time.unix))
                         moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
                         moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))
@@ -554,7 +555,7 @@ def main():
                     ax7[1].plot(local_time, zenith_time, '.', label=tel, alpha=0.7)
                 if not moon_done:
                     if len(dl2) > 0:
-                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
+                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, location=SubarrayDescription.from_hdf(dl2_files[0]).tel_earth_locations[int(tel.split('_')[-1])], thinning=100)
                         time_all.append(np.array(time.unix))
                         moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
                         moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))

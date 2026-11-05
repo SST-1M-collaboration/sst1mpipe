@@ -22,13 +22,14 @@ import os
 import shutil
 import sys
 
+from astropy.coordinates import AltAz
 from astropy.time import Time
+from ctapipe.instrument import SubarrayDescription
 
 import sst1mpipe
 from sst1mpipe.analysis import add_reco_ra_dec
 from sst1mpipe.io import check_outdir, load_config, load_dl2_sst1m, write_photon_list
 from sst1mpipe.utils import (
-    get_horizon_frame,
     get_telescopes,
 )
 
@@ -100,12 +101,14 @@ def main():
     logging.info('N of events of %s after selection cuts: %d', tel, len(dl2_photon_list))
 
     # transform reco alt az to ra dec
+    subarray = SubarrayDescription.from_hdf(input_file)
     if tel == 'stereo':
         # For computation of reco ra/dec from reco alt/az in stereo data, it should not matter which telescope frame we use.
         # The respective telescope frames are correctly used in reconstruction itself to get reco alt/az.
-        horizon_frame = get_horizon_frame(config=config, telescope='tel_021', times=Time(dl2_photon_list.local_time, format='unix'))
+        location = subarray.tel_earth_locations[subarray.tel_ids[0]]
     else:
-        horizon_frame = get_horizon_frame(config=config, telescope=tel, times=Time(dl2_photon_list.local_time, format='unix'))
+        location = subarray.tel_earth_locations[int(tel.split('_')[-1])]
+    horizon_frame = AltAz(location=location, obstime=Time(dl2_photon_list.local_time, format='unix'))
 
     logging.info('Adding reco RA and DEC ...')
     dl2_photon_list = add_reco_ra_dec(dl2_photon_list, horizon_frame=horizon_frame)
@@ -115,6 +118,7 @@ def main():
         output_file=output_file,
         telescope=tel,
         config=config,
+        subarray=subarray,
         )
 
 if __name__ == '__main__':

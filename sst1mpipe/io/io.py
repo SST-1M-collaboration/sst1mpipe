@@ -36,7 +36,6 @@ from sst1mpipe.utils.utils import (
     add_true_impact,
     event_selection,
     get_finite,
-    get_horizon_frame,
     get_pointing_radec,
     get_telescopes,
     join_in_order,
@@ -247,7 +246,7 @@ def write_dl2(
 
 def write_photon_list(
         pl_table, output_file=None, telescope=None,
-        config=None):
+        config=None, subarray=None):
     """
     Helper function to write PL file
 
@@ -258,6 +257,8 @@ def write_photon_list(
     output_file: string
     telescope: string
     config: dict
+    subarray: ctapipe.instrument.SubarrayDescription
+        subarray of the DL2 file, written in the photon list (telescope positions)
 
     Returns
     -------
@@ -269,6 +270,8 @@ def write_photon_list(
         table_path='/photon_list', table_name=telescope,
         config=config, mode='w'
         )
+    if subarray is not None:
+        subarray.to_hdf(output_file)
 
 
 def write_extra_parameters(
@@ -307,7 +310,8 @@ def write_extra_parameters(
             merged_table = join(params, simulation, keys=['obs_id', 'event_id'])
             configuration = read_table(file, "/configuration/instrument/telescope/optics")
             merged_table['equivalent_focal_length'] = configuration['equivalent_focal_length'] * np.ones(len(merged_table))
-            merged_table = add_disp(merged_table, get_horizon_frame(config=config, telescope=tel))
+            location = SubarrayDescription.from_hdf(file).tel_earth_locations[int(tel.split('_')[-1])]
+            merged_table = add_disp(merged_table, AltAz(location=location, obstime=Time("2022-11-01T02:00")))
             merged_table = add_miss(merged_table)
             merged_table = add_true_impact(merged_table, input_file=file, tel=tel)
             merged_table = add_log_true_energy(merged_table)
