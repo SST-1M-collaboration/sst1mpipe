@@ -27,6 +27,7 @@ N_CHANNELS = 1
 
 N_TRIGGER_SECTORS = 3
 PATCHES_PER_SECTOR = 144
+N_TRACES_PER_SECTOR = 192  # trigger input traces sent per sector, the first PATCHES_PER_SECTOR are the patches
 N_PATCHES = N_TRIGGER_SECTORS * PATCHES_PER_SECTOR  # 432
 
 # columns of the camera configuration file (one row per pixel) used for the trigger patches
