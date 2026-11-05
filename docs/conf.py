@@ -39,6 +39,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', '**.ipynb_checkpoints']
 # They are rendered with their saved outputs, not executed (the docs build has no test data).
 TUTORIAL_NOTEBOOKS = [
     "sst1m_read_zfits_event_source.ipynb",
+    "sst1m_trigger_traces.ipynb",
 ]
 _notebooks_dir = Path(__file__).parent.parent / "notebooks"
 _tutorials_dir = Path(__file__).parent / "tutorials"
