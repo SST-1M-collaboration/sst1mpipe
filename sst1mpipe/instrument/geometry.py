@@ -1,5 +1,6 @@
 import numpy as np
 from astropy import units as u
+from ctapipe.coordinates import EngineeringCameraFrame
 from ctapipe.instrument.camera import CameraGeometry
 from scipy.sparse import identity
 
@@ -36,7 +37,13 @@ def generate_geometry_from_camera(
         name = 'SST-1M'
     ):
     """
-    Generate the SST-1M geometry from the CTS configuration
+    Generate the SST-1M geometry from the CTS configuration.
+
+    The pixel positions of the CTS configuration are in the ctapipe `EngineeringCameraFrame`
+    (camera seen from the front, x = -y and y = -x of the `CameraFrame`): the geometry has this
+    frame, so that ctapipe draws it in this orientation and transforms it to the `CameraFrame` of the
+    subarray of the event sources and of the simulations (``geometry.transform_to(CameraFrame())``).
+
     :param camera: a CTS instance
     :param source_x:  x coord
     :param source_y:  y coord
@@ -65,6 +72,7 @@ def generate_geometry_from_camera(
         pix_y,
         pix_area,
         pix_type='hexagonal',
+        frame=EngineeringCameraFrame(),
         # neighbors=neighbors_pix
     )
 
