@@ -137,10 +137,11 @@ The full configuration files:
         --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
 
 The raw data file is read twice (the images of the pedestal events are calibrated as the events by
-``sst1mpipe-process``, with the statistics of the ADC samples), and the monitoring file contains the pointing of the telescope, the
-statistics of the ADC samples of the pedestal events (baseline and noise, for the voltage drop correction
-and the dead pixels) and the statistics of their images (NSB noise, for the ``NSBImageCleaner``), in rolling
-chunks of the last pedestal events. What the tool does, its settings and the content of the monitoring file are described
+``sst1mpipe-process``, with the camera calibration coefficients of the first pass), and the monitoring file
+contains the pointing of the telescope, the statistics of the ADC samples of the pedestal events (baseline
+and noise), the camera calibration coefficients computed from them (voltage drop correction and dead
+pixels) and the statistics of their images (NSB noise, for the ``NSBImageCleaner``), in rolling chunks of
+the last pedestal events. What the tool does, its settings and the content of the monitoring file are described
 in :ref:`sst1mpipe_monitoring`.
 
 
@@ -163,9 +164,10 @@ monitoring containers of each event with the monitoring data at its time, before
 
 * the pointing of the telescope (``event.monitoring.tel[tel_id].pointing``), interpolated
 * the statistics of the ADC samples of the pedestal events
-  (``event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform``), used by the
-  ``R0R1Calibrator`` for the voltage drop correction and the dead pixels (the outlier pixels of the
-  monitoring are dead pixels)
+  (``event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform``)
+* the camera calibration coefficients (``event.monitoring.tel[tel_id].camera.coefficients``): the
+  ``factor`` of the voltage drop correction and the ``outlier_mask`` of the dead pixels (the outlier pixels
+  of the monitoring), applied by the ctapipe ``CameraCalibrator``
 * the statistics of the images of the pedestal events (``pixel_statistics.pedestal_image``), used by the
   ``NSBImageCleaner``
 
@@ -200,9 +202,13 @@ Other settings of the processing:
 * ``--DataWriter.write_dl1_images``, ``--DataWriter.write_r1_waveforms``: images and waveforms written
 * ``--progress``: progress bar
 
-**Without monitoring source**, the raw data are calibrated without the statistics of the pedestal
+The ``R0R1Calibrator`` does the corrections which do not need the pedestal events: DigiCam pedestal,
+dc to p.e., window transmittance, and the pixels with bad calibration parameters and the ``bad_pixels``
+added to the ``outlier_mask``.
+
+**Without monitoring source**, the raw data are calibrated without the coefficients of the pedestal
 events: no voltage drop correction, no dead pixels (only the ``bad_pixels`` and the pixels with bad
-calibration parameters), and the picture thresholds of the ``NSBImageCleaner`` are not raised. The
+calibration parameters, warning in the log), and the picture thresholds of the ``NSBImageCleaner`` are not raised. The
 output file has no pointing (the event source gives the RA/Dec of the run only), so it cannot be
 reconstructed in DL2 by ``sst1mpipe_dl1_dl2``. This is used for the ZMQ streams of the real-time analysis
 (``sst1mpipe_rta_config.json``); a monitoring file can be given to the stream as well.
@@ -210,9 +216,10 @@ reconstructed in DL2 by ``sst1mpipe_dl1_dl2``. This is used for the ZMQ streams 
 **Simulations** (``.simtel.gz`` files) are processed without monitoring source, with the MC
 configuration files (``sst1mpipe_mc_config_low_nsb.json``, ``sst1mpipe_mc_config_high_nsb.json``). How
 each telescope is calibrated is set in the configuration: for the simulated telescopes 1 and 2, the R1
-waveforms of the simulation are kept and corrected for the PDE drop (``R0R1Calibrator.calibrate_r0``
-false, ``pde_drop_factor``), without saturation correction (``ImageSaturationCorrector.apply_correction``
-false):
+waveforms of the simulation are kept (``R0R1Calibrator.calibrate_r0`` false), the charges are corrected for
+the PDE drop by the ``factor`` of the coefficients (``R0R1Calibrator.pde_drop_factor``), and the saturated
+pixels are not corrected (``ImageSaturationCorrector`` ``integration_level`` and ``peak_time_level``
+``null``):
 
 .. code-block:: bash
 
@@ -248,8 +255,8 @@ from the variance of the ADC samples of the pedestal events (ADC², square of th
 
 * the **baseline shift** (ADC): spline of the variance, fitted for each telescope (``baseline_shift_spline``);
 * the **gain drop** ``1 + gain_drop_slope * shift`` and the **charge drop**
-  ``1 + (gain_drop_slope + pde_drop_slope) * shift``: the voltage drop correction of the ``R0R1Calibrator``
-  divides the charges by the charge drop;
+  ``1 + (gain_drop_slope + pde_drop_slope) * shift``: the voltage drop correction (``factor`` of the camera
+  calibration coefficients of ``sst1mpipe-monitoring``) divides the charges by the charge drop;
 * the **NSB rate** per pixel: shift / (``pulse_integral`` * gain drop) / duration of a sample (4 ns), and
   the **NSB photon rate**: with the charge drop and divided by ``photon_detection_efficiency``.
 

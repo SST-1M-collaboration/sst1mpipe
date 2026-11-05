@@ -6,12 +6,12 @@ import tables
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
 from ctapipe.calib import CameraCalibrator
-from ctapipe.containers import ArrayEventContainer, SchedulingBlockType
+from ctapipe.containers import ArrayEventContainer, CameraCalibrationContainer, SchedulingBlockType
 from ctapipe.core import run_tool
 from ctapipe.core.tool import ToolConfigurationError
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import HDF5MonitoringSource, read_table
-from ctapipe.io.hdf5dataformat import DL0_TEL_POINTING_GROUP, DL1_PIXEL_STATISTICS_GROUP
+from ctapipe.io.hdf5dataformat import DL0_TEL_POINTING_GROUP, DL1_CAMERA_COEFFICIENTS_GROUP, DL1_PIXEL_STATISTICS_GROUP
 from ctapipe.io.metadata import read_reference_metadata
 from traitlets.config import Config
 
@@ -21,7 +21,7 @@ from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP, load_config
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES, CameraEventType
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.monitoring import PedestalWaveformAggregator, last_chunk_index
+from sst1mpipe.monitoring import CameraCoefficientsCalculator, PedestalWaveformAggregator, last_chunk_index
 from sst1mpipe.resources import DATA_CONFIG_FILE, MONITORING_CONFIG_FILE, RTA_CONFIG_FILE
 from sst1mpipe.scripts.sst1mpipe_monitoring_tool import MonitoringTool
 
@@ -90,11 +90,9 @@ def test_image_statistics(monitoring_file):
     assert 0.1 < np.median(table["std"]) < 3
 
 
-def calibrators(config_file, subarray, **r0_r1_settings):
+def calibrators(config_file, subarray):
     """R0R1Calibrator, CameraCalibrator and ImageSaturationCorrector configured by a config file"""
     config = Config(load_config(config_file, ismc=False))
-    for name, value in r0_r1_settings.items():
-        config.R0R1Calibrator[name] = value
     return [
         R0R1Calibrator(subarray=subarray, config=config),
         CameraCalibrator(subarray=subarray, config=config),
@@ -107,8 +105,7 @@ def calibration_settings(config_file, subarray):
     settings = {}
     r0_r1_calibrator, camera_calibrator, saturation_corrector = calibrators(config_file, subarray)
     components = [
-        r0_r1_calibrator, r0_r1_calibrator.voltage_drop_model, camera_calibrator, saturation_corrector,
-        *camera_calibrator.image_extractors.values(),
+        r0_r1_calibrator, camera_calibrator, saturation_corrector, *camera_calibrator.image_extractors.values(),
     ]
     for component in components:
         for name in component.traits(config=True):
@@ -125,16 +122,19 @@ def test_calibration_settings_of_the_processing(tel_id):
     with SST1MEventSource(OBSERVATION_RUNS[tel_id]["path"]) as source:
         subarray = source.subarray
     monitoring = calibration_settings(MONITORING_CONFIG_FILE, subarray)
-    assert monitoring["R0R1Calibrator.voltage_drop_correction"] == {tel_id: "global"}
-    assert monitoring["R0R1Calibrator.flag_dead_pixels"] == {tel_id: True}
     for config_file in (DATA_CONFIG_FILE, RTA_CONFIG_FILE):
         assert calibration_settings(config_file, subarray) == monitoring
+    # the camera calibration coefficients are computed by sst1mpipe-monitoring only
+    calculator = CameraCoefficientsCalculator(subarray=subarray, config=Config(load_config(MONITORING_CONFIG_FILE)))
+    assert calculator.voltage_drop_correction.tel[tel_id] == "global"
+    assert calculator.flag_dead_pixels.tel[tel_id]
 
 
 def test_image_statistics_calibrated_as_by_the_processing(monitoring_file):
     """
     statistics of the images of the pedestal events calibrated as by sst1mpipe-process with the
-    monitoring file (SST1MMonitoringSource): voltage drop correction and interpolated dead pixels
+    monitoring file (SST1MMonitoringSource): camera calibration coefficients with the voltage drop
+    correction and the interpolated dead pixels
     """
     table = read_table(monitoring_file, f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/tel_{TEL_ID:03d}")
     waveform = read_table(monitoring_file, f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform/tel_{TEL_ID:03d}")
@@ -142,24 +142,21 @@ def test_image_statistics_calibrated_as_by_the_processing(monitoring_file):
     voltage_drops = []
     with SST1MEventSource(OBSERVATION_FILE) as source:
         monitoring_source = SST1MMonitoringSource(subarray=source.subarray, input_files=[monitoring_file])
-        components = {
-            "process": calibrators(DATA_CONFIG_FILE, source.subarray),
-            "uncorrected": calibrators(
-                DATA_CONFIG_FILE, source.subarray,
-                voltage_drop_correction=[["type", "*", "none"]], flag_dead_pixels=[["type", "*", False]],
-            ),
-        }
+        r0_r1_calibrator, camera_calibrator, saturation_corrector = calibrators(DATA_CONFIG_FILE, source.subarray)
         for event in source:
             if event.trigger.event_type not in PEDESTAL_EVENT_TYPES:
                 continue
-            monitoring_source.fill_monitoring_container(event)
-            for name, (r0_r1_calibrator, camera_calibrator, saturation_corrector) in components.items():
+            for name in ("process", "uncorrected"):
+                # without the coefficients of the monitoring: no voltage drop correction nor dead pixels
+                monitoring_source.fill_monitoring_container(event)
+                if name == "uncorrected":
+                    event.monitoring.tel[TEL_ID].camera.coefficients = CameraCalibrationContainer()
+                else:
+                    voltage_drops.append(np.median(1 / event.monitoring.tel[TEL_ID].camera.coefficients.factor))
                 r0_r1_calibrator(event)
                 camera_calibrator(event)
                 saturation_corrector(event)
                 images[name].append(np.array(event.dl1.tel[TEL_ID].image, dtype=np.float32))
-            std = event.monitoring.tel[TEL_ID].camera.pixel_statistics.pedestal_waveform.std
-            voltage_drops.append(components["process"][0].voltage_drop(TEL_ID, std))
     process, uncorrected = (np.array(images[name]) for name in ("process", "uncorrected"))
     assert len(process) == N_PEDESTALS
 
@@ -179,6 +176,21 @@ def test_image_statistics_calibrated_as_by_the_processing(monitoring_file):
     # the charges of the dead pixels are interpolated from their neighbours
     assert dead.sum() > 0
     assert not np.allclose(process[:, dead], uncorrected[:, dead] / np.mean(voltage_drops))
+
+
+def test_camera_coefficients(monitoring_file):
+    """one row of coefficients per chunk of the statistics of the ADC samples, valid from the end of the chunk"""
+    waveform = read_table(monitoring_file, f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform/tel_{TEL_ID:03d}")
+    coefficients = read_table(monitoring_file, f"{DL1_CAMERA_COEFFICIENTS_GROUP}/tel_{TEL_ID:03d}")
+    assert len(coefficients) == len(waveform)
+    np.testing.assert_array_equal(coefficients["time"].mjd, waveform["time_end"].mjd)
+
+    subarray = SubarrayDescription.from_hdf(monitoring_file)
+    calculator = CameraCoefficientsCalculator(subarray=subarray, config=Config(load_config(MONITORING_CONFIG_FILE)))
+    np.testing.assert_allclose(coefficients["factor"], calculator(waveform, TEL_ID)["factor"])
+    # global voltage drop correction: the charges are increased; the outliers are the dead pixels
+    assert np.all(coefficients["factor"] > 1)
+    np.testing.assert_array_equal(coefficients["outlier_mask"], waveform["outlier_mask"])
 
 
 def test_pointing_table(monitoring_file):
@@ -202,7 +214,7 @@ def test_read_by_ctapipe_monitoring_source(monitoring_file):
     """the monitoring file is read by the ctapipe HDF5MonitoringSource"""
     source = HDF5MonitoringSource(input_files=[monitoring_file])
     assert source.subarray.tel_ids.tolist() == [TEL_ID]
-    assert {t.name for t in source.monitoring_types} == {"PIXEL_STATISTICS", "TELESCOPE_POINTINGS"}
+    assert {t.name for t in source.monitoring_types} == {"CAMERA_COEFFICIENTS", "PIXEL_STATISTICS", "TELESCOPE_POINTINGS"}
 
     times, _, _ = read_pedestal_waveforms(OBSERVATION_FILE)
     event = ArrayEventContainer()
@@ -212,6 +224,12 @@ def test_read_by_ctapipe_monitoring_source(monitoring_file):
     image = read_table(monitoring_file, f"{DL1_PIXEL_STATISTICS_GROUP}/sky_pedestal_image/tel_{TEL_ID:03d}")
     np.testing.assert_array_equal(monitoring.camera.pixel_statistics.pedestal_image.std, image["std"][0])
     assert 70 * u.deg < monitoring.pointing.altitude < 80 * u.deg
+
+    # camera calibration coefficients: ctapipe takes the last chunk ended before the time, as sst1mpipe
+    coefficients = read_table(monitoring_file, f"{DL1_CAMERA_COEFFICIENTS_GROUP}/tel_{TEL_ID:03d}")
+    event.trigger.time = times[-1]
+    source.fill_monitoring_container(event)
+    np.testing.assert_array_equal(monitoring.camera.coefficients.factor, coefficients["factor"][-1])
 
 
 def test_configuration_and_metadata(monitoring_file):

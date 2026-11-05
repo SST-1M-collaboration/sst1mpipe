@@ -42,20 +42,21 @@ events by ``sst1mpipe-process``, with the statistics of the ADC samples:
 1. **First pass:** the time of the first and of the last event of each telescope is kept, for the
    pointing table, and the mean and the std of the ADC samples of each pixel (R0 waveforms) of the
    **pedestal events** (internal triggers of the camera). The statistics of the ADC samples are then
-   computed (rolling chunks, see below).
+   computed (rolling chunks, see below), and from them the **camera calibration coefficients**
+   (``CameraCoefficientsCalculator``).
 2. **Second pass:** the image of each pedestal event (charge of each pixel in p.e.) is calibrated as the
    events by ``sst1mpipe-process``:
 
-   * the statistics of the ADC samples of the first pass at the time of the pedestal event (last chunk
+   * the camera calibration coefficients of the first pass at the time of the pedestal event (last chunk
      ended before it, as given by ``SST1MMonitoringSource`` to ``sst1mpipe-process``);
-   * ``R0R1Calibrator``: dc to p.e., **voltage drop correction** and **dead pixels** (outliers of the
-     statistics of the ADC samples) flagged;
-   * ``CameraCalibrator``: integration of the waveforms, the charge of the dead pixels interpolated from
-     their neighbours;
+   * ``R0R1Calibrator``: DigiCam pedestal, dc to p.e., window, bad pixels;
+   * ``CameraCalibrator``: integration of the waveforms, multiplied by the ``factor`` of the coefficients
+     (**voltage drop correction**), the charge of the **dead pixels** and of the bad pixels interpolated
+     from their neighbours;
    * ``ImageSaturationCorrector``.
 
-   The statistics of the images are then computed. The pedestal events without statistics of the ADC
-   samples are not used (warning in the log), as they are skipped by ``sst1mpipe-process``.
+   The statistics of the images are then computed. The pedestal events without coefficients (no chunk of
+   statistics of the ADC samples at their time) are not used (warning in the log), as they are skipped by ``sst1mpipe-process``.
 
 The calibration settings (``R0R1Calibrator``, ``CameraCalibrator``, ``ImageSaturationCorrector``) of
 ``sst1mpipe_monitoring_config.json`` are those of ``sst1mpipe_data_config.json`` and
@@ -75,6 +76,13 @@ At the end of the run, the tool writes:
   of the ADC samples), ``std`` the noise (mean of the std of the ADC samples, used for the voltage drop
   correction and the dead pixels), ``outlier_mask`` (dead pixels: noise below half of the median of the
   camera) and ``is_valid``.
+* the **camera calibration coefficients**, one row per chunk of the statistics of the ADC samples, in the
+  ctapipe table ``dl1/monitoring/telescope/calibration/camera/coefficients/tel_XXX`` (read by the ctapipe
+  ``HDF5MonitoringSource``): ``factor`` = 1 / charge drop of the ``SiPMVoltageDropModel`` (voltage drop
+  correction, ``CameraCoefficientsCalculator.voltage_drop_correction``: ``global`` with the median variance
+  of the camera, ``pixelwise`` or ``none``), ``outlier_mask`` (dead pixels, ``flag_dead_pixels``),
+  ``time`` (end of the chunk: valid from its last pedestal event), ``time_start``, ``time_end``,
+  ``is_valid``, and ``pedestal_offset`` and ``time_shift`` (0).
 * the **statistics of the images of the pedestal events**, in rolling chunks of pedestal events
   (``ImageStatisticsCalculator``, the last 1000 pedestal events, at each pedestal event, by default): ``mean``, ``median`` and ``std`` of the charges
   (p.e.). The ``std`` is the NSB noise used by the ``NSBImageCleaner`` to raise the picture threshold of
@@ -167,6 +175,8 @@ The main settings, in ``sst1mpipe_monitoring_config.json``:
 * ``outlier_detector_list``: ``RangeOutlierDetector`` (``validity_range``), ``MedianOutlierDetector``
   (``median_range_factors``) or ``StdOutlierDetector`` (``std_range_factors``) applied to the ``mean``,
   ``median`` or ``std`` of the chunks
+* ``CameraCoefficientsCalculator``: ``voltage_drop_correction`` and ``flag_dead_pixels``, and the
+  ``SiPMVoltageDropModel``, for the camera calibration coefficients
 * ``R0R1Calibrator`` and ``CameraCalibrator``: calibration of the images, as for the processing
 * ``SST1MEventSource.swapped_modules``: modules of the camera whose cables were swapped during a period,
   which are put back in place when the events are read

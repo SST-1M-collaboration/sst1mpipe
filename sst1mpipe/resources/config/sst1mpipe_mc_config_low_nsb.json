@@ -60,10 +60,15 @@
     },
 
     "ImageSaturationCorrector": {
-      "apply_correction": [
-        ["type", "*", true],
-        ["id", 1, false],
-        ["id", 2, false]
+      "integration_level": [
+        ["type", "*", 0.2],
+        ["id", 1, null],
+        ["id", 2, null]
+      ],
+      "peak_time_level": [
+        ["type", "*", 2500],
+        ["id", 1, null],
+        ["id", 2, null]
       ]
     },
 

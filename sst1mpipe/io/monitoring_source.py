@@ -6,15 +6,22 @@ import astropy.units as u
 from astropy.time import Time
 import numpy as np
 import tables
-from ctapipe.containers import StatisticsContainer, TelescopePointingContainer
+from ctapipe.containers import CameraCalibrationContainer, StatisticsContainer, TelescopePointingContainer
 from ctapipe.io import HDF5MonitoringSource, read_table
+from ctapipe.io.hdf5dataformat import DL1_CAMERA_COEFFICIENTS_GROUP
 from ctapipe.io.monitoringtypes import MonitoringType
 from ctapipe.monitoring import StatisticsInterpolator
 
 from sst1mpipe.io.io import R0_PIXEL_STATISTICS_GROUP
 from sst1mpipe.monitoring import last_chunk_index
 
-__all__ = ["LastChunkStatisticsInterpolator", "SST1MMonitoringSource", "statistics_container", "waveform_statistics_interpolator"]
+__all__ = [
+    "LastChunkCoefficients",
+    "LastChunkStatisticsInterpolator",
+    "SST1MMonitoringSource",
+    "statistics_container",
+    "waveform_statistics_interpolator",
+]
 
 
 class LastChunkStatisticsInterpolator(StatisticsInterpolator):
@@ -48,6 +55,42 @@ class LastChunkStatisticsInterpolator(StatisticsInterpolator):
         return interpolated[0] if len(interpolated) == 1 else interpolated
 
 
+class LastChunkCoefficients:
+    """
+    Camera calibration coefficients (`~sst1mpipe.monitoring.CameraCoefficientsCalculator`) of the
+    last chunk of pedestal events ended at or before the requested time, as the statistics
+    (`LastChunkStatisticsInterpolator`). ``tables`` by telescope id, with the columns of the ctapipe
+    coefficients table and the start and end of the chunks. Out of the time range of the chunks
+    (within ``timestamp_tolerance``), or for a telescope without coefficients, the coefficients are
+    not filled (``factor`` None).
+
+    The ctapipe HDF5MonitoringSource takes the last coefficients of time before the event, but
+    rejects the events before the first chunk.
+    """
+
+    def __init__(self, tables):
+        self.tables = {}
+        for tel_id, table in tables.items():
+            table = table.copy()
+            table.sort("time_end")
+            self.tables[tel_id] = (table, Time(table["time_start"]), Time(table["time_end"]))
+
+    def __call__(self, tel_id, time, timestamp_tolerance=0 * u.s):
+        if tel_id not in self.tables:
+            return CameraCalibrationContainer()
+        table, time_start, time_end = self.tables[tel_id]
+        if time < time_start.min() - timestamp_tolerance or time > time_end.max() + timestamp_tolerance:
+            return CameraCalibrationContainer()
+        row = table[last_chunk_index(time_end, time)]
+        # the pedestal is subtracted by the R0R1Calibrator: no pedestal offset nor time shift
+        return CameraCalibrationContainer(
+            time=Time(row["time"]),
+            factor=np.asarray(row["factor"]),
+            outlier_mask=np.asarray(row["outlier_mask"], dtype=bool),
+            is_valid=bool(row["is_valid"]),
+        )
+
+
 class SST1MMonitoringSource(HDF5MonitoringSource):
     """
     Monitoring data of the SST-1M runs (files of sst1mpipe-monitoring), interpolated at the
@@ -55,8 +98,10 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
     as by the ctapipe `~ctapipe.io.HDF5MonitoringSource`, with:
 
     - the statistics of the ADC samples of the pedestal events (R0 tables ``<event type>_waveform``)
-      in ``camera.pixel_statistics.pedestal_waveform``, used by the R0R1Calibrator
-      (voltage drop correction and dead pixels)
+      in ``camera.pixel_statistics.pedestal_waveform``
+    - the camera calibration coefficients computed from them (voltage drop correction and dead
+      pixels, `~sst1mpipe.monitoring.CameraCoefficientsCalculator`) in ``camera.coefficients``,
+      applied by the ctapipe CameraCalibrator (`LastChunkCoefficients`)
     - the statistics of the images of the pedestal events of channel 0 in
       ``camera.pixel_statistics.pedestal_image``, of shape (n_pixels,) as the images (DigiCam
       has a single channel), for the NSBImageCleaner
@@ -73,6 +118,7 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
         super()._process_single_file(file)
         self._process_image_statistics()
         self._process_waveform_statistics(file)
+        self._process_coefficients(file)
 
     def _process_image_statistics(self):
         """Statistics of the images of the pedestal events: last chunk ended before the event"""
@@ -97,6 +143,22 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
                 for tel_id in self.subarray.tel_ids
             })
 
+    def _process_coefficients(self, file):
+        """
+        Camera calibration coefficients of the telescopes: last chunk ended before the event.
+        With several files, the coefficients of each telescope are those of the last file which has them.
+        """
+        if not hasattr(self, "_coefficient_tables"):
+            self._coefficient_tables = {}
+        with tables.open_file(file) as h5file:
+            tel_ids = [
+                tel_id for tel_id in self.subarray.tel_ids
+                if f"{DL1_CAMERA_COEFFICIENTS_GROUP}/tel_{tel_id:03d}" in h5file
+            ]
+        for tel_id in tel_ids:
+            self._coefficient_tables[tel_id] = read_table(file, f"{DL1_CAMERA_COEFFICIENTS_GROUP}/tel_{tel_id:03d}")
+        self._coefficients = LastChunkCoefficients(self._coefficient_tables)
+
     def fill_monitoring_container(self, event):
         """
         Fill the monitoring containers of the telescopes of the monitoring files, at the
@@ -117,7 +179,7 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
                         values = interpolator(tel_id, time, self.timestamp_tolerance)
                         statistics["pedestal_waveform"] = statistics_container(values)
             if self.has_camera_coefficients:
-                monitoring.camera.coefficients = self.get_camera_monitoring_container(tel_id, time).coefficients
+                monitoring.camera.coefficients = self._coefficients(tel_id, time, self.timestamp_tolerance)
             if self.has_pointings:
                 try:
                     monitoring.pointing = self.get_telescope_pointing_container(tel_id, time)

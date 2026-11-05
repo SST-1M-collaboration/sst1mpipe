@@ -128,7 +128,8 @@ def test_process_with_monitoring_source(monitoring, tmp_path):
     # the monitoring data are copied into the DL1 file, the pointing is read by load_dl1_sst1m
     with tables.open_file(monitoring) as source, tables.open_file(output) as dl1:
         monitoring_tables = [t._v_pathname for t in source.walk_nodes("/", "Table") if "monitoring" in t._v_pathname]
-        assert len(monitoring_tables) == 3
+        # pointing, statistics of the ADC samples and of the images, camera calibration coefficients
+        assert len(monitoring_tables) == 4
         for path in monitoring_tables:
             np.testing.assert_array_equal(dl1.get_node(path).read(), source.get_node(path).read())
     # the pointing of the events is interpolated by ctapipe (HDF5EventSource) and by load_dl1_sst1m

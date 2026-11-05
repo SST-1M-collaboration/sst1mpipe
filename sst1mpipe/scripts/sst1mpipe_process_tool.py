@@ -17,7 +17,6 @@ from sst1mpipe.io import attach_monitoring_file, write_dl1_info
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
-from sst1mpipe.utils.nsb_tools import SiPMVoltageDropModel
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
 
 
@@ -27,25 +26,28 @@ class ProcessorTool(Tool):
     extraction and optionally image parameterization.
     This implementation is based on the ctapipe.tool.ProcessorTool
 
-    For the SST-1M raw data (R0, SST1MEventSource), the R0 -> R1 calibration is done
-    by the R0R1Calibrator, with the statistics of the ADC samples of the pedestal events
-    (voltage drop correction and dead pixels). The statistics of the calibrated images of
-    the pedestal events are used by the NSBImageCleaner, which raises the picture threshold
-    of the pixels with a high pedestal std.
+    For the SST-1M raw data (R0, SST1MEventSource), the R0 -> R1 calibration is done by the
+    R0R1Calibrator: the corrections which do not need the pedestal events (DigiCam pedestal,
+    dc to p.e., window, bad pixels). The corrections which need them (voltage drop correction,
+    dead pixels) are the camera calibration coefficients of the monitoring
+    (event.monitoring.tel[tel_id].camera.coefficients), applied by the CameraCalibrator. The
+    statistics of the calibrated images of the pedestal events are used by the NSBImageCleaner,
+    which raises the picture threshold of the pixels with a high pedestal std.
 
-    These statistics and the pointing of the telescope are given by the monitoring sources
-    (monitoring_source_list), e.g. the monitoring file of the run written by
+    These coefficients and statistics and the pointing of the telescope are given by the monitoring
+    sources (monitoring_source_list), e.g. the monitoring file of the run written by
     sst1mpipe-monitoring (SST1MMonitoringSource), as in ctapipe-process: the monitoring
     containers of each event are filled before its calibration. The events without monitoring
     data (no chunk of pedestal events at their time) are skipped. The monitoring data are
     attached to the output file (attach_monitoring). Without monitoring source, the raw data are
-    calibrated without these statistics, and the output file has no pointing.
+    calibrated without voltage drop correction nor dead pixels, and the output file has no pointing.
 
     The charges and peak times of the saturated pixels are corrected by the ImageSaturationCorrector.
     How each telescope is calibrated is set in the configuration: for the simulated telescopes
-    1 and 2, the R1 waveforms of the simulation are kept and corrected for the PDE drop
-    (R0R1Calibrator.calibrate_r0 false, pde_drop_factor), without saturation correction
-    (ImageSaturationCorrector.apply_correction false).
+    1 and 2, the R1 waveforms of the simulation are kept (R0R1Calibrator.calibrate_r0 false), the
+    charges are corrected for the PDE drop by the factor of the camera calibration coefficients
+    (R0R1Calibrator.pde_drop_factor), and the saturated pixels are not corrected
+    (ImageSaturationCorrector.integration_level and peak_time_level null).
     Only the events of the runs with an allowed scheduling block type (allowed_sb_types)
     are processed, e.g. the observations but not the transitions between two wobbles.
 
@@ -135,7 +137,7 @@ class ProcessorTool(Tool):
     classes = (
         [
             CameraCalibrator, ImageProcessor, DataWriter, DBSCANImageCleaner, TimeDBSCANImageCleaner,
-            R0R1Calibrator, SiPMVoltageDropModel, ImageSaturationCorrector, ShowerProcessor,
+            R0R1Calibrator, ImageSaturationCorrector, ShowerProcessor,
             SST1MMonitoringSource,
         ]
         + classes_with_traits(EventSource)
