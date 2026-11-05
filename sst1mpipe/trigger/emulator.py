@@ -27,6 +27,8 @@ The ``sst1mpipe-trigger`` tool (``sst1mpipe/scripts/sst1mpipe_trigger_tool.py``)
 runs both emulators on a file. Configuration examples:
 ``sst1mpipe/resources/config/sst1mpipe_trigger_emulator_{mc,data}.json``.
 """
+from abc import abstractmethod
+
 import numpy as np
 from ctapipe.core import TelescopeComponent
 from ctapipe.core.traits import CaselessStrEnum, Dict, Float, FloatTelescopeParameter, Int, List
@@ -102,9 +104,9 @@ class TriggerEmulator(TelescopeComponent):
             )
         return traces.astype(np.int64)
 
+    @abstractmethod
     def scores(self, traces):
         """Score of each patch and sample (432, T), compared to the threshold."""
-        raise NotImplementedError
 
     def trigger_output(self, traces, tel_id):
         """Trigger output (432, T) bool and the scores it is decided on, from the triplet traces."""
