@@ -13,7 +13,7 @@ from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.resources import CONFIG_DIR
 from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator, fixed_point
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.trigger.emulator import fadc, neighbor_matrix, score_quantizer
+from sst1mpipe.trigger.emulator import BASELINE_SAMPLE, fadc, neighbor_matrix, score_quantizer
 from sst1mpipe.utils import get_subarray
 
 Q14 = {
@@ -86,6 +86,8 @@ def test_fadc_keeps_negative_pixels():
     # sample 2: (300-10) * 3 -> 255
     assert fadc(waveform, baseline, patch_matrix).tolist() == [[2, 255, 255]]
     assert fadc(np.zeros((3, 1)), baseline, patch_matrix).tolist() == [[0]]
+    # pixels without data (pixel_flags 0) do not contribute: (5-10) + (13-10) = -2 -> 0, 0 + 2 = 2, 290 + 290 -> 255
+    assert fadc(waveform, baseline, patch_matrix, pixel_flags=[1, 1, 0]).tolist() == [[0, 2, 255]]
 
 
 def test_score_quantizer():
@@ -106,21 +108,23 @@ def test_trigger_geometry():
 
 
 @pytest.mark.parametrize("tel_id", sorted(TRANSITION_FILES))
-def test_trigger_traces_follow_the_pixels(tel_id):
-    # the trigger input traces of the camera (FPGA) are the patches rebuilt from the pixel waveforms:
-    # checks the sector order of the telescope and the patch order of the reader
-    emu = TriggerPatch7Emulator(subarray=get_subarray())
-    source = SST1MEventSource(input_url=TRANSITION_FILES[tel_id], max_events=20)
-    camera, rebuilt = [], []
-    for event in source:
+def test_trigger_input_traces_match_the_waveforms(tel_id):
+    """
+    the trigger input traces of the camera (FPGA) are the patches rebuilt from the pixel waveforms:
+    checks the sector order of the telescope and the patch order of the reader. The FPGA updates its
+    baseline continuously: the traces are identical at the sample of the stored baseline, and close
+    elsewhere (mean squared error 4.4 ADC^2 per trace for tel 21, 6.3 for tel 22, ~5000 to 10000
+    with a wrong order of the traces)
+    """
+    squared_error, n_traces = 0, 0
+    for event in SST1MEventSource(input_url=TRANSITION_FILES[tel_id]):
         r0 = event.r0.tel[tel_id]
-        camera.append(emu.trigger_traces(event, tel_id))
-        rebuilt.append(fadc(r0.waveform[0], r0.pedestal))
-        # the patch7 output of the camera is the emulated one
-        output, _ = emu(event, tel_id)
-        assert np.count_nonzero(output != emu.hardware_output(event, tel_id)) <= 0.001 * output.size
-    camera, rebuilt = np.ravel(camera), np.ravel(rebuilt)
-    assert np.corrcoef(camera, rebuilt)[0, 1] > 0.99
+        camera = np.asarray(r0.trigger_input_traces).astype(np.int64)
+        rebuilt = fadc(r0.waveform[0], r0.pedestal, pixel_flags=r0.pixel_flags)
+        np.testing.assert_array_equal(camera[:, BASELINE_SAMPLE], rebuilt[:, BASELINE_SAMPLE])
+        squared_error += np.sum((camera - rebuilt) ** 2)
+        n_traces += len(camera)
+    assert squared_error / n_traces < 10
 
 
 # patch7 threshold of the camera in the test files: the only threshold for which the emulated patch7

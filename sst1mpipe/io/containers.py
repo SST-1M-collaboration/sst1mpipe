@@ -91,7 +91,7 @@ class SST1MR0CameraContainer(R0CameraContainer):
     """
 
     pixel_flags = Field(None, "numpy array containing pixel flags (n_pixels)")
-    pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels)")
+    pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels), 0 for the pixels without data")
     camera_event_number = Field(None, "event number within the first trigger of operation")
     event_time = Field(None, "White Rabbit timestamp of the event (ns, TAI)")
     gps_time = Field(None, "timestamp from a precise external clock (ns)")

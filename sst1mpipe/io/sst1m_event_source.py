@@ -411,7 +411,8 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
 
     r0 = array_event.r0.tel[tel_id]
     r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
-    r0.pedestal = camera_event.hiGain.waveforms.baselines[sort_ids] / 16
+    # baseline of DigiCam in 1/16 ADC; negative for the pixels without data (dead modules): 0
+    r0.pedestal = np.maximum(camera_event.hiGain.waveforms.baselines[sort_ids] / 16, 0)
     r0.camera_event_number = camera_event.eventNumber
     r0.pixel_flags = camera_event.pixels_flags[sort_ids]
     r0.event_time = local_time

@@ -618,3 +618,14 @@ def test_no_trigger_sector_order():
         camera_event = next(iter(f.Events))._replace(telescopeID=23)
     with pytest.raises(ValueError, match="No trigger sector order for telescope 23"):
         sst1m_event_source.fill_r0_event(SST1MArrayEventContainer(), camera_event)
+
+
+def test_pedestal_of_pixels_without_data():
+    """the pixels without data (dead modules of tel 21: pixel_flags 0) have a baseline of 0, not negative"""
+    event = next(iter(SST1MEventSource(input_url=TRANSITION_FILES[21], max_events=1)))
+    r0 = event.r0.tel[21]
+    without_data = r0.pixel_flags == 0
+    assert without_data.sum() == 48
+    assert np.all(r0.waveform[0][without_data] == 0)
+    assert np.all(r0.pedestal[without_data] == 0)
+    assert np.all(r0.pedestal >= 0)
