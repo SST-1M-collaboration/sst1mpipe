@@ -151,7 +151,7 @@ def test_patch7_output_from_camera_input(tel_id, path, threshold):
 
 
 def test_patch7_sums_clusters():
-    emu = TriggerPatch7Emulator(subarray=get_subarray())
+    emu = TriggerPatch7Emulator(subarray=get_subarray(), threshold=242)
     traces = np.zeros((432, 50), dtype=np.int64)
     patch, sample = 200, 20
     traces[patch, sample] = 100

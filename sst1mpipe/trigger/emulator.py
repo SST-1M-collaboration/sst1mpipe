@@ -1,15 +1,17 @@
 """Software emulation of the SST-1M DigiCam trigger, from R0 data.
 
-Two emulators share the base class ``TriggerEmulator``:
+Three emulators share the base class ``TriggerEmulator``:
 
 * ``TriggerPatch7Emulator``, the trigger running on the telescopes: sum of the
   7 patches of each cluster, fires above a threshold;
+* ``TriggerPatch19Emulator``: sum of the 19 patches of each cluster, fires above a
+  threshold (not used on the telescopes, its camera output is always 0);
 * ``TriggerTDSCANEmulator``, the candidate firmware trigger: the traces are
   quantized to 4-bit codes and filtered by the TDSCAN kernel, in floating
   point or in fixed point (bit-exact with the HLS core), and it fires above a
   threshold.
 
-Both take the R0 data of one telescope event and return the trigger output,
+All take the R0 data of one telescope event and return the trigger output,
 one boolean per patch and sample (432, T). They work on the 432 triplet
 traces (the FADC output, one trace per patch of 3 pixels), which come from:
 
@@ -65,6 +67,14 @@ class TriggerEmulator(TelescopeComponent):
 
     def __init__(self, subarray, config=None, parent=None, **kwargs):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
+        missing = []
+        for tel_id in self.subarray.tel_ids:
+            try:
+                self.threshold.tel[tel_id]
+            except KeyError:
+                missing.append(tel_id)
+        if missing:
+            raise ValueError(f"{type(self).__name__}.threshold must be set for the telescopes {missing}")
 
     @classmethod
     def _compute_trigger_traces(cls, waveform, baseline, pixel_flags=None, patch_matrix=DigiCam.patch_matrix):
@@ -122,11 +132,22 @@ class TriggerPatch7Emulator(TriggerEmulator):
     """patch7: sum of the 7 patches of each cluster (fewer at the camera edge)."""
 
     threshold = FloatTelescopeParameter(
-        default_value=242.0, help="patch7 fires when a 7-patch cluster sum is above this value"
+        help="patch7 fires when a 7-patch cluster sum is above this value (required)"
     ).tag(config=True)
 
     def scores(self, traces):
         return DigiCam.cluster_7_matrix.dot(traces)
+
+
+class TriggerPatch19Emulator(TriggerEmulator):
+    """patch19: sum of the 19 patches of each cluster (fewer at the camera edge)."""
+
+    threshold = FloatTelescopeParameter(
+        help="patch19 fires when a 19-patch cluster sum is above this value (required)"
+    ).tag(config=True)
+
+    def scores(self, traces):
+        return DigiCam.cluster_19_matrix.dot(traces)
 
 
 class TriggerTDSCANEmulator(TriggerEmulator):
