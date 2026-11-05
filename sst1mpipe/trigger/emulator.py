@@ -21,7 +21,7 @@ traces (the FADC output, one trace per patch of 3 pixels), which come from:
 
 Every camera-wide operation is a product with a sparse DigiCam matrix:
 ``patch_matrix`` (pixels -> patches), ``cluster_7_matrix`` (patch7 clusters)
-and the neighbour matrix derived from it (TDSCAN).
+and ``neighbor_patch_matrix`` derived from it (TDSCAN).
 
 The ``sst1mpipe-trigger`` tool (``sst1mpipe/scripts/sst1mpipe_trigger_tool.py``)
 runs both emulators on a file. Configuration examples:
@@ -30,21 +30,9 @@ runs both emulators on a file. Configuration examples:
 import numpy as np
 from ctapipe.core import TelescopeComponent
 from ctapipe.core.traits import CaselessStrEnum, Dict, Float, FloatTelescopeParameter, Int, List
-from scipy.sparse import identity
 
-from sst1mpipe.constants import N_PATCHES
 from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.trigger import fixed_point
-
-
-
-# ---------------------------------------------------------------------------
-# Camera trigger geometry
-# ---------------------------------------------------------------------------
-
-def neighbor_matrix():
-    """(432, 432) sparse matrix, 1 where two patches are neighbours: the patch7 clusters without their centre."""
-    return (DigiCam.cluster_7_matrix - identity(N_PATCHES, dtype=np.int64, format="csr")).tocsr()
 
 
 # ---------------------------------------------------------------------------
@@ -188,7 +176,7 @@ class TriggerTDSCANEmulator(TriggerEmulator):
 
     def __init__(self, subarray, config=None, parent=None, **kwargs):
         super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
-        self.neighbors = neighbor_matrix()
+        self.neighbors = DigiCam.neighbor_patch_matrix
 
         self.edges = np.array(self.score_quantizer_edges, dtype=float)
         if np.any(np.diff(self.edges) <= 0):

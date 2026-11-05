@@ -13,7 +13,7 @@ from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.resources import CONFIG_DIR
 from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator, fixed_point
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.trigger.emulator import BASELINE_SAMPLE, fadc, neighbor_matrix, score_quantizer
+from sst1mpipe.trigger.emulator import BASELINE_SAMPLE, fadc, score_quantizer
 from sst1mpipe.utils import get_subarray
 
 Q14 = {
@@ -100,7 +100,7 @@ def test_trigger_geometry():
     assert np.array_equal(DigiCam.patch_matrix.indptr, np.arange(0, 1297, 3))
     assert sorted(DigiCam.patch_matrix.indices.tolist()) == list(range(1296))
 
-    neighbors = neighbor_matrix()
+    neighbors = DigiCam.neighbor_patch_matrix
     assert (neighbors != neighbors.T).nnz == 0                  # symmetric
     assert neighbors.diagonal().sum() == 0                      # a patch is not its own neighbour
     assert set(np.asarray(neighbors.sum(axis=1)).ravel()) <= {3, 4, 6}  # 6 inside, fewer at the edge
@@ -182,7 +182,7 @@ def test_tdscan_single_impulse():
     assert np.count_nonzero(scores[patch]) == 5
 
     # A neighbour sees the ring-1 weights: floor(code / 32) of -1, -4, -16, 8, 32.
-    neighbor = neighbor_matrix()[patch].indices[0]
+    neighbor = DigiCam.neighbor_patch_matrix[patch].indices[0]
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0, -0.25, -0.25, -0.25]
 
 
@@ -196,7 +196,7 @@ def test_tdscan_single_impulse_floating_point():
 
     # Without quantization the scores are the weights themselves, tap 4 first.
     assert scores[patch, 18:23].tolist() == [0.5, 0.5, -0.5, -0.5, 0.5]
-    neighbor = neighbor_matrix()[patch].indices[0]
+    neighbor = DigiCam.neighbor_patch_matrix[patch].indices[0]
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0625, -0.125, -0.03125, -0.0078125]
 
 

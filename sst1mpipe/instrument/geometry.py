@@ -1,6 +1,7 @@
 import numpy as np
 from astropy import units as u
 from ctapipe.instrument.camera import CameraGeometry
+from scipy.sparse import identity
 
 # from ctapipe.instrument.camera import find_neighbor_pixels
 from cts_core import camera as cam
@@ -93,6 +94,15 @@ def compute_cluster_matrix_7(camera):
             cluster_matrix[cluster.ID, patch] = 1
 
     return cluster_matrix
+
+
+def compute_neighbor_patch_matrix(cluster_7_matrix):
+    """
+    (n_patches, n_patches) sparse matrix, 1 where two patches are neighbours: the patch7 clusters
+    without their centre
+    """
+    n_patches = cluster_7_matrix.shape[0]
+    return (cluster_7_matrix - identity(n_patches, dtype=np.int64, format="csr")).tocsr()
 
 
 def compute_cluster_matrix_19(camera):
