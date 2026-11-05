@@ -8,7 +8,7 @@ from scipy.sparse import csr_matrix
 from traitlets import TraitError
 from traitlets.config import Config
 
-from conftest import TRANSITION_FILES
+from conftest import OBSERVATION_RUNS, TRANSITION_FILES
 from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.resources import CONFIG_DIR
 from sst1mpipe.trigger import TriggerPatch7Emulator, TriggerTDSCANEmulator, fixed_point
@@ -121,6 +121,29 @@ def test_trigger_traces_follow_the_pixels(tel_id):
         assert np.count_nonzero(output != emu.hardware_output(event, tel_id)) <= 0.001 * output.size
     camera, rebuilt = np.ravel(camera), np.ravel(rebuilt)
     assert np.corrcoef(camera, rebuilt)[0, 1] > 0.99
+
+
+# patch7 threshold of the camera in the test files: the only threshold for which the emulated patch7
+# output of the trigger_input_traces is the camera output, on all the events of the file
+PATCH7_THRESHOLD_OF_FILES = [
+    (21, TRANSITION_FILES[21], 210),
+    (22, TRANSITION_FILES[22], 280),
+    (21, OBSERVATION_RUNS[21]["path"], 185),
+    (22, OBSERVATION_RUNS[22]["path"], 240),
+]
+
+
+@pytest.mark.parametrize("tel_id, path, threshold", PATCH7_THRESHOLD_OF_FILES, ids=lambda v: getattr(v, "name", v))
+def test_patch7_output_from_camera_input(tel_id, path, threshold):
+    """the patch7 output emulated from the trigger input traces of the camera is the camera output"""
+    emu = TriggerPatch7Emulator(subarray=get_subarray(), threshold=threshold)
+    n_events = 0
+    for event in SST1MEventSource(input_url=path, max_events=500):
+        r0 = event.r0.tel[tel_id]
+        output, _ = emu.trigger_output(np.asarray(r0.trigger_input_traces).astype(np.int64), tel_id)
+        np.testing.assert_array_equal(output, np.asarray(r0.trigger_output_patch7).astype(bool))
+        n_events += 1
+    assert n_events > 0
 
 
 def test_patch7_sums_clusters():
