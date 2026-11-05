@@ -121,3 +121,20 @@ def test_read_trigger_patches_refuses_inconsistent_patches(tmp_path):
     config_file.write_text("".join(lines))
     with pytest.raises(ValueError, match="different readout values"):
         read_trigger_patches(config_file)
+
+
+def test_geometry_in_engineering_frame():
+    """the CTS geometry is in the EngineeringCameraFrame: in the CameraFrame, it is the one of the subarray"""
+    import astropy.units as u
+    from ctapipe.coordinates import CameraFrame, EngineeringCameraFrame
+    from ctapipe.instrument import SubarrayDescription
+
+    from sst1mpipe.resources import SUBARRAY_FILE
+
+    assert isinstance(GEOMETRY.frame, EngineeringCameraFrame)
+    in_camera_frame = GEOMETRY.transform_to(CameraFrame())
+    for tel in SubarrayDescription.from_hdf(SUBARRAY_FILE).tel.values():
+        subarray_geometry = tel.camera.geometry
+        assert isinstance(subarray_geometry.frame, CameraFrame)
+        np.testing.assert_allclose(in_camera_frame.pix_x.to_value(u.mm), subarray_geometry.pix_x.to_value(u.mm), atol=1e-3)
+        np.testing.assert_allclose(in_camera_frame.pix_y.to_value(u.mm), subarray_geometry.pix_y.to_value(u.mm), atol=1e-3)
