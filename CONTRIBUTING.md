@@ -84,6 +84,7 @@ Key workflows include:
 
 * [ci.yml](.github/workflows/ci.yml) — Continuous integration (tests, linting, and quality checks)
 * [documentation.yml](.github/workflows/documentation.yml) — Builds and deploys the project documentation
+* [release.yml](.github/workflows/release.yml) — Builds the package and publishes it on PyPI when a version tag is pushed, see [Making a release](#making-a-release)
 
 ---
 
@@ -102,6 +103,12 @@ It is used to configure:
 * **Pytest** (test configuration and options)
 * **Coverage.py** (test coverage thresholds and reporting)
 * Potentially other tools used in the development workflow
+
+### `MANIFEST.in`
+
+The [MANIFEST.in](MANIFEST.in) file selects the files of the source distribution (`.tar.gz`) published on
+PyPI. It removes the test data (`sst1mpipe/resources/test_data`, ~550 MB of Git LFS files) from it; the
+wheel excludes them in `pyproject.toml`.
 
 ### `environment.yml`
 
@@ -177,3 +184,147 @@ git lfs install
 
 Large file tracking rules are defined in `.gitattributes`, which specifies which file types should be handled by Git LFS instead of standard Git storage.
 
+## Making a release
+
+How to publish a new version of `sst1mpipe` on [PyPI](https://pypi.org/project/sst1mpipe/).
+
+### Version numbers
+
+Since 0.32, the versions of `sst1mpipe` follow the versions of
+[ctapipe](https://github.com/cta-observatory/ctapipe): `sst1mpipe` 0.32.x uses ctapipe 0.32.
+The versions follow [PEP 440](https://peps.python.org/pep-0440/):
+
+| Version     | Meaning                                                                 |
+|-------------|-------------------------------------------------------------------------|
+| `0.32.0a1`  | alpha release (`a2`, `a3`, … for the next alpha releases)              |
+| `0.32.0b1`  | beta release                                                            |
+| `0.32.0rc1` | release candidate                                                       |
+| `0.32.0`    | final release                                                           |
+| `0.32.1`    | bug fix release, still with ctapipe 0.32                                |
+| `0.33.0`    | first release with ctapipe 0.33 (update the ctapipe pin in `pyproject.toml` and `environment.yml`) |
+
+The 0.32.0aN versions are alpha releases: the R0 to DL1 processing (`sst1mpipe-monitoring`,
+`sst1mpipe-process`) uses the new ctapipe tools, while the DL1 to DL3 steps and the stereo matching are
+not migrated yet.
+
+`pip install sst1mpipe` ignores the alpha, beta and rc versions: they are installed with
+`pip install --pre sst1mpipe` or with the exact version, e.g. `pip install sst1mpipe==0.32.0a1`.
+
+> [!WARNING]
+> A version published on PyPI can never be uploaded again, even after deleting it: check the
+> package before pushing the tag (see [Checking the package](#2-check-the-package-locally)).
+
+### How a release works
+
+The workflow [.github/workflows/release.yml](.github/workflows/release.yml) runs when a tag `v*` is
+pushed:
+
+1. **build**: checks that the tag is `v` + the version of `pyproject.toml` (tag `v0.32.0a2` for
+   version `0.32.0a2`), builds the source distribution and the wheel (`python -m build`) and checks
+   them (`twine check --strict`).
+2. **publish-pypi**: uploads them on PyPI with
+   [trusted publishing](https://docs.pypi.org/trusted-publishers/): PyPI accepts the upload because it
+   comes from this workflow of this repository, without any token or password.
+
+The workflow can also be started by hand (Actions → release → Run workflow): it then only builds and
+checks the package, without publishing it.
+
+The test data (`sst1mpipe/resources/test_data`, ~550 MB of Git LFS files) are not in the package (PyPI
+limit: 100 MB per file): they are excluded in `pyproject.toml` (wheel) and `MANIFEST.in` (source
+distribution). The tests are run from the git repository.
+
+### Release steps
+
+#### 1. Prepare the version
+
+In a branch and a pull request:
+
+- set the new `version` in [pyproject.toml](pyproject.toml);
+- if the version follows a new ctapipe version, update the ctapipe pin in `pyproject.toml`
+  (`ctapipe[eventio]~=0.33.0`) and in `environment.yml`;
+- check that the dependencies of `pyproject.toml` match `environment.yml`;
+- update the installation instructions of [README.md](README.md) and `docs/introduction.rst` if needed.
+
+#### 2. Check the package locally
+
+```bash
+pip install build twine
+python -m build
+twine check --strict dist/*
+```
+
+Check the size and the content of the wheel (no test data, ~2 MB), then install it in a new
+environment and try it:
+
+```bash
+unzip -l dist/sst1mpipe-*.whl
+python -m venv /tmp/sst1mpipe-release
+/tmp/sst1mpipe-release/bin/pip install dist/sst1mpipe-*.whl
+/tmp/sst1mpipe-release/bin/sst1mpipe-process --help
+```
+
+#### 3. Merge and tag
+
+Once the pull request is merged and the CI of `main` passes, tag the merge commit and push the tag:
+
+```bash
+git checkout main
+git pull origin main
+git tag v0.32.0a2
+git push origin v0.32.0a2
+```
+
+Follow the workflow in the Actions tab of GitHub. Once it is done, the version is on
+https://pypi.org/project/sst1mpipe/.
+
+#### 4. Check the release
+
+```bash
+python -m venv /tmp/sst1mpipe-check
+/tmp/sst1mpipe-check/bin/pip install --pre sst1mpipe==0.32.0a2
+/tmp/sst1mpipe-check/bin/python -c "import sst1mpipe; print(sst1mpipe.__version__)"
+```
+
+#### 5. Publish the GitHub release
+
+On GitHub, Releases → Draft a new release, choose the tag, generate the release notes (list of the
+merged pull requests) and add a short summary of the main changes. Tick "Set as a pre-release" for
+the alpha, beta and rc versions.
+
+### Troubleshooting
+
+| Error in the workflow | Cause and fix |
+|-----------------------|---------------|
+| `tag v… is not the version v… of pyproject.toml` | The tag does not match the version. Nothing is published: delete the tag (`git tag -d vX` and `git push origin :refs/tags/vX`), fix the version or the tag, and push the tag again. |
+| `invalid-publisher: valid token, but no corresponding publisher` | The trusted publisher is missing or different on PyPI, see [One-time setup](#one-time-setup-of-pypi). |
+| `File already exists` / `400 Bad Request` | This version is already on PyPI and cannot be uploaded again: release a new version. |
+| `Failed to parse pyproject.toml` | Invalid TOML in `pyproject.toml` (e.g. a missing comma): check it locally with `python -m build`. |
+
+If a job fails after the build (e.g. the upload), fix the cause and use "Re-run failed jobs" in the
+Actions tab: the same tag can be used again as long as nothing was uploaded.
+
+### One-time setup of PyPI
+
+Needed once per package (`sst1mpipe`, `sst1m-cts`), before its first release.
+
+1. Create an account on https://pypi.org and enable two-factor authentication (required to publish).
+2. In Account settings → Publishing, add a (pending) trusted publisher of type GitHub:
+
+   | Field             | Value                  |
+   |-------------------|------------------------|
+   | PyPI Project Name | `sst1mpipe`            |
+   | Owner             | `SST-1M-collaboration` |
+   | Repository name   | `sst1mpipe`            |
+   | Workflow name     | `release.yml`          |
+   | Environment name  | `pypi`                 |
+
+3. After the first release, add the other maintainers in the project on PyPI (Manage → Collaborators),
+   so that the package does not depend on a single account.
+
+### Dependency: sst1m-cts
+
+`sst1mpipe` uses the camera configuration of DigiCam of [CTS](https://github.com/SST-1M-collaboration/CTS),
+published on PyPI as [sst1m-cts](https://pypi.org/project/sst1m-cts/) (import `sst1m_cts_core`).
+CTS is released the same way (tag `v*`, workflow `release.yml` of the CTS repository). A new version of
+`sst1mpipe` that needs a new version of CTS requires the CTS release first, then the update of
+`sst1m-cts>=…` in `pyproject.toml` and `environment.yml`.

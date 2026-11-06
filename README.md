@@ -60,11 +60,4 @@ pip install .
 
 # Making a release
 
-1. Set the version in `pyproject.toml` (e.g. `0.32.0a2`), merge it in `main`.
-2. Tag the merge commit with the version and push the tag:
-   ```
-   git tag v0.32.0a2
-   git push origin v0.32.0a2
-   ```
-   The workflow `.github/workflows/release.yml` builds the package and publishes it on PyPI.
-3. Create the GitHub release of the tag, with the release notes.
+See [Making a release](CONTRIBUTING.md#making-a-release) in CONTRIBUTING.md.
