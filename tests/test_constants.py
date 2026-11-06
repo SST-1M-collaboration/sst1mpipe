@@ -1,7 +1,7 @@
 import astropy.units as u
 import numpy as np
 from ctapipe.instrument import SubarrayDescription
-from cts_core.camera import Camera
+from sst1m_cts_core.camera import Camera
 
 from sst1mpipe.constants import (N_PIXELS, CAMERA, SUBARRAY_DESCRIPTION, N_CHANNELS, N_PATCHES, PATCHES_PER_SECTOR,
                                  PATCH_IDS, PATCH_SORT_IDS,

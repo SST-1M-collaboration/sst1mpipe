@@ -5,7 +5,7 @@ from ctapipe.instrument.camera import CameraGeometry
 from scipy.sparse import identity
 
 # from ctapipe.instrument.camera import find_neighbor_pixels
-from cts_core import camera as cam
+from sst1m_cts_core import camera as cam
 
 from sst1mpipe.resources import CAMERA_CONFIG_FILE
 

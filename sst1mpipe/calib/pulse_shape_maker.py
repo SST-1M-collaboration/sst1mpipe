@@ -18,7 +18,7 @@ import numpy as np
 #from spe_mc_v6 import mes_fitter_mc
 from astropy.io import ascii as asc
 
-#from cts_core.camera import Camera
+#from sst1m_cts_core.camera import Camera
 #from digicampipe.instrument import geometry
 #from digicampipe.io.event_stream import event_stream, add_slow_data
 from ctapipe.io import EventSource
