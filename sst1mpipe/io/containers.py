@@ -54,8 +54,7 @@ class CameraEventType(Flag):
     """
     Event type of a DigiCam camera event: a bit mask of the trigger conditions of the event.
 
-    Each trigger condition is one bit (see https://github.com/cta-sst-1m/digicampipe/issues/244),
-    and the event type is the sum of the bits of the event:
+    Each trigger condition is one bit and the event type is the sum of the bits of the event:
 
     =====  ===========  ================  ==================================================
     Bit    Value        Member            Meaning
