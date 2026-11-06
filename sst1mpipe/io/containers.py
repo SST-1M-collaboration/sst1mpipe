@@ -51,7 +51,83 @@ __all__ = [
 
 
 class CameraEventType(Flag):
-    # from https://github.com/cta-sst-1m/digicampipe/issues/244
+    """
+    Event type of a DigiCam camera event: a bit mask of the trigger conditions of the event.
+
+    Each trigger condition is one bit (see https://github.com/cta-sst-1m/digicampipe/issues/244),
+    and the event type is the sum of the bits of the event:
+
+    =====  ===========  ================  ==================================================
+    Bit    Value        Member            Meaning
+    =====  ===========  ================  ==================================================
+    0      ``0x1``      ``PATCH7``        algorithm 0 trigger (patch7)
+    1      ``0x2``      ``PATCH19``       algorithm 1 trigger (patch19)
+    2      ``0x4``      ``MUON_TRIGGER``  algorithm 2 trigger (muon)
+    3      ``0x8``      ``INTERNAL``      internal trigger (the pedestal events)
+    4      ``0x10``     ``EXTMSTR``       external trigger, on the master only
+    5, 6   ``0x20``,    ``BIT5``,         unused
+           ``0x40``     ``BIT6``
+    7      ``0x80``     ``CONTINUOUS``    continuous readout marker
+    16     ``0x10000``  ``MUON_DETECT``   muon detected by the camera server
+    17     ``0x20000``  ``HILLAS``        Hillas parameters computed by the camera server
+    =====  ===========  ================  ==================================================
+
+    E.g. ``5 = 0x1 + 0x4`` is an event triggered by both the patch7 and the muon triggers,
+    ``PATCH7|MUON_TRIGGER``.
+
+    The readers (``SST1MEventSource``, ``ZMQEventSource``) store it in
+    ``event.r0.tel[tel_id].event_type``: the container converts the integer of the file or
+    stream to a ``CameraEventType``.
+
+    Notes
+    -----
+    - ``==`` compares the whole mask: ``CameraEventType(5) == CameraEventType.PATCH7`` is False.
+      To test if an event has a trigger condition, whatever the other bits, use ``in`` (or ``&``).
+    - ``UNKNOWN`` (0) is in every event type, as the empty mask of a ``Flag``: test
+      ``not event_type`` for an event without any bit.
+    - A bit which is not a member (bits 8 to 15, above 17) raises a ``ValueError``.
+    - The ctapipe event type of the event (``event.trigger.event_type``) is a pedestal event for
+      an event type equal to ``INTERNAL``, ``SUBARRAY`` otherwise, see
+      ``sst1mpipe.io.sst1m_event_source.camera_event_type_to_event_type``.
+
+    Examples
+    --------
+    Test the trigger conditions of an event, e.g. of type 5:
+
+    >>> from sst1mpipe.io.containers import CameraEventType
+    >>> event_type = CameraEventType(5)  # e.g. event.r0.tel[tel_id].event_type
+    >>> event_type
+    <CameraEventType.PATCH7|MUON_TRIGGER: 5>
+    >>> CameraEventType.PATCH7 in event_type, CameraEventType.MUON_TRIGGER in event_type
+    (True, True)
+    >>> CameraEventType.PATCH19 in event_type
+    False
+    >>> event_type == CameraEventType.PATCH7
+    False
+
+    Any of several trigger conditions:
+
+    >>> bool(event_type & (CameraEventType.PATCH7 | CameraEventType.PATCH19))
+    True
+
+    Bits, name and value of the event type:
+
+    >>> list(event_type)
+    [<CameraEventType.PATCH7: 1>, <CameraEventType.MUON_TRIGGER: 4>]
+    >>> event_type.name, event_type.value
+    ('PATCH7|MUON_TRIGGER', 5)
+    >>> CameraEventType.PATCH7 | CameraEventType.MUON_TRIGGER == event_type
+    True
+
+    The integers of a table (e.g. the ``event_type`` column of ``sst1mpipe-trigger``) are tested
+    with the values of the bits:
+
+    >>> import numpy as np
+    >>> event_types = np.array([1, 5, 8, 4])
+    >>> (event_types & CameraEventType.MUON_TRIGGER.value) != 0
+    array([False,  True, False,  True])
+    """
+
     UNKNOWN = 0x0
     PATCH7 = 0x1  # algorithm 0 trigger - PATCH7
     PATCH19 = 0x2  # algorithm 1 trigger - PATCH19
