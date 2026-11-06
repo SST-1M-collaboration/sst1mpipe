@@ -1,0 +1,889 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Processing the data with the ctapipe tools &mdash; sst1mpipe 0.32.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=13237357" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5f9769cd"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="_static/togglebutton.js?v=4a39c7ea"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Trigger type of the camera events" href="camera_event_type.html" />
+    <link rel="prev" title="Introduction" href="introduction.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            sst1mpipe
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Processing the data with the ctapipe tools</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#configuration">Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#monitoring-of-the-run-sst1mpipe-monitoring">1. Monitoring of the run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#processing-of-the-run-sst1mpipe-process">2. Processing of the run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#merging">3. Merging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#reading-the-outputs">Reading the outputs</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="camera_event_type.html">Trigger type of the camera events</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sst1mpipe_monitoring.html">Monitoring of a run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="sst1m_analysis_workflow.html">SST-1M analysis workflow</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">sst1mpipe</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Processing the data with the ctapipe tools</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/data_processing.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="processing-the-data-with-the-ctapipe-tools">
+<span id="data-processing"></span><h1>Processing the data with the ctapipe tools<a class="headerlink" href="#processing-the-data-with-the-ctapipe-tools" title="Link to this heading"></a></h1>
+<p>The raw data (R0) of the SST-1M telescopes are processed with two
+<a class="reference external" href="https://github.com/cta-observatory/ctapipe">ctapipe</a> tools, run one after the other on each
+run (raw data file <code class="docutils literal notranslate"><span class="pre">SST1M&lt;tel&gt;_&lt;date&gt;_&lt;run&gt;.fits.fz</span></code> of a telescope):</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code>: monitoring data of the run (pointing and statistics of the pedestal
+events), see <a class="reference internal" href="#monitoring-step"><span class="std std-ref">1. Monitoring of the run: sst1mpipe-monitoring</span></a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>: calibration and DL1 (and DL2 geometry) of the events of the run, with the
+monitoring data of the run, see <a class="reference internal" href="#process-step"><span class="std std-ref">2. Processing of the run: sst1mpipe-process</span></a></p></li>
+</ol>
+<p>The DL1 files of the runs can then be merged, see <a class="reference internal" href="#merging-step"><span class="std std-ref">3. Merging</span></a>.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>SST1M1_20260120_1179.fits.fz ──► sst1mpipe-monitoring ──► SST1M1_20260120_1179.monitoring.h5
+          │                                                          │
+          └──────────────────► sst1mpipe-process ◄───────────────────┘
+                                      │
+                                      ▼
+                        SST1M1_20260120_1179_W1.dl1.h5  ──►  ctapipe-merge
+</pre></div>
+</div>
+<p>The command line tools <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code> and <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code> are installed with
+<code class="docutils literal notranslate"><span class="pre">sst1mpipe</span></code> (see <a class="reference internal" href="introduction.html#introduction"><span class="std std-ref">Introduction</span></a>).</p>
+<section id="configuration">
+<span id="processing-config"></span><h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading"></a></h2>
+<p>All the tools take a configuration file (<code class="docutils literal notranslate"><span class="pre">--config</span></code>, JSON or YAML), and every setting can also be given
+on the command line, e.g. <code class="docutils literal notranslate"><span class="pre">--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_size=50</span></code>.
+<code class="docutils literal notranslate"><span class="pre">--help</span></code> lists the main options and <code class="docutils literal notranslate"><span class="pre">--help-all</span></code> all the settings. The configuration used is stored
+in the provenance log of the tool (<code class="docutils literal notranslate"><span class="pre">&lt;tool&gt;.provenance.log</span></code>, <code class="docutils literal notranslate"><span class="pre">--provenance-log</span></code>).</p>
+<p>The configuration files of <code class="docutils literal notranslate"><span class="pre">sst1mpipe</span></code> are in <code class="docutils literal notranslate"><span class="pre">sst1mpipe/resources/config</span></code>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 45.0%" />
+<col style="width: 55.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>File</p></th>
+<th class="head"><p>Used by</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe_monitoring_config.json</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_config.json</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code> for the real data, and the analysis steps after DL1</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe_mc_config_low_nsb.json</span></code>, <code class="docutils literal notranslate"><span class="pre">sst1mpipe_mc_config_high_nsb.json</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code> for the simulations at low and high NSB, and the analysis steps after DL1</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe_rta_config.json</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code> for the ZMQ streams of the real-time analysis</p></td>
+</tr>
+</tbody>
+</table>
+<p>Each section of a file configures a component (a ctapipe class) by its name. The settings of a
+telescope component can be given per telescope, as a list of rules: <code class="docutils literal notranslate"><span class="pre">[&quot;type&quot;,</span> <span class="pre">&quot;*&quot;,</span> <span class="pre">value]</span></code> for all the
+telescopes, <code class="docutils literal notranslate"><span class="pre">[&quot;id&quot;,</span> <span class="pre">21,</span> <span class="pre">value]</span></code> for telescope 21. When several rules match a telescope, the last one
+wins. A plain value applies to all the telescopes.</p>
+<p><strong>Calibration</strong> (<code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_config.json</span></code>): <code class="docutils literal notranslate"><span class="pre">null</span></code> files are the default files of the telescope
+(<code class="docutils literal notranslate"><span class="pre">sst1mpipe/resources/calibration</span></code>: averaged calibration parameters of 2023-2024, and the window
+transmittance measured in the lab).</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="nt">"R0R1Calibrator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"calibration_file"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"window_transmittance_file"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"voltage_drop_correction"</span><span class="p">:</span><span class="w"> </span><span class="s2">"global"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"flag_bad_calibration_pixels"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"flag_dead_pixels"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"saturation_threshold"</span><span class="p">:</span><span class="w"> </span><span class="mi">3000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"saturation_width_level"</span><span class="p">:</span><span class="w"> </span><span class="mi">2500</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"saturation_width_threshold"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"bad_pixels"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="p">[]]</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"pde_drop_factor"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">],</span>
+<span class="w">    </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">],</span>
+<span class="w">    </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">},</span>
+</pre></div>
+</div>
+<p><strong>Cleaning</strong> (<code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_config.json</span></code>): the <code class="docutils literal notranslate"><span class="pre">NSBImageCleaner</span></code> with the thresholds of each telescope.
+The picture threshold of a pixel is raised to <code class="docutils literal notranslate"><span class="pre">pedestal_factor</span></code> times the std of its pedestal images
+when this is above <code class="docutils literal notranslate"><span class="pre">picture_threshold_pe</span></code>.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="nt">"ImageProcessor"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"image_cleaner_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"NSBImageCleaner"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"use_telescope_frame"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"TailcutsImageCleaner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"picture_threshold_pe"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">],</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">9</span><span class="p">]</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">"boundary_threshold_pe"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">],</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">"min_picture_neighbors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"NSBImageCleaner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"picture_threshold_pe"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">],</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">]</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">"boundary_threshold_pe"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">],</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">"min_picture_neighbors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span>
+<span class="w">          </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">"keep_isolated_pixels"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"time_limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"time_num_neighbors"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"largest_island_only"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"pedestal_factor"</span><span class="p">:</span><span class="w"> </span><span class="mf">2.5</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"bright_cleaning_threshold"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">},</span>
+</pre></div>
+</div>
+<p><strong>Rolling chunks of the monitoring</strong> (<code class="docutils literal notranslate"><span class="pre">sst1mpipe_monitoring_config.json</span></code>): statistics of the last 100
+pedestal events, updated at each pedestal event (see <a class="reference internal" href="sst1mpipe_monitoring.html#sst1mpipe-monitoring"><span class="std std-ref">Monitoring of a run: sst1mpipe-monitoring</span></a>).</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="nt">"WaveformStatisticsCalculator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"stats_aggregator_type"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="s2">"PedestalWaveformAggregator"</span><span class="p">]],</span>
+<span class="w">  </span><span class="nt">"faulty_pixels_fraction"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"outlier_detector_list"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span><span class="nt">"apply_to"</span><span class="p">:</span><span class="w"> </span><span class="s2">"std"</span><span class="p">,</span><span class="w"> </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MedianOutlierDetector"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"median_range_factors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">10.0</span><span class="p">]}}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"PedestalWaveformAggregator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"chunking_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SizeChunking"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"SizeChunking"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"chunk_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"chunk_shift"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"last_chunk_policy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"overlap"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"allow_undersized_tables"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"TimeChunking"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"chunk_duration"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1 s"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"chunk_shift"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.1 s"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"last_chunk_policy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"overlap"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"allow_undersized_tables"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">},</span>
+</pre></div>
+</div>
+<p><strong>Overriding some settings</strong>: <code class="docutils literal notranslate"><span class="pre">--config</span></code> can be given several times; each file overrides the
+settings it gives, and a list (e.g. the rules of a telescope parameter) is replaced as a whole. E.g. the
+calibration parameters of dark runs of the two telescopes, and chunks of 50 pedestal events, in
+<code class="docutils literal notranslate"><span class="pre">my_config.yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">R0R1Calibrator</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">calibration_file</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">21</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">sst1mpipe/resources/calibration/dark_runs/20230917_0528_0529_Tel1_fitted_parameters.h5</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">id</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">22</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">sst1mpipe/resources/calibration/dark_runs/20230921_0149_0150_Tel2_fitted_parameters.h5</span><span class="p p-Indicator">]</span>
+<span class="nt">WaveformStatisticsCalculator</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">PedestalWaveformAggregator</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">SizeChunking</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">chunk_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+</pre></div>
+</div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sst1mpipe-monitoring<span class="w"> </span>--input<span class="w"> </span>SST1M1_20260120_1179.fits.fz<span class="w"> </span>--output<span class="w"> </span>SST1M1_20260120_1179.monitoring.h5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--config<span class="w"> </span>sst1mpipe/resources/config/sst1mpipe_monitoring_config.json<span class="w"> </span>--config<span class="w"> </span>my_config.yaml
+</pre></div>
+</div>
+<p>The full configuration files:</p>
+<div class="toggle docutils container">
+<div class="literal-block-wrapper docutils container" id="id1">
+<div class="code-block-caption"><span class="caption-text">sst1mpipe_monitoring_config.json</span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"MonitoringTool"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"overwrite"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"progress_bar"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"pointing_update_interval"</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
+<span class="w">  </span><span class="p">},</span>
+
+<span class="w">  </span><span class="nt">"EventSource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"max_events"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"allowed_tels"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">  </span><span class="p">},</span>
+
+<span class="w">  </span><span class="nt">"SST1MEventSource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"pointing_ra"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"pointing_dec"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"focal_length_choice"</span><span class="p">:</span><span class="w"> </span><span class="s2">"EQUIVALENT"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"swapped_modules"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span><span class="nt">"tel_id"</span><span class="p">:</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="nt">"start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2023-09-01T00:00:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"stop"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2024-07-18T00:00:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"modules"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">59</span><span class="p">,</span><span class="w"> </span><span class="mi">88</span><span class="p">]},</span>
+<span class="w">      </span><span class="p">{</span><span class="nt">"tel_id"</span><span class="p">:</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="nt">"start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2025-12-17T12:00:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"stop"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-01-15T12:00:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"modules"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">9</span><span class="p">]}</span>
+<span class="w">    </span><span class="p">]</span>
+<span class="w">  </span><span class="p">},</span>
+
+<span class="w">  </span><span class="nt">"R0R1Calibrator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"calibration_file"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"window_transmittance_file"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"voltage_drop_correction"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="s2">"global"</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"pde_drop_factor"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"flag_bad_calibration_pixels"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"flag_dead_pixels"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"bad_pixels"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="p">[]],</span><span class="w"> </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="p">[]],</span><span class="w"> </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="p">[]]],</span>
+<span class="w">    </span><span class="nt">"saturation_threshold"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="mi">3000</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"saturation_width_level"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="mi">2500</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"saturation_width_threshold"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">]]</span>
+<span class="w">  </span><span class="p">},</span>
+
+<span class="w">  </span><span class="nt">"ImageSaturationCorrector"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"integration_level"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"peak_time_level"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="mi">2500</span><span class="p">]]</span>
+<span class="w">  </span><span class="p">},</span>
+
+<span class="w">  </span><span class="nt">"CameraCalibrator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"data_volume_reducer_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"NullDataVolumeReducer"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"image_extractor_type"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="s2">"LocalPeakWindowSum"</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"invalid_pixel_handler_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"NeighborAverage"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"apply_peak_time_shift"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"apply_waveform_time_shift"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">false</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"LocalPeakWindowSum"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"window_width"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">]],</span>
+<span class="w">      </span><span class="nt">"window_shift"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">]],</span>
+<span class="w">      </span><span class="nt">"apply_integration_correction"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">]]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span>
+
+<span class="w">  </span><span class="nt">"WaveformStatisticsCalculator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"stats_aggregator_type"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="s2">"PedestalWaveformAggregator"</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"faulty_pixels_fraction"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"outlier_detector_list"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span><span class="nt">"apply_to"</span><span class="p">:</span><span class="w"> </span><span class="s2">"std"</span><span class="p">,</span><span class="w"> </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MedianOutlierDetector"</span><span class="p">,</span><span class="w"> </span><span class="nt">"config"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"median_range_factors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">10.0</span><span class="p">]}}</span>
+<span class="w">    </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">"PedestalWaveformAggregator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"chunking_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SizeChunking"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"SizeChunking"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"chunk_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"chunk_shift"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"last_chunk_policy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"overlap"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"allow_undersized_tables"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="nt">"TimeChunking"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"chunk_duration"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1 s"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"chunk_shift"</span><span class="p">:</span><span class="w"> </span><span class="s2">"0.1 s"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"last_chunk_policy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"overlap"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"allow_undersized_tables"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span>
+
+<span class="w">  </span><span class="nt">"ImageStatisticsCalculator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"stats_aggregator_type"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="s2">"PlainAggregator"</span><span class="p">]],</span>
+<span class="w">    </span><span class="nt">"faulty_pixels_fraction"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"outlier_detector_list"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">"PlainAggregator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"chunking_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SizeChunking"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"SizeChunking"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"chunk_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"chunk_shift"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"last_chunk_policy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"overlap"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"allow_undersized_tables"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="nt">"TimeChunking"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"chunk_duration"</span><span class="p">:</span><span class="w"> </span><span class="s2">"10 s"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"chunk_shift"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1 s"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"last_chunk_policy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"overlap"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"allow_undersized_tables"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"SigmaClippingAggregator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"max_sigma"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"iterations"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"chunking_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SizeChunking"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"SizeChunking"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"chunk_size"</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"chunk_shift"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"last_chunk_policy"</span><span class="p">:</span><span class="w"> </span><span class="s2">"overlap"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"allow_undersized_tables"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="toggle docutils container">
+<div class="literal-block-wrapper docutils container" id="id2">
+<div class="code-block-caption"><span class="caption-text">sst1mpipe_data_config.json</span><a class="headerlink" href="#id2" title="Link to this code"></a></div>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="w">   </span><span class="nt">"array_center_coords"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"long_deg"</span><span class="p">:</span><span class="w"> </span><span class="mf">14.7825010</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"lat_deg"</span><span class="p">:</span><span class="w"> </span><span class="mf">49.9124420</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"height_m"</span><span class="p">:</span><span class="w"> </span><span class="mf">511.195000</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"telescope_coords"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"tel_021"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"long_deg"</span><span class="p">:</span><span class="w"> </span><span class="mf">14.782924</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"lat_deg"</span><span class="p">:</span><span class="w"> </span><span class="mf">49.911800</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"height_m"</span><span class="p">:</span><span class="w"> </span><span class="mi">510</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="nt">"tel_022"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"long_deg"</span><span class="p">:</span><span class="w"> </span><span class="mf">14.782078</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"lat_deg"</span><span class="p">:</span><span class="w"> </span><span class="mf">49.913084</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"height_m"</span><span class="p">:</span><span class="w"> </span><span class="mi">510</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"SST1MEventSource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"swapped_modules"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">"tel_id"</span><span class="p">:</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="nt">"start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2023-09-01T00:00:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"stop"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2024-07-18T00:00:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"modules"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">59</span><span class="p">,</span><span class="w"> </span><span class="mi">88</span><span class="p">]},</span>
+<span class="w">        </span><span class="p">{</span><span class="nt">"tel_id"</span><span class="p">:</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="nt">"start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2025-12-17T12:00:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"stop"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-01-15T12:00:00"</span><span class="p">,</span><span class="w"> </span><span class="nt">"modules"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="mi">9</span><span class="p">]}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"ImageSaturationCorrector"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"integration_level"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.2</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"peak_time_level"</span><span class="p">:</span><span class="w"> </span><span class="mi">2500</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"R0R1Calibrator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"calibration_file"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">"window_transmittance_file"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">"voltage_drop_correction"</span><span class="p">:</span><span class="w"> </span><span class="s2">"global"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"flag_bad_calibration_pixels"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"flag_dead_pixels"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"saturation_threshold"</span><span class="p">:</span><span class="w"> </span><span class="mi">3000</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"saturation_width_level"</span><span class="p">:</span><span class="w"> </span><span class="mi">2500</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"saturation_width_threshold"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"bad_pixels"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="p">[]]</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">"pde_drop_factor"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">[</span><span class="s2">"type"</span><span class="p">,</span><span class="w"> </span><span class="s2">"*"</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">],</span>
+<span class="w">        </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">],</span>
+<span class="w">        </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="kc">null</span><span class="p">]</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"telescope_equivalent_focal_length"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"tel_021"</span><span class="p">:</span><span class="w"> </span><span class="mf">5.6</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"tel_022"</span><span class="p">:</span><span class="w"> </span><span class="mf">5.6</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"stereo"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"event_matching_method"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"WhiteRabbitClosest"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"SlidingWindow"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"window_half_width"</span><span class="p">:</span><span class="w"> </span><span class="mf">1E-3</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"offset_search"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">"time_start"</span><span class="p">:</span><span class="w"> </span><span class="mf">-1E-2</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"time_stop"</span><span class="p">:</span><span class="w"> </span><span class="mf">1E-2</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"time_step"</span><span class="p">:</span><span class="w"> </span><span class="mf">2E-5</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="nt">"WhiteRabbitClosest"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"max_time_diff_ns"</span><span class="p">:</span><span class="w"> </span><span class="mf">1E4</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="nt">"SWATEventIDs"</span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"analysis"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"global_theta_cut"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.2</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"global_gammaness_cut"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.75</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"stereo_delta_disp_cut_deg"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"stereo_relative_std_reco_energy_cut"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"stereo_std_gammaness_cut"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"gamma_efficiency"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.7</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"log_energy_min_tev"</span><span class="p">:</span><span class="mi">-1</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"log_energy_max_tev"</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"n_energy_bins"</span><span class="p">:</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"gamma_min_simulated_energy_tev"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.2</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"proton_min_simulated_energy_tev"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.4</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"n_training_events"</span><span class="p">:</span><span class="w"> </span><span class="mf">5E5</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"gamma_to_proton_training_ratio"</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"reco_energy_scaling_factor"</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"stereo_reco_weights"</span><span class="p">:</span><span class="w"> </span><span class="s2">"camera_frame_hillas_intensity"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"observation_time_h"</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"off_regions"</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"event_selection"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"camera_frame_hillas_intensity"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">50</span><span class="p">,</span><span class="w"> </span><span class="mi">1000000</span><span class="p">],</span>
+<span class="w">        </span><span class="nt">"camera_frame_hillas_width"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">],</span>
+<span class="w">        </span><span class="nt">"camera_frame_hillas_length"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">],</span>
+<span class="w">        </span><span class="nt">"leakage_intensity_width_2"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.7</span><span class="p">]</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"CameraCalibrator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"image_extractor_type"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"LocalPeakWindowSum"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"LocalPeakWindowSum"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"apply_integration_correction"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"window_shift"</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"window_width"</span><span class="p">:</span><span class="w"> </span><span class="mi">7</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">"invalid_pixel_handler_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"NeighborAverage"</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"NsbCalibrator"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"intensity_correction"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">"tel_021"</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span><span class="p">,</span>
+<span class="w">          </span><span class="nt">"tel_022"</span><span class="p">:</span><span class="w"> </span><span class="mf">1.0</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"ImageProcessor"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"image_cleaner_type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"NSBImageCleaner"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"use_telescope_frame"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"TailcutsImageCleaner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"picture_threshold_pe"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">],</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">9</span><span class="p">]</span>
+<span class="w">            </span><span class="p">],</span>
+<span class="w">            </span><span class="nt">"boundary_threshold_pe"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">],</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span>
+<span class="w">            </span><span class="p">],</span>
+<span class="w">            </span><span class="nt">"min_picture_neighbors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span>
+<span class="w">            </span><span class="p">]</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">        </span><span class="nt">"NSBImageCleaner"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"picture_threshold_pe"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">],</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">8</span><span class="p">]</span>
+<span class="w">            </span><span class="p">],</span>
+<span class="w">            </span><span class="nt">"boundary_threshold_pe"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">],</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">]</span>
+<span class="w">            </span><span class="p">],</span>
+<span class="w">            </span><span class="nt">"min_picture_neighbors"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">],</span>
+<span class="w">              </span><span class="p">[</span><span class="s2">"id"</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]</span>
+<span class="w">            </span><span class="p">],</span>
+<span class="w">            </span><span class="nt">"keep_isolated_pixels"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"time_limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"time_num_neighbors"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"largest_island_only"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"pedestal_factor"</span><span class="p">:</span><span class="w"> </span><span class="mf">2.5</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"bright_cleaning_threshold"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"DataWriter"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"write_dl2"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"ShowerProcessor"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"reconstructor_types"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"HillasReconstructor"</span><span class="p">],</span>
+<span class="w">      </span><span class="nt">"HillasReconstructor"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"StereoQualityQuery"</span><span class="p">:</span><span class="w">   </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">"quality_criteria"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">            </span><span class="p">[</span><span class="s2">"enough intensity"</span><span class="p">,</span><span class="w"> </span><span class="s2">"parameters.hillas.intensity &gt; 0"</span><span class="p">],</span>
+<span class="w">            </span><span class="p">[</span><span class="s2">"Positive width"</span><span class="p">,</span><span class="w"> </span><span class="s2">"parameters.hillas.width.value &gt; 0"</span><span class="p">],</span>
+<span class="w">            </span><span class="p">[</span><span class="s2">"enough pixels"</span><span class="p">,</span><span class="w"> </span><span class="s2">"parameters.morphology.n_pixels &gt; 0"</span><span class="p">],</span>
+<span class="w">            </span><span class="p">[</span><span class="s2">"not clipped"</span><span class="p">,</span><span class="w"> </span><span class="s2">"parameters.leakage.intensity_width_2 &lt; 1.0"</span><span class="p">]</span>
+<span class="w">          </span><span class="p">]</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"random_forest_regressor_args"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"max_depth"</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"min_samples_leaf"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"n_jobs"</span><span class="p">:</span><span class="w"> </span><span class="mi">-1</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"n_estimators"</span><span class="p">:</span><span class="w"> </span><span class="mi">150</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"bootstrap"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"criterion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"squared_error"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"max_leaf_nodes"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"min_impurity_decrease"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"min_samples_split"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"min_weight_fraction_leaf"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"oob_score"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"random_state"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"verbose"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"warm_start"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+<span class="w">      </span><span class="p">},</span>
+
+<span class="w">      </span><span class="nt">"random_forest_classifier_args"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"max_depth"</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"min_samples_leaf"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"n_jobs"</span><span class="p">:</span><span class="w"> </span><span class="mi">-1</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"n_estimators"</span><span class="p">:</span><span class="w"> </span><span class="mi">100</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"criterion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"gini"</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"min_samples_split"</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"min_weight_fraction_leaf"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"max_leaf_nodes"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"min_impurity_decrease"</span><span class="p">:</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"bootstrap"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"oob_score"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"random_state"</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"verbose"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"warm_start"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">"class_weight"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">      </span><span class="p">},</span>
+
+<span class="w">    </span><span class="nt">"energy_regression_features"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">"log_camera_frame_hillas_intensity"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_width"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_length"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_wl"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_skewness"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_kurtosis"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_timing_slope"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"leakage_intensity_width_2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_x"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_y"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"HillasReconstructor_tel_impact_distance"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"HillasReconstructor_h_max"</span>
+<span class="w">     </span><span class="p">],</span>
+<span class="w">        </span>
+<span class="w">    </span><span class="nt">"particle_classification_features"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">"log_camera_frame_hillas_intensity"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_width"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_length"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_wl"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_skewness"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_kurtosis"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_timing_slope"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"leakage_intensity_width_2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_x"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_y"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"HillasReconstructor_tel_impact_distance"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"HillasReconstructor_h_max"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"log_reco_energy"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"reco_disp_norm"</span>
+<span class="w">      </span><span class="p">],</span>
+
+<span class="w">    </span><span class="nt">"disp_method"</span><span class="p">:</span><span class="w"> </span><span class="s2">"disp_norm_sign"</span><span class="p">,</span>
+
+<span class="w">    </span><span class="nt">"disp_regression_features"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">"log_camera_frame_hillas_intensity"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_width"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_length"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_wl"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_skewness"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_kurtosis"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_timing_slope"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"leakage_intensity_width_2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"HillasReconstructor_tel_impact_distance"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"HillasReconstructor_h_max"</span>
+<span class="w">      </span><span class="p">],</span>
+
+<span class="w">    </span><span class="nt">"disp_classification_features"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">"log_camera_frame_hillas_intensity"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_width"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_length"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_wl"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_skewness"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_kurtosis"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_timing_slope"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"leakage_intensity_width_2"</span>
+<span class="w">      </span><span class="p">],</span>
+
+<span class="w">      </span><span class="nt">"misdirection_regression_features_mono"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">"log_camera_frame_hillas_intensity"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_width"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_length"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_wl"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_skewness"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_kurtosis"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_timing_slope"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"leakage_intensity_width_2"</span>
+<span class="w">      </span><span class="p">],</span>
+
+<span class="w">      </span><span class="nt">"misdirection_regression_features_stereo"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">"log_camera_frame_hillas_intensity_tel1"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_width_tel1"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_length_tel1"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_wl_tel1"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_skewness_tel1"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_kurtosis_tel1"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_timing_slope_tel1"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"leakage_intensity_width_2_tel1"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"HillasReconstructor_tel_impact_distance_tel1"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"log_camera_frame_hillas_intensity_tel2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_width_tel2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_length_tel2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_wl_tel2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_skewness_tel2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_hillas_kurtosis_tel2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"camera_frame_timing_slope_tel2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"leakage_intensity_width_2_tel2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"HillasReconstructor_tel_impact_distance_tel2"</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">"HillasReconstructor_h_max"</span>
+<span class="w">      </span><span class="p">],</span>
+
+<span class="w">    </span><span class="nt">"mean_charge_to_nsb_rate"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">"tel_021"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"mean_charge_bin_low"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"nsb_rate"</span><span class="p">:</span><span class="w"> </span><span class="s2">"low"</span>
+<span class="w">          </span><span class="p">},</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"mean_charge_bin_low"</span><span class="p">:</span><span class="w"> </span><span class="mf">2.3554</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"nsb_rate"</span><span class="p">:</span><span class="w"> </span><span class="s2">"med"</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">],</span>
+<span class="w">        </span><span class="nt">"tel_022"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">          </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"mean_charge_bin_low"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"nsb_rate"</span><span class="p">:</span><span class="w"> </span><span class="s2">"low"</span>
+<span class="w">          </span><span class="p">},</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="nt">"mean_charge_bin_low"</span><span class="p">:</span><span class="w"> </span><span class="mf">2.4287</span><span class="p">,</span>
+<span class="w">            </span><span class="nt">"nsb_rate"</span><span class="p">:</span><span class="w"> </span><span class="s2">"med"</span>
+<span class="w">          </span><span class="p">}</span>
+<span class="w">        </span><span class="p">]</span>
+<span class="w">      </span><span class="p">}</span>
+
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="monitoring-of-the-run-sst1mpipe-monitoring">
+<span id="monitoring-step"></span><h2>1. Monitoring of the run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code><a class="headerlink" href="#monitoring-of-the-run-sst1mpipe-monitoring" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sst1mpipe-monitoring<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="w"> </span>SST1M1_20260120_1179.fits.fz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output<span class="w"> </span>SST1M1_20260120_1179.monitoring.h5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--config<span class="w"> </span>sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
+</pre></div>
+</div>
+<p>The raw data file is read twice (the images of the pedestal events are calibrated as the events by
+<code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>, with the statistics of the ADC samples), and the monitoring file contains the pointing of the telescope, the
+statistics of the ADC samples of the pedestal events (baseline and noise, for the voltage drop correction
+and the dead pixels) and the statistics of their images (NSB noise, for the <code class="docutils literal notranslate"><span class="pre">NSBImageCleaner</span></code>), in rolling
+chunks of the last pedestal events. What the tool does, its settings and the content of the monitoring file are described
+in <a class="reference internal" href="sst1mpipe_monitoring.html#sst1mpipe-monitoring"><span class="std std-ref">Monitoring of a run: sst1mpipe-monitoring</span></a>.</p>
+</section>
+<section id="processing-of-the-run-sst1mpipe-process">
+<span id="process-step"></span><h2>2. Processing of the run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code><a class="headerlink" href="#processing-of-the-run-sst1mpipe-process" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sst1mpipe-process<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="w"> </span>SST1M1_20260120_1179.fits.fz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output<span class="w"> </span>SST1M1_20260120_1179.dl1.h5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--config<span class="w"> </span>sst1mpipe/resources/config/sst1mpipe_data_config.json<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--monitoring-source<span class="w"> </span>SST1MMonitoringSource<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--SST1MMonitoringSource.input_files<span class="w"> </span>SST1M1_20260120_1179.monitoring.h5
+</pre></div>
+</div>
+<p>As <code class="docutils literal notranslate"><span class="pre">ctapipe-process</span> <span class="pre">--monitoring-source</span></code>, the monitoring source <code class="docutils literal notranslate"><span class="pre">SST1MMonitoringSource</span></code> fills the
+monitoring containers of each event with the monitoring data at its time, before its calibration:</p>
+<ul class="simple">
+<li><p>the pointing of the telescope (<code class="docutils literal notranslate"><span class="pre">event.monitoring.tel[tel_id].pointing</span></code>), interpolated</p></li>
+<li><p>the statistics of the ADC samples of the pedestal events
+(<code class="docutils literal notranslate"><span class="pre">event.monitoring.tel[tel_id].camera.pixel_statistics.pedestal_waveform</span></code>), used by the
+<code class="docutils literal notranslate"><span class="pre">R0R1Calibrator</span></code> for the voltage drop correction and the dead pixels (the outlier pixels of the
+monitoring are dead pixels)</p></li>
+<li><p>the statistics of the images of the pedestal events (<code class="docutils literal notranslate"><span class="pre">pixel_statistics.pedestal_image</span></code>), used by the
+<code class="docutils literal notranslate"><span class="pre">NSBImageCleaner</span></code></p></li>
+</ul>
+<p>The statistics of an event are those of the last chunk of pedestal events ended before it: with the
+rolling chunks of <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code>, the statistics of the last 100 (ADC samples) and 1000
+(images) pedestal events before the event, updated at each pedestal event. The events before
+the end of the first chunk use the first chunk. The events out of the time range of the chunks, by more
+than <code class="docutils literal notranslate"><span class="pre">--SST1MMonitoringSource.timestamp_tolerance</span></code> (1 s), or out of the pointing table, have no
+monitoring data and cannot be calibrated: they are skipped, and
+their number is given in the log. The pedestal events are calibrated and cleaned but not written:
+they are used to count the fraction of pedestal events which survive the cleaning.</p>
+<p>Then the events are calibrated (<code class="docutils literal notranslate"><span class="pre">R0R1Calibrator</span></code>, <code class="docutils literal notranslate"><span class="pre">CameraCalibrator</span></code>, <code class="docutils literal notranslate"><span class="pre">ImageSaturationCorrector</span></code>),
+cleaned and parametrized (<code class="docutils literal notranslate"><span class="pre">ImageProcessor</span></code>), and their shower geometry is reconstructed
+(<code class="docutils literal notranslate"><span class="pre">ShowerProcessor</span></code>) if the DL2 is written (<code class="docutils literal notranslate"><span class="pre">DataWriter.write_dl2</span></code>, true in the data config).</p>
+<p>The output file contains the DL1 (and DL2) of the events, <code class="docutils literal notranslate"><span class="pre">/dl1/info</span></code> (summary of the processing:
+calibration files, target, number of triggered and pedestal events, number of pedestal events which
+survive the cleaning, average fraction of pixels whose picture threshold is raised by the
+<code class="docutils literal notranslate"><span class="pre">NSBImageCleaner</span></code>) and, with
+<code class="docutils literal notranslate"><span class="pre">--ProcessorTool.attach_monitoring=True</span></code> (default), a copy of the monitoring data of the monitoring
+file (<code class="docutils literal notranslate"><span class="pre">attach_monitoring_file</span></code>). The DL1 file is then self-contained: e.g. <code class="docutils literal notranslate"><span class="pre">load_dl1_sst1m</span></code> reads the pointing of the events
+from it. The wobble of the run is added to the name of the output file (<code class="docutils literal notranslate"><span class="pre">_W1</span></code>,
+<code class="docutils literal notranslate"><span class="pre">--ProcessorTool.wobble_in_output_name</span></code>).</p>
+<p>Other settings of the processing:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--ProcessorTool.allowed_sb_types</span></code>: the runs processed, by type of scheduling block
+(<code class="docutils literal notranslate"><span class="pre">OBSERVATION</span></code> by default; <code class="docutils literal notranslate"><span class="pre">UNKNOWN</span></code> for the transitions between two wobbles, <code class="docutils literal notranslate"><span class="pre">CALIBRATION</span></code> for
+the dark and bias runs)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--max-events</span></code>, <code class="docutils literal notranslate"><span class="pre">--allowed-tels</span></code>: events and telescopes processed</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--DataWriter.write_dl1_images</span></code>, <code class="docutils literal notranslate"><span class="pre">--DataWriter.write_r1_waveforms</span></code>: images and waveforms written</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--progress</span></code>: progress bar</p></li>
+</ul>
+<p><strong>Without monitoring source</strong>, the raw data are calibrated without the statistics of the pedestal
+events: no voltage drop correction, no dead pixels (only the <code class="docutils literal notranslate"><span class="pre">bad_pixels</span></code> and the pixels with bad
+calibration parameters), and the picture thresholds of the <code class="docutils literal notranslate"><span class="pre">NSBImageCleaner</span></code> are not raised. The
+output file has no pointing (the event source gives the RA/Dec of the run only), so it cannot be
+reconstructed in DL2 by <code class="docutils literal notranslate"><span class="pre">sst1mpipe_dl1_dl2</span></code>. This is used for the ZMQ streams of the real-time analysis
+(<code class="docutils literal notranslate"><span class="pre">sst1mpipe_rta_config.json</span></code>); a monitoring file can be given to the stream as well.</p>
+<p><strong>Simulations</strong> (<code class="docutils literal notranslate"><span class="pre">.simtel.gz</span></code> files) are processed without monitoring source, with the MC
+configuration files (<code class="docutils literal notranslate"><span class="pre">sst1mpipe_mc_config_low_nsb.json</span></code>, <code class="docutils literal notranslate"><span class="pre">sst1mpipe_mc_config_high_nsb.json</span></code>). How
+each telescope is calibrated is set in the configuration: for the simulated telescopes 1 and 2, the R1
+waveforms of the simulation are kept and corrected for the PDE drop (<code class="docutils literal notranslate"><span class="pre">R0R1Calibrator.calibrate_r0</span></code>
+false, <code class="docutils literal notranslate"><span class="pre">pde_drop_factor</span></code>), without saturation correction (<code class="docutils literal notranslate"><span class="pre">ImageSaturationCorrector.apply_correction</span></code>
+false):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sst1mpipe-process<span class="w"> </span>--input<span class="w"> </span>gamma.simtel.gz<span class="w"> </span>--output<span class="w"> </span>gamma.dl1.h5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--config<span class="w"> </span>sst1mpipe/resources/config/sst1mpipe_mc_config_low_nsb.json
+</pre></div>
+</div>
+<p><strong>A night of data</strong>: the monitoring and the processing of each run, e.g.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">CONFIG</span><span class="o">=</span>sst1mpipe/resources/config
+<span class="k">for</span><span class="w"> </span>raw<span class="w"> </span><span class="k">in</span><span class="w"> </span>/data/raw/2026/01/20/SST1M1/SST1M1_20260120_*.fits.fz<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w">    </span><span class="nv">run</span><span class="o">=</span><span class="k">$(</span>basename<span class="w"> </span><span class="s2">"</span><span class="nv">$raw</span><span class="s2">"</span><span class="w"> </span>.fits.fz<span class="k">)</span>
+<span class="w">    </span>sst1mpipe-monitoring<span class="w"> </span>-i<span class="w"> </span><span class="s2">"</span><span class="nv">$raw</span><span class="s2">"</span><span class="w"> </span>-o<span class="w"> </span><span class="s2">"</span><span class="nv">$run</span><span class="s2">.monitoring.h5"</span><span class="w"> </span>--config<span class="w"> </span><span class="nv">$CONFIG</span>/sst1mpipe_monitoring_config.json
+<span class="w">    </span>sst1mpipe-process<span class="w"> </span>-i<span class="w"> </span><span class="s2">"</span><span class="nv">$raw</span><span class="s2">"</span><span class="w"> </span>-o<span class="w"> </span><span class="s2">"</span><span class="nv">$run</span><span class="s2">.dl1.h5"</span><span class="w"> </span>--config<span class="w"> </span><span class="nv">$CONFIG</span>/sst1mpipe_data_config.json<span class="w"> </span><span class="se">\</span>
+<span class="w">        </span>--monitoring-source<span class="w"> </span>SST1MMonitoringSource<span class="w"> </span>--SST1MMonitoringSource.input_files<span class="w"> </span><span class="s2">"</span><span class="nv">$run</span><span class="s2">.monitoring.h5"</span>
+<span class="k">done</span>
+</pre></div>
+</div>
+<p>The transition runs between two wobbles are skipped by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code> (no output events), and the
+dark runs have no pointing.</p>
+</section>
+<section id="merging">
+<span id="merging-step"></span><h2>3. Merging<a class="headerlink" href="#merging" title="Link to this heading"></a></h2>
+<p><strong>Monitoring data into a DL1 file</strong>: if the DL1 file was produced without the monitoring data
+(<code class="docutils literal notranslate"><span class="pre">--ProcessorTool.attach_monitoring=False</span></code>), they can be attached to it afterwards. The ctapipe
+monitoring data (pointing, statistics of the images) are attached by <code class="docutils literal notranslate"><span class="pre">ctapipe-merge</span></code> with the
+<code class="docutils literal notranslate"><span class="pre">monitoring-only</span></code> merge strategy, and <code class="docutils literal notranslate"><span class="pre">attach_monitoring_file</span></code> also attaches the statistics of the
+ADC samples (<code class="docutils literal notranslate"><span class="pre">/r0/monitoring</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ctapipe-merge<span class="w"> </span>--append<span class="w"> </span>--merge-strategy<span class="w"> </span>monitoring-only<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>SST1M1_20260120_1179.monitoring.h5<span class="w"> </span>--output<span class="w"> </span>SST1M1_20260120_1179_W1.dl1.h5
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">attach_monitoring_file</span>
+
+<span class="n">attach_monitoring_file</span><span class="p">(</span><span class="s2">"SST1M1_20260120_1179.monitoring.h5"</span><span class="p">,</span> <span class="s2">"SST1M1_20260120_1179_W1.dl1.h5"</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>DL1 files of several runs of a telescope</strong> (e.g. a night) are merged with <code class="docutils literal notranslate"><span class="pre">ctapipe-merge</span></code> (the files of the two telescopes have different subarrays: they are combined by the stereo step):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>ctapipe-merge<span class="w"> </span>--input-dir<span class="w"> </span>dl1/<span class="w"> </span>--pattern<span class="w"> </span><span class="s2">"SST1M1_20260120_*.dl1.h5"</span><span class="w"> </span>--output<span class="w"> </span>SST1M1_20260120.dl1.h5
+<span class="c1"># or</span>
+ctapipe-merge<span class="w"> </span>SST1M1_20260120_1179_W1.dl1.h5<span class="w"> </span>SST1M1_20260120_1180_W1.dl1.h5<span class="w"> </span>--output<span class="w"> </span>merged.dl1.h5
+</pre></div>
+</div>
+<p>The events, the pointing tables, the statistics of the images of the pedestal events and the
+scheduling and observation blocks of the runs are merged. The statistics of the ADC samples
+(<code class="docutils literal notranslate"><span class="pre">/r0/monitoring</span></code>) and <code class="docutils literal notranslate"><span class="pre">/dl1/info</span></code> are not: they stay in the monitoring and DL1 files of the runs.
+<code class="docutils literal notranslate"><span class="pre">--no-dl1-images</span></code> merges the files without the images. The simulated DL1 files are merged in the same
+way (<code class="docutils literal notranslate"><span class="pre">sst1mpipe_merge_hdf5</span></code> for a directory of MC files).</p>
+</section>
+<section id="reading-the-outputs">
+<h2>Reading the outputs<a class="headerlink" href="#reading-the-outputs" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ctapipe.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">HDF5EventSource</span><span class="p">,</span> <span class="n">TableLoader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dl1_sst1m</span><span class="p">,</span> <span class="n">load_dl1_pedestals</span><span class="p">,</span> <span class="n">load_r0_pedestals</span>
+
+<span class="c1"># DL1 parameters with the pointing and the trigger time of the events</span>
+<span class="n">events</span> <span class="o">=</span> <span class="n">load_dl1_sst1m</span><span class="p">(</span><span class="s2">"SST1M1_20260120_1179_W1.dl1.h5"</span><span class="p">,</span> <span class="n">tel</span><span class="o">=</span><span class="s2">"tel_021"</span><span class="p">)</span>
+
+<span class="c1"># statistics of the pedestal events of the run</span>
+<span class="n">images</span> <span class="o">=</span> <span class="n">load_dl1_pedestals</span><span class="p">(</span><span class="s2">"SST1M1_20260120_1179_W1.dl1.h5"</span><span class="p">,</span> <span class="n">tel</span><span class="o">=</span><span class="s2">"tel_021"</span><span class="p">)</span>
+<span class="n">samples</span> <span class="o">=</span> <span class="n">load_r0_pedestals</span><span class="p">(</span><span class="s2">"SST1M1_20260120_1179.monitoring.h5"</span><span class="p">,</span> <span class="n">tel</span><span class="o">=</span><span class="s2">"tel_021"</span><span class="p">)</span>
+
+<span class="c1"># ctapipe readers: the pointing of the events is interpolated from the pointing table</span>
+<span class="k">with</span> <span class="n">TableLoader</span><span class="p">(</span><span class="s2">"SST1M1_20260120_1179_W1.dl1.h5"</span><span class="p">)</span> <span class="k">as</span> <span class="n">loader</span><span class="p">:</span>
+    <span class="n">table</span> <span class="o">=</span> <span class="n">loader</span><span class="o">.</span><span class="n">read_telescope_events</span><span class="p">([</span><span class="mi">21</span><span class="p">],</span> <span class="n">dl1_parameters</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">pointing</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">load_dl1_sst1m</span></code> adds the parameters of the analysis which are not computed by ctapipe
+(<code class="docutils literal notranslate"><span class="pre">add_dl1_extra_parameters</span></code>): <code class="docutils literal notranslate"><span class="pre">log_camera_frame_hillas_intensity</span></code>, <code class="docutils literal notranslate"><span class="pre">camera_frame_hillas_wl</span></code>,
+<code class="docutils literal notranslate"><span class="pre">equivalent_focal_length</span></code>; for the observed data <code class="docutils literal notranslate"><span class="pre">local_time</span></code>, <code class="docutils literal notranslate"><span class="pre">date</span></code> and <code class="docutils literal notranslate"><span class="pre">meanQ</span></code> (mean charge
+of the pedestal images); for the simulations the true parameters of the showers, <code class="docutils literal notranslate"><span class="pre">log_true_energy</span></code>,
+the DISP parameters, <code class="docutils literal notranslate"><span class="pre">miss</span></code> and <code class="docutils literal notranslate"><span class="pre">true_tel_impact_distance</span></code>. They are not written in the DL1 files.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="camera_event_type.html" class="btn btn-neutral float-right" title="Trigger type of the camera events" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SST-1M collaboration.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

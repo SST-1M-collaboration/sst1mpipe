@@ -1,0 +1,341 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monitoring of a run: sst1mpipe-monitoring &mdash; sst1mpipe 0.32.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=13237357" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5f9769cd"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="_static/togglebutton.js?v=4a39c7ea"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="SST-1M analysis workflow" href="sst1m_analysis_workflow.html" />
+    <link rel="prev" title="Trigger type of the camera events" href="camera_event_type.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            sst1mpipe
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_processing.html">Processing the data with the ctapipe tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="camera_event_type.html">Trigger type of the camera events</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Monitoring of a run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-the-tool-does">What the tool does</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#rolling-chunks-of-the-last-pedestal-events">Rolling chunks of the last pedestal events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#content-of-the-monitoring-file">Content of the monitoring file</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sst1m_analysis_workflow.html">SST-1M analysis workflow</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">sst1mpipe</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Monitoring of a run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/sst1mpipe_monitoring.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="monitoring-of-a-run-sst1mpipe-monitoring">
+<span id="sst1mpipe-monitoring"></span><h1>Monitoring of a run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code><a class="headerlink" href="#monitoring-of-a-run-sst1mpipe-monitoring" title="Link to this heading"></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code> is a ctapipe tool which computes the monitoring data of a run of a SST-1M
+telescope from its raw data (R0, <code class="docutils literal notranslate"><span class="pre">SST1M&lt;tel&gt;_&lt;date&gt;_&lt;run&gt;.fits.fz</span></code>): the pointing of the telescope and
+the statistics of its pedestal events. The monitoring file is then given to <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>
+(<code class="docutils literal notranslate"><span class="pre">--monitoring-source</span> <span class="pre">SST1MMonitoringSource</span></code>), which uses it for the calibration and the cleaning of the
+events of the run, see <a class="reference internal" href="data_processing.html#data-processing"><span class="std std-ref">Processing the data with the ctapipe tools</span></a>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sst1mpipe-monitoring<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="w"> </span>SST1M1_20260120_1179.fits.fz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output<span class="w"> </span>SST1M1_20260120_1179.monitoring.h5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--config<span class="w"> </span>sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
+</pre></div>
+</div>
+<p>Main options (<code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span> <span class="pre">--help</span></code>, and <code class="docutils literal notranslate"><span class="pre">--help-all</span></code> for all the settings):</p>
+<table class="docutils align-default">
+<tbody>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">-i</span></code>, <code class="docutils literal notranslate"><span class="pre">--input</span></code></p></td>
+<td><p>raw data file of the run (<code class="docutils literal notranslate"><span class="pre">EventSource.input_url</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">-o</span></code>, <code class="docutils literal notranslate"><span class="pre">--output</span></code></p></td>
+<td><p>monitoring file (HDF5), required</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--config</span></code></p></td>
+<td><p>configuration file, by default
+<code class="docutils literal notranslate"><span class="pre">sst1mpipe/resources/config/sst1mpipe_monitoring_config.json</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">-m</span></code>, <code class="docutils literal notranslate"><span class="pre">--max-events</span></code></p></td>
+<td><p>number of events read (all the events of the run by default)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">-t</span></code>, <code class="docutils literal notranslate"><span class="pre">--allowed-tels</span></code></p></td>
+<td><p>telescopes read (all by default)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">--overwrite</span></code></p></td>
+<td><p>overwrite the output file (an existing file is an error otherwise)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">--progress</span></code></p></td>
+<td><p>progress bar during the event loop</p></td>
+</tr>
+</tbody>
+</table>
+<p>Only the SST-1M raw data are accepted: the simulations (<code class="docutils literal notranslate"><span class="pre">.simtel.gz</span></code>) have no monitoring data and are
+processed without monitoring source.</p>
+<section id="what-the-tool-does">
+<h2>What the tool does<a class="headerlink" href="#what-the-tool-does" title="Link to this heading"></a></h2>
+<p>The raw data file is read twice, so that the images of the pedestal events are calibrated exactly as the
+events by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>, with the statistics of the ADC samples:</p>
+<ol class="arabic">
+<li><p><strong>First pass:</strong> the time of the first and of the last event of each telescope is kept, for the
+pointing table, and the mean and the std of the ADC samples of each pixel (R0 waveforms) of the
+<strong>pedestal events</strong> (internal triggers of the camera). The statistics of the ADC samples are then
+computed (rolling chunks, see below).</p></li>
+<li><p><strong>Second pass:</strong> the image of each pedestal event (charge of each pixel in p.e.) is calibrated as the
+events by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>:</p>
+<ul class="simple">
+<li><p>the statistics of the ADC samples of the first pass at the time of the pedestal event (last chunk
+ended before it, as given by <code class="docutils literal notranslate"><span class="pre">SST1MMonitoringSource</span></code> to <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">R0R1Calibrator</span></code>: dc to p.e., <strong>voltage drop correction</strong> and <strong>dead pixels</strong> (outliers of the
+statistics of the ADC samples) flagged;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CameraCalibrator</span></code>: integration of the waveforms, the charge of the dead pixels interpolated from
+their neighbours;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ImageSaturationCorrector</span></code>.</p></li>
+</ul>
+<p>The statistics of the images are then computed. The pedestal events without statistics of the ADC
+samples are not used (warning in the log), as they are skipped by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>.</p>
+</li>
+</ol>
+<p>The calibration settings (<code class="docutils literal notranslate"><span class="pre">R0R1Calibrator</span></code>, <code class="docutils literal notranslate"><span class="pre">CameraCalibrator</span></code>, <code class="docutils literal notranslate"><span class="pre">ImageSaturationCorrector</span></code>) of
+<code class="docutils literal notranslate"><span class="pre">sst1mpipe_monitoring_config.json</span></code> are those of <code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_config.json</span></code> and
+<code class="docutils literal notranslate"><span class="pre">sst1mpipe_rta_config.json</span></code>: if they are changed for the processing, they must be changed for the
+monitoring too (checked by the tests). Reading the file twice takes about 25 % more time than once (43 s
+instead of 35 s for 11.5 s of data of a telescope).</p>
+<p>At the end of the run, the tool writes:</p>
+<ul class="simple">
+<li><p>the <strong>pointing</strong> of each telescope: altitude and azimuth of the target of the run every
+<code class="docutils literal notranslate"><span class="pre">MonitoringTool.pointing_update_interval</span></code> (1 s) from the first to the last event of the telescope.
+The target is read from the TARGET field of the file, or given with <code class="docutils literal notranslate"><span class="pre">--SST1MEventSource.pointing_ra</span></code>
+and <code class="docutils literal notranslate"><span class="pre">--SST1MEventSource.pointing_dec</span></code>. The runs without target (e.g. dark runs, transitions between
+two wobbles) have no pointing table, with a warning.</p></li>
+<li><p>the <strong>statistics of the ADC samples of the pedestal events</strong>, in rolling chunks of pedestal events
+(<code class="docutils literal notranslate"><span class="pre">WaveformStatisticsCalculator</span></code>, the last 100 pedestal events, at each pedestal event, by default): <code class="docutils literal notranslate"><span class="pre">mean</span></code> and <code class="docutils literal notranslate"><span class="pre">median</span></code> of the baseline (mean
+of the ADC samples), <code class="docutils literal notranslate"><span class="pre">std</span></code> the noise (mean of the std of the ADC samples, used for the voltage drop
+correction and the dead pixels), <code class="docutils literal notranslate"><span class="pre">outlier_mask</span></code> (dead pixels: noise below half of the median of the
+camera) and <code class="docutils literal notranslate"><span class="pre">is_valid</span></code>.</p></li>
+<li><p>the <strong>statistics of the images of the pedestal events</strong>, in rolling chunks of pedestal events
+(<code class="docutils literal notranslate"><span class="pre">ImageStatisticsCalculator</span></code>, the last 1000 pedestal events, at each pedestal event, by default): <code class="docutils literal notranslate"><span class="pre">mean</span></code>, <code class="docutils literal notranslate"><span class="pre">median</span></code> and <code class="docutils literal notranslate"><span class="pre">std</span></code> of the charges
+(p.e.). The <code class="docutils literal notranslate"><span class="pre">std</span></code> is the NSB noise used by the <code class="docutils literal notranslate"><span class="pre">NSBImageCleaner</span></code> to raise the picture threshold of
+the pixels, and the <code class="docutils literal notranslate"><span class="pre">mean</span></code> gives <code class="docutils literal notranslate"><span class="pre">meanQ</span></code> of the DL1 parameters.</p></li>
+<li><p>the description of the telescope, the scheduling and observation blocks of the run and the reference
+metadata, as in the ctapipe DL1 files.</p></li>
+</ul>
+<p>The event type of the pedestal events, <code class="docutils literal notranslate"><span class="pre">&lt;event</span> <span class="pre">type&gt;</span></code> in the names of the tables, is given by the target
+of the run:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>target of the run</p></th>
+<th class="head"><p>event type</p></th>
+<th class="head"><p>tables</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dark</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DARK_PEDESTAL</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">dark_pedestal_waveform/image</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">bias</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ELECTRONIC_PEDESTAL</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">electronic_pedestal_waveform/image</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>other targets</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SKY_PEDESTAL</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sky_pedestal_waveform/image</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>A run without pedestal events has no statistics tables (warning in the log), and a run without any event
+gives no output file.</p>
+</section>
+<section id="rolling-chunks-of-the-last-pedestal-events">
+<h2>Rolling chunks of the last pedestal events<a class="headerlink" href="#rolling-chunks-of-the-last-pedestal-events" title="Link to this heading"></a></h2>
+<p>The statistics are computed in <strong>rolling chunks</strong>: a chunk of <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> pedestal events starts every
+<code class="docutils literal notranslate"><span class="pre">chunk_shift</span></code> pedestal events, so that consecutive chunks overlap. For each event, <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>
+uses the <strong>last chunk ended before the event</strong>: the statistics of the last <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> pedestal events
+before it, updated every <code class="docutils literal notranslate"><span class="pre">chunk_shift</span></code> pedestal events. By default <code class="docutils literal notranslate"><span class="pre">chunk_shift</span></code> is 1: a new chunk at
+each pedestal event, so that the statistics of an event are always those of the <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> pedestal
+events just before it (100 for the ADC samples, 1000 for the images). For example, with <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> 4
+and <code class="docutils literal notranslate"><span class="pre">chunk_shift</span></code> 1:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>pedestal events   p0  p1  p2  p3  p4  p5  p6  p7
+chunk 0           [p0 ........... p3]
+chunk 1               [p1 ........... p4]
+chunk 2                   [p2 ........... p5]
+chunk 3                       [p3 ........... p6]
+chunk 4                           [p4 ........... p7]
+
+event between p3 and p4  -&gt;  chunk 0  (p0-p3)
+event between p4 and p5  -&gt;  chunk 1  (p1-p4)
+event between p6 and p7  -&gt;  chunk 3  (p3-p6)
+event after p7           -&gt;  chunk 4  (p4-p7)
+</pre></div>
+</div>
+<p>With <code class="docutils literal notranslate"><span class="pre">chunk_shift</span></code> 2, there would be the chunks 0, 2 and 4 only: the events between p5 and p7 would
+use chunk 2 (p2-p5).</p>
+<ul class="simple">
+<li><p>The events before the end of the first chunk (the first <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> pedestal events of the run) use
+the first chunk: there are not yet <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> pedestal events before them.</p></li>
+<li><p>The last chunk always ends at the last pedestal event of the run (<code class="docutils literal notranslate"><span class="pre">last_chunk_policy</span></code> <code class="docutils literal notranslate"><span class="pre">overlap</span></code>),
+and is not repeated if the last rolling chunk already ends there.</p></li>
+<li><p>The events before the first pedestal event or after the last one, by more than
+<code class="docutils literal notranslate"><span class="pre">SST1MMonitoringSource.timestamp_tolerance</span></code> (1 s), have no statistics and are skipped by
+<code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>.</p></li>
+<li><p>A run with less pedestal events than <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> has a single chunk of all its pedestal events
+(<code class="docutils literal notranslate"><span class="pre">allow_undersized_tables</span></code>).</p></li>
+</ul>
+<p>A run of n pedestal events has n - <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> + 1 chunks: with about 100 pedestal events per second,
+a run of 40 s has about 4000 pedestal events, about 3900 chunks of ADC samples (the last second of
+pedestal events) and 3000 chunks of images (the last 10 s). A larger <code class="docutils literal notranslate"><span class="pre">chunk_shift</span></code> gives less rows in
+the monitoring and DL1 files, but updates the statistics less often.</p>
+<p>For each chunk, as in the <code class="docutils literal notranslate"><span class="pre">ctapipe-calculate-pixel-statistics</span></code> tool (ctapipe
+<code class="docutils literal notranslate"><span class="pre">PixelStatisticsCalculator</span></code>, <code class="docutils literal notranslate"><span class="pre">sst1mpipe.monitoring</span></code>):</p>
+<ul class="simple">
+<li><p>the statistics of each pixel are computed over the pedestal events of the chunk;</p></li>
+<li><p>the outlier pixels are flagged by the outlier detectors (<code class="docutils literal notranslate"><span class="pre">outlier_mask</span></code>), and are NaN in the
+statistics given to the events;</p></li>
+<li><p>the chunk is not valid (<code class="docutils literal notranslate"><span class="pre">is_valid</span></code>) if more than <code class="docutils literal notranslate"><span class="pre">faulty_pixels_fraction</span></code> (10 %) of its pixels are
+outliers.</p></li>
+</ul>
+<p>Unlike the <code class="docutils literal notranslate"><span class="pre">ctapipe-calculate-pixel-statistics</span></code> tool, whose first pass ignores <code class="docutils literal notranslate"><span class="pre">chunk_shift</span></code>, all the
+chunks are rolling, and the chunk of an event is the last one ended before it, not the last one started
+before it (which would contain the pedestal events after the event).</p>
+<p>The main settings, in <code class="docutils literal notranslate"><span class="pre">sst1mpipe_monitoring_config.json</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking</span></code> and
+<code class="docutils literal notranslate"><span class="pre">ImageStatisticsCalculator.PlainAggregator.SizeChunking</span></code>: <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code> the number of pedestal
+events in a chunk, <code class="docutils literal notranslate"><span class="pre">chunk_shift</span></code> the number of pedestal events between the starts of two chunks (at
+most <code class="docutils literal notranslate"><span class="pre">chunk_size</span></code>, <code class="docutils literal notranslate"><span class="pre">null</span></code> for chunks which do not overlap). <code class="docutils literal notranslate"><span class="pre">chunking_type</span></code> <code class="docutils literal notranslate"><span class="pre">TimeChunking</span></code>
+gives chunks of a duration instead (<code class="docutils literal notranslate"><span class="pre">chunk_duration</span></code> and <code class="docutils literal notranslate"><span class="pre">chunk_shift</span></code> in seconds).
+<code class="docutils literal notranslate"><span class="pre">allow_undersized_tables</span></code> gives a single chunk for the runs with less pedestal events than a chunk,
+and <code class="docutils literal notranslate"><span class="pre">last_chunk_policy</span></code> <code class="docutils literal notranslate"><span class="pre">overlap</span></code> makes the last chunk end at the last pedestal event.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">stats_aggregator_type</span></code> of the <code class="docutils literal notranslate"><span class="pre">ImageStatisticsCalculator</span></code>: <code class="docutils literal notranslate"><span class="pre">PlainAggregator</span></code> (mean, median and
+std) or <code class="docutils literal notranslate"><span class="pre">SigmaClippingAggregator</span></code> (without the outlier events, <code class="docutils literal notranslate"><span class="pre">max_sigma</span></code> and <code class="docutils literal notranslate"><span class="pre">iterations</span></code>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">outlier_detector_list</span></code>: <code class="docutils literal notranslate"><span class="pre">RangeOutlierDetector</span></code> (<code class="docutils literal notranslate"><span class="pre">validity_range</span></code>), <code class="docutils literal notranslate"><span class="pre">MedianOutlierDetector</span></code>
+(<code class="docutils literal notranslate"><span class="pre">median_range_factors</span></code>) or <code class="docutils literal notranslate"><span class="pre">StdOutlierDetector</span></code> (<code class="docutils literal notranslate"><span class="pre">std_range_factors</span></code>) applied to the <code class="docutils literal notranslate"><span class="pre">mean</span></code>,
+<code class="docutils literal notranslate"><span class="pre">median</span></code> or <code class="docutils literal notranslate"><span class="pre">std</span></code> of the chunks</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">R0R1Calibrator</span></code> and <code class="docutils literal notranslate"><span class="pre">CameraCalibrator</span></code>: calibration of the images, as for the processing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SST1MEventSource.swapped_modules</span></code>: modules of the camera whose cables were swapped during a period,
+which are put back in place when the events are read</p></li>
+</ul>
+<p>Every setting can also be given on the command line, e.g.
+<code class="docutils literal notranslate"><span class="pre">--WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking.chunk_shift=10</span></code> (a new chunk every
+10 pedestal events).</p>
+</section>
+<section id="content-of-the-monitoring-file">
+<h2>Content of the monitoring file<a class="headerlink" href="#content-of-the-monitoring-file" title="Link to this heading"></a></h2>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>SST1M1_20260120_1179.monitoring.h5
+├── configuration/                    telescope description, scheduling and observation blocks
+├── dl0/monitoring/telescope/pointing/tel_021
+│       time, azimuth, altitude
+├── r0/monitoring/telescope/calibration/camera/pixel_statistics/sky_pedestal_waveform/tel_021
+│       time_start, time_end, event_id_start, event_id_end, n_events,
+│       mean, median, std, outlier_mask, is_valid
+└── dl1/monitoring/telescope/calibration/camera/pixel_statistics/sky_pedestal_image/tel_021
+        time_start, time_end, event_id_start, event_id_end, n_events,
+        mean, median, std, outlier_mask, is_valid
+</pre></div>
+</div>
+<p>The monitoring file is a ctapipe monitoring file: it is read by the ctapipe <code class="docutils literal notranslate"><span class="pre">HDF5MonitoringSource</span></code>
+(pointing and statistics of the images), by <code class="docutils literal notranslate"><span class="pre">SST1MMonitoringSource</span></code> (all the tables) and its tables with
+<code class="docutils literal notranslate"><span class="pre">ctapipe.io.read_table</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ctapipe.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_table</span>
+
+<span class="n">path</span> <span class="o">=</span> <span class="s2">"/dl1/monitoring/telescope/calibration/camera/pixel_statistics/sky_pedestal_image/tel_021"</span>
+<span class="n">statistics</span> <span class="o">=</span> <span class="n">read_table</span><span class="p">(</span><span class="s2">"SST1M1_20260120_1179.monitoring.h5"</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">statistics</span><span class="p">[</span><span class="s2">"time_start"</span><span class="p">,</span> <span class="s2">"time_end"</span><span class="p">,</span> <span class="s2">"n_events"</span><span class="p">])</span>
+</pre></div>
+</div>
+<p>The monitoring tables are also copied into the DL1 file by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>
+(<code class="docutils literal notranslate"><span class="pre">--ProcessorTool.attach_monitoring</span></code>), so that the DL1 file is self-contained.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="camera_event_type.html" class="btn btn-neutral float-left" title="Trigger type of the camera events" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sst1m_analysis_workflow.html" class="btn btn-neutral float-right" title="SST-1M analysis workflow" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SST-1M collaboration.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

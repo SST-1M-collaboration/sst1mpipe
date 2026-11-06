@@ -1,0 +1,244 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trigger type of the camera events &mdash; sst1mpipe 0.32.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=13237357" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5f9769cd"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="_static/togglebutton.js?v=4a39c7ea"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Monitoring of a run: sst1mpipe-monitoring" href="sst1mpipe_monitoring.html" />
+    <link rel="prev" title="Processing the data with the ctapipe tools" href="data_processing.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            sst1mpipe
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_processing.html">Processing the data with the ctapipe tools</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Trigger type of the camera events</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#sst1mpipe.io.containers.CameraEventType"><code class="docutils literal notranslate"><span class="pre">CameraEventType</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sst1mpipe_monitoring.html">Monitoring of a run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="sst1m_analysis_workflow.html">SST-1M analysis workflow</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">sst1mpipe</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Trigger type of the camera events</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/camera_event_type.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="trigger-type-of-the-camera-events">
+<span id="camera-event-type"></span><h1>Trigger type of the camera events<a class="headerlink" href="#trigger-type-of-the-camera-events" title="Link to this heading"></a></h1>
+<p>The raw data (R0) of an event read by <code class="docutils literal notranslate"><span class="pre">SST1MEventSource</span></code> (zfits files) or <code class="docutils literal notranslate"><span class="pre">ZMQEventSource</span></code>
+(ZMQ stream) contain the event type sent by DigiCam, <code class="docutils literal notranslate"><span class="pre">event.r0.tel[tel_id].event_type</span></code>. It is a
+bit mask of the tpye trigger of the event, <a class="reference internal" href="#sst1mpipe.io.containers.CameraEventType" title="sst1mpipe.io.containers.CameraEventType"><code class="xref py py-class docutils literal notranslate"><span class="pre">CameraEventType</span></code></a>.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="sst1mpipe.io.containers.CameraEventType">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">sst1mpipe.io.containers.</span></span><span class="sig-name descname"><span class="pre">CameraEventType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.io.containers.CameraEventType" title="Link to this definition"></a></dt>
+<dd><p>Event type of a DigiCam camera event: a bit mask of the trigger conditions of the event.</p>
+<p>Each trigger condition is one bit and the event type is the sum of the bits of the event:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Bit</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Member</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x1</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">PATCH7</span></code></p></td>
+<td><p>algorithm 0 trigger (patch7)</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x2</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">PATCH19</span></code></p></td>
+<td><p>algorithm 1 trigger (patch19)</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x4</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MUON_TRIGGER</span></code></p></td>
+<td><p>algorithm 2 trigger (muon)</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x8</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">INTERNAL</span></code></p></td>
+<td><p>internal trigger (the pedestal events)</p></td>
+</tr>
+<tr class="row-even"><td><p>4</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x10</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">EXTMSTR</span></code></p></td>
+<td><p>external trigger, on the master only</p></td>
+</tr>
+<tr class="row-odd"><td><p>5, 6</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x20</span></code>,
+<code class="docutils literal notranslate"><span class="pre">0x40</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">BIT5</span></code>,
+<code class="docutils literal notranslate"><span class="pre">BIT6</span></code></p></td>
+<td><p>unused</p></td>
+</tr>
+<tr class="row-even"><td><p>7</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x80</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">CONTINUOUS</span></code></p></td>
+<td><p>continuous readout marker</p></td>
+</tr>
+<tr class="row-odd"><td><p>16</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x10000</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MUON_DETECT</span></code></p></td>
+<td><p>muon detected by the camera server</p></td>
+</tr>
+<tr class="row-even"><td><p>17</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0x20000</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">HILLAS</span></code></p></td>
+<td><p>Hillas parameters computed by the camera server</p></td>
+</tr>
+</tbody>
+</table>
+<p>E.g. <code class="docutils literal notranslate"><span class="pre">5</span> <span class="pre">=</span> <span class="pre">0x1</span> <span class="pre">+</span> <span class="pre">0x4</span></code> is an event triggered by both the patch7 and the muon triggers,
+<code class="docutils literal notranslate"><span class="pre">PATCH7|MUON_TRIGGER</span></code>.</p>
+<p>The readers (<code class="docutils literal notranslate"><span class="pre">SST1MEventSource</span></code>, <code class="docutils literal notranslate"><span class="pre">ZMQEventSource</span></code>) store it in
+<code class="docutils literal notranslate"><span class="pre">event.r0.tel[tel_id].event_type</span></code>: the container converts the integer of the file or
+stream to a <code class="docutils literal notranslate"><span class="pre">CameraEventType</span></code>.</p>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">==</span></code> compares the whole mask: <code class="docutils literal notranslate"><span class="pre">CameraEventType(5)</span> <span class="pre">==</span> <span class="pre">CameraEventType.PATCH7</span></code> is False.
+To test if an event has a trigger condition, whatever the other bits, use <code class="docutils literal notranslate"><span class="pre">in</span></code> (or <code class="docutils literal notranslate"><span class="pre">&amp;</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">UNKNOWN</span></code> (0) is in every event type, as the empty mask of a <code class="docutils literal notranslate"><span class="pre">Flag</span></code>: test
+<code class="docutils literal notranslate"><span class="pre">not</span> <span class="pre">event_type</span></code> for an event without any bit.</p></li>
+<li><p>A bit which is not a member (bits 8 to 15, above 17) raises a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p></li>
+<li><p>The ctapipe event type of the event (<code class="docutils literal notranslate"><span class="pre">event.trigger.event_type</span></code>) is a pedestal event for
+an event type equal to <code class="docutils literal notranslate"><span class="pre">INTERNAL</span></code>, <code class="docutils literal notranslate"><span class="pre">SUBARRAY</span></code> otherwise, see
+<code class="docutils literal notranslate"><span class="pre">sst1mpipe.io.sst1m_event_source.camera_event_type_to_event_type</span></code>.</p></li>
+</ul>
+<p class="rubric">Examples</p>
+<p>Test the trigger conditions of an event, e.g. of type 5:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.io.containers</span><span class="w"> </span><span class="kn">import</span> <span class="n">CameraEventType</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">event_type</span> <span class="o">=</span> <span class="n">CameraEventType</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>  <span class="c1"># e.g. event.r0.tel[tel_id].event_type</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">event_type</span>
+<span class="go">&lt;CameraEventType.PATCH7|MUON_TRIGGER: 5&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">CameraEventType</span><span class="o">.</span><span class="n">PATCH7</span> <span class="ow">in</span> <span class="n">event_type</span><span class="p">,</span> <span class="n">CameraEventType</span><span class="o">.</span><span class="n">MUON_TRIGGER</span> <span class="ow">in</span> <span class="n">event_type</span>
+<span class="go">(True, True)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">CameraEventType</span><span class="o">.</span><span class="n">PATCH19</span> <span class="ow">in</span> <span class="n">event_type</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">event_type</span> <span class="o">==</span> <span class="n">CameraEventType</span><span class="o">.</span><span class="n">PATCH7</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+<p>Any of several trigger conditions:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nb">bool</span><span class="p">(</span><span class="n">event_type</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">CameraEventType</span><span class="o">.</span><span class="n">PATCH7</span> <span class="o">|</span> <span class="n">CameraEventType</span><span class="o">.</span><span class="n">PATCH19</span><span class="p">))</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>Bits, name and value of the event type:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nb">list</span><span class="p">(</span><span class="n">event_type</span><span class="p">)</span>
+<span class="go">[&lt;CameraEventType.PATCH7: 1&gt;, &lt;CameraEventType.MUON_TRIGGER: 4&gt;]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">event_type</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">event_type</span><span class="o">.</span><span class="n">value</span>
+<span class="go">('PATCH7|MUON_TRIGGER', 5)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">CameraEventType</span><span class="o">.</span><span class="n">PATCH7</span> <span class="o">|</span> <span class="n">CameraEventType</span><span class="o">.</span><span class="n">MUON_TRIGGER</span> <span class="o">==</span> <span class="n">event_type</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>The integers of a table (e.g. the <code class="docutils literal notranslate"><span class="pre">event_type</span></code> column of <code class="docutils literal notranslate"><span class="pre">sst1mpipe-trigger</span></code>) are tested
+with the values of the bits:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">event_types</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">4</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">(</span><span class="n">event_types</span> <span class="o">&amp;</span> <span class="n">CameraEventType</span><span class="o">.</span><span class="n">MUON_TRIGGER</span><span class="o">.</span><span class="n">value</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span>
+<span class="go">array([False,  True, False,  True])</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="data_processing.html" class="btn btn-neutral float-left" title="Processing the data with the ctapipe tools" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sst1mpipe_monitoring.html" class="btn btn-neutral float-right" title="Monitoring of a run: sst1mpipe-monitoring" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SST-1M collaboration.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
