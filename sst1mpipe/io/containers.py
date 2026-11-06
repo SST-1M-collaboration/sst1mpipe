@@ -74,7 +74,7 @@ class CameraEventType(Flag):
     E.g. ``5 = 0x1 + 0x4`` is an event triggered by both the patch7 and the muon triggers,
     ``PATCH7|MUON_TRIGGER``.
 
-    The readers (``SST1MEventSource``, ``ZMQEventSource``) store it in
+    The readers (`~sst1mpipe.io.sst1m_event_source.SST1MEventSource`, `~sst1mpipe.io.zmq_event_source.ZMQEventSource`) store it in
     ``event.r0.tel[tel_id].event_type``: the container converts the integer of the file or
     stream to a ``CameraEventType``.
 
