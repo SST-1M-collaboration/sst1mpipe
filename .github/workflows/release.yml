@@ -3,9 +3,8 @@ name: release
 # Build the package and publish it on PyPI when a version tag (v*) is pushed,
 # e.g. `git tag v0.32.0a1 && git push origin v0.32.0a1`.
 # The tag must be the version of pyproject.toml, with a leading "v".
-# Uploads use the PyPI trusted publishing (no token): the GitHub environments "testpypi"
-# and "pypi" must be declared as trusted publishers of the sst1mpipe project on
-# test.pypi.org and pypi.org.
+# Uploads use the PyPI trusted publishing (no token): the GitHub environment "pypi" must be
+# declared as trusted publisher of the sst1mpipe project on pypi.org.
 
 on:
   push:
@@ -50,27 +49,8 @@ jobs:
           name: dist
           path: dist/
 
-  publish-testpypi:
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/sst1mpipe
-    permissions:
-      id-token: write  # trusted publishing
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
-      - name: Publish on TestPyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-
   publish-pypi:
-    needs: publish-testpypi
+    needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     environment:
