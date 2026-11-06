@@ -2,14 +2,7 @@
 
 
 from . import cleaning  # registers the custom ImageCleaners in ctapipe
-from .NSB_tools import (
-    VAR_to_Idrop,
-    VAR_to_NSB,
-    VAR_to_NSB_photon_rate,
-    VAR_to_shift,
-    gain_drop_th,
-    get_simple_nsbrate,
-)
+from .nsb_tools import SiPMVoltageDropModel
 from .utils import (
     add_disp,
     add_disp_to_parameters,

@@ -14,13 +14,14 @@ from ctapipe.io import EventSource
 from ctapipe.visualization import CameraDisplay
 from scipy.ndimage import convolve1d
 from scipy.optimize import minimize
+from traitlets.config import Config
 
 from sst1mpipe.calib.calib import get_default_window
 from sst1mpipe.io import load_config
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
-from sst1mpipe.utils.NSB_tools import VAR_to_Idrop
+from sst1mpipe.utils.nsb_tools import default_model
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE
 
 DEFAULT_CONFIG_FILE = DATA_CONFIG_FILE
@@ -110,6 +111,8 @@ class muon_finder:
         self.gain            = gain
         self.tel             = tel
         self.sim_tel_id      = tel - 20
+        # voltage drop of the SiPMs, configured by the data config
+        self.voltage_drop_model = default_model(Config(DEFAULT_CONFIG))
 
         self.plot=plot
         self.ismc = ismc
@@ -235,7 +238,7 @@ class muon_finder:
                 pedestal_std = event.monitoring.tel[tel].camera.pixel_statistics.pedestal_waveform.std
                 if pedestal_std is None:
                     continue
-                VI = VAR_to_Idrop(np.nanmean(pedestal_std)**2, self.tel)
+                VI = self.voltage_drop_model.charge_drop(self.tel, np.nanmean(pedestal_std)**2)
                 Q_sum_ADC    = (r0data.waveform[0].T[self.w_start:self.w_end] - r0data.pedestal).sum(axis=0)
                 Q_sum_window = Q_sum_ADC /self.gain /VI /self.window_t
 

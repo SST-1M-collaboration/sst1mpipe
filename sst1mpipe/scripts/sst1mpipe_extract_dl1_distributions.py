@@ -34,7 +34,7 @@ from sst1mpipe.io import (
     pedestal_cleaning_fractions,
 )
 from sst1mpipe.utils import get_telescopes
-from sst1mpipe.utils.NSB_tools import VAR_to_NSB, mean_pedestal_std
+from sst1mpipe.utils.nsb_tools import default_model, mean_pedestal_std
 
 
 def parse_args():
@@ -205,6 +205,8 @@ def load_data(files, config=None, tel=None, data_level='dl1'):
     recleaned_fractions = []
     times = []
     nsb = []
+    # NSB rate from the pedestal events (voltage drop model of the SiPMs, default parameters)
+    nsb_model = default_model()
 
     for input_file in files:
         try:
@@ -227,7 +229,7 @@ def load_data(files, config=None, tel=None, data_level='dl1'):
                 cs=21
             else:
                 cs=22
-            NSB = VAR_to_NSB(mean_pedestal_std(pt)**2, cs)
+            NSB = nsb_model.nsb_rate(cs, mean_pedestal_std(pt)**2).to_value(u.MHz)
             nsb.append(NSB.mean())
         except Exception:
             print('No pedestals in : ' + input_file + '.')

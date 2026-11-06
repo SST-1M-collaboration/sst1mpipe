@@ -56,6 +56,7 @@ from sst1mpipe.monitoring import (
     check_chunk_shift,
     compute_pixel_statistics,
 )
+from sst1mpipe.utils.nsb_tools import SiPMVoltageDropModel
 
 
 class MonitoringTool(Tool):
@@ -112,7 +113,7 @@ class MonitoringTool(Tool):
 
     classes = (
         [
-            R0R1Calibrator, CameraCalibrator, ImageSaturationCorrector,
+            R0R1Calibrator, SiPMVoltageDropModel, CameraCalibrator, ImageSaturationCorrector,
             WaveformStatisticsCalculator, ImageStatisticsCalculator,
         ]
         + classes_with_traits(EventSource)

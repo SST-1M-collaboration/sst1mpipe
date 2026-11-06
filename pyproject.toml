@@ -61,6 +61,7 @@ sst1mpipe_read_camera_server_logs = "sst1mpipe.scripts.read_camera_server_logs:m
 sst1mpipe-process = "sst1mpipe.scripts.sst1mpipe_process_tool:main"
 sst1mpipe-trigger = "sst1mpipe.scripts.sst1mpipe_trigger_tool:main"
 sst1mpipe-monitoring = "sst1mpipe.scripts.sst1mpipe_monitoring_tool:main"
+sst1mpipe-nsb = "sst1mpipe.scripts.sst1mpipe_nsb_tool:main"
 
 # EventSource implementations found by ctapipe.io.EventSource
 [project.entry-points.ctapipe_io]
