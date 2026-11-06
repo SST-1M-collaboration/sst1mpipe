@@ -46,4 +46,4 @@ dependencies:
       - numpy<2
       - ctaplot~=0.6.2
       - pyirf~=0.8.0
-      - sst1m-cts>=1.0 # cts_core: camera configuration of DigiCam
+      - sst1m-cts>=1.0 # sst1m_cts_core: camera configuration of DigiCam
