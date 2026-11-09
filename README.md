@@ -47,7 +47,7 @@ Install miniforge by following the instructions
 bash Miniforge3-$(uname)-$(uname -m).sh
 ````
 
-- download stable version of <b>sst1mpipe</b> (latest version = 0.9.0)
+- download stable version of <b>sst1mpipe</b>
 - create and activate <b>mamba</b> environment
 - install <b>sst1mpipe</b>
 ```
