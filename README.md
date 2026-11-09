@@ -1,4 +1,7 @@
-[![documentation](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/documentation.yml/badge.svg)](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/documentation.yml) [![ci](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml/badge.svg)](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml)
+[![ci](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml/badge.svg)](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/sst1mpipe)](https://pypi.org/project/sst1mpipe/) 
+[![license](https://img.shields.io/github/license/SST-1M-collaboration/sst1mpipe)](LICENSE)
+[![docs](https://img.shields.io/badge/docs-github.io-blue)](https://sst-1m-collaboration.github.io/sst1mpipe/)
 # SST-1M pipeline 
 
 The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository is used for processing and analyzing data from the <b>SST-1M</b> prototype. Currently, two SST-1M telescopes are installed in Ondrejov, Czech Republic, operation in both mono and stereo observation modes. The <b>SST-1M</b> pipeline is based on [ctapipe](https://github.com/cta-observatory/ctapipe) and draws inspiration from [cta-lstchain](https://github.com/cta-observatory/cta-lstchain). Some funcionalities for stereoscopic reconstruction are inspired by [magic-cta-pipe](https://github.com/cta-observatory/magic-cta-pipe).
@@ -6,7 +9,7 @@ The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository is
 sst1mpipe provides tools for low-level data analysis up to DL3, which can be further analyzed using standard tools such as [gammapy](https://github.com/gammapy).
 
 - **Source code:** https://github.com/SST-1M-collaboration/sst1mpipe
-- **Documentation:** https://sst1mpipe.readthedocs.io/
+- **Documentation:** https://sst-1m-collaboration.github.io/sst1mpipe/
 
 
 **NOTE ON OLD RELEASES**
