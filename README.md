@@ -51,7 +51,7 @@ bash Miniforge3-$(uname)-$(uname -m).sh
 - create and activate <b>mamba</b> environment
 - install <b>sst1mpipe</b>
 ```
-SST1MPIPE_VER=0.9.0
+SST1MPIPE_VER=0.9.1
 
 wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz
 tar -xvf v$SST1MPIPE_VER.tar.gz
