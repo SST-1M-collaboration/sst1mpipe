@@ -60,7 +60,3 @@ mamba env create -n sst1m-$SST1MPIPE_VER -f environment.yml
 mamba activate sst1m-$SST1MPIPE_VER
 pip install .
 ```
-
-# Making a release
-
-See [Making a release](CONTRIBUTING.md#making-a-release) in CONTRIBUTING.md.
