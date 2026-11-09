@@ -18,6 +18,18 @@ v0.3.5 of *sst1mpipe* was the last one before the repository was made public. Ol
 
 # Installation
 
+## From PyPI
+
+Since 0.32, the versions of *sst1mpipe* follow the versions of [ctapipe](https://github.com/cta-observatory/ctapipe)
+(*sst1mpipe* 0.32.x uses ctapipe 0.32). The 0.32.0aN versions are alpha releases: the DL1 to DL3 steps and the
+stereo matching are not migrated to the new ctapipe tools yet.
+
+```
+pip install --pre sst1mpipe
+```
+
+## With conda
+
 The advanced package and environment management system, [Anaconda](https://www.anaconda.com/distribution/#download-section), [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Mamba](https://anaconda.org/conda-forge/mamba), need to be installed first.
 
 The Mamba is recommended due to some (quite often occurred) stuck at solving environment on Anaconda. Up to now Mamba works well.
@@ -48,3 +60,7 @@ mamba env create -n sst1m-$SST1MPIPE_VER -f environment.yml
 mamba activate sst1m-$SST1MPIPE_VER
 pip install .
 ```
+
+# Making a release
+
+See [Making a release](CONTRIBUTING.md#making-a-release) in CONTRIBUTING.md.
