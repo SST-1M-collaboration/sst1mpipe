@@ -15,7 +15,9 @@ One message per telescope event and one per stereo event, multipart:
 2. the header (msgpack): format ``version``, ``source`` (name of the publisher), ``count``
    (number of the message of the publisher for this topic: a gap is a lost message), ``obs_id``, ``event_id``,
    ``tel_id`` (0 for stereo), and for each data level of the event its ``scalars``
-   ``{name: value}`` and the descriptions of its ``arrays`` ``[name, dtype, shape]``;
+   ``{name: value}`` and the descriptions of its ``arrays`` ``[name, dtype, shape, frame]``
+   (``frame``: index of the frame of the array among the array frames: an array of several
+   levels, e.g. the DL0 waveform equal to the R1 waveform, is sent once);
 3. one frame per array, the raw bytes of the numpy array (no copy).
 
 The data levels are ``trigger``, ``r0``, ``r1``, ``dl0``, ``dl1``, ``dl2`` (of the telescope)
@@ -25,8 +27,9 @@ and ``dl2_stereo``. Their fields have the names of the columns of the ctapipe ``
 ns, TeV) and the times in unix seconds.
 
 To limit the bandwidth, the publisher sends the full events (waveforms, images) only every
-``full_event_period`` seconds; the other events have their trigger, DL1 parameters and DL2 only
-(enough for the statistics and the rates).
+``full_event_period`` seconds: the first event after the period with a DL1 image (a finite Hillas
+intensity), or any event after two periods. The other events have their trigger, DL1 parameters and
+DL2 only (enough for the statistics and the rates).
 """
 
 import os
@@ -68,22 +71,57 @@ def telescope_topic(tel_id):
     return f"tel{int(tel_id)}"
 
 
-def _unit(unit):
-    """Unit of the values of a quantity of ``unit`` (cached: the physical type is slow to get)"""
-    if unit not in _UNIT_CACHE:
-        _UNIT_CACHE[unit] = UNITS.get(str(unit.physical_type))
-    return _UNIT_CACHE[unit]
+def _unit_factor(unit):
+    """
+    Factor converting the values of a quantity of ``unit`` to the unit of its physical type
+    (`UNITS`), None to keep them (cached: the physical type and the conversion are slow to get)
+    """
+    factor = _UNIT_CACHE.get(unit, False)
+    if factor is False:
+        target = UNITS.get(str(unit.physical_type))
+        factor = _UNIT_CACHE[unit] = None if target is None or unit == target else unit.to(target)
+    return factor
+
+
+#: julian date of the unix epoch
+_UNIX_EPOCH_JD = 2440587.5
+#: day (unix_tai // 86400) -> unix - unix_tai (the leap seconds change only at the start of a day)
+_LEAP_SECONDS = {}
+#: plain types sent as they are
+_PLAIN_TYPES = (bool, int, float, str)
+
+
+def _unix(value):
+    """
+    Unix time (s) of a scalar `~astropy.time.Time`: its TAI unix time (fast) corrected by the leap
+    seconds of its day (cached; the UTC conversion of astropy, ~70 us, is done once per day)
+    """
+    if value.scale != "tai" or not value.isscalar:
+        return value.unix
+    # the julian date of the internal representation: 1 us (the public jd1 / jd2 / unix_tai: 7 to 16 us)
+    jd = getattr(value, "_time", value)
+    unix_tai = float((jd.jd1 - _UNIX_EPOCH_JD + jd.jd2) * 86400.0)
+    day = unix_tai // 86400.0
+    offset = _LEAP_SECONDS.get(day)
+    if offset is None:
+        offset = _LEAP_SECONDS[day] = float(value.unix) - unix_tai
+    return unix_tai + offset
 
 
 def _value(value):
     """Plain value (number, string, numpy array) of a field value, None if it cannot be sent"""
+    kind = type(value)
+    if kind in _PLAIN_TYPES:  # the most frequent (fast path)
+        return value
+    if isinstance(value, np.generic):  # numpy scalar
+        return value.item() if value.dtype != object else None
     if value is None or isinstance(value, (Container, dict)):
         return None
     if isinstance(value, u.Quantity):
-        unit = _unit(value.unit)
-        value = value.to_value(unit) if unit is not None else value.value
+        factor = _unit_factor(value.unit)
+        value = value.value if factor is None else value.value * factor
     elif isinstance(value, Time):
-        value = value.unix  # times in unix seconds
+        return _unix(value)  # times in unix seconds
     elif isinstance(value, Enum):
         value = value.value
     if isinstance(value, (bool, int, float, str, np.bool_, np.integer, np.floating)):
@@ -157,6 +195,7 @@ def event_messages(event, full=True, tel_ids=None, stereo=True):
                     fields = _fields(container)
                     if fields:
                         levels[level] = fields
+            _share_waveform(levels)
         if tel_id in event.dl1.tel:
             dl1 = event.dl1.tel[tel_id]
             fields = _fields(dl1.parameters, recursive=True) if dl1.parameters is not None else {}
@@ -179,6 +218,26 @@ def event_messages(event, full=True, tel_ids=None, stereo=True):
     return messages
 
 
+def _share_waveform(levels):
+    """
+    The DL0 waveform equal to the R1 waveform (no data volume reduction) is the same array, sent
+    once by `encode`
+    """
+    r1, dl0 = levels.get("r1", {}).get("waveform"), levels.get("dl0", {}).get("waveform")
+    if isinstance(r1, np.ndarray) and isinstance(dl0, np.ndarray) and r1 is not dl0 and np.array_equal(r1, dl0):
+        levels["dl0"]["waveform"] = r1
+
+
+def _has_image(event):
+    """Whether a telescope of the event has a DL1 image (a finite Hillas intensity)"""
+    for dl1 in event.dl1.tel.values():
+        parameters = dl1.parameters
+        intensity = parameters.hillas.intensity if parameters is not None else None
+        if intensity is not None and np.isfinite(intensity):
+            return True
+    return False
+
+
 def encode(topic, levels, obs_id, event_id, tel_id, source="", count=0):
     """
     Frames of a message (see the module).
@@ -199,16 +258,18 @@ def encode(topic, levels, obs_id, event_id, tel_id, source="", count=0):
     list
         The frames: topic, header, then the arrays (sent without copy).
     """
-    arrays = []
+    arrays, frames = [], {}  # frames: id of an array -> index of its frame
     header = dict(version=FORMAT_VERSION, source=source, count=int(count), obs_id=int(obs_id),
                   event_id=int(event_id), tel_id=int(tel_id), levels={})
     for level, fields in levels.items():
         scalars, descriptions = {}, []
         for name, value in fields.items():
             if isinstance(value, np.ndarray):
-                value = np.ascontiguousarray(value)
-                descriptions.append([name, value.dtype.str, list(value.shape)])
-                arrays.append(value)
+                index = frames.get(id(value))
+                if index is None:  # an array of several levels is sent once
+                    index = frames[id(value)] = len(arrays)
+                    arrays.append(np.ascontiguousarray(value))
+                descriptions.append([name, value.dtype.str, list(value.shape), index])
             else:
                 scalars[name] = value
         header["levels"][level] = dict(scalars=scalars, arrays=descriptions)
@@ -230,14 +291,18 @@ def decode(frames):
     if header.get("version") != FORMAT_VERSION:
         raise ValueError(f"Unknown format version {header.get('version')} (known: {FORMAT_VERSION})")
     keys = dict(obs_id=header["obs_id"], event_id=header["event_id"], tel_id=header["tel_id"])
-    buffers = iter(frames[2:])
+    buffers = frames[2:]
+    arrays = {}  # index of the frame -> array (an array of several levels is the same array)
     levels = {}
     for level, content in header["levels"].items():
         row = dict(content["scalars"])
-        for name, dtype, shape in content["arrays"]:
-            frame = next(buffers)
-            data = frame.buffer if isinstance(frame, zmq.Frame) else frame
-            row[name] = np.frombuffer(data, dtype=np.dtype(dtype)).reshape(shape)
+        for name, dtype, shape, index in content["arrays"]:
+            array = arrays.get(index)
+            if array is None:
+                frame = buffers[index]
+                data = frame.buffer if isinstance(frame, zmq.Frame) else frame
+                array = arrays[index] = np.frombuffer(data, dtype=np.dtype(dtype)).reshape(shape)
+            row[name] = array
         row.update(keys)
         levels[level] = row
     return header, levels
@@ -287,7 +352,9 @@ class ZMQEventPublisher(Component):
         if self._socket is None:
             return
         now = time.monotonic()
-        full = now - self._last_full >= self.full_event_period
+        # a full event after the period: one with an image, or any after two periods
+        elapsed = now - self._last_full
+        full = elapsed >= self.full_event_period and (elapsed >= 2 * self.full_event_period or _has_image(event))
         if full:
             self._last_full = now
         obs_id, event_id = event.index.obs_id, event.index.event_id
@@ -363,9 +430,12 @@ class ZMQEventSubscriber:
         (header, levels) or None
             The decoded message (`decode`), None if nothing was received in time.
         """
-        if timeout is not None and not self.socket.poll(int(timeout * 1000)):
-            return None
-        frames = self.socket.recv_multipart(copy=False)
+        try:  # a message waiting: no poll (one system call less per message)
+            frames = self.socket.recv_multipart(flags=zmq.NOBLOCK, copy=False)
+        except zmq.Again:
+            if timeout is not None and not self.socket.poll(int(timeout * 1000)):
+                return None
+            frames = self.socket.recv_multipart(copy=False)
         header, levels = decode(frames)
         self.received += 1
         source, count = header["source"], header["count"]
