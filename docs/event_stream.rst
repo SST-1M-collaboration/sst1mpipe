@@ -9,16 +9,16 @@ of the events (``sst1mpipe-viewer``), with ``--publish``:
     sst1mpipe-process -i tcp://camera-server:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json \
         --publish tcp://viewer-host:5561
 
-The receiver (e.g. the viewer) *binds* the endpoint and the processes of the pipeline *connect*
+The subscriber (e.g. the viewer) *binds* the endpoint and the processes of the pipeline *connect*
 to it (PUB / SUB sockets of ZMQ):
 
-- several processes can publish to the same receiver, e.g. the workers of a telescope sharing its
-  camera stream (PULL): the receiver gets each event once, from the worker which processed it.
+- several processes can publish to the same subscriber, e.g. the workers of a telescope sharing its
+  camera stream (PULL): the subscriber gets each event once, from the worker which processed it.
   The events of different workers can arrive in a different order than their timestamps;
-- a publisher never waits for the receiver: if the receiver is absent or too slow, the messages
-  are dropped. The messages of each publisher are numbered, so that the receiver counts the
+- a publisher never waits for the subscriber: if the subscriber is absent or too slow, the messages
+  are dropped. The messages of each publisher are numbered, so that the subscriber counts the
   messages lost;
-- the messages published before the receiver is connected are lost.
+- the messages published before the subscriber is connected are lost.
 
 Messages
 --------
@@ -35,16 +35,16 @@ events, with the waveforms and the images, are sent only every
 ``--ZMQEventPublisher.full_event_period`` seconds (1 s by default, 0 for all the events); the
 other events have their trigger, DL1 parameters and DL2, enough for the statistics and the rates.
 
-Receiving the events
+Receiving the events (subscriber)
 --------------------
 
 .. code-block:: python
 
-    from sst1mpipe.io.zmq_event_stream import ZMQEventReceiver
+    from sst1mpipe.io.zmq_event_stream import ZMQEventSubscriber
 
-    with ZMQEventReceiver("tcp://*:5561") as receiver:
+    with ZMQEventSubscriber("tcp://*:5561") as subscriber:
         while True:
-            message = receiver.receive(timeout=1.0)
+            message = subscriber.receive(timeout=1.0)
             if message is not None:
                 header, levels = message  # levels: {"dl1": {"hillas_intensity": ..., ...}, ...}
 

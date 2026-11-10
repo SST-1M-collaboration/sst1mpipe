@@ -2,10 +2,10 @@
 Stream of the processed events of the pipeline (ZMQ), e.g. for the viewer of the events.
 
 The pipeline publishes its events (``ZMQEventPublisher``, PUB socket which *connects*) and a single
-receiver gets them (``ZMQEventReceiver``, SUB socket which *binds*): several processes of the
+subscriber gets them (``ZMQEventSubscriber``, SUB socket which *binds*): several processes of the
 pipeline (e.g. the workers of a telescope, which share its camera stream in PULL) can publish to
-the same receiver, each event once. A publisher never waits for the receiver: when the receiver
-is absent or too slow, the messages are dropped (the receiver counts them, see below).
+the same subscriber, each event once. A publisher never waits for the subscriber: when the subscriber
+is absent or too slow, the messages are dropped (the subscriber counts them, see below).
 
 Messages
 --------
@@ -13,7 +13,7 @@ One message per telescope event and one per stereo event, multipart:
 
 1. the topic: ``tel<tel_id>`` (e.g. ``tel21``) or ``stereo``;
 2. the header (msgpack): format ``version``, ``source`` (name of the publisher), ``count``
-   (number of the message of the publisher: a gap is a lost message), ``obs_id``, ``event_id``,
+   (number of the message of the publisher for this topic: a gap is a lost message), ``obs_id``, ``event_id``,
    ``tel_id`` (0 for stereo), and for each data level of the event its ``scalars``
    ``{name: value}`` and the descriptions of its ``arrays`` ``[name, dtype, shape]``;
 3. one frame per array, the raw bytes of the numpy array (no copy).
@@ -43,7 +43,7 @@ from ctapipe.core import Component, Container
 from ctapipe.core.traits import Float, Int, Unicode
 
 __all__ = [
-    "FORMAT_VERSION", "STEREO_TOPIC", "LEVELS", "ZMQEventPublisher", "ZMQEventReceiver", "event_messages",
+    "FORMAT_VERSION", "STEREO_TOPIC", "LEVELS", "ZMQEventPublisher", "ZMQEventSubscriber", "event_messages",
     "encode", "decode", "telescope_topic",
 ]
 
@@ -192,7 +192,7 @@ def encode(topic, levels, obs_id, event_id, tel_id, source="", count=0):
     source : str
         Name of the publisher.
     count : int
-        Number of the message of the publisher.
+        Number of the message of the publisher for this topic.
 
     Returns
     -------
@@ -251,14 +251,14 @@ class ZMQEventPublisher(Component):
 
     url = Unicode(
         default_value=None, allow_none=True,
-        help="ZMQ endpoint of the receiver of the events (e.g. tcp://viewer-host:5561); none: no stream",
+        help="ZMQ endpoint of the subscriber of the events (e.g. tcp://viewer-host:5561); none: no stream",
     ).tag(config=True)
     full_event_period = Float(
         default_value=1.0,
         help="period (s) of the full events, with the waveforms and the images (0: all the events)",
     ).tag(config=True)
     send_high_water_mark = Int(
-        default_value=1000, help="maximum number of messages queued for the receiver (the others are dropped)",
+        default_value=1000, help="maximum number of messages queued for the subscriber (the others are dropped)",
     ).tag(config=True)
     source_name = Unicode(
         default_value=f"{socket.gethostname()}:{os.getpid()}", help="name of this publisher in the messages",
@@ -266,7 +266,7 @@ class ZMQEventPublisher(Component):
 
     def __init__(self, config=None, parent=None, **kwargs):
         super().__init__(config=config, parent=parent, **kwargs)
-        self.count = 0
+        self.counts = {}  # topic -> number of messages sent
         self._last_full = -np.inf
         self._context = self._socket = None
         if self.url:
@@ -292,8 +292,9 @@ class ZMQEventPublisher(Component):
             self._last_full = now
         obs_id, event_id = event.index.obs_id, event.index.event_id
         for topic, tel_id, levels in event_messages(event, full=full, tel_ids=tel_ids, stereo=stereo):
-            frames = encode(topic, levels, obs_id, event_id, tel_id, self.source_name, self.count)
-            self.count += 1
+            count = self.counts.get(topic, 0)
+            frames = encode(topic, levels, obs_id, event_id, tel_id, self.source_name, count)
+            self.counts[topic] = count + 1
             # PUB never blocks: the messages which do not fit in the queue are dropped
             self._socket.send_multipart(frames, copy=False)
 
@@ -310,7 +311,7 @@ class ZMQEventPublisher(Component):
         self.close()
 
 
-class ZMQEventReceiver:
+class ZMQEventSubscriber:
     """
     Receive the events published by `ZMQEventPublisher` (SUB socket binding ``url``, e.g.
     ``tcp://*:5561``): several publishers can connect to it.
@@ -318,7 +319,7 @@ class ZMQEventReceiver:
     Parameters
     ----------
     url : str
-        Endpoint bound by the receiver.
+        Endpoint bound by the subscriber.
     topics : iterable of str
         Topics received (e.g. ``["tel21"]``), all if empty.
     receive_high_water_mark : int
@@ -330,7 +331,7 @@ class ZMQEventReceiver:
         Number of messages received.
     lost : dict
         ``{source: number of messages lost}``, from the gaps of the message counts of each
-        publisher (messages dropped because the receiver was too slow).
+        publisher and topic (messages dropped because the subscriber was too slow).
     """
 
     def __init__(self, url, topics=(), receive_high_water_mark=10000):
@@ -368,10 +369,11 @@ class ZMQEventReceiver:
         header, levels = decode(frames)
         self.received += 1
         source, count = header["source"], header["count"]
-        expected = self._next_count.get(source)
+        key = (source, bytes(frames[0]))  # the messages are numbered per publisher and topic
+        expected = self._next_count.get(key)
         if expected is not None and count > expected:
             self.lost[source] = self.lost.get(source, 0) + count - expected
-        self._next_count[source] = count + 1
+        self._next_count[key] = count + 1
         return header, levels
 
     def close(self):

@@ -1,4 +1,4 @@
-"""Stream of the processed events (ZMQEventPublisher -> ZMQEventReceiver)"""
+"""Stream of the processed events (ZMQEventPublisher -> ZMQEventSubscriber)"""
 
 import threading
 import time
@@ -22,7 +22,7 @@ from ctapipe.containers import (
 from sst1mpipe.io.zmq_event_stream import (
     STEREO_TOPIC,
     ZMQEventPublisher,
-    ZMQEventReceiver,
+    ZMQEventSubscriber,
     decode,
     encode,
     event_messages,
@@ -87,40 +87,40 @@ def test_encode_decode():
     assert decoded["dl1"] == {"hillas_intensity": 5.5, "name": "x", "obs_id": 1, "event_id": 2, "tel_id": 21}
 
 
-def wait_for_publishers(receiver, duration=0.3):
+def wait_for_publishers(subscriber, duration=0.3):
     """
     Let the publishers connect: a SUB socket sends its subscriptions to a new publisher only when
-    it is used (as the receiver of the viewer, which polls all the time)
+    it is used (as the subscriber of the viewer, which polls all the time)
     """
     end = time.monotonic() + duration
     while time.monotonic() < end:
-        assert receiver.receive(timeout=0.02) is None
+        assert subscriber.receive(timeout=0.02) is None
 
 
-def receive_all(receiver, n, timeout=5.0):
+def receive_all(subscriber, n, timeout=5.0):
     """The messages received (at most n, until timeout)"""
     messages, start = [], time.monotonic()
     while len(messages) < n and time.monotonic() - start < timeout:
-        message = receiver.receive(timeout=0.1)
+        message = subscriber.receive(timeout=0.1)
         if message is not None:
             messages.append(message)
     return messages
 
 
 @pytest.mark.parametrize("n_publishers", [1, 2])
-def test_publishers_to_receiver(n_publishers):
-    """Several publishers (e.g. workers of the pipeline) connect to the receiver: each event once"""
+def test_publishers_to_subscriber(n_publishers):
+    """Several publishers (e.g. workers of the pipeline) connect to the subscriber: each event once"""
     endpoint = "inproc://zmq-event-stream-test-%d" % n_publishers
-    with ZMQEventReceiver(endpoint) as receiver:
+    with ZMQEventSubscriber(endpoint) as subscriber:
         publishers = [ZMQEventPublisher(url=endpoint, full_event_period=0, source_name=f"worker{i}")
                       for i in range(n_publishers)]
-        wait_for_publishers(receiver)
+        wait_for_publishers(subscriber)
         for event_id in range(10):
             publishers[event_id % n_publishers](make_event(event_id), stereo=False)
-        messages = receive_all(receiver, 20)
+        messages = receive_all(subscriber, 20)
         for publisher in publishers:
             publisher.close()
-    assert len(messages) == 20 and receiver.received == 20 and not receiver.lost
+    assert len(messages) == 20 and subscriber.received == 20 and not subscriber.lost
     received = sorted({(levels["dl1"]["event_id"], levels["dl1"]["tel_id"]) for _, levels in messages})
     assert received == [(event_id, tel_id) for event_id in range(10) for tel_id in (21, 22)]
     assert {header["source"] for header, _ in messages} == {f"worker{i}" for i in range(n_publishers)}
@@ -128,18 +128,34 @@ def test_publishers_to_receiver(n_publishers):
 
 def test_topics_and_losses():
     endpoint = "inproc://zmq-event-stream-topics"
-    with ZMQEventReceiver(endpoint, topics=["tel22"]) as receiver:
+    with ZMQEventSubscriber(endpoint, topics=["tel22"]) as subscriber:
         publisher = ZMQEventPublisher(url=endpoint, full_event_period=3600)
-        wait_for_publishers(receiver)
+        wait_for_publishers(subscriber)
         publisher(make_event(1))
         publisher(make_event(2))
-        messages = receive_all(receiver, 2)
+        messages = receive_all(subscriber, 2)
         # only the topic tel22; the first event is full, the second light
         assert [levels["dl1"]["tel_id"] for _, levels in messages] == [22, 22]
         assert "r1" in messages[0][1] and "r1" not in messages[1][1]
-        # the messages of the other topics are counted as lost (gaps of the counts of the publisher)
-        assert receiver.lost == {publisher.source_name: 2}
+        # the messages are numbered per topic: those of the other topics are not counted as lost
+        assert not subscriber.lost
         publisher.close()
+
+
+def test_lost_messages():
+    """A gap of the message counts of a publisher (for a topic) is counted as lost messages"""
+    import zmq
+
+    endpoint = "inproc://zmq-event-stream-losses"
+    with ZMQEventSubscriber(endpoint) as subscriber:
+        sender = subscriber._context.socket(zmq.PUB)
+        sender.connect(endpoint)
+        wait_for_publishers(subscriber)
+        for count in (0, 1, 4):
+            sender.send_multipart(encode("tel21", {"dl1": {"x": 1.0}}, 1, count, 21, source="w", count=count))
+        assert len(receive_all(subscriber, 3)) == 3
+        assert subscriber.lost == {"w": 2}
+        sender.close(linger=0)
 
 
 def test_publisher_without_url():
@@ -155,18 +171,18 @@ def test_process_publishes_the_events(tmp_path):
 
     tel_id = 21
     received, stop = [], threading.Event()
-    with ZMQEventReceiver("tcp://127.0.0.1:*") as receiver:
+    with ZMQEventSubscriber("tcp://127.0.0.1:*") as subscriber:
 
         def receive():
             while not stop.is_set():
-                message = receiver.receive(timeout=0.05)
+                message = subscriber.receive(timeout=0.05)
                 if message is not None:
                     received.append(message)
 
         thread = threading.Thread(target=receive, daemon=True)
         thread.start()
         output = tmp_path / "events.dl1.h5"
-        run_process(TRANSITION_FILES[tel_id], output, f"--publish={receiver.endpoint}",
+        run_process(TRANSITION_FILES[tel_id], output, f"--publish={subscriber.endpoint}",
                     "--ZMQEventPublisher.full_event_period=0", "--ProcessorTool.allowed_sb_types=UNKNOWN")
         time.sleep(0.5)
         stop.set()
