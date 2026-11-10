@@ -201,3 +201,17 @@ def test_process_publishes_the_events(tmp_path):
                                    row["camera_frame_hillas_intensity"])
         assert levels["dl1"]["image"].shape == (1296,) and "r0" in levels
         assert {"trigger", "r0", "r1", "dl1"} <= set(levels)
+
+
+def test_queued_messages_sent_at_close():
+    """The messages still queued when the publisher is closed are sent (not dropped)"""
+    with ZMQEventSubscriber("tcp://127.0.0.1:*") as subscriber:
+        publisher = ZMQEventPublisher(url=subscriber.endpoint, full_event_period=0)
+        wait_for_publishers(subscriber)
+        event = make_event()
+        for _ in range(100):
+            publisher(event)
+        publisher.close()
+        n_messages = 100 * len(event_messages(event))
+        assert len(receive_all(subscriber, n_messages)) == n_messages
+        assert not subscriber.lost

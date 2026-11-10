@@ -44,6 +44,7 @@ import zmq
 from astropy.time import Time
 from ctapipe.core import Component, Container
 from ctapipe.core.traits import Float, Int, Unicode
+from traitlets import default
 
 __all__ = [
     "FORMAT_VERSION", "STEREO_TOPIC", "LEVELS", "ZMQEventPublisher", "ZMQEventSubscriber", "event_messages",
@@ -325,9 +326,17 @@ class ZMQEventPublisher(Component):
     send_high_water_mark = Int(
         default_value=1000, help="maximum number of messages queued for the subscriber (the others are dropped)",
     ).tag(config=True)
-    source_name = Unicode(
-        default_value=f"{socket.gethostname()}:{os.getpid()}", help="name of this publisher in the messages",
+    close_linger = Float(
+        default_value=1.0, help="maximum time (s) to send the queued messages when the publisher is closed",
     ).tag(config=True)
+    source_name = Unicode(
+        help="name of this publisher in the messages (default: <host>:<pid>)",
+    ).tag(config=True)
+
+    @default("source_name")
+    def _default_source_name(self):
+        # of this process (not of the one which imported the module: the workers may be forked)
+        return f"{socket.gethostname()}:{os.getpid()}"
 
     def __init__(self, config=None, parent=None, **kwargs):
         super().__init__(config=config, parent=parent, **kwargs)
@@ -338,7 +347,6 @@ class ZMQEventPublisher(Component):
             self._context = zmq.Context.instance()
             self._socket = self._context.socket(zmq.PUB)
             self._socket.setsockopt(zmq.SNDHWM, self.send_high_water_mark)
-            self._socket.setsockopt(zmq.LINGER, 0)
             self._socket.connect(self.url)
             self.log.info("Publishing the events to %s", self.url)
 
@@ -366,9 +374,9 @@ class ZMQEventPublisher(Component):
             self._socket.send_multipart(frames, copy=False)
 
     def close(self):
-        """Close the socket"""
+        """Close the socket (the queued messages are sent first, during at most ``close_linger``)"""
         if self._socket is not None:
-            self._socket.close(linger=0)
+            self._socket.close(linger=int(self.close_linger * 1000))
             self._socket = None
 
     def __enter__(self):
