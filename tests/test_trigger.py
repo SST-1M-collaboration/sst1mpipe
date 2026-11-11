@@ -200,6 +200,19 @@ def test_tdscan_single_impulse_floating_point():
     assert scores[neighbor, 18:23].tolist() == [0.25, 0.0625, -0.125, -0.03125, -0.0078125]
 
 
+def test_digicam_matrices_sums_are_exact():
+    """The int16 DigiCam matrices give exact sums of the uint8 traces (no overflow: up to 19 x 255)"""
+    traces = np.full((432, 3), 255, dtype=np.uint8)
+    for name in ("cluster_7_matrix", "cluster_19_matrix", "neighbor_patch_matrix"):
+        matrix = getattr(DigiCam, name)
+        assert matrix.dtype == np.int16
+        expected = matrix.astype(np.int64).dot(traces.astype(np.int64))
+        np.testing.assert_array_equal(matrix.dot(traces), expected)
+    assert DigiCam.cluster_19_matrix.dot(traces).max() == 19 * 255
+    pixels = np.full((1296, 3), 4095, dtype=np.int64)
+    np.testing.assert_array_equal(DigiCam.patch_matrix.dot(pixels), 3 * 4095)
+
+
 def test_missing_trigger_traces_are_refused():
     from sst1mpipe.io.containers import SST1MArrayEventContainer
 

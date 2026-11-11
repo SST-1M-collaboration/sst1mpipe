@@ -414,7 +414,8 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
     # float32 holds it exactly (float16 would not: 11 bits of mantissa)
     r0.pedestal = np.maximum(camera_event.hiGain.waveforms.baselines[sort_ids], 0).astype(np.float32) / 16
     r0.camera_event_number = camera_event.eventNumber
-    r0.pixel_flags = camera_event.pixels_flags[sort_ids]
+    # pixel flags of DigiCam (uint16 in the camera event): EMPTY 0 (no data), VALID 1
+    r0.pixel_flags = camera_event.pixels_flags[sort_ids].astype(bool)
     r0.event_time = local_time
     if camera_event.trig is not None:
         r0.gps_time = local_time_to_time(camera_event.trig.timeSec, camera_event.trig.timeNanoSec)
