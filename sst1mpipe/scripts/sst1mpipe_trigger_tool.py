@@ -112,9 +112,8 @@ class TriggerTool(Tool):
 
     def emulate(self, event, tel_id):
         if not self.event_source.is_simulation:
-            # module swaps at the time of the event, undone for the trigger traces
-            swapped_pixels = self.event_source.swapped_pixels(tel_id, event.trigger.time)
-            traces = self.patch7.trigger_traces(event, tel_id, swapped_pixels=swapped_pixels)
+            # trigger traces of the camera, in patch_sw_id order with the module swaps undone by the reader
+            traces = self.patch7.trigger_traces(event, tel_id)
         else:
             # simulated pedestal per sample, read by eventio from the simtel file
             monitoring = self.event_source.file_.camera_monitorings[tel_id]
@@ -141,7 +140,12 @@ class TriggerTool(Tool):
         self.counts[tel_id, "tdscan"] += result.tdscan
 
         if self.compare_camera:
-            camera_output = self.patch7.hardware_output(event, tel_id, swapped_pixels=swapped_pixels)
+            camera_output = event.r0.tel[tel_id].trigger_output_patch7
+            if camera_output is None:
+                raise ValueError(
+                    f"Telescope {tel_id}: no trigger_output_patch7 in this file (None in the R0 data), "
+                    "the emulated trigger cannot be compared to the camera"
+                )
             result.camera_patch7 = bool(camera_output.any())
             result.camera_patch7_mismatches = int(np.sum(camera_output != patch7_output))
             self.counts[tel_id, "camera_patch7"] += result.camera_patch7

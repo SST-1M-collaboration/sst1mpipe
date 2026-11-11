@@ -1,25 +1,19 @@
-"""NSB level and voltage drop of the SiPMs (sst1mpipe.utils.nsb_tools, sst1mpipe-nsb)"""
+"""NSB level and voltage drop of the SiPMs (sst1mpipe.utils.nsb_tools)"""
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import tables
-from astropy.table import QTable
-from ctapipe.core import run_tool
-from ctapipe.core.tool import ToolConfigurationError
-from ctapipe.io import read_table
 from traitlets.config import Config
 
 from conftest import DARK_FILE, OBSERVATION_RUNS, WAVEFORM_CHUNK_ARGS, run_monitoring
 from sst1mpipe.calib import R0R1Calibrator
 from sst1mpipe.io import load_r0_pedestals
-from sst1mpipe.scripts.sst1mpipe_nsb_tool import HDF5_TABLE, NSBTool
 from sst1mpipe.utils import get_subarray
 from sst1mpipe.utils.nsb_tools import (
     SiPMVoltageDropModel,
     get_dark_baseline,
     mean_pedestal_std,
-    pedestal_time,
     plot_nsb_rate,
     read_pedestal_tables,
 )
@@ -176,58 +170,6 @@ def test_plot_nsb_rate(observation_monitoring, model):
         np.testing.assert_allclose(line.get_ydata(), rate.to_value(u.MHz))
         assert "photon" in ax.get_ylabel() if photon_rate else "photon" not in ax.get_ylabel()
         plt.close(ax.figure)
-
-
-def run_nsb_tool(*args):
-    tool = NSBTool()
-    run_tool(tool, argv=list(map(str, args)), raises=True)
-    return tool
-
-
-def test_nsb_tool(observation_monitoring, model, tmp_path):
-    """NSB table of the chunks of pedestal events of the monitoring files of both telescopes, and plot"""
-    output, plot = tmp_path / "nsb.ecsv", tmp_path / "nsb.png"
-    run_nsb_tool("-i", observation_monitoring[21], "-i", observation_monitoring[22], "-o", output, "--plot", plot)
-    assert plot.exists()
-
-    table = QTable.read(output)
-    assert set(table["tel_id"]) == {21, 22}
-    for tel_id in (21, 22):
-        pedestals = load_r0_pedestals(observation_monitoring[tel_id])
-        rows = table[table["tel_id"] == tel_id]
-        assert len(rows) == len(pedestals)
-        variance = mean_pedestal_std(pedestals) ** 2
-        np.testing.assert_allclose(rows["pedestal_variance"], variance)
-        np.testing.assert_allclose(rows["charge_drop"], model.charge_drop(tel_id, variance))
-        np.testing.assert_allclose(rows["nsb_rate"].to_value(u.MHz), model.nsb_rate(tel_id, variance).to_value(u.MHz))
-        assert np.all(np.abs((rows["time"] - pedestal_time(pedestals)).to_value(u.s)) < 1e-6)
-        assert np.all(rows["n_events"] == np.asarray(pedestals["n_events"]).reshape(len(pedestals), -1).max(axis=1))
-    # NSB of the test runs: about 100 MHz per pixel
-    assert np.all((20 * u.MHz < table["nsb_rate"]) & (table["nsb_rate"] < 1000 * u.MHz))
-
-
-def test_nsb_tool_configuration(observation_monitoring, tmp_path):
-    """the model is configured from the command line; HDF5 output"""
-    outputs = {pde: tmp_path / f"nsb_{pde}.h5" for pde in (0.35, 0.7)}
-    for pde, output in outputs.items():
-        run_nsb_tool("-i", observation_monitoring[22], "-o", output, f"--SiPMVoltageDropModel.photon_detection_efficiency={pde}")
-    default, configured = (read_table(outputs[pde], HDF5_TABLE) for pde in (0.35, 0.7))
-    np.testing.assert_allclose(configured["nsb_photon_rate"], default["nsb_photon_rate"] / 2)
-    np.testing.assert_allclose(configured["nsb_rate"], default["nsb_rate"])
-
-
-def test_nsb_tool_errors(monitoring_files, tmp_path):
-    paths, empty = monitoring_files
-    with pytest.raises(ToolConfigurationError, match="No statistics"):
-        run_nsb_tool("-i", empty, "-o", tmp_path / "nsb.ecsv")
-    with pytest.raises(ToolConfigurationError, match="format"):
-        run_nsb_tool("-i", paths[0], "-o", tmp_path / "nsb.txt")
-    existing = tmp_path / "existing.ecsv"
-    existing.touch()
-    with pytest.raises(ToolConfigurationError, match="exists"):
-        run_nsb_tool("-i", paths[0], "-o", existing)
-    run_nsb_tool("-i", paths[0], "-o", existing, "--overwrite")
-    assert len(QTable.read(existing)) > 0
 
 
 def test_get_dark_baseline():

@@ -18,6 +18,7 @@ dependencies:
   - astropy<7 # astropy.coordinates.get_moon is removed in astropy 7 (sst1mpipe_obsplan)
   - numpy<2 # astropy 6.1 fails to import with numpy 2.4 (np.in1d removed)
   - nbmake # used to pytest jupyter notebooks
+  - pandas
   - pytables
   - pytest
   - ruff
@@ -32,13 +33,18 @@ dependencies:
   - sphinx-togglebutton
   - sphinxcontrib-mermaid
   - nbsphinx
+  - pandoc # used by nbsphinx to convert the markdown cells of the notebooks
   - numpydoc
   - vitables # to visualize hdf5 tables
   - wheel
+  - wrapt
+  - iminuit
+  - pyzmq
+  - msgpack-python
   - pip:
       # pip ignores the conda pins: without it, pip upgrades numpy to 2.x for pandas 3.1 (dependency
       # of ctaplot), and astropy 6.1 fails to import (np.in1d removed in numpy 2.4)
       - numpy<2
       - ctaplot~=0.6.2
       - pyirf~=0.8.0
-      - cts @ git+https://github.com/SST-1M-collaboration/CTS.git
+      - sst1m-cts>=1.0 # sst1m_cts_core: camera configuration of DigiCam

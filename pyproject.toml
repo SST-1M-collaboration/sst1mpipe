@@ -5,13 +5,76 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sst1mpipe"
-version = "0.9.0-dev"
+# The versions follow the ctapipe versions: sst1mpipe 0.32.x uses ctapipe 0.32.
+# Alpha releases (0.32.0aN) until the DL1 to DL3 steps and the stereo matching use the new
+# ctapipe tools.
+version = "0.32.0a1"
 description = "Analysis chain for the SST-1M prototype"
 authors = [
   { name = "SST-1M collaboration" }
   ]
 license = { file = "LICENSE" }
 readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.12"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: BSD License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+  "ctapipe[eventio]~=0.32.0",
+  "astropy>=6.1,<7",  # astropy.coordinates.get_moon is removed in astropy 7 (sst1mpipe_obsplan)
+  "numpy<2",  # astropy 6.1 fails to import with numpy 2.4 (np.in1d removed)
+  "astroquery~=0.4.6",
+  "click",
+  "ctaplot~=0.6.2",
+  "gammapy~=1.3.0",
+  "h5py",
+  "iminuit",
+  "joblib",
+  "matplotlib",
+  "msgpack",  # headers of the messages of the stream of the processed events (zmq_event_stream)
+  "pandas",
+  "pillow",
+  "protozfits",
+  "pyirf~=0.8.0",
+  "pyzmq",
+  "scikit-learn",
+  "scipy",
+  "sst1m-cts>=1.0",  # sst1m_cts_core: camera configuration of DigiCam
+  "tables",
+  "tqdm",
+  "traitlets",
+  "wrapt",
+]
+
+[project.optional-dependencies]
+tests = [
+  "coverage",
+  "nbmake",
+  "pytest",
+]
+docs = [
+  "nbsphinx",
+  "numpydoc",
+  "sphinx",
+  "sphinx-argparse",
+  "sphinx-automodapi",
+  "sphinx-design",
+  "sphinx-rtd-theme",
+  "sphinx-togglebutton",
+  "sphinxcontrib-mermaid",
+]
+dev = [
+  "sst1mpipe[tests,docs]",
+  "build",
+  "ruff",
+  "twine",
+]
 
 
 [project.urls]
@@ -28,7 +91,11 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["sst1mpipe*"]
+exclude = ["sst1mpipe.resources.test_data*"]
 
+# The test data (resources/test_data, ~550 MB of Git LFS files) are not in the package:
+# the tests run from the git repository (see also MANIFEST.in for the sdist).
 [tool.setuptools.package-data]
 sst1mpipe = [
   "resources/config/*",
@@ -36,9 +103,10 @@ sst1mpipe = [
   "resources/calibration/window/*",
   "resources/calibration/dark_runs/*",
   "resources/instrument/*",
-  "resources/test_data/zfits/*",
-  "resources/test_data/simtel/*"
 ]
+
+[tool.setuptools.exclude-package-data]
+sst1mpipe = ["resources/test_data/**"]
 
 [project.scripts]
 sst1mpipe_dl1_dl2 = "sst1mpipe.scripts.sst1mpipe_dl1_dl2:main"
@@ -61,7 +129,6 @@ sst1mpipe_read_camera_server_logs = "sst1mpipe.scripts.read_camera_server_logs:m
 sst1mpipe-process = "sst1mpipe.scripts.sst1mpipe_process_tool:main"
 sst1mpipe-trigger = "sst1mpipe.scripts.sst1mpipe_trigger_tool:main"
 sst1mpipe-monitoring = "sst1mpipe.scripts.sst1mpipe_monitoring_tool:main"
-sst1mpipe-nsb = "sst1mpipe.scripts.sst1mpipe_nsb_tool:main"
 
 # EventSource implementations found by ctapipe.io.EventSource
 [project.entry-points.ctapipe_io]
@@ -82,11 +149,12 @@ per-file-ignores = { "**/__init__.py" = ["F401"] }
 
 [tool.pytest]
 addopts = ["-vv", "-s", "--nbmake"]
-testpaths = ['tests/', 'notebooks/sst1m_raw_r0_r1.ipynb']
+testpaths = ['tests/', 'notebooks/sst1m_raw_r0_r1.ipynb', 'notebooks/sst1m_read_zfits_event_source.ipynb',
+             'notebooks/sst1m_trigger_traces.ipynb']
 
 [tool.coverage.run]
 branch = true
-command_line = "-m pytest tests/"
+command_line = "-m pytest"
 source = ["sst1mpipe/"]
 
 [tool.coverage.report]
