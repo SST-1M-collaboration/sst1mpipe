@@ -18,6 +18,7 @@ from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
+from sst1mpipe.io.zmq_event_stream import ZMQEventPublisher
 
 
 class ProcessorTool(Tool):
@@ -26,25 +27,28 @@ class ProcessorTool(Tool):
     extraction and optionally image parameterization.
     This implementation is based on the ctapipe.tool.ProcessorTool
 
-    For the SST-1M raw data (R0, SST1MEventSource), the R0 -> R1 calibration is done
-    by the R0R1Calibrator, with the statistics of the ADC samples of the pedestal events
-    (voltage drop correction and dead pixels). The statistics of the calibrated images of
-    the pedestal events are used by the NSBImageCleaner, which raises the picture threshold
-    of the pixels with a high pedestal std.
+    For the SST-1M raw data (R0, SST1MEventSource), the R0 -> R1 calibration is done by the
+    R0R1Calibrator: the corrections which do not need the pedestal events (DigiCam pedestal,
+    dc to p.e., window, bad pixels). The corrections which need them (voltage drop correction,
+    dead pixels) are the camera calibration coefficients of the monitoring
+    (event.monitoring.tel[tel_id].camera.coefficients), applied by the CameraCalibrator. The
+    statistics of the calibrated images of the pedestal events are used by the NSBImageCleaner,
+    which raises the picture threshold of the pixels with a high pedestal std.
 
-    These statistics and the pointing of the telescope are given by the monitoring sources
-    (monitoring_source_list), e.g. the monitoring file of the run written by
+    These coefficients and statistics and the pointing of the telescope are given by the monitoring
+    sources (monitoring_source_list), e.g. the monitoring file of the run written by
     sst1mpipe-monitoring (SST1MMonitoringSource), as in ctapipe-process: the monitoring
     containers of each event are filled before its calibration. The events without monitoring
     data (no chunk of pedestal events at their time) are skipped. The monitoring data are
     attached to the output file (attach_monitoring). Without monitoring source, the raw data are
-    calibrated without these statistics, and the output file has no pointing.
+    calibrated without voltage drop correction nor dead pixels, and the output file has no pointing.
 
     The charges and peak times of the saturated pixels are corrected by the ImageSaturationCorrector.
     How each telescope is calibrated is set in the configuration: for the simulated telescopes
-    1 and 2, the R1 waveforms of the simulation are kept and corrected for the PDE drop
-    (R0R1Calibrator.calibrate_r0 false, pde_drop_factor), without saturation correction
-    (ImageSaturationCorrector.apply_correction false).
+    1 and 2, the R1 waveforms of the simulation are kept (R0R1Calibrator.calibrate_r0 false), the
+    charges are corrected for the PDE drop by the factor of the camera calibration coefficients
+    (R0R1Calibrator.pde_drop_factor), and the saturated pixels are not corrected
+    (ImageSaturationCorrector.integration_level and peak_time_level null).
     Only the events of the runs with an allowed scheduling block type (allowed_sb_types)
     are processed, e.g. the observations but not the transitions between two wobbles.
 
@@ -71,6 +75,12 @@ class ProcessorTool(Tool):
     ZMQ stream:
 
     > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json
+
+    Publish the processed events to the viewer of the events (ZMQ, see
+    `sst1mpipe.io.zmq_event_stream`; several processes can publish to the same viewer):
+
+    > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json
+      --publish tcp://viewer-host:5561
     """
 
     progress_bar = Bool(
@@ -120,6 +130,7 @@ class ProcessorTool(Tool):
         ("t", "allowed-tels"): "EventSource.allowed_tels",
         ("m", "max-events"): "EventSource.max_events",
         "monitoring-source": "ProcessorTool.monitoring_source_list",
+        "publish": "ZMQEventPublisher.url",
     }
 
     flags = {
@@ -135,7 +146,7 @@ class ProcessorTool(Tool):
         [
             CameraCalibrator, ImageProcessor, DataWriter, DBSCANImageCleaner, TimeDBSCANImageCleaner,
             R0R1Calibrator, ImageSaturationCorrector, ShowerProcessor,
-            SST1MMonitoringSource,
+            SST1MMonitoringSource, ZMQEventPublisher,
         ]
         + classes_with_traits(EventSource)
         + classes_with_traits(MonitoringSource)
@@ -163,6 +174,9 @@ class ProcessorTool(Tool):
         # the writer is closed in finish(), to read back the output file. If the processing
         # fails before, it is closed when the tool exits.
         self.writer = DataWriter(event_source=self.event_source, parent=self)
+        # the processed events published in a ZMQ stream (e.g. for the viewer), if --publish is given
+        self.publisher = ZMQEventPublisher(parent=self)
+        self._exit_stack.callback(self.publisher.close)
         # reconstruction of the shower geometry, written in the DL2
         self.shower_processor = ShowerProcessor(parent=self, subarray=self.event_source.subarray)
         self._sb_types = {}
@@ -215,6 +229,7 @@ class ProcessorTool(Tool):
             if self.writer.write_dl2:
                 self.shower_processor(event)
             self.writer(event)
+            self.publisher(event)
 
     def fill_monitoring(self, event):
         """

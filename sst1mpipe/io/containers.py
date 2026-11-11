@@ -74,7 +74,7 @@ class CameraEventType(Flag):
     E.g. ``5 = 0x1 + 0x4`` is an event triggered by both the patch7 and the muon triggers,
     ``PATCH7|MUON_TRIGGER``.
 
-    The readers (``SST1MEventSource``, ``ZMQEventSource``) store it in
+    The readers (`~sst1mpipe.io.sst1m_event_source.SST1MEventSource`, `~sst1mpipe.io.zmq_event_source.ZMQEventSource`) store it in
     ``event.r0.tel[tel_id].event_type``: the container converts the integer of the file or
     stream to a ``CameraEventType``.
 
@@ -171,10 +171,10 @@ class SST1MR0CameraContainer(R0CameraContainer):
     event_time = Field(None, "White Rabbit timestamp of the event (ns, TAI)")
     gps_time = Field(None, "timestamp from a precise external clock (ns)")
     _event_type = Field(None, "camera event type")
-    trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples), uint8, patch_sw_id order")
-    trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples), bool, central patch_sw_id order")
-    trigger_output_patch19 = Field(None, "trigger 19 patch cluster traces (n_clusters, n_samples), bool, central patch_sw_id order")
-    trigger_output_muon = Field(None, "trigger muon cluster traces (n_clusters, n_samples), bool, central patch_sw_id order")
+    trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples), uint8, patch_sw_id order; None if not in the data")
+    trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples), bool, central patch_sw_id order; None if not in the data")
+    trigger_output_patch19 = Field(None, "trigger 19 patch cluster traces (n_clusters, n_samples), bool, central patch_sw_id order; None if not in the data")
+    trigger_output_muon = Field(None, "trigger muon cluster traces (n_clusters, n_samples), bool,  central patch_sw_id order; None if not in the data")
 
     @property
     def event_type(self):

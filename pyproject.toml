@@ -37,6 +37,7 @@ dependencies = [
   "iminuit",
   "joblib",
   "matplotlib",
+  "msgpack",  # headers of the messages of the stream of the processed events (zmq_event_stream)
   "pandas",
   "pillow",
   "protozfits",
