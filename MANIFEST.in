@@ -1,0 +1,3 @@
+# The test data (Git LFS, ~550 MB) are not in the source distribution: the tests run from the
+# git repository
+prune sst1mpipe/resources/test_data

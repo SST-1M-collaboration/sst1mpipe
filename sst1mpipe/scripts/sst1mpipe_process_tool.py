@@ -18,6 +18,7 @@ from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
+from sst1mpipe.io.zmq_event_stream import ZMQEventPublisher
 
 
 class ProcessorTool(Tool):
@@ -74,6 +75,12 @@ class ProcessorTool(Tool):
     ZMQ stream:
 
     > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json
+
+    Publish the processed events to the viewer of the events (ZMQ, see
+    `sst1mpipe.io.zmq_event_stream`; several processes can publish to the same viewer):
+
+    > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json
+      --publish tcp://viewer-host:5561
     """
 
     progress_bar = Bool(
@@ -123,6 +130,7 @@ class ProcessorTool(Tool):
         ("t", "allowed-tels"): "EventSource.allowed_tels",
         ("m", "max-events"): "EventSource.max_events",
         "monitoring-source": "ProcessorTool.monitoring_source_list",
+        "publish": "ZMQEventPublisher.url",
     }
 
     flags = {
@@ -138,7 +146,7 @@ class ProcessorTool(Tool):
         [
             CameraCalibrator, ImageProcessor, DataWriter, DBSCANImageCleaner, TimeDBSCANImageCleaner,
             R0R1Calibrator, ImageSaturationCorrector, ShowerProcessor,
-            SST1MMonitoringSource,
+            SST1MMonitoringSource, ZMQEventPublisher,
         ]
         + classes_with_traits(EventSource)
         + classes_with_traits(MonitoringSource)
@@ -166,6 +174,9 @@ class ProcessorTool(Tool):
         # the writer is closed in finish(), to read back the output file. If the processing
         # fails before, it is closed when the tool exits.
         self.writer = DataWriter(event_source=self.event_source, parent=self)
+        # the processed events published in a ZMQ stream (e.g. for the viewer), if --publish is given
+        self.publisher = ZMQEventPublisher(parent=self)
+        self._exit_stack.callback(self.publisher.close)
         # reconstruction of the shower geometry, written in the DL2
         self.shower_processor = ShowerProcessor(parent=self, subarray=self.event_source.subarray)
         self._sb_types = {}
@@ -218,6 +229,7 @@ class ProcessorTool(Tool):
             if self.writer.write_dl2:
                 self.shower_processor(event)
             self.writer(event)
+            self.publisher(event)
 
     def fill_monitoring(self, event):
         """

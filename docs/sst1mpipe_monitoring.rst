@@ -69,7 +69,8 @@ At the end of the run, the tool writes:
 * the **pointing** of each telescope: altitude and azimuth of the target of the run every
   ``MonitoringTool.pointing_update_interval`` (1 s) from the first to the last event of the telescope.
   The target is read from the TARGET field of the file, or given with ``--SST1MEventSource.pointing_ra``
-  and ``--SST1MEventSource.pointing_dec``. The runs without target (e.g. dark runs, transitions between
+  and ``--SST1MEventSource.pointing_dec`` (:attr:`~sst1mpipe.io.sst1m_event_source.SST1MEventSource.pointing_ra`,
+  :attr:`~sst1mpipe.io.sst1m_event_source.SST1MEventSource.pointing_dec`). The runs without target (e.g. dark runs, transitions between
   two wobbles) have no pointing table, with a warning.
 * the **statistics of the ADC samples of the pedestal events**, in rolling chunks of pedestal events
   (``WaveformStatisticsCalculator``, the last 100 pedestal events, at each pedestal event, by default): ``mean`` and ``median`` of the baseline (mean
@@ -178,7 +179,8 @@ The main settings, in ``sst1mpipe_monitoring_config.json``:
 * ``CameraCoefficientsCalculator``: ``voltage_drop_correction`` and ``flag_dead_pixels``, and the
   ``SiPMVoltageDropModel``, for the camera calibration coefficients
 * ``R0R1Calibrator`` and ``CameraCalibrator``: calibration of the images, as for the processing
-* ``SST1MEventSource.swapped_modules``: modules of the camera whose cables were swapped during a period,
+* :attr:`SST1MEventSource.swapped_modules <sst1mpipe.io.sst1m_event_source.SST1MEventSource.swapped_modules>`: modules of the camera whose cables
+  were swapped during a period,
   which are put back in place when the events are read
 
 Every setting can also be given on the command line, e.g.

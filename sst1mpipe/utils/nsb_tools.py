@@ -22,7 +22,7 @@ a single value applies to all the telescopes). As for every ctapipe telescope pa
 configured value replaces the whole default list: give the values of all the telescopes.
 
 The functions read the statistics of the ADC samples of the pedestal events of monitoring or DL1
-files and plot the NSB rate, see also the ``sst1mpipe-nsb`` tool.
+files and plot the NSB rate.
 """
 import logging
 

@@ -50,7 +50,7 @@ from sst1mpipe.io import (
     load_dl2_sst1m,
     load_source_catalog,
 )
-from sst1mpipe.utils import get_moon_params, get_sources_in_dir, get_trigger_time_ns
+from sst1mpipe.utils import get_moon_params, get_sources_in_dir, get_trigger_time_ns, read_subarray, telescope_location
 from sst1mpipe.utils.nsb_tools import default_model, plot_nsb_rate
 
 
@@ -374,6 +374,8 @@ def main():
                 dl1_files = make_file_list(dl1_path, stereo=stereo, level=dl1_tab_data_level)
             if is_dl2:
                 dl2_files = make_file_list(dl2_path, stereo=stereo, level='dl2')
+                # telescope positions, for the Moon (read once per telescope)
+                subarray = read_subarray(dl2_files[0]) if len(dl2_files) > 0 else None
 
             if '1' in telescope:
                 tel = 'tel_021'
@@ -517,7 +519,7 @@ def main():
 
                     # moon
                     if (not moon_done) and (len(dl2) > 0):
-                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
+                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, location=telescope_location(subarray, tel), thinning=100)
                         time_all.append(np.array(time.unix))
                         moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
                         moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))
@@ -554,7 +556,7 @@ def main():
                     ax7[1].plot(local_time, zenith_time, '.', label=tel, alpha=0.7)
                 if not moon_done:
                     if len(dl2) > 0:
-                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
+                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, location=telescope_location(subarray, tel), thinning=100)
                         time_all.append(np.array(time.unix))
                         moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
                         moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))
