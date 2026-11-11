@@ -81,6 +81,13 @@ class ProcessorTool(Tool):
 
     > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json
       --publish tcp://viewer-host:5561
+
+    Without output file (no --output nor DataWriter.output_path), nothing is written to disk (no
+    DL1 file, no provenance log): the events are only processed and published, e.g. for the
+    real-time analysis:
+
+    > sst1mpipe-process -i tcp://localhost:24593 --config sst1mpipe_rta_config.json
+      --publish tcp://viewer-host:5561
     """
 
     progress_bar = Bool(
@@ -171,9 +178,17 @@ class ProcessorTool(Tool):
         self.image_saturation_corrector = ImageSaturationCorrector(parent=self, subarray=subarray)
         self.camera_calibrator = CameraCalibrator(parent=self, subarray=self.event_source.subarray)
         self.image_processor = ImageProcessor(parent=self, subarray=self.event_source.subarray)
-        # the writer is closed in finish(), to read back the output file. If the processing
-        # fails before, it is closed when the tool exits.
-        self.writer = DataWriter(event_source=self.event_source, parent=self)
+        # without output file (--output, DataWriter.output_path), nothing is written to disk: e.g.
+        # the real-time analysis only publishing its events (--publish)
+        writer_config = self.config.get("DataWriter", {})
+        self.write_dl2 = bool(writer_config.get("write_dl2", DataWriter.write_dl2.default_value))
+        self.writer = None
+        if writer_config.get("output_path") is None:
+            self.log.info("No output file (--output): the processed events are not written to disk")
+        else:
+            # the writer is closed in finish(), to read back the output file. If the processing
+            # fails before, it is closed when the tool exits.
+            self.writer = DataWriter(event_source=self.event_source, parent=self)
         # the processed events published in a ZMQ stream (e.g. for the viewer), if --publish is given
         self.publisher = ZMQEventPublisher(parent=self)
         self._exit_stack.callback(self.publisher.close)
@@ -194,7 +209,14 @@ class ProcessorTool(Tool):
     def _close_writer(self):
         if not self._writer_closed:
             self._writer_closed = True
-            self.writer.finish()
+            if self.writer is not None:
+                self.writer.finish()
+
+    def write_provenance(self):
+        """The provenance log is not written without output file, unless it is asked for (--provenance-log)"""
+        if self.writer is None and "provenance_log" not in self.config.get(type(self).__name__, {}):
+            return
+        super().write_provenance()
 
     def start(self):
 
@@ -226,9 +248,10 @@ class ProcessorTool(Tool):
             if is_pedestal:
                 self.n_survived_pedestals += any(np.any(dl1.image_mask) for dl1 in event.dl1.tel.values())
                 continue
-            if self.writer.write_dl2:
+            if self.write_dl2:
                 self.shower_processor(event)
-            self.writer(event)
+            if self.writer is not None:
+                self.writer(event)
             self.publisher(event)
 
     def fill_monitoring(self, event):
@@ -291,11 +314,11 @@ class ProcessorTool(Tool):
 
     def finish(self):
 
-        if self.event_source.is_simulation:
+        if self.writer is not None and self.event_source.is_simulation:
             self.writer.write_simulated_shower_distributions(self.event_source.simulated_shower_distributions)
         self._close_writer()
-        output_path = self.writer.output_path
-        if self.attach_monitoring:
+        output_path = None if self.writer is None else self.writer.output_path
+        if self.attach_monitoring and output_path is not None:
             for monitoring_source in self.monitoring_sources:
                 for monitoring_file in getattr(monitoring_source, "input_files", []):
                     attach_monitoring_file(monitoring_file, output_path)
@@ -320,6 +343,9 @@ class ProcessorTool(Tool):
                 "Average (per event) fraction of pixels with raised picture threshold: %f",
                 self.raised_threshold_fraction,
             )
+
+        if output_path is None:
+            return
 
         # observation information, from the event source (SST1MEventSource)
         source = self.event_source

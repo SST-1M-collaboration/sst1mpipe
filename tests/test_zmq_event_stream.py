@@ -215,3 +215,39 @@ def test_queued_messages_sent_at_close():
         n_messages = 100 * len(event_messages(event))
         assert len(receive_all(subscriber, n_messages)) == n_messages
         assert not subscriber.lost
+
+
+def test_process_without_output_writes_nothing(tmp_path, monkeypatch):
+    """without output file, the events are processed and published but nothing is written to disk"""
+    from conftest import TRANSITION_FILES
+    from ctapipe.core import run_tool
+
+    from sst1mpipe.resources import RTA_CONFIG_FILE
+    from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
+
+    monkeypatch.chdir(tmp_path)
+    with ZMQEventSubscriber("tcp://127.0.0.1:*") as subscriber:
+        messages = []
+        stop = threading.Event()
+
+        def receive():
+            while not stop.is_set():
+                message = subscriber.receive(timeout=0.05)
+                if message is not None:
+                    messages.append(message)
+
+        thread = threading.Thread(target=receive, daemon=True)
+        thread.start()
+        tool = ProcessorTool()
+        run_tool(tool, argv=[
+            f"--input={TRANSITION_FILES[21]}", f"--config={RTA_CONFIG_FILE}", "--no-progress", "--max-events=40",
+            f"--publish={subscriber.endpoint}", "--ZMQEventPublisher.full_event_period=0",
+            "--ProcessorTool.allowed_sb_types=UNKNOWN",
+        ], raises=True)
+        time.sleep(0.5)
+        stop.set()
+        thread.join()
+
+    assert tool.writer is None
+    assert len(messages) > 0 and all("dl1" in levels for _, levels in messages)
+    assert list(tmp_path.iterdir()) == []
