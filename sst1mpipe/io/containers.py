@@ -165,7 +165,7 @@ class SST1MR0CameraContainer(R0CameraContainer):
     the trigger cluster and patch matrices in `sst1mpipe.instrument.camera.DigiCam`.
     """
 
-    pixel_flags = Field(None, "numpy array containing pixel flags (n_pixels)")
+    pixel_flags = Field(None, "pixels with data (n_pixels), bool: False for the DigiCam flag EMPTY (0), True for VALID (1)")
     pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels, float32, a multiple of 1/16), 0 for the pixels without data")
     camera_event_number = Field(None, "event number within the first trigger of operation")
     event_time = Field(None, "White Rabbit timestamp of the event (ns, TAI)")

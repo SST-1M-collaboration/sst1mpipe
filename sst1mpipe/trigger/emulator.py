@@ -81,7 +81,7 @@ class TriggerEmulator(TelescopeComponent):
         """Triplet traces (432, T) from the raw waveforms (1296, T), like the FADC gateware.
 
         Each pixel: sample - floor(baseline), signed, clipped above at 4095 only; 0 for the pixels
-        with a ``pixel_flags`` of 0 (pixels without data, real data only).
+        with a false ``pixel_flags`` (pixels without data, real data only).
         Each triplet: sum of its 3 pixels, clipped to [0, 255] (uint8, as the camera traces).
 
         The DigiCam baseline is updated continuously by the FPGA: with the baseline stored in the
@@ -91,7 +91,7 @@ class TriggerEmulator(TelescopeComponent):
         pixels = waveform.astype(np.int64) - np.floor(baseline).astype(np.int64)[:, None]
         pixels = np.minimum(pixels, 4095)
         if pixel_flags is not None:
-            pixels[np.asarray(pixel_flags) == 0] = 0
+            pixels[~np.asarray(pixel_flags, dtype=bool)] = 0
         return np.clip(patch_matrix.dot(pixels), 0, 255).astype(np.uint8)
 
     def trigger_traces(self, event, tel_id, pedestal=None):

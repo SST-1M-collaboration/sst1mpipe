@@ -120,7 +120,7 @@ def test_r0_fields(events):
     assert events["shapes"] == {(
         ("waveform", (1, N_PIXELS, N_SAMPLES), np.dtype("int16")),
         ("pedestal", (N_PIXELS,), np.dtype("float32")),
-        ("pixel_flags", (N_PIXELS,), np.dtype("uint16")),
+        ("pixel_flags", (N_PIXELS,), np.dtype("bool")),
         ("trigger_input_traces", (N_TRIGGER_PATCHES, N_SAMPLES), np.dtype("uint8")),
         ("trigger_output_patch7", (N_TRIGGER_PATCHES, N_SAMPLES), np.dtype("bool")),
         ("trigger_output_patch19", (N_TRIGGER_PATCHES, N_SAMPLES), np.dtype("bool")),
