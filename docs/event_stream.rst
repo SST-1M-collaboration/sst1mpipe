@@ -9,6 +9,9 @@ of the events (``sst1mpipe-viewer``), with ``--publish``:
     sst1mpipe-process -i tcp://camera-server:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json \
         --publish tcp://viewer-host:5561
 
+Without output file (no ``-o``), nothing is written to disk: the events are only processed and
+published.
+
 The subscriber (e.g. the viewer) *binds* the endpoint and the processes of the pipeline *connect*
 to it (PUB / SUB sockets of ZMQ):
 
