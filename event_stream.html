@@ -1,0 +1,194 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stream of the processed events &mdash; sst1mpipe 0.32.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=13237357" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5f9769cd"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="_static/togglebutton.js?v=4a39c7ea"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Trigger type of the camera events" href="camera_event_type.html" />
+    <link rel="prev" title="Event sources" href="event_sources.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            sst1mpipe
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_processing.html">Processing the data with the ctapipe tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="event_sources.html">Event sources</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Stream of the processed events</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#messages">Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#full-events">Full events</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#receiving-the-events-subscriber">Receiving the events (subscriber)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="camera_event_type.html">Trigger type of the camera events</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sst1mpipe_monitoring.html">Monitoring of a run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="sst1m_analysis_workflow.html">SST-1M analysis workflow</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">sst1mpipe</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Stream of the processed events</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/event_stream.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="stream-of-the-processed-events">
+<h1>Stream of the processed events<a class="headerlink" href="#stream-of-the-processed-events" title="Link to this heading"></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code> can publish the events it processes in a ZMQ stream, e.g. for the viewer
+of the events (<code class="docutils literal notranslate"><span class="pre">sst1mpipe-viewer</span></code>), with <code class="docutils literal notranslate"><span class="pre">--publish</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sst1mpipe-process -i tcp://camera-server:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json \</span>
+<span class="go">    --publish tcp://viewer-host:5561</span>
+</pre></div>
+</div>
+<p>Without output file (no <code class="docutils literal notranslate"><span class="pre">-o</span></code>), nothing is written to disk: the events are only processed and
+published.</p>
+<p>The subscriber (e.g. the viewer) <em>binds</em> the endpoint and the processes of the pipeline <em>connect</em>
+to it (PUB / SUB sockets of ZMQ):</p>
+<ul class="simple">
+<li><p>several processes can publish to the same subscriber, e.g. the workers of a telescope sharing its
+camera stream (PULL): the subscriber gets each event once, from the worker which processed it.
+The events of different workers can arrive in a different order than their timestamps;</p></li>
+<li><p>a publisher never waits for the subscriber: if the subscriber is absent or too slow, the messages
+are dropped. The messages of each publisher are numbered, so that the subscriber counts the
+messages lost;</p></li>
+<li><p>the messages published before the subscriber is connected are lost;</p></li>
+<li><p>when a publisher is closed, the messages still queued are sent during at most
+<code class="docutils literal notranslate"><span class="pre">--ZMQEventPublisher.close_linger</span></code> seconds (1 s by default).</p></li>
+</ul>
+<p>The publisher is <code class="docutils literal notranslate"><span class="pre">sst1mpipe.io.zmq_event_stream.ZMQEventPublisher</span></code> (a ctapipe component, called
+with each event), the subscriber <code class="docutils literal notranslate"><span class="pre">sst1mpipe.io.zmq_event_stream.ZMQEventSubscriber</span></code>.</p>
+<section id="messages">
+<h2>Messages<a class="headerlink" href="#messages" title="Link to this heading"></a></h2>
+<p>One message per telescope event (topic <code class="docutils literal notranslate"><span class="pre">tel&lt;tel_id&gt;</span></code>, e.g. <code class="docutils literal notranslate"><span class="pre">tel21</span></code>) and one per stereo event
+(topic <code class="docutils literal notranslate"><span class="pre">stereo</span></code>). A message is multipart:</p>
+<ol class="arabic simple">
+<li><p>the topic;</p></li>
+<li><p>the header (msgpack): format <code class="docutils literal notranslate"><span class="pre">version</span></code>, <code class="docutils literal notranslate"><span class="pre">source</span></code> (name of the publisher, <code class="docutils literal notranslate"><span class="pre">&lt;host&gt;:&lt;pid&gt;</span></code> by
+default), <code class="docutils literal notranslate"><span class="pre">count</span></code> (number of the message of the publisher for this topic: a gap is a lost
+message), <code class="docutils literal notranslate"><span class="pre">obs_id</span></code>, <code class="docutils literal notranslate"><span class="pre">event_id</span></code>, <code class="docutils literal notranslate"><span class="pre">tel_id</span></code> (0 for stereo), and for each data level of the
+event its <code class="docutils literal notranslate"><span class="pre">scalars</span></code> <code class="docutils literal notranslate"><span class="pre">{name:</span> <span class="pre">value}</span></code> and the descriptions of its <code class="docutils literal notranslate"><span class="pre">arrays</span></code>
+<code class="docutils literal notranslate"><span class="pre">[name,</span> <span class="pre">dtype,</span> <span class="pre">shape,</span> <span class="pre">frame]</span></code>. <code class="docutils literal notranslate"><span class="pre">frame</span></code> is the index of the frame of the array among the
+array frames: an array of several levels, e.g. the DL0 waveform equal to the R1 waveform, is
+sent once;</p></li>
+<li><p>one frame per array: the raw bytes of the numpy array, sent without copy.</p></li>
+</ol>
+<p>The data levels are <code class="docutils literal notranslate"><span class="pre">trigger</span></code>, <code class="docutils literal notranslate"><span class="pre">r0</span></code>, <code class="docutils literal notranslate"><span class="pre">r1</span></code>, <code class="docutils literal notranslate"><span class="pre">dl0</span></code>, <code class="docutils literal notranslate"><span class="pre">dl1</span></code>, <code class="docutils literal notranslate"><span class="pre">dl2</span></code> (of the telescope) and
+<code class="docutils literal notranslate"><span class="pre">dl2_stereo</span></code>. Their fields have the names of the columns of the ctapipe <code class="docutils literal notranslate"><span class="pre">DataWriter</span></code>
+(e.g. <code class="docutils literal notranslate"><span class="pre">hillas_intensity</span></code>, <code class="docutils literal notranslate"><span class="pre">camera_frame_hillas_intensity</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;algorithm&gt;_tel_energy</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&lt;algorithm&gt;_alt</span></code> for stereo), with the quantities in the units of the ctapipe tables (deg, m,
+ns, TeV) and the times in unix seconds. The fields which are <code class="docutils literal notranslate"><span class="pre">None</span></code> (e.g. trigger traces not
+sent by the camera) are not in the messages.</p>
+</section>
+<section id="full-events">
+<h2>Full events<a class="headerlink" href="#full-events" title="Link to this heading"></a></h2>
+<p>To limit the bandwidth (a full event of DigiCam takes about 770 kB: R0, R1 and DL0 waveforms,
+trigger traces, DL1 images), the full events are sent only every
+<code class="docutils literal notranslate"><span class="pre">--ZMQEventPublisher.full_event_period</span></code> seconds (1 s by default, 0 for all the events): the first
+event after the period with a DL1 image (a finite Hillas intensity), or any event after two
+periods. The other events have their trigger, DL1 parameters and DL2 (about 1.5 kB), enough for
+the statistics and the rates.</p>
+</section>
+<section id="receiving-the-events-subscriber">
+<h2>Receiving the events (subscriber)<a class="headerlink" href="#receiving-the-events-subscriber" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.io.zmq_event_stream</span><span class="w"> </span><span class="kn">import</span> <span class="n">ZMQEventSubscriber</span>
+
+<span class="k">with</span> <span class="n">ZMQEventSubscriber</span><span class="p">(</span><span class="s2">"tcp://*:5561"</span><span class="p">)</span> <span class="k">as</span> <span class="n">subscriber</span><span class="p">:</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="n">subscriber</span><span class="o">.</span><span class="n">receive</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">message</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">header</span><span class="p">,</span> <span class="n">levels</span> <span class="o">=</span> <span class="n">message</span>  <span class="c1"># levels: {"dl1": {"hillas_intensity": ..., ...}, ...}</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="event_sources.html" class="btn btn-neutral float-left" title="Event sources" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="camera_event_type.html" class="btn btn-neutral float-right" title="Trigger type of the camera events" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SST-1M collaboration.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

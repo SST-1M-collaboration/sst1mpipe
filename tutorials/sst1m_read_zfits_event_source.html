@@ -1,0 +1,1070 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reading SST-1M raw data (zfits) with the SST1MEventSource &mdash; sst1mpipe 0.32.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=13237357" />
+      <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5f9769cd"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="../_static/togglebutton.js?v=4a39c7ea"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="The DigiCam trigger: trigger traces, patch7, and how to emulate it" href="sst1m_trigger_traces.html" />
+    <link rel="prev" title="Tutorials" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            sst1mpipe
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing.html">Processing the data with the ctapipe tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../event_sources.html">Event sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../event_stream.html">Stream of the processed events</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../camera_event_type.html">Trigger type of the camera events</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sst1mpipe_monitoring.html">Monitoring of a run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sst1m_analysis_workflow.html">SST-1M analysis workflow</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Tutorials</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html#reading-the-raw-data">Reading the raw data</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Reading SST-1M raw data (zfits) with the <code class="docutils literal notranslate"><span class="pre">SST1MEventSource</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#1.-Opening-a-file">1. Opening a file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#2.-Run-level-information">2. Run level information</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#3.-Looping-over-the-events">3. Looping over the events</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#4.-Visualising-an-event">4. Visualising an event</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#5.-Run-level-summaries">5. Run level summaries</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#6.-Under-the-hood:-the-raw-zfits-file">6. Under the hood: the raw zfits file</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#Going-further">Going further</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="index.html#the-digicam-trigger">The DigiCam trigger</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sst1mpipe</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Tutorials</a></li>
+      <li class="breadcrumb-item active">Reading SST-1M raw data (zfits) with the <code class="docutils literal notranslate"><span class="pre">SST1MEventSource</span></code></li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/sst1m_read_zfits_event_source.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This page is the notebook <code class="docutils literal notranslate"><span class="pre">notebooks/sst1m_read_zfits_event_source.ipynb</span></code> of the
+<a class="reference external" href="https://github.com/SST-1M-collaboration/sst1mpipe">sst1mpipe repository</a>:
+download it to run it yourself.</p>
+</div>
+<section id="Reading-SST-1M-raw-data-(zfits)-with-the-SST1MEventSource">
+<h1>Reading SST-1M raw data (zfits) with the <code class="docutils literal notranslate"><span class="pre">SST1MEventSource</span></code><a class="headerlink" href="#Reading-SST-1M-raw-data-(zfits)-with-the-SST1MEventSource" title="Link to this heading"></a></h1>
+<p>This notebook shows how to read the SST-1M raw data files (R0, <code class="docutils literal notranslate"><span class="pre">*.fits.fz</span></code>, written by the DigiCam camera server) with the ctapipe event source of sst1mpipe, <a class="reference external" href="https://sst-1m-collaboration.github.io/sst1mpipe/event_sources.html#sst1mpipe.io.sst1m_event_source.SST1MEventSource">sst1mpipe.io.sst1m_event_source.SST1MEventSource</a>, and how to explore what it gives you:</p>
+<ol class="arabic simple">
+<li><p>Opening a file: through the generic <code class="docutils literal notranslate"><span class="pre">ctapipe.io.EventSource</span></code> or the <a class="reference external" href="https://sst-1m-collaboration.github.io/sst1mpipe/event_sources.html#sst1mpipe.io.sst1m_event_source.SST1MEventSource">SST1MEventSource</a> directly</p></li>
+<li><p>Run level information: telescope, run, target, pointing, observation / scheduling blocks, DigiCam configuration, subarray</p></li>
+<li><p>Looping over the events and exploring the containers (<code class="docutils literal notranslate"><span class="pre">index</span></code>, <code class="docutils literal notranslate"><span class="pre">trigger</span></code>, <code class="docutils literal notranslate"><span class="pre">r0</span></code>, <code class="docutils literal notranslate"><span class="pre">monitoring</span></code>)</p></li>
+<li><p>Visualising the waveforms, the camera images and the trigger traces</p></li>
+<li><p>Some run level summaries (event types, trigger rate)</p></li>
+<li><p>Under the hood: the same file read directly with <code class="docutils literal notranslate"><span class="pre">protozfits</span></code></p></li>
+</ol>
+<p>The files used here are the test files distributed with sst1mpipe (<code class="docutils literal notranslate"><span class="pre">sst1mpipe/resources/test_data/zfits</span></code>, stored with git LFS: run <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">lfs</span> <span class="pre">pull</span></code> if they are only pointers). Replace <code class="docutils literal notranslate"><span class="pre">input_file</span></code> by any SST-1M raw data file.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">astropy.units</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">u</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">astropy.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">fits</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">astropy.table</span><span class="w"> </span><span class="kn">import</span> <span class="n">Table</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ctapipe.containers</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ctapipe.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventSource</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ctapipe.visualization</span><span class="w"> </span><span class="kn">import</span> <span class="n">CameraDisplay</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.io.containers</span><span class="w"> </span><span class="kn">import</span> <span class="n">CameraEventType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.io.sst1m_event_source</span><span class="w"> </span><span class="kn">import</span> <span class="n">SST1MEventSource</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.resources</span><span class="w"> </span><span class="kn">import</span> <span class="n">TEST_DATA_DIR</span>
+</pre></div>
+</div>
+</div>
+<section id="1.-Opening-a-file">
+<h2>1. Opening a file<a class="headerlink" href="#1.-Opening-a-file" title="Link to this heading"></a></h2>
+<p>The test data directory contains a few short runs of both telescopes: a dark run, transitions between two wobbles and Mrk 421 observations. The file names follow <code class="docutils literal notranslate"><span class="pre">SST1M&lt;telescope&gt;_&lt;date&gt;_&lt;run&gt;.fits.fz</span></code>.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">zfits_dir</span> <span class="o">=</span> <span class="n">TEST_DATA_DIR</span> <span class="o">/</span> <span class="s2">"zfits"</span>
+<span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">zfits_dir</span><span class="o">.</span><span class="n">iterdir</span><span class="p">()):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">path</span><span class="o">.</span><span class="n">name</span><span class="si">:</span><span class="s2">32s</span><span class="si">}</span><span class="s2"> TARGET = </span><span class="si">{</span><span class="n">fits</span><span class="o">.</span><span class="n">getheader</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s1">'Events'</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'TARGET'</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+SST1M1_20260120_1179.fits.fz     TARGET = MRK421_W1,166.994800,38.105300
+SST1M1_20260121_0206.fits.fz     TARGET = Transition
+SST1M2_20260119_0007.fits.fz     TARGET = DARK
+SST1M2_20260120_1102.fits.fz     TARGET = MRK421_W1,166.994800,38.105300
+SST1M2_20260121_0585.fits.fz     TARGET = Transition
+</pre></div></div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Mrk 421 observation (wobble W1) of the telescope SST1M-2: 35 events</span>
+<span class="n">input_file</span> <span class="o">=</span> <span class="n">zfits_dir</span> <span class="o">/</span> <span class="s2">"SST1M2_20260120_1102.fits.fz"</span>
+</pre></div>
+</div>
+</div>
+<p><a class="reference external" href="https://sst-1m-collaboration.github.io/sst1mpipe/event_sources.html#sst1mpipe.io.sst1m_event_source.SST1MEventSource">SST1MEventSource</a> is registered as a ctapipe I/O plugin (entry point <code class="docutils literal notranslate"><span class="pre">ctapipe_io</span></code> in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>), so the generic <code class="docutils literal notranslate"><span class="pre">ctapipe.io.EventSource</span></code> recognises the SST-1M files by itself (<a class="reference external" href="https://sst-1m-collaboration.github.io/sst1mpipe/event_sources.html#sst1mpipe.io.sst1m_event_source.SST1MEventSource.is_compatible">SST1MEventSource.is_compatible</a> checks that the file
+has an <code class="docutils literal notranslate"><span class="pre">Events</span></code> table of <code class="docutils literal notranslate"><span class="pre">DataModel.CameraEvent</span></code> protobuf messages):</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"is_compatible:"</span><span class="p">,</span> <span class="n">SST1MEventSource</span><span class="o">.</span><span class="n">is_compatible</span><span class="p">(</span><span class="n">input_file</span><span class="p">))</span>
+
+<span class="n">source</span> <span class="o">=</span> <span class="n">EventSource</span><span class="p">(</span><span class="n">input_file</span><span class="p">,</span> <span class="n">max_events</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">source</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+is_compatible: True
+&lt;class &#39;sst1mpipe.io.sst1m_event_source.SST1MEventSource&#39;&gt;
+</pre></div></div>
+</div>
+<p>You can also instantiate it explicitly, which lets you pass its options (ctapipe traitlets), e.g. <code class="docutils literal notranslate"><span class="pre">max_events</span></code>, a manual pointing (<a class="reference external" href="https://sst-1m-collaboration.github.io/sst1mpipe/event_sources.html#sst1mpipe.io.sst1m_event_source.SST1MEventSource.pointing_ra">pointing_ra</a>, <a class="reference external" href="https://sst-1m-collaboration.github.io/sst1mpipe/event_sources.html#sst1mpipe.io.sst1m_event_source.SST1MEventSource.pointing_dec">pointing_dec</a>, in deg) which overrides the <code class="docutils literal notranslate"><span class="pre">TARGET</span></code> field of the file, or the
+wrongly connected camera modules (<a class="reference external" href="https://sst-1m-collaboration.github.io/sst1mpipe/event_sources.html#sst1mpipe.io.sst1m_event_source.SST1MEventSource.swapped_modules">swapped_modules</a>). Use <code class="docutils literal notranslate"><span class="pre">help(SST1MEventSource)</span></code> or the <a class="reference external" href="https://sst-1m-collaboration.github.io/sst1mpipe/event_sources.html">documentation of the event sources</a> for the full list. The event source reads a <strong>single file</strong>: loop over the files to read several runs.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">trait</span> <span class="ow">in</span> <span class="n">SST1MEventSource</span><span class="o">.</span><span class="n">class_traits</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">:</span><span class="s2">28s</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">trait</span><span class="o">.</span><span class="n">help</span><span class="p">[:</span><span class="mi">90</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+allowed_tels                 list of allowed tel_ids, others will be ignored. If None, all telescopes in the input stre
+focal_length_choice          Which focal length to use for the camera frame transformations.
+input_url                    Path to the input file containing events.
+max_events                   Maximum number of events that will be read from the file
+pointing_dec                 Pointing declination in deg. Overrides the TARGET field of the file.
+pointing_ra                  Pointing right ascension in deg. Overrides the TARGET field of the file.
+swapped_modules              Wrongly connected modules: the pixels of the two modules are swapped for the events of the
+</pre></div></div>
+</div>
+</section>
+<section id="2.-Run-level-information">
+<h2>2. Run level information<a class="headerlink" href="#2.-Run-level-information" title="Link to this heading"></a></h2>
+<p>Everything which does not change from event to event is available as attributes of the event source, without reading any event.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"telescope id   :"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">tel_id</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"run id (obs_id):"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">run_id</span><span class="p">,</span> <span class="s2">" run number:"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">run_number</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"target         :"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">target</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"wobble         :"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">wobble</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"pointing (ICRS):"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">pointing</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"manual pointing:"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">pointing_manual</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"pedestal events:"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">pedestal_event_type</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"SWAT event ids :"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">swat_event_ids_available</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"data levels    :"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">datalevels</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"simulation     :"</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">is_simulation</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+telescope id   : 22
+run id (obs_id): 202601201102  run number: 1102
+target         : MRK421
+wobble         : W1
+pointing (ICRS): &lt;SkyCoord (ICRS): (ra, dec) in deg
+    (166.9948, 38.1053)&gt;
+manual pointing: False
+pedestal events: EventType.SKY_PEDESTAL
+SWAT event ids : True
+data levels    : (&lt;DataLevel.R0: 1&gt;,)
+simulation     : False
+</pre></div></div>
+</div>
+<section id="Observation-and-scheduling-blocks">
+<h3>Observation and scheduling blocks<a class="headerlink" href="#Observation-and-scheduling-blocks" title="Link to this heading"></a></h3>
+<p>They follow the ctapipe data model and are written in the DL1 files by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>. The observation block is a <code class="docutils literal notranslate"><span class="pre">SST1MObservationBlockContainer</span></code> (with the <code class="docutils literal notranslate"><span class="pre">target</span></code> and <code class="docutils literal notranslate"><span class="pre">wobble</span></code> of the run in addition to the ctapipe fields), the start and duration of the run come from the <code class="docutils literal notranslate"><span class="pre">DATE</span></code> and <code class="docutils literal notranslate"><span class="pre">DATEEND</span></code> fields of the file header.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">observation_block</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">observation_blocks</span><span class="p">[</span><span class="n">source</span><span class="o">.</span><span class="n">run_id</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">observation_block</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">:</span><span class="s2">26s</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+obs_id                     202601201102
+sb_id                      202601201102
+producer_id                SST1M-22
+state                      ObservationBlockState.UNKNOWN
+subarray_pointing_lat      38.1053 deg
+subarray_pointing_lon      166.9948 deg
+subarray_pointing_frame    CoordinateFrameType.ICRS
+scheduled_duration         nan min
+scheduled_start_time       0.0
+actual_start_time          2026-01-21T03:06:31.000
+actual_duration            0.0 min
+target                     MRK421
+wobble                     W1
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">scheduling_block</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">scheduling_blocks</span><span class="p">[</span><span class="n">source</span><span class="o">.</span><span class="n">run_id</span><span class="p">]</span>
+<span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">scheduling_block</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">:</span><span class="s2">26s</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+sb_id                      202601201102
+sb_type                    SchedulingBlockType.OBSERVATION
+producer_id                SST1M-22
+observing_mode             ObservingMode.WOBBLE
+pointing_mode              PointingMode.TRACK
+</pre></div></div>
+</div>
+</section>
+<section id="The-subarray">
+<h3>The subarray<a class="headerlink" href="#The-subarray" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">SubarrayDescription</span></code> only contains the telescope of the file. It gives the optics and the camera (geometry, readout: sampling rate, number of samples…).</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">subarray</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">subarray</span>
+<span class="n">subarray</span><span class="o">.</span><span class="n">info</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Subarray : SST1M_miniarray
+Num Tels : 1
+Footprint: 0.02 km2
+Height   : 511.20 m
+Lon/Lat  : 14.782501388888885 deg, 49.912441666666666 deg
+
+     Type      Count Tel IDs
+-------------- ----- -------
+SST_1M_DigiCam     1 22
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">tel</span> <span class="o">=</span> <span class="n">subarray</span><span class="o">.</span><span class="n">tel</span><span class="p">[</span><span class="n">source</span><span class="o">.</span><span class="n">tel_id</span><span class="p">]</span>
+<span class="n">camera</span> <span class="o">=</span> <span class="n">tel</span><span class="o">.</span><span class="n">camera</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">tel</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"pixels           :"</span><span class="p">,</span> <span class="n">camera</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">n_pixels</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"pixel shape      :"</span><span class="p">,</span> <span class="n">camera</span><span class="o">.</span><span class="n">geometry</span><span class="o">.</span><span class="n">pix_type</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"sampling rate    :"</span><span class="p">,</span> <span class="n">camera</span><span class="o">.</span><span class="n">readout</span><span class="o">.</span><span class="n">sampling_rate</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"reference pulse  :"</span><span class="p">,</span> <span class="n">camera</span><span class="o">.</span><span class="n">readout</span><span class="o">.</span><span class="n">reference_pulse_shape</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"focal length     :"</span><span class="p">,</span> <span class="n">tel</span><span class="o">.</span><span class="n">optics</span><span class="o">.</span><span class="n">equivalent_focal_length</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+SST_1M_DigiCam
+pixels           : 1296
+pixel shape      : PixelShape.HEXAGON
+sampling rate    : 0.25 GHz
+reference pulse  : (1, 1520)
+focal length     : 5.599999904632568 m
+</pre></div></div>
+</div>
+</section>
+<section id="DigiCam-configuration">
+<h3>DigiCam configuration<a class="headerlink" href="#DigiCam-configuration" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">DigicamConfig</span></code> table of the file (configuration of the DigiCam boards) is read into a <code class="docutils literal notranslate"><span class="pre">DigicamConfigContainer</span></code>. The arrays have one entry per board slot, 0 for the empty slots.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">digicam_config</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">digicam_config</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">digicam_config</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+{&#39;digicam_time_nanosec&#39;: 247889788,
+ &#39;digicam_time_sec&#39;: 6865,
+ &#39;firmware_card_type&#39;: array([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1,
+       1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=uint8),
+ &#39;firmware_code&#39;: array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=uint8),
+ &#39;firmware_rev&#39;: array([ 0, 39, 39, 39, 39, 39, 39, 39, 39, 39,  0, 39, 39, 39, 39, 39, 39,
+       39, 39, 39,  0, 39, 39, 39, 39, 39, 39, 39, 39, 39,  0, 46, 46, 48,
+       46, 46, 48, 46, 46], dtype=uint8),
+ &#39;firmware_vers&#39;: array([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1,
+       1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1], dtype=uint8),
+ &#39;gateware_card_type&#39;: array([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1,
+       1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=uint8),
+ &#39;gateware_code&#39;: array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=uint8),
+ &#39;gateware_rev&#39;: array([ 0, 25, 25, 25, 25, 25, 25, 25, 25, 25,  0, 25, 25, 25, 25, 25, 25,
+       25, 25, 25,  0, 25, 25, 25, 25, 25, 25, 25, 25, 25,  0, 23, 23, 23,
+       23, 23, 23, 23, 23], dtype=uint8),
+ &#39;gateware_vers&#39;: array([0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1,
+       1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1], dtype=uint8),
+ &#39;hv&#39;: array([0, 2, 2, 1, 2, 2, 2, 2, 2, 2, 0, 1, 1, 1, 1, 2, 1, 1, 1, 2, 0, 1,
+       1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 2, 1, 0, 2, 1, 0, 2], dtype=uint8),
+ &#39;operation_data&#39;: 0,
+ &#39;operation_id&#39;: 0,
+ &#39;protocol_vers&#39;: array([255,   1,   1,   1,   1,   1,   1,   1,   1,   1, 255,   1,   1,
+         1,   1,   1,   1,   1,   1,   1, 255,   1,   1,   1,   1,   1,
+         1,   1,   1,   1, 255,   1,   1,   1,   1,   1,   1,   1,   1],
+      dtype=uint8),
+ &#39;sn&#39;: array([      0, 1120024, 1120025, 1110016, 1120027, 1120020, 1120029,
+       1120026, 1120023, 1120022,       0, 1110014, 1110005, 1110012,
+       1110015,       0, 1110017, 1110018, 1110019, 1120021,       0,
+       1110003, 1110004, 1110005, 1110006, 1110007, 1110008, 1110009,
+       1110010, 1110011,       0, 3100001, 3120007, 3110002, 3100001,
+       3120007, 3110002, 3100001, 3120007], dtype=uint32)}
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Table</span><span class="p">({</span><span class="n">key</span><span class="p">:</span> <span class="n">value</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">digicam_config</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">ndim</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">})[:</span><span class="mi">12</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div><i>Table length=12</i>
+<table id="table139636550355664" class="table-striped table-bordered table-condensed">
+<thead><tr><th>protocol_vers</th><th>sn</th><th>hv</th><th>gateware_rev</th><th>gateware_vers</th><th>gateware_code</th><th>gateware_card_type</th><th>firmware_rev</th><th>firmware_vers</th><th>firmware_code</th><th>firmware_card_type</th></tr></thead>
+<thead><tr><th>uint8</th><th>uint32</th><th>uint8</th><th>uint8</th><th>uint8</th><th>uint8</th><th>uint8</th><th>uint8</th><th>uint8</th><th>uint8</th><th>uint8</th></tr></thead>
+<tr><td>255</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>1</td><td>1120024</td><td>2</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>1120025</td><td>2</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>1110016</td><td>1</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>1120027</td><td>2</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>1120020</td><td>2</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>1120029</td><td>2</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>1120026</td><td>2</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>1120023</td><td>2</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>1</td><td>1120022</td><td>2</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+<tr><td>255</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>1</td><td>1110014</td><td>1</td><td>25</td><td>1</td><td>0</td><td>1</td><td>39</td><td>1</td><td>0</td><td>1</td></tr>
+</table></div></div>
+</div>
+</section>
+</section>
+<section id="3.-Looping-over-the-events">
+<h2>3. Looping over the events<a class="headerlink" href="#3.-Looping-over-the-events" title="Link to this heading"></a></h2>
+<p>Iterating over the source gives one <code class="docutils literal notranslate"><span class="pre">SST1MArrayEventContainer</span></code> per camera event. It is a ctapipe <code class="docutils literal notranslate"><span class="pre">ArrayEventContainer</span></code> whose R0 and monitoring containers have extra SST-1M fields. Only the R0 data, the trigger and the pointing are filled by the event source: the R1/DL0/DL1 containers are filled later by the calibration and the image processing (see <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>).</p>
+<p>The event source should be used as a context manager (it closes the file at the end).</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">EventSource</span><span class="p">(</span><span class="n">input_file</span><span class="p">,</span> <span class="n">max_events</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span> <span class="k">as</span> <span class="n">source</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">source</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"count=</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2"> obs_id=</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">obs_id</span><span class="si">}</span><span class="s2"> event_id=</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">event_id</span><span class="si">}</span><span class="s2"> "</span>
+              <span class="sa">f</span><span class="s2">"type=</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">event_type</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> tels=</span><span class="si">{</span><span class="n">event</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">tels_with_trigger</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+count=0 obs_id=202601201102 event_id=25085123 type=SUBARRAY tels=[22]
+count=1 obs_id=202601201102 event_id=25085126 type=SUBARRAY tels=[22]
+count=2 obs_id=202601201102 event_id=25085127 type=SUBARRAY tels=[22]
+</pre></div></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">event</span></code> still holds the last event of the loop. A ctapipe container prints its fields with their description:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">event</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+&lt;class &#39;sst1mpipe.io.containers.SST1MArrayEventContainer&#39;&gt;
+[&#39;index&#39;, &#39;r0&#39;, &#39;r1&#39;, &#39;dl0&#39;, &#39;dl1&#39;, &#39;dl2&#39;, &#39;simulation&#39;, &#39;trigger&#39;, &#39;count&#39;, &#39;monitoring&#39;, &#39;muon&#39;]
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>  <span class="c1"># print: the values of the fields</span>
+<span class="n">event</span><span class="o">.</span><span class="n">index</span>         <span class="c1"># repr: the description and default of each field</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+{&#39;event_id&#39;: 25085127, &#39;obs_id&#39;: 202601201102}
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+ctapipe.containers.EventIndexContainer:
+                        obs_id: Observation Block ID with default
+                                18446744073709551615
+                      event_id: Array Event ID with default 18446744073709551615
+</pre></div></div>
+</div>
+<section id="The-trigger">
+<h3>The trigger<a class="headerlink" href="#The-trigger" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">event.trigger.event_type</span></code> is the ctapipe <code class="docutils literal notranslate"><span class="pre">EventType</span></code>: <code class="docutils literal notranslate"><span class="pre">SUBARRAY</span></code> for the events triggered by the camera and the pedestal type of the run for the internal triggers (<code class="docutils literal notranslate"><span class="pre">SKY_PEDESTAL</span></code>, or <code class="docutils literal notranslate"><span class="pre">DARK_PEDESTAL</span></code> / <code class="docutils literal notranslate"><span class="pre">ELECTRONIC_PEDESTAL</span></code> for the dark / bias runs). The time is the DigiCam clock as an <code class="docutils literal notranslate"><span class="pre">astropy.time.Time</span></code>.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">trigger</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"time (ISO, UTC):"</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">time</span><span class="o">.</span><span class="n">utc</span><span class="o">.</span><span class="n">isot</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+{&#39;event_type&#39;: &lt;EventType.SUBARRAY: 32&gt;,
+ &#39;tel&#39;: {22: {&#39;event_type&#39;: &lt;EventType.SUBARRAY: 32&gt;,
+              &#39;n_trigger_pixels&#39;: -1,
+              &#39;time&#39;: &lt;Time object: scale=&#39;tai&#39; format=&#39;unix_tai&#39; value=1768964826.7517002&gt;,
+              &#39;trigger_pixels&#39;: None}},
+ &#39;tels_with_trigger&#39;: [22],
+ &#39;time&#39;: &lt;Time object: scale=&#39;tai&#39; format=&#39;unix_tai&#39; value=1768964826.7517002&gt;}
+time (ISO, UTC): 2026-01-21T03:06:29.752
+</pre></div></div>
+</div>
+</section>
+<section id="The-R0-data-of-the-telescope">
+<h3>The R0 data of the telescope<a class="headerlink" href="#The-R0-data-of-the-telescope" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">event.r0.tel</span></code> is a map <code class="docutils literal notranslate"><span class="pre">tel_id</span> <span class="pre">-&gt;</span> <span class="pre">SST1MR0CameraContainer</span></code>. In addition to the ctapipe <code class="docutils literal notranslate"><span class="pre">waveform</span></code> (shape <code class="docutils literal notranslate"><span class="pre">(n_channels,</span> <span class="pre">n_pixels,</span> <span class="pre">n_samples)</span></code>, one gain channel for DigiCam, pixels sorted by pixel id), it contains the DigiCam specific fields: the baseline computed by DigiCam (<code class="docutils literal notranslate"><span class="pre">pedestal</span></code>), the pixel flags, the camera event type (a <code class="docutils literal notranslate"><span class="pre">CameraEventType</span></code> flag), the clocks, and the trigger traces.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[17]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">tel_id</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">tel_id</span>
+<span class="n">r0</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">r0</span><span class="o">.</span><span class="n">tel</span><span class="p">[</span><span class="n">tel_id</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">r0</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+{&#39;_event_type&#39;: &lt;CameraEventType.PATCH7: 1&gt;,
+ &#39;camera_event_number&#39;: 3612335,
+ &#39;event_time&#39;: &lt;Time object: scale=&#39;tai&#39; format=&#39;unix_tai&#39; value=1768964826.7517002&gt;,
+ &#39;gps_time&#39;: None,
+ &#39;pedestal&#39;: array([286.9375, 180.625 , 201.625 , ..., 181.1875, 233.    , 194.6875]),
+ &#39;pixel_flags&#39;: array([1, 1, 1, ..., 1, 1, 1], dtype=uint16),
+ &#39;trigger_input_traces&#39;: array([[ 8,  2,  3, ...,  0,  0,  0],
+       [ 0,  0,  0, ...,  0,  0,  0],
+       [18, 12,  9, ...,  0,  0,  0],
+       ...,
+       [ 0,  0,  0, ..., 15, 31, 39],
+       [ 0,  0,  0, ...,  0,  0,  0],
+       [ 0,  0,  0, ..., 27, 38, 21]], dtype=uint8),
+ &#39;trigger_output_muon&#39;: array([[0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0],
+       ...,
+       [0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0]], dtype=uint8),
+ &#39;trigger_output_patch19&#39;: array([[0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0],
+       ...,
+       [0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0]], dtype=uint8),
+ &#39;trigger_output_patch7&#39;: array([[0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0],
+       ...,
+       [0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0],
+       [0, 0, 0, ..., 0, 0, 0]], dtype=uint8),
+ &#39;waveform&#39;: array([[[295, 293, 291, ..., 287, 285, 284],
+        [181, 179, 180, ..., 182, 179, 175],
+        [201, 199, 202, ..., 194, 197, 198],
+        ...,
+        [174, 172, 172, ..., 176, 176, 176],
+        [224, 223, 225, ..., 255, 258, 248],
+        [190, 190, 189, ..., 190, 195, 194]]], dtype=int16)}
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[18]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># a quick overview of all the fields: type and shape</span>
+<span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">r0</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">"shape"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span>
+    <span class="n">dtype</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">"dtype"</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">:</span><span class="s2">24s</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span><span class="si">:</span><span class="s2">12s</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+waveform                 int16        (1, 1296, 50)
+pixel_flags              uint16       (1296,)
+pedestal                 float64      (1296,)
+camera_event_number      int
+event_time               Time         ()
+gps_time                 NoneType
+_event_type              CameraEventType
+trigger_input_traces     uint8        (432, 50)
+trigger_output_patch7    uint8        (432, 50)
+trigger_output_patch19   uint8        (432, 50)
+trigger_output_muon      uint8        (432, 50)
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[19]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"camera event number:"</span><span class="p">,</span> <span class="n">r0</span><span class="o">.</span><span class="n">camera_event_number</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"camera event type  :"</span><span class="p">,</span> <span class="n">r0</span><span class="o">.</span><span class="n">event_type</span><span class="p">,</span> <span class="s2">"-&gt;"</span><span class="p">,</span> <span class="nb">repr</span><span class="p">(</span><span class="n">r0</span><span class="o">.</span><span class="n">event_type</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"is internal trigger:"</span><span class="p">,</span> <span class="n">CameraEventType</span><span class="o">.</span><span class="n">INTERNAL</span> <span class="ow">in</span> <span class="n">r0</span><span class="o">.</span><span class="n">event_type</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"event time (TAI)   :"</span><span class="p">,</span> <span class="n">r0</span><span class="o">.</span><span class="n">event_time</span><span class="o">.</span><span class="n">unix_tai</span><span class="p">,</span> <span class="s2">"s"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"GPS time           :"</span><span class="p">,</span> <span class="n">r0</span><span class="o">.</span><span class="n">gps_time</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"baseline (ADC)     :"</span><span class="p">,</span> <span class="n">r0</span><span class="o">.</span><span class="n">pedestal</span><span class="p">[:</span><span class="mi">5</span><span class="p">],</span> <span class="s2">"..."</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"pixel flags        :"</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">r0</span><span class="o">.</span><span class="n">pixel_flags</span><span class="p">,</span> <span class="n">return_counts</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+camera event number: 3612335
+camera event type  : CameraEventType.PATCH7 -&gt; &lt;CameraEventType.PATCH7: 1&gt;
+is internal trigger: False
+event time (TAI)   : 1768964826.7517002 s
+GPS time           : None
+baseline (ADC)     : [286.9375 180.625  201.625  176.375  194.3125] ...
+pixel flags        : (array([1], dtype=uint16), array([1296]))
+</pre></div></div>
+</div>
+</section>
+<section id="The-monitoring">
+<h3>The monitoring<a class="headerlink" href="#The-monitoring" title="Link to this heading"></a></h3>
+<p>The pointing in RA / Dec of the run is filled for each event. The altitude / azimuth of the telescope and the camera monitoring (pedestal statistics…) are filled by the monitoring source <code class="docutils literal notranslate"><span class="pre">SST1MMonitoringSource</span></code> from the output of <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code>, so they are empty here.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[20]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">pointing</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">monitoring</span><span class="o">.</span><span class="n">pointing</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"RA :"</span><span class="p">,</span> <span class="n">pointing</span><span class="o">.</span><span class="n">array_ra</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">deg</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Dec:"</span><span class="p">,</span> <span class="n">pointing</span><span class="o">.</span><span class="n">array_dec</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">deg</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Alt:"</span><span class="p">,</span> <span class="n">pointing</span><span class="o">.</span><span class="n">array_altitude</span><span class="p">,</span> <span class="s2">"(from the monitoring source)"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+RA : 166d59m41.28s
+Dec: 38d06m19.08s
+Alt: nan rad (from the monitoring source)
+</pre></div></div>
+</div>
+</section>
+</section>
+<section id="4.-Visualising-an-event">
+<h2>4. Visualising an event<a class="headerlink" href="#4.-Visualising-an-event" title="Link to this heading"></a></h2>
+<p>Let’s take the brightest triggered (<code class="docutils literal notranslate"><span class="pre">SUBARRAY</span></code>) event and the first pedestal event of the run.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[21]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">max_signal</span><span class="p">(</span><span class="n">event</span><span class="p">):</span>
+    <span class="c1"># largest signal above the DigiCam baseline in the camera (ADC)</span>
+    <span class="n">r0</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">r0</span><span class="o">.</span><span class="n">tel</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">r0</span><span class="o">.</span><span class="n">waveform</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">r0</span><span class="o">.</span><span class="n">pedestal</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">])</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+
+<span class="n">shower_event</span><span class="p">,</span> <span class="n">pedestal_event</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+<span class="k">with</span> <span class="n">EventSource</span><span class="p">(</span><span class="n">input_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">source</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">source</span><span class="p">:</span>
+        <span class="n">event_type</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">event_type</span>
+        <span class="k">if</span> <span class="n">event_type</span> <span class="o">==</span> <span class="n">EventType</span><span class="o">.</span><span class="n">SUBARRAY</span> <span class="ow">and</span> <span class="p">(</span><span class="n">shower_event</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">max_signal</span><span class="p">(</span><span class="n">event</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_signal</span><span class="p">(</span><span class="n">shower_event</span><span class="p">)):</span>
+            <span class="n">shower_event</span> <span class="o">=</span> <span class="n">event</span>
+        <span class="k">if</span> <span class="n">event_type</span> <span class="o">==</span> <span class="n">source</span><span class="o">.</span><span class="n">pedestal_event_type</span> <span class="ow">and</span> <span class="n">pedestal_event</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">pedestal_event</span> <span class="o">=</span> <span class="n">event</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">shower_event</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">shower_event</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">event_type</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">pedestal_event</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">pedestal_event</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">event_type</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+{&#39;event_id&#39;: 25085157, &#39;obs_id&#39;: 202601201102} EventType.SUBARRAY
+{&#39;event_id&#39;: 25085129, &#39;obs_id&#39;: 202601201102} EventType.SKY_PEDESTAL
+</pre></div></div>
+</div>
+<section id="Waveforms">
+<h3>Waveforms<a class="headerlink" href="#Waveforms" title="Link to this heading"></a></h3>
+<p>The waveforms are in ADC counts, with the DigiCam baseline (<code class="docutils literal notranslate"><span class="pre">pedestal</span></code>) not subtracted. We plot the brightest pixels of the triggered event (largest signal above baseline) and a few pixels of the pedestal event.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[22]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">geometry</span> <span class="o">=</span> <span class="n">subarray</span><span class="o">.</span><span class="n">tel</span><span class="p">[</span><span class="n">tel_id</span><span class="p">]</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">geometry</span>
+<span class="n">sampling_rate</span> <span class="o">=</span> <span class="n">subarray</span><span class="o">.</span><span class="n">tel</span><span class="p">[</span><span class="n">tel_id</span><span class="p">]</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">readout</span><span class="o">.</span><span class="n">sampling_rate</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">13</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span> <span class="n">sharey</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">ev</span><span class="p">,</span> <span class="n">title</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="p">[</span><span class="n">shower_event</span><span class="p">,</span> <span class="n">pedestal_event</span><span class="p">],</span> <span class="p">[</span><span class="s2">"triggered event"</span><span class="p">,</span> <span class="s2">"pedestal event"</span><span class="p">],</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="n">r0</span> <span class="o">=</span> <span class="n">ev</span><span class="o">.</span><span class="n">r0</span><span class="o">.</span><span class="n">tel</span><span class="p">[</span><span class="n">tel_id</span><span class="p">]</span>
+    <span class="n">waveform</span> <span class="o">=</span> <span class="n">r0</span><span class="o">.</span><span class="n">waveform</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># single gain channel</span>
+    <span class="n">time</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">waveform</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="n">sampling_rate</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">GHz</span><span class="p">)</span>  <span class="c1"># ns</span>
+    <span class="n">signal</span> <span class="o">=</span> <span class="p">(</span><span class="n">waveform</span> <span class="o">-</span> <span class="n">r0</span><span class="o">.</span><span class="n">pedestal</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">])</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">pix</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">signal</span><span class="p">)[::</span><span class="o">-</span><span class="mi">1</span><span class="p">][:</span><span class="mi">5</span><span class="p">]:</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">waveform</span><span class="p">[</span><span class="n">pix</span><span class="p">],</span> <span class="n">drawstyle</span><span class="o">=</span><span class="s2">"steps-mid"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="sa">f</span><span class="s2">"pixel </span><span class="si">{</span><span class="n">pix</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">title</span><span class="si">}</span><span class="s2">, event </span><span class="si">{</span><span class="n">ev</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">event_id</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"time [ns]"</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"ADC"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_sst1m_read_zfits_event_source_36_0.png" src="../_images/tutorials_sst1m_read_zfits_event_source_36_0.png" />
+</div>
+</div>
+</section>
+<section id="Camera-images">
+<h3>Camera images<a class="headerlink" href="#Camera-images" title="Link to this heading"></a></h3>
+<p>A simple R0 “image”: the maximum of each waveform minus the DigiCam baseline. Proper images (in p.e.) need the R0 -&gt; R1 calibration and the charge extraction done by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+
+<span class="n">r0</span> <span class="o">=</span> <span class="n">shower_event</span><span class="o">.</span><span class="n">r0</span><span class="o">.</span><span class="n">tel</span><span class="p">[</span><span class="n">tel_id</span><span class="p">]</span>
+<span class="n">image</span> <span class="o">=</span> <span class="n">r0</span><span class="o">.</span><span class="n">waveform</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">r0</span><span class="o">.</span><span class="n">pedestal</span>
+<span class="n">display</span> <span class="o">=</span> <span class="n">CameraDisplay</span><span class="p">(</span><span class="n">geometry</span><span class="p">,</span> <span class="n">image</span><span class="o">=</span><span class="n">image</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">title</span><span class="o">=</span><span class="s2">"max(waveform) - baseline [ADC]"</span><span class="p">)</span>
+<span class="n">display</span><span class="o">.</span><span class="n">add_colorbar</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+<span class="n">peak_time</span> <span class="o">=</span> <span class="n">r0</span><span class="o">.</span><span class="n">waveform</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">sampling_rate</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">GHz</span><span class="p">)</span>
+<span class="n">display</span> <span class="o">=</span> <span class="n">CameraDisplay</span><span class="p">(</span><span class="n">geometry</span><span class="p">,</span> <span class="n">image</span><span class="o">=</span><span class="n">peak_time</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">title</span><span class="o">=</span><span class="s2">"peak time [ns]"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"RdBu_r"</span><span class="p">)</span>
+<span class="n">display</span><span class="o">.</span><span class="n">add_colorbar</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+<span class="n">display</span> <span class="o">=</span> <span class="n">CameraDisplay</span><span class="p">(</span><span class="n">geometry</span><span class="p">,</span> <span class="n">image</span><span class="o">=</span><span class="n">r0</span><span class="o">.</span><span class="n">pedestal</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">title</span><span class="o">=</span><span class="s2">"DigiCam baseline [ADC]"</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">"viridis"</span><span class="p">)</span>
+<span class="n">display</span><span class="o">.</span><span class="n">add_colorbar</span><span class="p">(</span><span class="n">ax</span><span class="o">=</span><span class="n">axes</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_sst1m_read_zfits_event_source_38_0.png" src="../_images/tutorials_sst1m_read_zfits_event_source_38_0.png" />
+</div>
+</div>
+</section>
+<section id="Trigger-traces">
+<h3>Trigger traces<a class="headerlink" href="#Trigger-traces" title="Link to this heading"></a></h3>
+<p>The trigger input traces (432 trigger patches) and the trigger outputs of the clusters of 7 and 19 patches and of the muon trigger are also stored, as <code class="docutils literal notranslate"><span class="pre">(n_patches,</span> <span class="pre">n_samples)</span></code> arrays (filled with <code class="docutils literal notranslate"><span class="pre">nan</span></code> when absent from the file). They are in patch order (<code class="docutils literal notranslate"><span class="pre">patch_sw_id</span></code>, the patch of 3 pixels <code class="docutils literal notranslate"><span class="pre">DigiCam.patch_matrix</span></code>, the central patch for the outputs): the reader takes care of the order of the camera sectors of each telescope (<code class="docutils literal notranslate"><span class="pre">sst1mpipe.constants.TRIGGER_SECTOR_ORDER</span></code>) and of the wrongly
+connected modules, as for the pixels. The outputs are 0/1: here the event was triggered by the 7 patch clusters (camera event type <code class="docutils literal notranslate"><span class="pre">PATCH7</span></code>).</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[24]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">r0</span> <span class="o">=</span> <span class="n">shower_event</span><span class="o">.</span><span class="n">r0</span><span class="o">.</span><span class="n">tel</span><span class="p">[</span><span class="n">tel_id</span><span class="p">]</span>
+<span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"trigger_input_traces"</span><span class="p">,</span> <span class="s2">"trigger_output_patch7"</span><span class="p">,</span> <span class="s2">"trigger_output_patch19"</span><span class="p">,</span> <span class="s2">"trigger_output_muon"</span><span class="p">]</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">17</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="k">for</span> <span class="n">ax</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="n">names</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="n">traces</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">r0</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="n">im</span> <span class="o">=</span> <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">traces</span><span class="p">,</span> <span class="n">aspect</span><span class="o">=</span><span class="s2">"auto"</span><span class="p">,</span> <span class="n">interpolation</span><span class="o">=</span><span class="s2">"none"</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"sample"</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">colorbar</span><span class="p">(</span><span class="n">im</span><span class="p">,</span> <span class="n">ax</span><span class="o">=</span><span class="n">ax</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"patch / cluster"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_sst1m_read_zfits_event_source_40_0.png" src="../_images/tutorials_sst1m_read_zfits_event_source_40_0.png" />
+</div>
+</div>
+</section>
+</section>
+<section id="5.-Run-level-summaries">
+<h2>5. Run level summaries<a class="headerlink" href="#5.-Run-level-summaries" title="Link to this heading"></a></h2>
+<p>The events are read one by one, so it is easy to collect a few quantities over the whole run: event types, event times, baselines…</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[25]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">with</span> <span class="n">EventSource</span><span class="p">(</span><span class="n">input_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">source</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">source</span><span class="p">:</span>
+        <span class="n">r0</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">r0</span><span class="o">.</span><span class="n">tel</span><span class="p">[</span><span class="n">source</span><span class="o">.</span><span class="n">tel_id</span><span class="p">]</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">"event_id"</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">event_id</span><span class="p">,</span>
+            <span class="s2">"camera_event_number"</span><span class="p">:</span> <span class="n">r0</span><span class="o">.</span><span class="n">camera_event_number</span><span class="p">,</span>
+            <span class="s2">"time"</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">time</span><span class="o">.</span><span class="n">unix_tai</span><span class="p">,</span>
+            <span class="s2">"event_type"</span><span class="p">:</span> <span class="n">event</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">event_type</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="s2">"camera_event_type"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">r0</span><span class="o">.</span><span class="n">event_type</span><span class="p">),</span>
+            <span class="s2">"mean_baseline"</span><span class="p">:</span> <span class="n">r0</span><span class="o">.</span><span class="n">pedestal</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span>
+            <span class="s2">"max_adc"</span><span class="p">:</span> <span class="n">r0</span><span class="o">.</span><span class="n">waveform</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
+        <span class="p">})</span>
+<span class="n">events</span> <span class="o">=</span> <span class="n">Table</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+<span class="n">events</span><span class="p">[</span><span class="s2">"dt"</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">events</span><span class="p">[</span><span class="s2">"time"</span><span class="p">],</span> <span class="n">prepend</span><span class="o">=</span><span class="n">events</span><span class="p">[</span><span class="s2">"time"</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="mf">1e3</span>
+<span class="n">events</span><span class="p">[</span><span class="s2">"dt"</span><span class="p">]</span><span class="o">.</span><span class="n">unit</span> <span class="o">=</span> <span class="n">u</span><span class="o">.</span><span class="n">ms</span>
+<span class="n">events</span><span class="p">[:</span><span class="mi">10</span><span class="p">]</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[25]:
+</pre></div>
+</div>
+<div class="output_area rendered_html docutils container">
+<div><i>Table length=10</i>
+<table id="table139636533695728" class="table-striped table-bordered table-condensed">
+<thead><tr><th>event_id</th><th>camera_event_number</th><th>time</th><th>event_type</th><th>camera_event_type</th><th>mean_baseline</th><th>max_adc</th><th>dt</th></tr></thead>
+<thead><tr><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th>ms</th></tr></thead>
+<thead><tr><th>int64</th><th>int64</th><th>float64</th><th>str12</th><th>str24</th><th>float64</th><th>int16</th><th>float64</th></tr></thead>
+<tr><td>25085123</td><td>3612333</td><td>1768964826.7464712</td><td>SUBARRAY</td><td>CameraEventType.PATCH7</td><td>204.08931327160494</td><td>330</td><td>0.0</td></tr>
+<tr><td>25085126</td><td>3612334</td><td>1768964826.7513413</td><td>SUBARRAY</td><td>CameraEventType.PATCH7</td><td>203.91575038580248</td><td>332</td><td>4.870176315307617</td></tr>
+<tr><td>25085127</td><td>3612335</td><td>1768964826.7517002</td><td>SUBARRAY</td><td>CameraEventType.PATCH7</td><td>203.90586419753086</td><td>331</td><td>0.35881996154785156</td></tr>
+<tr><td>25085129</td><td>3612336</td><td>1768964826.7549167</td><td>SKY_PEDESTAL</td><td>CameraEventType.INTERNAL</td><td>204.06394675925927</td><td>327</td><td>3.2165050506591797</td></tr>
+<tr><td>25085133</td><td>3612337</td><td>1768964826.7649167</td><td>SKY_PEDESTAL</td><td>CameraEventType.INTERNAL</td><td>203.9892939814815</td><td>324</td><td>9.999990463256836</td></tr>
+<tr><td>25085136</td><td>3612338</td><td>1768964826.7697473</td><td>SUBARRAY</td><td>CameraEventType.PATCH7</td><td>203.92447916666666</td><td>327</td><td>4.830598831176758</td></tr>
+<tr><td>25085137</td><td>3612339</td><td>1768964826.7706814</td><td>SUBARRAY</td><td>CameraEventType.PATCH7</td><td>203.83858989197532</td><td>334</td><td>0.9341239929199219</td></tr>
+<tr><td>25085140</td><td>3612340</td><td>1768964826.7749166</td><td>SKY_PEDESTAL</td><td>CameraEventType.INTERNAL</td><td>204.0570023148148</td><td>343</td><td>4.235267639160156</td></tr>
+<tr><td>25085143</td><td>3612341</td><td>1768964826.783039</td><td>SUBARRAY</td><td>CameraEventType.PATCH7</td><td>203.84495563271605</td><td>322</td><td>8.122444152832031</td></tr>
+<tr><td>25085144</td><td>3612342</td><td>1768964826.7849166</td><td>SKY_PEDESTAL</td><td>CameraEventType.INTERNAL</td><td>204.05102237654322</td><td>322</td><td>1.8775463104248047</td></tr>
+</table></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[26]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">(</span><span class="n">events</span><span class="p">[</span><span class="s2">"event_type"</span><span class="p">]))</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">(</span><span class="n">events</span><span class="p">[</span><span class="s2">"camera_event_type"</span><span class="p">]))</span>
+<span class="n">duration</span> <span class="o">=</span> <span class="n">events</span><span class="p">[</span><span class="s2">"time"</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">events</span><span class="p">[</span><span class="s2">"time"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">events</span><span class="p">)</span><span class="si">}</span><span class="s2"> events in </span><span class="si">{</span><span class="n">duration</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> s -&gt; </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">events</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">duration</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> Hz"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Counter({&#39;SUBARRAY&#39;: 22, &#39;SKY_PEDESTAL&#39;: 13})
+Counter({&#39;CameraEventType.PATCH7&#39;: 22, &#39;CameraEventType.INTERNAL&#39;: 13})
+35 events in 0.128 s -&gt; 272.5 Hz
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[27]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
+<span class="n">t0</span><span class="p">,</span> <span class="n">id0</span> <span class="o">=</span> <span class="n">events</span><span class="p">[</span><span class="s2">"time"</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">events</span><span class="p">[</span><span class="s2">"event_id"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram_bin_edges</span><span class="p">(</span><span class="n">events</span><span class="p">[</span><span class="s2">"max_adc"</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">event_type</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">events</span><span class="p">[</span><span class="s2">"event_type"</span><span class="p">]):</span>
+    <span class="n">mask</span> <span class="o">=</span> <span class="n">events</span><span class="p">[</span><span class="s2">"event_type"</span><span class="p">]</span> <span class="o">==</span> <span class="n">event_type</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">events</span><span class="p">[</span><span class="s2">"time"</span><span class="p">][</span><span class="n">mask</span><span class="p">]</span> <span class="o">-</span> <span class="n">t0</span><span class="p">,</span> <span class="n">events</span><span class="p">[</span><span class="s2">"event_id"</span><span class="p">][</span><span class="n">mask</span><span class="p">]</span> <span class="o">-</span> <span class="n">id0</span><span class="p">,</span> <span class="s2">"o"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">event_type</span><span class="p">)</span>
+    <span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">events</span><span class="p">[</span><span class="s2">"max_adc"</span><span class="p">][</span><span class="n">mask</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="n">bins</span><span class="p">,</span> <span class="n">histtype</span><span class="o">=</span><span class="s2">"step"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">event_type</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="s2">"time since first event [s]"</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="sa">f</span><span class="s2">"event_id - </span><span class="si">{</span><span class="n">id0</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="n">axes</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">xlabel</span><span class="o">=</span><span class="s2">"max ADC of the event"</span><span class="p">,</span> <span class="n">ylabel</span><span class="o">=</span><span class="s2">"events"</span><span class="p">,</span> <span class="n">yscale</span><span class="o">=</span><span class="s2">"log"</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="n">axes</span><span class="p">:</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/tutorials_sst1m_read_zfits_event_source_44_0.png" src="../_images/tutorials_sst1m_read_zfits_event_source_44_0.png" />
+</div>
+</div>
+</section>
+<section id="6.-Under-the-hood:-the-raw-zfits-file">
+<h2>6. Under the hood: the raw zfits file<a class="headerlink" href="#6.-Under-the-hood:-the-raw-zfits-file" title="Link to this heading"></a></h2>
+<p>The event source reads the files with <code class="docutils literal notranslate"><span class="pre">protozfits</span></code>. If you need a field of the DigiCam <code class="docutils literal notranslate"><span class="pre">CameraEvent</span></code> protobuf message which is not copied to the ctapipe containers, you can read the file directly. Each row of the <code class="docutils literal notranslate"><span class="pre">Events</span></code> table is a named tuple; the most useful fields are listed below (see <code class="docutils literal notranslate"><span class="pre">sst1mpipe.io.sst1m_event_source.fill_r0_event</span></code> for how they are converted).</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[28]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">input_file</span><span class="p">)</span> <span class="k">as</span> <span class="n">hdul</span><span class="p">:</span>
+    <span class="n">hdul</span><span class="o">.</span><span class="n">info</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Filename: sst1mpipe/resources/test_data/zfits/SST1M2_20260120_1102.fits.fz
+No.    Name      Ver    Type      Cards   Dimensions   Format
+  0  PRIMARY       1 PrimaryHDU       8   ()
+  1  DigicamConfig    1 BinTableHDU    122   1R x 15C   [1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB]
+  2  Events        1 BinTableHDU    210   1R x 33C   [1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB, 1QB]
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[29]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getheader</span><span class="p">(</span><span class="n">input_file</span><span class="p">,</span> <span class="s2">"Events"</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"TARGET"</span><span class="p">,</span> <span class="s2">"PBFHEAD"</span><span class="p">,</span> <span class="s2">"DATE"</span><span class="p">,</span> <span class="s2">"DATEEND"</span><span class="p">,</span> <span class="s2">"ZNAXIS2"</span><span class="p">]:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">:</span><span class="s2">8s</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">header</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span><span class="si">!r:</span><span class="s2">40s</span><span class="si">}</span><span class="s2"> / </span><span class="si">{</span><span class="n">header</span><span class="o">.</span><span class="n">comments</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+TARGET   = &#39;MRK421_W1,166.994800,38.105300&#39;         / Current Target
+PBFHEAD  = &#39;DataModel.CameraEvent&#39;                  / Written message name
+DATE     = &#39;2026-01-21T03:06:31&#39;                    / File creation date
+DATEEND  = &#39;2026-01-21T03:06:31&#39;                    / File closing date
+ZNAXIS2  = 35                                       / Number of uncompressed rows
+</pre></div></div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[30]:
+</pre></div>
+</div>
+<div class="input_area highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">protozfits</span><span class="w"> </span><span class="kn">import</span> <span class="n">File</span>
+
+<span class="k">with</span> <span class="n">File</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">input_file</span><span class="p">))</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="n">raw_event</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">Events</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">"telescopeID       :"</span><span class="p">,</span> <span class="n">raw_event</span><span class="o">.</span><span class="n">telescopeID</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"eventNumber       :"</span><span class="p">,</span> <span class="n">raw_event</span><span class="o">.</span><span class="n">eventNumber</span><span class="p">,</span> <span class="s2">"(-&gt; r0.camera_event_number)"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"arrayEvtNum       :"</span><span class="p">,</span> <span class="n">raw_event</span><span class="o">.</span><span class="n">arrayEvtNum</span><span class="p">,</span> <span class="s2">"(SWAT event id -&gt; index.event_id)"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"event_type        :"</span><span class="p">,</span> <span class="n">raw_event</span><span class="o">.</span><span class="n">event_type</span><span class="p">,</span> <span class="s2">"-&gt;"</span><span class="p">,</span> <span class="n">CameraEventType</span><span class="p">(</span><span class="n">raw_event</span><span class="o">.</span><span class="n">event_type</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"local time        :"</span><span class="p">,</span> <span class="n">raw_event</span><span class="o">.</span><span class="n">local_time_sec</span><span class="p">,</span> <span class="s2">"s"</span><span class="p">,</span> <span class="n">raw_event</span><span class="o">.</span><span class="n">local_time_nanosec</span><span class="p">,</span> <span class="s2">"ns"</span><span class="p">)</span>
+<span class="n">waveforms</span> <span class="o">=</span> <span class="n">raw_event</span><span class="o">.</span><span class="n">hiGain</span><span class="o">.</span><span class="n">waveforms</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"hiGain.waveforms  :"</span><span class="p">,</span> <span class="n">waveforms</span><span class="o">.</span><span class="n">_fields</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"samples           :"</span><span class="p">,</span> <span class="n">waveforms</span><span class="o">.</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="s2">"(n_pixels * n_samples, flat, unsorted pixels)"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"pixelsIndices     :"</span><span class="p">,</span> <span class="n">waveforms</span><span class="o">.</span><span class="n">pixelsIndices</span><span class="p">[:</span><span class="mi">10</span><span class="p">],</span> <span class="s2">"..."</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"baselines         :"</span><span class="p">,</span> <span class="n">waveforms</span><span class="o">.</span><span class="n">baselines</span><span class="p">[:</span><span class="mi">5</span><span class="p">],</span> <span class="s2">"(/ 16 -&gt; r0.pedestal)"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+File({&#39;DigicamConfig&#39;: Table(1xDataModel.DigicamConfig), &#39;Events&#39;: Table(35xDataModel.CameraEvent)})
+telescopeID       : 22
+eventNumber       : 3612333 (-&gt; r0.camera_event_number)
+arrayEvtNum       : 25085123 (SWAT event id -&gt; index.event_id)
+event_type        : 1 -&gt; CameraEventType.PATCH7
+local time        : 1768964826 s 746471248 ns
+hiGain.waveforms  : (&#39;samples&#39;, &#39;pixelsIndices&#39;, &#39;firstSplIdx&#39;, &#39;num_samples&#39;, &#39;baselines&#39;, &#39;peak_time_pos&#39;, &#39;time_over_threshold&#39;)
+samples           : (64800,) (n_pixels * n_samples, flat, unsorted pixels)
+pixelsIndices     : [146 117 177 145 213 178 179 147 249 250] ...
+baselines         : [3622 3136 3571 3810 3405] (/ 16 -&gt; r0.pedestal)
+</pre></div></div>
+</div>
+</section>
+<section id="Going-further">
+<h2>Going further<a class="headerlink" href="#Going-further" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code> runs the full chain R0 -&gt; DL1 on these files (R0 -&gt; R1 calibration, image extraction, cleaning, Hillas parameters) and writes the ctapipe DL1 format.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code> computes the pedestal statistics and the pointing, read back by the <code class="docutils literal notranslate"><span class="pre">SST1MMonitoringSource</span></code> into <code class="docutils literal notranslate"><span class="pre">event.monitoring</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">notebooks/sst1m_raw_r0_r1.ipynb</span></code> shows the R0 -&gt; R1 calibration.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Tutorials" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sst1m_trigger_traces.html" class="btn btn-neutral float-right" title="The DigiCam trigger: trigger traces, patch7, and how to emulate it" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SST-1M collaboration.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

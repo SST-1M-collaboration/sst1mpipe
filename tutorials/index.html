@@ -1,0 +1,172 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tutorials &mdash; sst1mpipe 0.32.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css?v=13237357" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5f9769cd"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="../_static/togglebutton.js?v=4a39c7ea"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Reading SST-1M raw data (zfits) with the SST1MEventSource" href="sst1m_read_zfits_event_source.html" />
+    <link rel="prev" title="SST-1M analysis workflow" href="../sst1m_analysis_workflow.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            sst1mpipe
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_processing.html">Processing the data with the ctapipe tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../event_sources.html">Event sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../event_stream.html">Stream of the processed events</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../camera_event_type.html">Trigger type of the camera events</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sst1mpipe_monitoring.html">Monitoring of a run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sst1m_analysis_workflow.html">SST-1M analysis workflow</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Tutorials</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#reading-the-raw-data">Reading the raw data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sst1m_read_zfits_event_source.html">Reading SST-1M raw data (zfits) with the <code class="docutils literal notranslate"><span class="pre">SST1MEventSource</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#the-digicam-trigger">The DigiCam trigger</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sst1m_trigger_traces.html">The DigiCam trigger: trigger traces, patch7, and how to emulate it</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sst1mpipe</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Tutorials</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="tutorials">
+<h1>Tutorials<a class="headerlink" href="#tutorials" title="Link to this heading"></a></h1>
+<p>Examples of how to use sst1mpipe, as Jupyter notebooks. Each notebook is in the
+<code class="docutils literal notranslate"><span class="pre">notebooks</span></code> directory of the repository: run it from a clone of the repository with
+sst1mpipe installed (<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">-e</span> <span class="pre">.</span></code>) and the test data downloaded (<code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">lfs</span> <span class="pre">pull</span></code>).</p>
+<section id="reading-the-raw-data">
+<h2>Reading the raw data<a class="headerlink" href="#reading-the-raw-data" title="Link to this heading"></a></h2>
+<p>The SST-1M raw data (R0, <code class="docutils literal notranslate"><span class="pre">SST1M&lt;telescope&gt;_&lt;date&gt;_&lt;run&gt;.fits.fz</span></code> zfits files written by the
+DigiCam camera server) are read with the ctapipe event source <a class="reference internal" href="../event_sources.html#sst1mpipe.io.sst1m_event_source.SST1MEventSource" title="sst1mpipe.io.sst1m_event_source.SST1MEventSource"><code class="xref py py-class docutils literal notranslate"><span class="pre">SST1MEventSource</span></code></a>
+(see <a class="reference internal" href="../event_sources.html"><span class="doc">Event sources</span></a>). It is a ctapipe I/O plugin: <a class="reference external" href="https://ctapipe.readthedocs.io/en/stable/api/ctapipe.io.EventSource.html#ctapipe.io.EventSource" title="(in ctapipe v0.33.0)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ctapipe.io.EventSource</span></code></a> opens the SST-1M
+files by itself.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ctapipe.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventSource</span>
+
+<span class="k">with</span> <span class="n">EventSource</span><span class="p">(</span><span class="s2">"SST1M2_20260120_1102.fits.fz"</span><span class="p">,</span> <span class="n">max_events</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span> <span class="k">as</span> <span class="n">source</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">source</span><span class="o">.</span><span class="n">target</span><span class="p">,</span> <span class="n">source</span><span class="o">.</span><span class="n">pointing</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">source</span><span class="p">:</span>
+        <span class="n">r0</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">r0</span><span class="o">.</span><span class="n">tel</span><span class="p">[</span><span class="n">source</span><span class="o">.</span><span class="n">tel_id</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">event_id</span><span class="p">,</span> <span class="n">event</span><span class="o">.</span><span class="n">trigger</span><span class="o">.</span><span class="n">event_type</span><span class="p">,</span> <span class="n">r0</span><span class="o">.</span><span class="n">waveform</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The notebook below goes through everything the event source gives: run information
+(target, pointing, observation blocks, subarray, DigiCam configuration), the fields of the
+events (index, trigger, R0 waveforms, baselines, trigger traces, monitoring), plots of the
+waveforms and camera images, and the underlying <code class="docutils literal notranslate"><span class="pre">protozfits</span></code> data.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="sst1m_read_zfits_event_source.html">Reading SST-1M raw data (zfits) with the <code class="docutils literal notranslate"><span class="pre">SST1MEventSource</span></code></a></li>
+</ul>
+</div>
+</section>
+<section id="the-digicam-trigger">
+<h2>The DigiCam trigger<a class="headerlink" href="#the-digicam-trigger" title="Link to this heading"></a></h2>
+<p>The trigger traces recorded by the camera (trigger input traces of the patches, patch7 output), how the
+patch7 trigger works, and how to emulate it from the raw data and from simulations with
+<code class="docutils literal notranslate"><span class="pre">sst1mpipe.trigger</span></code> (patch7, patch19, TDSCAN).</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="sst1m_trigger_traces.html">The DigiCam trigger: trigger traces, patch7, and how to emulate it</a></li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../sst1m_analysis_workflow.html" class="btn btn-neutral float-left" title="SST-1M analysis workflow" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sst1m_read_zfits_event_source.html" class="btn btn-neutral float-right" title="Reading SST-1M raw data (zfits) with the SST1MEventSource" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SST-1M collaboration.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
