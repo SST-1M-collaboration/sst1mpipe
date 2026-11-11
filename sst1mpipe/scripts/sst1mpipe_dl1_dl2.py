@@ -26,7 +26,6 @@ import shutil
 import sys
 
 import pandas as pd
-from ctapipe.instrument import SubarrayDescription
 
 import sst1mpipe
 from sst1mpipe.io import (
@@ -42,6 +41,7 @@ from sst1mpipe.utils import (
     energy_min_cut,
     get_closest_rf_model,
     get_telescopes,
+    read_subarray,
 )
 
 
@@ -131,8 +131,7 @@ def main():
     shutil.copyfile(input_file, output_file)
 
     ismc = check_mc(input_file)
-    # the DL2 file is a copy of the DL1 file: same subarray (telescope positions)
-    subarray = SubarrayDescription.from_hdf(output_file)
+    subarray = read_subarray(input_file)
 
     # Cut on minimum mc_energy in the output file, which is needed if we want to safely combine MC from different productions
     # NOTE: This doesn't change the mc and histogram tab in the output files and this must be taken care of in performance

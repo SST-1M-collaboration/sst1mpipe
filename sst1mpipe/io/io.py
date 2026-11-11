@@ -27,6 +27,7 @@ from sst1mpipe.io.containers import DL1_info, DL2_info
 from sst1mpipe.monitoring import last_chunk_index
 from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
+    SIMULATION_OBSTIME,
     add_disp,
     add_features,
     add_log_true_energy,
@@ -37,8 +38,11 @@ from sst1mpipe.utils.utils import (
     event_selection,
     get_finite,
     get_pointing_radec,
+    get_tel_id,
     get_telescopes,
     join_in_order,
+    read_subarray,
+    telescope_location,
     stereo_var_cuts,
 )
 
@@ -310,8 +314,8 @@ def write_extra_parameters(
             merged_table = join(params, simulation, keys=['obs_id', 'event_id'])
             configuration = read_table(file, "/configuration/instrument/telescope/optics")
             merged_table['equivalent_focal_length'] = configuration['equivalent_focal_length'] * np.ones(len(merged_table))
-            location = SubarrayDescription.from_hdf(file).tel_earth_locations[int(tel.split('_')[-1])]
-            merged_table = add_disp(merged_table, AltAz(location=location, obstime=Time("2022-11-01T02:00")))
+            location = telescope_location(read_subarray(file), tel)
+            merged_table = add_disp(merged_table, AltAz(location=location, obstime=SIMULATION_OBSTIME))
             merged_table = add_miss(merged_table)
             merged_table = add_true_impact(merged_table, input_file=file, tel=tel)
             merged_table = add_log_true_energy(merged_table)
@@ -426,7 +430,7 @@ def read_trigger_time(input_file, tel):
     """
 
     trigger = read_table(input_file, '/dl1/event/telescope/trigger')
-    trigger = trigger[trigger['tel_id'] == int(tel.split('_')[-1])]
+    trigger = trigger[trigger['tel_id'] == get_tel_id(tel)]
     return Table({
         'obs_id': trigger['obs_id'],
         'event_id': trigger['event_id'],

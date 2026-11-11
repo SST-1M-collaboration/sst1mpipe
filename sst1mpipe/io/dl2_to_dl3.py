@@ -9,11 +9,11 @@ from astropy.io import fits
 from astropy.table import Table
 from astropy.time import Time
 from ctapipe.coordinates import TelescopeFrame
-from ctapipe.instrument import SubarrayDescription
 from gammapy.data import DataStore
 
 from sst1mpipe.analysis import add_reco_ra_dec
 from sst1mpipe.io import check_outdir, load_config, load_more_dl2_files
+from sst1mpipe.utils import read_subarray, telescope_location
 
 
 def photon_df_to_fits(dl2_photons,
@@ -64,6 +64,8 @@ def photon_df_to_fits(dl2_photons,
 
     """
 
+    if subarray is None:
+        raise ValueError("subarray is required (SubarrayDescription.from_hdf(dl2_file)): array centre, telescope positions")
     tel_setup = dl2_photons['tel_setup'].iloc[0]
     instrument = "SST1M_"+tel_setup
     if tel_setup=='stereo':
@@ -105,7 +107,7 @@ def photon_df_to_fits(dl2_photons,
     #                                       az =  np.array(dl2_photons['reco_az'])*u.deg))
 
     if ('reco_ra' not in dl2_photons.keys()) or ('reco_dec' not in dl2_photons.keys()):
-        horizon_frame = AltAz(location=subarray.tel_earth_locations[subarray.tel_ids[0]],
+        horizon_frame = AltAz(location=telescope_location(subarray, tel_setup),
                               obstime=Time(dl2_photons['local_time'], format='unix'))
         dl2_photons = add_reco_ra_dec(dl2_photons, horizon_frame=horizon_frame)
         logging.info('Calculated reco RA and DEC, which were missing in the photon list')
@@ -353,7 +355,7 @@ def dl2_dir_to_dl3(target_name   = None,
                 gammaness_cut=gammaness_cuts
                 )
     df_dl2 = df_dl2_unsort.copy().sort_values("local_time").reset_index()
-    subarray = SubarrayDescription.from_hdf(all_files[0])
+    subarray = read_subarray(all_files[0])
     #times = np.array(times_unsort)
     #times.sort()
 

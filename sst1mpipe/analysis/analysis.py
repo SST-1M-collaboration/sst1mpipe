@@ -74,7 +74,7 @@ def add_source_altaz(data, source=None, horizon_frame=None):
     return data
 
 
-def get_camera_frame(data, location=None):
+def get_camera_frame(data, location):
     """
 
     Parameters

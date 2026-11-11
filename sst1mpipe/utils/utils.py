@@ -154,6 +154,73 @@ def get_trigger_time_ns(data):
     return np.asarray(time).astype('datetime64[ns]').astype(np.int64)
 
 
+#: observation time of the horizon frames of the simulations, which have no times (arbitrary:
+#: it has no effect on the alt/az of the events)
+SIMULATION_OBSTIME = Time("2022-11-01T02:00")
+
+
+def get_tel_id(telescope):
+    """
+    Telescope id of a telescope string of the analysis chain (inverse of `get_tel_string`),
+    e.g. 21 for ``"tel_021"``
+
+    Raises
+    ------
+    ValueError
+        For ``"stereo"`` or a string which is not ``tel_<id>``.
+    """
+    prefix, _, number = str(telescope).rpartition("_")
+    if prefix != "tel" or not number.isdigit():
+        raise ValueError(f"{telescope!r} is not a telescope string (tel_<id>)")
+    return int(number)
+
+
+def telescope_location(subarray, telescope):
+    """
+    Position (EarthLocation) of a telescope of a subarray, from its telescope string (``"tel_021"``).
+    For ``"stereo"``: the first telescope of the subarray (for the RA/Dec of the stereo
+    reconstruction, from its alt/az, either telescope can be used).
+    """
+    if telescope == "stereo":
+        return subarray.tel_earth_locations[subarray.tel_ids[0]]
+    return subarray.tel_earth_locations[get_tel_id(telescope)]
+
+
+def read_subarray(path):
+    """
+    Subarray stored in a file (DL1, DL2, photon list). For an old file without subarray, the
+    subarray of sst1mpipe (``sst1m_array.h5``) is used, with a warning.
+    """
+    try:
+        return SubarrayDescription.from_hdf(path)
+    except (KeyError, OSError, tables.NoSuchNodeError) as error:
+        logging.warning("No subarray in %s (%s): the subarray of sst1mpipe %s is used", path, error, SUBARRAY_FILE)
+        return SubarrayDescription.from_hdf(SUBARRAY_FILE)
+
+
+def merge_subarrays(subarrays, name=None):
+    """
+    Subarray of the telescopes of several subarrays (e.g. those of the mono DL1 files of a stereo
+    file, one telescope each), with the reference location of the first one. A telescope in several
+    subarrays has its position in the first one.
+    """
+    from ctapipe.coordinates import GroundFrame
+
+    first = subarrays[0]
+    reference = first.reference_location
+    positions, descriptions = {}, {}
+    for subarray in subarrays:
+        earth = subarray.tel_earth_locations
+        for tel_id in subarray.tel_ids:
+            if tel_id in descriptions:
+                continue
+            ground = GroundFrame.from_earth_location(earth[tel_id], reference)
+            positions[tel_id] = u.Quantity([ground.x, ground.y, ground.z]).to(u.m)
+            descriptions[tel_id] = subarray.tel[tel_id]
+    return SubarrayDescription(name=name or first.name, tel_positions=positions, tel_descriptions=descriptions,
+                               reference_location=reference)
+
+
 def get_tel_string(tel, mc=True):
     """
     Makes string with telescope designation understandable
@@ -1164,13 +1231,13 @@ def get_event_pos_in_camera(data, horizon_frame, true_pos=True):
     return camera_pos.x, camera_pos.y
 
 
-def camera_to_altaz(pos_x, pos_y, focal, pointing_alt, pointing_az, location=None, times=None):
+def camera_to_altaz(pos_x, pos_y, focal, pointing_alt, pointing_az, location, times=None):
     """
     Horizon coordinates of camera positions, for a telescope at ``location``
     (``subarray.tel_earth_locations[tel_id]``)
     """
     # without times (simulations), an arbitrary time: it has no effect on the alt/az
-    obstime = times if times is not None else Time("2022-11-01T02:00")
+    obstime = times if times is not None else SIMULATION_OBSTIME
     horizon_frame = AltAz(location=location, obstime=obstime)
     pointing_direction = SkyCoord(
         alt=clip_alt(pointing_alt), az=pointing_az, frame=horizon_frame
@@ -1236,7 +1303,7 @@ def moon_phase_angle(time):
                       moon.distance - sun.distance*np.cos(elongation))
 
 
-def get_moon_params(data, location=None, thinning=100):
+def get_moon_params(data, location, thinning=100):
     """Moon position, separation from the pointing and phase angle, for a telescope at ``location``"""
     time = Time(data.iloc[::thinning, :]['local_time'], format='unix', scale='utc')
     moon = get_moon(time, location=location)

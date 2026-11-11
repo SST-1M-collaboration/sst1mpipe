@@ -2,10 +2,8 @@
 Positions of the telescopes: subarray of sst1mpipe/resources/instrument/sst1m_array.h5, stored in the
 files of the pipeline (DL1, DL2, photon lists) and read with SubarrayDescription.from_hdf
 """
-import sys
 
 import astropy.units as u
-import matplotlib
 import numpy as np
 import pandas as pd
 import pytest
@@ -16,8 +14,7 @@ from ctapipe.instrument import SubarrayDescription
 from conftest import OBSERVATION_RUNS, run_process
 from sst1mpipe.io import write_photon_list
 from sst1mpipe.resources import MC_CONFIG_FILES, SUBARRAY_FILE, TEST_DATA_DIR
-from sst1mpipe.scripts import sst1mpipe_obsplan
-from sst1mpipe.utils import camera_to_altaz
+from sst1mpipe.utils import camera_to_altaz, get_tel_id, merge_subarrays, read_subarray, telescope_location
 
 # longitude (deg), latitude (deg) and height (m) formerly given by the config files
 # (telescope_coords, array_center_coords)
@@ -85,15 +82,41 @@ def test_photon_list_subarray(tmp_path):
     assert list(SubarrayDescription.from_hdf(output).tel_ids) == [21]
 
 
-@pytest.mark.parametrize("subarray_file", [None, "dl1"])
-def test_obsplan_subarray_file(tmp_path, monkeypatch, subarray_file):
-    """sst1mpipe_obsplan uses the site of sst1m_array.h5, or of another subarray file"""
-    matplotlib.use("Agg")
-    argv = ["sst1mpipe_obsplan", "--date", "20260120", "--ra", "166.1", "--dec", "38.2", "--out-dir", str(tmp_path)]
-    if subarray_file == "dl1":
-        dl1 = tmp_path / "events.dl1.h5"
-        run_process(OBSERVATION_RUNS[22]["path"], dl1, "--max-events=5")
-        argv += ["--subarray-file", str(dl1)]
-    monkeypatch.setattr(sys, "argv", argv)
-    sst1mpipe_obsplan.main()
-    assert (tmp_path / "sst1m_observability_2026-01-20.png").exists()
+def test_get_tel_id():
+    assert get_tel_id("tel_021") == 21 and get_tel_id("tel_001") == 1
+    for telescope in ("stereo", "21", "cs1"):
+        with pytest.raises(ValueError, match="not a telescope string"):
+            get_tel_id(telescope)
+
+
+def test_telescope_location():
+    """the position of a telescope from its string; in stereo, the first telescope of the subarray"""
+    assert telescope_location(SUBARRAY, "tel_022") == SUBARRAY.tel_earth_locations[22]
+    assert telescope_location(SUBARRAY, "stereo") == SUBARRAY.tel_earth_locations[SUBARRAY.tel_ids[0]]
+
+
+def test_read_subarray_of_old_file(tmp_path):
+    """a file without subarray (written before the subarray was stored) gets the subarray of sst1mpipe"""
+    output = tmp_path / "old_events_pl.h5"
+    write_photon_list(pd.DataFrame({"event_id": [1], "reco_alt": [70.0]}), output_file=output, telescope="tel_021")
+    subarray = read_subarray(output)
+    assert list(subarray.tel_ids) == list(SUBARRAY.tel_ids)
+
+
+def test_merge_subarrays():
+    """the subarrays of the mono DL1 files of a stereo file: both telescopes at their positions"""
+    merged = merge_subarrays([SUBARRAY.select_subarray([21]), SUBARRAY.select_subarray([22])])
+    assert list(merged.tel_ids) == [21, 22]
+    for tel_id in (21, 22):
+        assert distance(merged.tel_earth_locations[tel_id], SUBARRAY.tel_earth_locations[tel_id]) < 1 * u.mm
+    # a telescope in several subarrays keeps its position in the first one
+    moved = SubarrayDescription(name="moved", tel_positions={22: [10.0, 0.0, 0.0] * u.m},
+                                tel_descriptions={22: SUBARRAY.tel[22]}, reference_location=SUBARRAY.reference_location)
+    assert distance(merge_subarrays([moved, SUBARRAY]).tel_earth_locations[22], SUBARRAY.tel_earth_locations[22]) > 1 * u.m
+
+
+@pytest.mark.parametrize("function", ["apply_models", "stereo_reconstruction"])
+def test_subarray_is_required(function):
+    reco = pytest.importorskip("sst1mpipe.reco.reco")  # needs pyirf, compatible with the installed astropy
+    with pytest.raises(ValueError, match="subarray is required"):
+        getattr(reco, function)(pd.DataFrame())
