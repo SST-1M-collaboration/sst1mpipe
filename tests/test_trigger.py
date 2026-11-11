@@ -204,9 +204,17 @@ def test_missing_trigger_traces_are_refused():
     from sst1mpipe.io.containers import SST1MArrayEventContainer
 
     event = SST1MArrayEventContainer()
-    event.r0.tel[22].trigger_input_traces = np.zeros((432, 50)) * np.nan   # what the reader stores
+    event.r0.tel[22].trigger_input_traces = None   # what the reader stores
     with pytest.raises(ValueError, match="no trigger_input_traces"):
         tdscan().trigger_traces(event, 22)
+
+
+@pytest.mark.parametrize("traces", [None, np.empty(0, dtype=np.uint8)])
+def test_trigger_traces_not_in_the_camera_event(traces):
+    """The trigger traces missing in a camera event (None or empty field) are None in the R0 data"""
+    from sst1mpipe.io.sst1m_event_source import prepare_trigger_input, read_trigger_traces
+
+    assert read_trigger_traces(traces, prepare_trigger_input, "trigger_input_traces", 50, np.arange(432)) is None
 
 
 def test_trigger_tool(tmp_path):

@@ -106,13 +106,13 @@ class TriggerEmulator(TelescopeComponent):
             waveform = event.r0.tel[tel_id].waveform[0]
             return self._compute_trigger_traces(waveform, pedestal[0])
 
-        traces = np.asarray(event.r0.tel[tel_id].trigger_input_traces)
-        if not np.all(np.isfinite(traces)):
+        traces = event.r0.tel[tel_id].trigger_input_traces
+        if traces is None or not np.all(np.isfinite(traces)):
             raise ValueError(
-                f"Telescope {tel_id}: no trigger_input_traces in this file (the reader filled them with NaN), "
+                f"Telescope {tel_id}: no trigger_input_traces in this file (None in the R0 data), "
                 "the trigger cannot be emulated on it"
             )
-        return traces.astype(np.int64)
+        return np.asarray(traces).astype(np.int64)
 
     @abstractmethod
     def scores(self, traces):
