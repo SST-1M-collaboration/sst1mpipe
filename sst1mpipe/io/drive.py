@@ -54,6 +54,11 @@ def read_drive_logs(file, subarray=None):
         data = hdul["logs"].data
 
         tel_id = int(re.search(r"\d+$", header["SUBSYS"]).group()) + DRIVE_TEL_ID_OFFSET
+        if tel_id not in subarray.tel:
+            raise ValueError(
+                f"Drive logs {file}: telescope {tel_id} (SUBSYS {header['SUBSYS']}, telescope 20 + n) is not in the"
+                f" subarray (telescopes {sorted(subarray.tel_ids)})"
+            )
         frame = header["RADECSYS"].lower()
         equinox = f"J{header['EQUINOX']:.0f}"
         time_scale = header["TIMESSYS"].lower()

@@ -41,6 +41,8 @@ TIME_CMAP.set_bad(alpha=0)
 
 # longest time between two samples of the drive counted as tracking time (s)
 MAX_SAMPLE_DURATION = 5
+# a zfits run started up to this time before a field (slew, settling) is drawn on it
+TARGET_START_MARGIN = 10 * u.min
 
 
 def mean_direction(coords):
@@ -65,11 +67,24 @@ def tracking_periods(drive, min_tracking):
     radec = drive_radec(track)
     # without the AltAz attributes (time, location) carried by the SkyCoord, to merge the telescopes
     track["radec"] = SkyCoord(radec.ra, radec.dec, frame=radec.frame.replicate_without_data())
-    duration = np.diff(track["time"].unix, append=np.inf)
-    track["duration"] = np.clip(duration, 0, MAX_SAMPLE_DURATION) * u.s
-    periods = np.split(np.arange(len(track)), np.flatnonzero(np.diff(index) > 1) + 1)
+    periods = [p for p in np.split(np.arange(len(track)), np.flatnonzero(np.diff(index) > 1) + 1) if len(p) > 0]
+    track["duration"] = sample_durations(track["time"].unix, periods) * u.s
     periods = [p for p in periods if (track["time"][p[-1]] - track["time"][p[0]]).to_value(u.s) >= min_tracking]
     return track, periods
+
+
+def sample_durations(times, periods):
+    """
+    Time (s) represented by each sample of the tracking periods: the time to the next sample of
+    its period (at most MAX_SAMPLE_DURATION), the median step of the period for its last sample
+    (the gaps between the periods are not tracking time)
+    """
+    durations = np.zeros(len(times))
+    for p in periods:
+        steps = np.clip(np.diff(times[p]), 0, MAX_SAMPLE_DURATION)
+        last = np.median(steps) if len(steps) > 0 else 0.0
+        durations[p] = np.append(steps, last)
+    return durations
 
 
 def find_fields(tracks, radius):
@@ -116,10 +131,14 @@ def read_targets(files):
 
 
 def field_targets(field, targets, radius):
-    """Targets of the zfits runs in the field, one per pointing"""
+    """
+    Targets of the zfits runs in the field, one per pointing: runs started during the field, or
+    up to TARGET_START_MARGIN before it (run started during the slew or the settling)
+    """
     selected = {}
+    start = field["start"] - TARGET_START_MARGIN
     for target in targets:
-        if field["start"] <= target["time"] <= field["stop"] and target["coord"].separation(field["center"]) < radius:
+        if start <= target["time"] <= field["stop"] and target["coord"].separation(field["center"]) < radius:
             selected[target["name"]] = target
     return list(selected.values())
 
@@ -223,9 +242,16 @@ def allsky_wcs(fields, frame):
     wcs.wcs.cdelt = [-1, 1]
     half_x, half_y = int(np.ceil(np.degrees(2 * np.sqrt(2)))), int(np.ceil(np.degrees(np.sqrt(2))))
     wcs.wcs.crpix = [half_x + 1, half_y + 1]
-    wcs.wcs.radesys = frame.name.upper()
-    wcs.wcs.equinox = frame.equinox.jyear
+    set_wcs_frame(wcs, frame)
     return wcs, (2 * half_y + 1, 2 * half_x + 1)
+
+
+def set_wcs_frame(wcs, frame):
+    """Sky frame of a WCS: its name, and its equinox for the frames which have one (FK5, not ICRS)"""
+    wcs.wcs.radesys = frame.name.upper()
+    equinox = getattr(frame, "equinox", None)
+    if equinox is not None:
+        wcs.wcs.equinox = equinox.jyear
 
 
 def field_wcs(center, half_width, n_bins=100):
@@ -236,8 +262,7 @@ def field_wcs(center, half_width, n_bins=100):
     scale = 2 * half_width / n_bins
     wcs.wcs.cdelt = [-scale, scale]
     wcs.wcs.crpix = [(n_bins + 1) / 2, (n_bins + 1) / 2]
-    wcs.wcs.radesys = center.frame.name.upper()
-    wcs.wcs.equinox = center.frame.equinox.jyear
+    set_wcs_frame(wcs, center.frame)
     return wcs, (n_bins, n_bins)
 
 
@@ -451,8 +476,15 @@ class PlotDrivePointingTool(Tool):
                 drive["pointing"] = self.pointing_model.revert(tel_id, drive["pointing"])
             tracks[tel_id] = tracking_periods(drive, self.min_tracking)
         tracks = dict(sorted(tracks.items()))
+        for tel_id, (_, periods) in tracks.items():
+            if len(periods) == 0:
+                self.log.warning("Telescope %d: no tracking on source of at least %g s", tel_id, self.min_tracking)
         radius = self.field_radius * u.deg
         fields = find_fields(tracks, radius)
+        self.plots = []
+        if len(fields) == 0:
+            self.log.warning("No tracking on source of at least %g s in the drive logs: no plot", self.min_tracking)
+            return
         targets = read_targets(self.zfits_files)
         for field in fields:
             self.log.info(

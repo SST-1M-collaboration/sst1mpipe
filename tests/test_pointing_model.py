@@ -99,6 +99,11 @@ def test_apply_tolerance(subarray, caplog):
     assert distance[0] < model.tolerance * u.arcsec
     assert distance[1] > model.tolerance * u.arcsec
     assert "Pointing model of telescope 21: 1 positions inverted with an error above 30.0 arcsec" in caplog.text
+    # without the check: the same drive position, no warning
+    caplog.clear()
+    unchecked = model.apply(21, sky, check=False)
+    assert np.all(unchecked.separation(drive) < 1e-6 * u.arcsec)
+    assert "error above" not in caplog.text
 
 
 def test_coefficients_per_telescope(subarray):
@@ -182,6 +187,17 @@ def test_plot_drive_pointing_tool(tmp_path, revert_pointing_model):
     assert run_tool(PlotDrivePointingTool(), argv=argv, cwd=tmp_path) == 0
     for name in ("drive_radec_vs_time.png", "drive_radec_map.png"):
         assert (tmp_path / "plots" / name).stat().st_size > 0
+
+
+def test_plot_drive_pointing_tool_without_tracking(tmp_path):
+    """drive logs without tracking period long enough: a warning and no plot, no error"""
+    from sst1mpipe.scripts.sst1mpipe_plot_drive_pointing_tool import PlotDrivePointingTool
+
+    tool = PlotDrivePointingTool()
+    argv = ["-i", str(DRIVE_FILES[0]), "-o", str(tmp_path / "plots"), "--min-tracking", "1e9"]
+    assert run_tool(tool, argv=argv, cwd=tmp_path) == 0
+    assert tool.plots == []
+    assert not list((tmp_path / "plots").iterdir())
 
 
 @pytest.mark.parametrize("tel_id, ie", [(21, -574.57), (22, -29.98)])

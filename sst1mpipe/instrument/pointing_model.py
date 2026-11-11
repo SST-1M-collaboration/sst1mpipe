@@ -50,14 +50,17 @@ class PointingModel(TelescopeComponent):
         """
         return self._add_corrections(tel_id, pointing, 1)
 
-    def apply(self, tel_id, pointing):
+    def apply(self, tel_id, pointing, check=True):
         """
         Drive position (AltAz SkyCoord) of the telescope tel_id pointing to the sky position
-        ``pointing`` (AltAz SkyCoord): first order inverse of `revert`. A warning is logged if
-        `revert` of the drive position is farther than ``tolerance`` from the sky position.
-        Altitudes beyond +-90 deg are NaN.
+        ``pointing`` (AltAz SkyCoord): first order inverse of `revert`. With ``check``, a warning
+        is logged if `revert` of the drive position is farther than ``tolerance`` from the sky
+        position (it evaluates the model a second time: ``check=False`` for large arrays or per
+        event). Altitudes beyond +-90 deg are NaN.
         """
         drive = self._add_corrections(tel_id, pointing, -1)
+        if not check:
+            return drive
         distance = np.atleast_1d(self.revert(tel_id, drive).separation(pointing).to_value(u.arcsec))
         above = distance > self.tolerance
         if np.any(above):
