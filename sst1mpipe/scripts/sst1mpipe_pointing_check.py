@@ -39,7 +39,6 @@ from sst1mpipe.io import (
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import (
-    get_location,
     get_target,
     get_tel_string,
     simbad_query,
@@ -177,7 +176,7 @@ def main():
     time_all = np.array(time_all)
 
     tel_string = get_tel_string(tel, mc=False)
-    location = get_location(config=config, tel=tel_string)
+    location = subarray.tel_earth_locations[tel]
 
     index_mid = int(std_samples.shape[0]/2)
     obstime = Time(time_all, format='unix')

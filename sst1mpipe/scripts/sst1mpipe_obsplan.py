@@ -17,8 +17,8 @@ Usage:
 $> python sst1mpipe_obsplan.py
 --date 20240810
 --source-catalog sst1m_source_catalog.json
---output-dir ./
---config sst1mpipe_config.json
+--out-dir ./
+--subarray-file sst1m_array.h5
 --min-moon-dist 50.
 --max-zenith 50.
 --ra 350.
@@ -36,10 +36,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from astropy.coordinates import AltAz, SkyCoord, get_moon, get_sun
 from astropy.time import Time
+from ctapipe.instrument import SubarrayDescription
 
 import sst1mpipe
-from sst1mpipe.io import check_outdir, load_config, load_source_catalog
-from sst1mpipe.utils import get_location, get_moon_phase
+from sst1mpipe.io import check_outdir, load_source_catalog
+from sst1mpipe.resources import SUBARRAY_FILE
+from sst1mpipe.utils import get_moon_phase
 
 
 def parse_args():
@@ -64,10 +66,13 @@ def parse_args():
                         help='Path to a json file with catalog of all observed SST1M targets.',
                         )
 
-    parser.add_argument('--config', '-c', action='store', type=str,
-                        dest='config_file',
-                        help='Path to a configuration file (to get the telescope location).',
+    parser.add_argument('--subarray-file', action='store', type=str,
+                        dest='subarray_file',
+                        default=str(SUBARRAY_FILE),
+                        help='HDF5 file with the subarray of the site (e.g. a DL1 file); its reference location'
+                             ' is used. Default: sst1mpipe/resources/instrument/sst1m_array.h5',
                         )
+
     parser.add_argument(
                         '--min-moon-dist',
                         dest='min_moon',
@@ -103,7 +108,6 @@ def main():
     args = parse_args()
     date = args.date
     source_catalog_file = args.source_cat
-    config_file = args.config_file
     min_moon_dist = args.min_moon * u.deg
     max_zenith = args.max_zenith * u.deg
     min_alt = 90.*u.deg - max_zenith
@@ -151,8 +155,7 @@ def main():
     else:
         scale = '[CET]'
 
-    config = load_config(config_file)
-    location = get_location(config=config, tel='tel_021')
+    location = SubarrayDescription.from_hdf(args.subarray_file).reference_location
     midnight = Time(tonight + ' 00:00:00') + 1 * u.day
     time_span = midnight + np.linspace(-8, 8, 100) * u.hour
     time_span_sparse = midnight + np.linspace(-8, 8, 10) * u.hour
