@@ -79,10 +79,16 @@ def generate_geometry_from_camera(
     return geom
 
 
+#: type of the DigiCam matrices (patches, clusters): their products stay exact (at most
+#: 19 patches x 255 = 4845) and scipy keeps int16 for the products with the uint8 trigger traces,
+#: about 4 times faster than int64 (bool or uint8 matrices would give uint8 products, which overflow)
+MATRIX_DTYPE = np.int16
+
+
 def compute_patch_matrix(camera):
     n_pixels = len(camera.Pixels)
     n_patches = len(camera.Patches)
-    patch_matrix = np.zeros((n_patches, n_pixels), dtype=int)
+    patch_matrix = np.zeros((n_patches, n_pixels), dtype=MATRIX_DTYPE)
 
     for patch in camera.Patches:
 
@@ -94,7 +100,7 @@ def compute_patch_matrix(camera):
 
 def compute_cluster_matrix_7(camera):
     n_clusters = len(camera.Clusters_7)
-    cluster_matrix = np.zeros((n_clusters, n_clusters), dtype=int)
+    cluster_matrix = np.zeros((n_clusters, n_clusters), dtype=MATRIX_DTYPE)
 
     for cluster in camera.Clusters_7:
 
@@ -110,12 +116,12 @@ def compute_neighbor_patch_matrix(cluster_7_matrix):
     without their centre
     """
     n_patches = cluster_7_matrix.shape[0]
-    return (cluster_7_matrix - identity(n_patches, dtype=np.int64, format="csr")).tocsr()
+    return (cluster_7_matrix - identity(n_patches, dtype=MATRIX_DTYPE, format="csr")).tocsr()
 
 
 def compute_cluster_matrix_19(camera):
     n_clusters = len(camera.Clusters_19)
-    cluster_matrix = np.zeros((n_clusters, n_clusters), dtype=int)
+    cluster_matrix = np.zeros((n_clusters, n_clusters), dtype=MATRIX_DTYPE)
 
     for cluster in camera.Clusters_19:
 
