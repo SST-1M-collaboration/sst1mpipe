@@ -9,8 +9,9 @@ Reading the raw data
 --------------------
 
 The SST-1M raw data (R0, ``SST1M<telescope>_<date>_<run>.fits.fz`` zfits files written by the
-DigiCam camera server) are read with the ctapipe event source ``SST1MEventSource``. It is a
-ctapipe I/O plugin: ``ctapipe.io.EventSource`` opens the SST-1M files by itself.
+DigiCam camera server) are read with the ctapipe event source :class:`~sst1mpipe.io.sst1m_event_source.SST1MEventSource`
+(see :doc:`../event_sources`). It is a ctapipe I/O plugin: `ctapipe.io.EventSource` opens the SST-1M
+files by itself.
 
 .. code-block:: python
 

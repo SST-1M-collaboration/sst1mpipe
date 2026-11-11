@@ -160,16 +160,23 @@ def camera_config_container(message, data_level):
 
 class ZMQEventSource(EventSource):
     """
-    Read the telescope events of a ZMQ stream (PULL socket).
+    Event source of the telescope events sent in a ZMQ stream, e.g. by the camera server for the
+    real time analysis.
+
+    The source connects a PULL socket to ``input_url`` (``<transport>://<address>``, e.g.
+    ``tcp://192.168.1.1:1986``) and reads the events until the end of the stream. It is a ctapipe
+    I/O plugin (entry point ``ctapipe_io``): `ctapipe.io.EventSource` opens a ZMQ endpoint with it
+    (see `is_compatible`).
 
     The messages of the stream (``CTAMessage``) are:
 
     - the DigiCam camera events (``CAMERA_EVENT``, ``DataModel.CameraEvent`` as in the zfits
-      files), filling ``event.r0`` and the trigger as the `SST1MEventSource`. The event id is
+      files), filling ``event.r0`` and the trigger as the
+      `~sst1mpipe.io.sst1m_event_source.SST1MEventSource`. The event id is
       the SWAT array event id if the first event has one, the camera event number otherwise.
     - the DigiCam run header (``CAMERA_RUN_HEADER``, ``DataModel.CameraRunHeader``) of a
       telescope, available in ``run_headers``, giving the obs_id of its camera events
-      (see `run_header_obs_id`) if there is no data stream message.
+      (see ``run_header_obs_id``) if there is no data stream message.
     - the data stream of a telescope (``TELESCOPE_DATA_STREAM``, ``DL0_TELESCOPE_DATA_STREAM``):
       its scheduling and observation blocks and the encoding of the waveforms
       (``stored / waveform_scale - waveform_offset``)
@@ -188,11 +195,22 @@ class ZMQEventSource(EventSource):
     telescope: ``allowed_tels`` if it gives a single telescope, otherwise the telescope of the
     first messages of the stream (received when the subarray is first used, and kept for the
     event loop).
+
+    Examples
+    --------
+    >>> from ctapipe.io import EventSource
+    >>> with EventSource("tcp://192.168.1.1:1986") as source:  # doctest: +SKIP
+    ...     for event in source:
+    ...         print(event.index.event_id, event.trigger.event_type, event.trigger.tels_with_trigger)
+
+    See Also
+    --------
+    sst1mpipe.io.sst1m_event_source.SST1MEventSource : the camera events of the zfits files
     """
 
     input_url = Unicode(
         info_text="URL of the input stream",
-        help="TCP and port address for the input ZMQ stream. Example `tcp://192.168.1.1:1986` ",
+        help="TCP and port address for the input ZMQ stream. Example ``tcp://192.168.1.1:1986``",
     ).tag(config=True)
 
     subarray_file = Path(
@@ -252,13 +270,14 @@ class ZMQEventSource(EventSource):
     @staticmethod
     def is_compatible(file_path) -> bool:
         """
-        True for a ZMQ endpoint ``<transport>://<address>`` (see `is_zmq_endpoint`),
+        True for a ZMQ endpoint ``<transport>://<address>`` (see ``is_zmq_endpoint``),
         without opening a connection
         """
         return is_zmq_endpoint(file_path)
 
     @property
     def is_stream(self):
+        """True: the events are received in a stream, whose length is not known"""
         return True
 
     @property
@@ -327,10 +346,12 @@ class ZMQEventSource(EventSource):
 
     @property
     def is_simulation(self) -> bool:
+        """False: the streams are real data"""
         return False
 
     @property
     def datalevels(self):
+        """The data levels of the events of a stream: R0 (camera events), R1 or DL0"""
         return (DataLevel.R0, DataLevel.R1, DataLevel.DL0)
 
     def _generator(self):
@@ -510,6 +531,7 @@ class ZMQEventSource(EventSource):
         return event
 
     def close(self):
+        """Close the socket and the ZMQ context"""
         self.socket.close(linger=0)
         self._context.term()
         self.log.info("Closed ZMQ connection to %s", self.input_url)
