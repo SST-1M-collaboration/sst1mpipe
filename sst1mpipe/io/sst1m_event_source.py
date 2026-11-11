@@ -316,7 +316,7 @@ def prepare_trigger_output(traces):
     traces = np.unpackbits(traces.reshape(-1, N_SECTORS, n_bytes, 1), axis=-1)
     traces = traces[..., ::-1]
     traces = traces.reshape(-1, N_PATCHES)
-    return traces.T
+    return traces.T.astype(bool)
 
 
 # trigger traces of the camera events: R0 field, conversion to (432, n_samples) in readout order,
@@ -410,8 +410,9 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
 
     r0 = array_event.r0.tel[tel_id]
     r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
-    # baseline of DigiCam in 1/16 ADC; negative for the pixels without data (dead modules): 0
-    r0.pedestal = np.maximum(camera_event.hiGain.waveforms.baselines[sort_ids] / 16, 0)
+    # baseline of DigiCam in 1/16 ADC (int16); negative for the pixels without data (dead modules): 0.
+    # float32 holds it exactly (float16 would not: 11 bits of mantissa)
+    r0.pedestal = np.maximum(camera_event.hiGain.waveforms.baselines[sort_ids], 0).astype(np.float32) / 16
     r0.camera_event_number = camera_event.eventNumber
     r0.pixel_flags = camera_event.pixels_flags[sort_ids]
     r0.event_time = local_time
