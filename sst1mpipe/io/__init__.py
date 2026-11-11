@@ -12,7 +12,6 @@ from .io import (
     pedestal_cleaning_fractions,
     get_pde_correction_factors,
     load_config,
-    translate_legacy_calibration_config,
     load_distributions_sst1m,
     load_dl1_pedestals,
     load_r0_pedestals,

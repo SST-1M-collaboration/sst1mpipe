@@ -3,11 +3,12 @@ Monitoring data of a SST-1M run, used afterwards by sst1mpipe-process (monitorin
 
 The raw data of the run (R0, SST1MEventSource) are read twice:
 
-1. pointing and statistics of the ADC samples of the pedestal events;
+1. pointing and statistics of the ADC samples of the pedestal events, from which the camera
+   calibration coefficients are computed (CameraCoefficientsCalculator: voltage drop correction,
+   dead pixels);
 2. statistics of the images of the pedestal events, calibrated exactly as the events by
-   sst1mpipe-process: R0R1Calibrator with the statistics of the ADC samples of the first pass at
-   the time of the pedestal event (voltage drop correction, dead pixels), CameraCalibrator and
-   ImageSaturationCorrector.
+   sst1mpipe-process: R0R1Calibrator, CameraCalibrator with the coefficients of the first pass at
+   the time of the pedestal event, and ImageSaturationCorrector.
 
 Content of the monitoring file:
 
@@ -19,6 +20,10 @@ Content of the monitoring file:
   chunks of pedestal events (a chunk of the last chunk_size pedestal events every chunk_shift):
   mean and median of the baseline, std (noise) of the samples, in the table
   r0/monitoring/telescope/calibration/camera/pixel_statistics/<event type>_waveform/tel_XXX
+- camera calibration coefficients (CameraCoefficientsCalculator), one row per chunk of the
+  statistics of the ADC samples of the pedestal events of the run: factor (1 / charge drop due to
+  the voltage drop) and outlier_mask (dead pixels), in the ctapipe table
+  dl1/monitoring/telescope/calibration/camera/coefficients/tel_XXX
 - statistics of the images of the pedestal events (ImageStatisticsCalculator), calibrated as by
   sst1mpipe-process, in rolling chunks of pedestal events, in the ctapipe pixel statistics table
   dl1/monitoring/telescope/calibration/camera/pixel_statistics/<event type>_image/tel_XXX
@@ -40,7 +45,7 @@ from ctapipe.core import Provenance, Tool, ToolConfigurationError
 from ctapipe.core.traits import Bool, Float, Path, classes_with_traits, flag
 from ctapipe.io import EventSource, HDF5TableWriter, metadata, write_table
 from ctapipe.io.datawriter import write_reference_metadata_headers
-from ctapipe.io.hdf5dataformat import DL0_TEL_POINTING_GROUP, DL1_PIXEL_STATISTICS_GROUP
+from ctapipe.io.hdf5dataformat import DL0_TEL_POINTING_GROUP, DL1_CAMERA_COEFFICIENTS_GROUP, DL1_PIXEL_STATISTICS_GROUP
 from ctapipe.monitoring.aggregator import BaseChunking, StatisticsAggregator
 from ctapipe.monitoring.outlier import OutlierDetector
 from tqdm import tqdm
@@ -48,9 +53,10 @@ from tqdm import tqdm
 from sst1mpipe.calib import ImageSaturationCorrector, R0R1Calibrator
 from sst1mpipe.io import R0_PIXEL_STATISTICS_GROUP
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
-from sst1mpipe.io.monitoring_source import statistics_container, waveform_statistics_interpolator
+from sst1mpipe.io.monitoring_source import LastChunkCoefficients
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.monitoring import (
+    CameraCoefficientsCalculator,
     ImageStatisticsCalculator,
     WaveformStatisticsCalculator,
     check_chunk_shift,
@@ -113,8 +119,8 @@ class MonitoringTool(Tool):
 
     classes = (
         [
-            R0R1Calibrator, SiPMVoltageDropModel, CameraCalibrator, ImageSaturationCorrector,
-            WaveformStatisticsCalculator, ImageStatisticsCalculator,
+            R0R1Calibrator, CameraCoefficientsCalculator, SiPMVoltageDropModel, CameraCalibrator,
+            ImageSaturationCorrector, WaveformStatisticsCalculator, ImageStatisticsCalculator,
         ]
         + classes_with_traits(EventSource)
         + classes_with_traits(StatisticsAggregator)
@@ -135,6 +141,7 @@ class MonitoringTool(Tool):
             )
         subarray = self.event_source.subarray
         self.r0_r1_calibrator = R0R1Calibrator(parent=self, subarray=subarray)
+        self.coefficients_calculator = CameraCoefficientsCalculator(parent=self, subarray=subarray)
         self.camera_calibrator = CameraCalibrator(parent=self, subarray=subarray)
         self.image_saturation_corrector = ImageSaturationCorrector(parent=self, subarray=subarray)
         self.waveform_calculator = WaveformStatisticsCalculator(parent=self, subarray=subarray)
@@ -150,10 +157,11 @@ class MonitoringTool(Tool):
         # quantities of the pedestal events of each (telescope, event type), in the event loops
         self.pedestal_waveforms = defaultdict(list)
         self.pedestal_images = defaultdict(list)
-        # statistics of each (telescope, event type)
+        # statistics and camera calibration coefficients of each (telescope, event type)
         self.waveform_statistics = {}
         self.image_statistics = {}
-        # pedestal events without statistics of the ADC samples, whose image is not used
+        self.coefficients = {}
+        # pedestal events without coefficients, whose image is not used
         self.n_pedestals_without_statistics = 0
 
     def start(self):
@@ -168,20 +176,23 @@ class MonitoringTool(Tool):
         self.waveform_statistics = self.compute_statistics(self.pedestal_waveforms, self.waveform_calculator, "waveform")
         if len(self.waveform_statistics) == 0:
             return
+        self.coefficients = {
+            key: self.coefficients_calculator(statistics, key[0]) for key, statistics in self.waveform_statistics.items()
+        }
 
-        # second pass: images of the pedestal events, calibrated with the statistics of the ADC
-        # samples of the first pass, as the events by sst1mpipe-process
-        interpolators = {
-            event_type: waveform_statistics_interpolator({
-                tel_id: table for (tel_id, table_type), table in self.waveform_statistics.items() if table_type == event_type
+        # second pass: images of the pedestal events, calibrated with the coefficients of the
+        # first pass, as the events by sst1mpipe-process
+        coefficients = {
+            event_type: LastChunkCoefficients({
+                tel_id: table for (tel_id, table_type), table in self.coefficients.items() if table_type == event_type
             })
-            for event_type in {event_type for _, event_type in self.waveform_statistics}
+            for event_type in {event_type for _, event_type in self.coefficients}
         }
         source = self.enter_context(EventSource(parent=self))
         for event in self.with_progress_bar(source, "pass 2/2"):
             event_type = event.trigger.event_type
-            if event_type in interpolators:
-                self.add_pedestal_images(event, event_type, interpolators[event_type])
+            if event_type in coefficients:
+                self.add_pedestal_images(event, event_type, coefficients[event_type])
         if self.n_pedestals_without_statistics > 0:
             self.log.warning(
                 "%d pedestal events without statistics of the ADC samples: not used for the statistics of the images",
@@ -207,17 +218,16 @@ class MonitoringTool(Tool):
                 (event.trigger.tel[tel_id].time, event.index.event_id, moments)
             )
 
-    def add_pedestal_images(self, event, event_type, interpolator):
+    def add_pedestal_images(self, event, event_type, coefficients):
         """
-        Calibrated image (DL1) of a pedestal event, as the events by sst1mpipe-process: statistics
-        of the ADC samples at the time of the event (last chunk ended before it), R0R1Calibrator
-        (voltage drop correction, dead pixels), CameraCalibrator and ImageSaturationCorrector.
-        The events without statistics of the ADC samples are not used, as in sst1mpipe-process.
+        Calibrated image (DL1) of a pedestal event, as the events by sst1mpipe-process:
+        R0R1Calibrator, CameraCalibrator with the coefficients at the time of the event (last chunk
+        ended before it: voltage drop correction, dead pixels) and ImageSaturationCorrector.
+        The events without coefficients are not used, as in sst1mpipe-process.
         """
         for tel_id in event.r0.tel:
-            statistics = event.monitoring.tel[tel_id].camera.pixel_statistics
-            statistics.pedestal_waveform = statistics_container(interpolator(tel_id, event.trigger.time))
-            if statistics.pedestal_waveform.std is None:
+            event.monitoring.tel[tel_id].camera.coefficients = coefficients(tel_id, event.trigger.time)
+            if event.monitoring.tel[tel_id].camera.coefficients.factor is None:
                 self.n_pedestals_without_statistics += 1
                 return
         self.r0_r1_calibrator(event)
@@ -258,6 +268,7 @@ class MonitoringTool(Tool):
         self.write_pointing_tables()
         self.write_statistics_tables(self.waveform_statistics, "waveform", R0_PIXEL_STATISTICS_GROUP)
         self.write_statistics_tables(self.image_statistics, "image", DL1_PIXEL_STATISTICS_GROUP)
+        self.write_coefficients_tables()
         Provenance().add_output_file(str(self.output_path), role="Monitoring")
         self.log.info("Monitoring data written in %s", self.output_path)
 
@@ -304,6 +315,17 @@ class MonitoringTool(Tool):
             table = QTable(dict(time=times, azimuth=altaz.az.to(u.rad), altitude=altaz.alt.to(u.rad)))
             write_table(table, self.output_path, f"{DL0_TEL_POINTING_GROUP}/tel_{tel_id:03d}")
             self.log.info("Pointing of telescope %d: %d rows", tel_id, len(table))
+
+    def write_coefficients_tables(self):
+        """
+        Camera calibration coefficients of each telescope, from the pedestal events of the type of
+        the run (pedestal_event_type of the event source), in the ctapipe coefficients table
+        """
+        event_type = self.event_source.pedestal_event_type
+        for (tel_id, table_type), table in self.coefficients.items():
+            if table_type == event_type:
+                write_table(table, self.output_path, f"{DL1_CAMERA_COEFFICIENTS_GROUP}/tel_{tel_id:03d}")
+                self.log.info("Camera calibration coefficients of telescope %d: %d chunks", tel_id, len(table))
 
     def write_statistics_tables(self, statistics, column, group):
         """Statistics of each telescope and event type, in the tables ``group/<event type>_<column>/tel_XXX``"""

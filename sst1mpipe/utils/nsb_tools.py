@@ -11,8 +11,8 @@ the square of their std, see sst1mpipe-monitoring):
 
 - the baseline shift (ADC), with a spline fitted for each telescope;
 - the gain drop and the charge drop (gain and PDE), the factors by which the gain and the charges
-  are reduced (the voltage drop correction of the `~sst1mpipe.calib.R0R1Calibrator` divides the
-  charges by the charge drop);
+  are reduced (the voltage drop correction, factor of the camera calibration coefficients of
+  `~sst1mpipe.monitoring.CameraCoefficientsCalculator`, divides the charges by the charge drop);
 - the NSB rate per pixel, in p.e. and in photons.
 
 All its parameters are configurable per telescope, in the config files (lists, e.g.
@@ -130,6 +130,11 @@ class SiPMVoltageDropModel(TelescopeComponent):
         spline = self._parameter("baseline_shift_spline", tel_id)
         tck = (np.asarray(spline["knots"], dtype=float), np.asarray(spline["coefficients"], dtype=float), int(spline["degree"]))
         return interpolate.splev(variance, tck)
+
+    def variance_range(self, tel_id):
+        """Range of the variance (ADC²) of the baseline shift spline (its first and last knots): out of it, the spline is extrapolated"""
+        knots = self._parameter("baseline_shift_spline", tel_id)["knots"]
+        return float(knots[0]), float(knots[-1])
 
     def gain_drop(self, tel_id, variance):
         """Factor by which the gain is reduced"""
