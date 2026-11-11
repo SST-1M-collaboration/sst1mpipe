@@ -488,9 +488,15 @@ def test_trigger_pixels_of_the_algorithms(event_type, expected_patches):
     r0 = r0_with_outputs(
         event_type, trigger_output_patch7=[3], trigger_output_patch19=[100], trigger_output_muon=[200, 201],
     )
-    pixels = sst1m_event_source.trigger_pixels(r0)
+    pixels = np.sort(sst1m_event_source.trigger_pixels(r0))
     expected = central_patch_pixels(*expected_patches) if expected_patches else np.array([], dtype=int)
     np.testing.assert_array_equal(pixels, expected)
+
+
+def test_pixels_in_patch():
+    """the 3 pixels of each patch, all the pixels once"""
+    assert sst1m_event_source.PIXELS_IN_PATCH.shape == (432, 3)
+    assert sorted(sst1m_event_source.PIXELS_IN_PATCH.ravel().tolist()) == list(range(1296))
 
 
 def test_trigger_pixels_without_output():
@@ -500,7 +506,7 @@ def test_trigger_pixels_without_output():
     assert sst1m_event_source.trigger_pixels(r0) is None
     # the output of an algorithm which did not trigger is not needed
     r0.event_type = CameraEventType.PATCH7
-    np.testing.assert_array_equal(sst1m_event_source.trigger_pixels(r0), central_patch_pixels(3))
+    np.testing.assert_array_equal(np.sort(sst1m_event_source.trigger_pixels(r0)), central_patch_pixels(3))
 
 
 @pytest.mark.parametrize("tel_id", [21, 22])
@@ -512,7 +518,7 @@ def test_trigger_pixels(tel_id):
         assert trigger.n_trigger_pixels == len(trigger.trigger_pixels)
         if CameraEventType.PATCH7 in r0.event_type:
             fired = np.flatnonzero(r0.trigger_output_patch7.any(axis=1))
-            np.testing.assert_array_equal(trigger.trigger_pixels, central_patch_pixels(*fired))
+            np.testing.assert_array_equal(np.sort(trigger.trigger_pixels), central_patch_pixels(*fired))
             assert trigger.n_trigger_pixels >= 3
         else:
             assert event.trigger.event_type != EventType.SUBARRAY
@@ -532,9 +538,9 @@ def test_trigger_pixels_with_swapped_modules():
         [(pixels_1, pixels_2)] = source.swapped_pixels(tel_id, event.trigger.time)
         new_position = np.arange(1296)
         new_position[pixels_1], new_position[pixels_2] = pixels_2, pixels_1
-        pixels = event.trigger.tel[tel_id].trigger_pixels
+        pixels = np.sort(event.trigger.tel[tel_id].trigger_pixels)
         np.testing.assert_array_equal(pixels, np.sort(new_position[pixels_ref]))
-        n_moved += not np.array_equal(pixels, pixels_ref)
+        n_moved += not np.array_equal(pixels, np.sort(pixels_ref))
     assert n_moved > 0
 
 

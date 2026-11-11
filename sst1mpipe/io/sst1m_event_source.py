@@ -382,44 +382,34 @@ TRIGGER_ALGORITHM_OUTPUTS = {
 }
 
 
-def trigger_pixels(r0, patch_matrix=DigiCam.patch_matrix):
+#: pixels of each trigger patch (n_patches, 3), patch_sw_id order
+PIXELS_IN_PATCH = DigiCam.patch_matrix.indices.reshape(DigiCam.patch_matrix.shape[0], -1)
+
+
+def trigger_pixels(r0):
     """
-    Pixels which triggered the camera event.
+    Pixels which triggered the camera event: the 3 pixels of the central patch of each cluster
+    active at least once in the trigger output of the algorithms which triggered the event.
 
-    1. The trigger algorithms which triggered the event are those of its event type
-       (``r0.event_type``, `~sst1mpipe.io.containers.CameraEventType`): ``PATCH7``, ``PATCH19``
-       and ``MUON_TRIGGER``, several of them for some events. The outputs of the other algorithms
-       are not used, even if active: they did not trigger the readout.
-    2. In the trigger output of each of these algorithms (one trace per cluster, rows in
-       patch_sw_id order of the central patch of the cluster), the clusters active at least once
-       in the readout window.
-    3. The pixels of these clusters: for simplicity, the 3 pixels of their central patch.
-
-    Parameters
-    ----------
-    r0: SST1MR0CameraContainer
-        R0 data of the telescope, trigger outputs in patch_sw_id order (as filled by `fill_r0_event`,
-        with the wrongly connected modules moved back): the patches are on the pixels of the waveforms
-    patch_matrix: scipy.sparse.csr_matrix
-        (n_patches, n_pixels): 1 for the 3 pixels of each patch (`DigiCam.patch_matrix`)
+    The algorithms are those of the event type (``r0.event_type``: ``PATCH7``, ``PATCH19``,
+    ``MUON_TRIGGER``, several for some events); the outputs of the other algorithms are not used,
+    even if active. The trigger outputs are in patch_sw_id order of the central patch of the
+    clusters, on the pixels of the waveforms (as filled by `fill_r0_event`).
 
     Returns
     -------
     numpy.ndarray or None
-        sorted indices of the pixels; empty if no algorithm triggered (e.g. pedestal events) or
-        if their outputs have no active cluster; None if the output of an algorithm which
-        triggered is not in the data (the trigger pixels are unknown)
+        indices of the pixels, empty if no algorithm triggered (e.g. pedestal events); None if the
+        output of an algorithm which triggered is not in the data
     """
-    event_type = CameraEventType(r0.event_type)
-    fired = np.zeros(patch_matrix.shape[0], dtype=bool)
+    triggered_patches = np.zeros(len(PIXELS_IN_PATCH), dtype=bool)
     for algorithm, name in TRIGGER_ALGORITHM_OUTPUTS.items():
-        if algorithm not in event_type:
-            continue
-        output = getattr(r0, name)
-        if output is None:
-            return None
-        fired |= np.asarray(output, dtype=bool).any(axis=1)
-    return np.unique(patch_matrix[fired].indices)
+        if algorithm in r0.event_type:
+            trigger_output = getattr(r0, name)
+            if trigger_output is None:
+                return None
+            triggered_patches |= np.any(trigger_output, axis=-1)
+    return PIXELS_IN_PATCH[triggered_patches].ravel()
 
 
 def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType.SKY_PEDESTAL):
