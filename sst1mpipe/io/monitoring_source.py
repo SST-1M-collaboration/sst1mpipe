@@ -58,7 +58,7 @@ class LastChunkStatisticsInterpolator(StatisticsInterpolator):
 class LastChunkCoefficients:
     """
     Camera calibration coefficients (`~sst1mpipe.monitoring.CameraCoefficientsCalculator`) of the
-    last chunk of pedestal events ended at or before the requested time, as the statistics
+    last valid chunk of pedestal events ended at or before the requested time, as the statistics
     (`LastChunkStatisticsInterpolator`). ``tables`` by telescope id, with the columns of the ctapipe
     coefficients table and the start and end of the chunks. Out of the time range of the chunks
     (within ``timestamp_tolerance``), or for a telescope without coefficients, the coefficients are
@@ -73,13 +73,16 @@ class LastChunkCoefficients:
         for tel_id, table in tables.items():
             table = table.copy()
             table.sort("time_end")
-            self.tables[tel_id] = (table, Time(table["time_start"]), Time(table["time_end"]))
+            # time range of all the chunks; only the valid chunks are used
+            first, last = Time(table["time_start"]).min(), Time(table["time_end"]).max()
+            table = table[np.asarray(table["is_valid"], dtype=bool).reshape(len(table), -1).all(axis=1)]
+            self.tables[tel_id] = (table, Time(table["time_end"]), first, last)
 
     def __call__(self, tel_id, time, timestamp_tolerance=0 * u.s):
         if tel_id not in self.tables:
             return CameraCalibrationContainer()
-        table, time_start, time_end = self.tables[tel_id]
-        if time < time_start.min() - timestamp_tolerance or time > time_end.max() + timestamp_tolerance:
+        table, time_end, first, last = self.tables[tel_id]
+        if len(table) == 0 or time < first - timestamp_tolerance or time > last + timestamp_tolerance:
             return CameraCalibrationContainer()
         row = table[last_chunk_index(time_end, time)]
         # the pedestal is subtracted by the R0R1Calibrator: no pedestal offset nor time shift
@@ -157,7 +160,7 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
             ]
         for tel_id in tel_ids:
             self._coefficient_tables[tel_id] = read_table(file, f"{DL1_CAMERA_COEFFICIENTS_GROUP}/tel_{tel_id:03d}")
-        self._coefficients = LastChunkCoefficients(self._coefficient_tables)
+        self._coefficients = None  # built at the first event, once all the files are read
 
     def fill_monitoring_container(self, event):
         """
@@ -179,6 +182,8 @@ class SST1MMonitoringSource(HDF5MonitoringSource):
                         values = interpolator(tel_id, time, self.timestamp_tolerance)
                         statistics["pedestal_waveform"] = statistics_container(values)
             if self.has_camera_coefficients:
+                if self._coefficients is None:
+                    self._coefficients = LastChunkCoefficients(self._coefficient_tables)
                 monitoring.camera.coefficients = self._coefficients(tel_id, time, self.timestamp_tolerance)
             if self.has_pointings:
                 try:

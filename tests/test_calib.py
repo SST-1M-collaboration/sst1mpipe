@@ -1,4 +1,5 @@
 
+import astropy.units as u
 import numpy as np
 import pytest
 import json
@@ -22,7 +23,7 @@ from traitlets.config import Config
 from sst1mpipe.calib import ImageSaturationCorrector, R0R1Calibrator
 from sst1mpipe.calib.calib import DEFAULT_CALIBRATION_FILES, DEFAULT_WINDOW_FILES
 from conftest import DARK_FILE
-from sst1mpipe.io import load_config, translate_legacy_calibration_config
+from sst1mpipe.io import load_config
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.monitoring import CameraCoefficientsCalculator
 from sst1mpipe.utils import get_subarray
@@ -171,6 +172,48 @@ def test_voltage_drop_coefficients(correction):
     np.testing.assert_array_equal(coefficients["time_shift"], 0)
 
 
+@pytest.mark.parametrize("correction", ["global", "pixelwise"])
+def test_voltage_drop_not_extrapolated(correction):
+    """above the range of the spline of the model (74 ADC² for tel 21), the factor is the one at its limit"""
+    calculator = coefficients_calculator(voltage_drop_correction=correction)
+    low, high = calculator.voltage_drop_model.variance_range(21)
+    limit = 1 / calculator.voltage_drop_model.charge_drop(21, high)
+    assert limit > 1
+    # 81 and 144 ADC²: the extrapolated charge drop is negative
+    factor = np.asarray(calculator(waveform_statistics(np.linspace(9, 12, 1296)), 21)["factor"])
+    np.testing.assert_allclose(factor, limit, rtol=1e-6)
+
+
+def test_coefficients_of_invalid_chunks_are_not_used():
+    """the coefficients at a time are those of the last valid chunk ended before it"""
+    from astropy.table import vstack
+
+    from sst1mpipe.io.monitoring_source import LastChunkCoefficients
+
+    calculator = coefficients_calculator(voltage_drop_correction="global")
+    chunks = []
+    for i, (std, is_valid) in enumerate([(3.0, True), (5.0, False), (4.0, True)]):
+        statistics = waveform_statistics(np.full(1296, std))
+        statistics["time_start"] = statistics["time_start"] + i * 10 * u.s
+        statistics["time_end"] = statistics["time_end"] + i * 10 * u.s
+        statistics["is_valid"] = [is_valid]
+        chunks.append(calculator(statistics, TEL_ID))
+    table = vstack(chunks)
+    coefficients = LastChunkCoefficients({TEL_ID: table})
+
+    def factor(seconds):
+        return coefficients(TEL_ID, Time("2026-01-20T22:00:00") + seconds * u.s).factor
+
+    np.testing.assert_array_equal(factor(15), table["factor"][0])
+    # after the invalid chunk (ended at 20 s): still the first chunk, then the third one (ended at 30 s)
+    np.testing.assert_array_equal(factor(25), table["factor"][0])
+    np.testing.assert_array_equal(factor(30), table["factor"][2])
+    assert factor(31) is None and factor(-1) is None
+    # no valid chunk: no coefficients
+    table["is_valid"] = False
+    assert LastChunkCoefficients({TEL_ID: table})(TEL_ID, Time("2026-01-20T22:00:15")).factor is None
+
+
 @pytest.mark.parametrize("flag_dead", [False, True])
 def test_dead_pixels(flag_dead):
     """the pixels without statistics (outliers of the monitoring) are dead pixels, a pixel with a low std is not"""
@@ -221,56 +264,6 @@ def test_wrong_settings():
         calibrator(calibration_file="/does/not/exist.h5")
     with pytest.raises(Exception, match="(?i)trait"):
         coefficients_calculator(voltage_drop_correction="wrong")
-
-
-@pytest.mark.parametrize("pixelwise, global_, expected", [
-    (False, True, "global"),
-    (True, False, "pixelwise"),
-    (True, True, "pixelwise"),
-    (False, False, "none"),
-])
-def test_translate_legacy_calibration_config(pixelwise, global_, expected):
-
-    legacy = {
-        "telescope_calibration": {
-            "tel_021": None,
-            "tel_022": CALIBRATION_FILE_TEL_2,
-            "bad_calib_px_interpolation": True,
-            "dynamic_dead_px_interpolation": False,
-        },
-        "NsbCalibrator": {
-            "apply_pixelwise_Vdrop_correction": pixelwise,
-            "apply_global_Vdrop_correction": global_,
-            "intensity_correction": {"tel_021": 1.0},
-            "mc_correction_for_PDE": False,
-        },
-    }
-    config = translate_legacy_calibration_config(legacy)
-
-    assert "telescope_calibration" not in config
-    assert config["NsbCalibrator"] == {"intensity_correction": {"tel_021": 1.0}}
-    assert config["R0R1Calibrator"] == {
-        "calibration_file": [["type", "*", None], ["id", 22, CALIBRATION_FILE_TEL_2]],
-        "flag_bad_calibration_pixels": True,
-    }
-    assert config["CameraCoefficientsCalculator"] == {"flag_dead_pixels": False, "voltage_drop_correction": expected}
-    calibrator_r0_r1 = R0R1Calibrator(subarray=get_subarray(), config=Config(config))
-    assert str(calibrator_r0_r1.calibration_file_path(22)) == CALIBRATION_FILE_TEL_2
-    calculator = CameraCoefficientsCalculator(subarray=get_subarray(), config=Config(config))
-    assert calculator.voltage_drop_correction.tel[21] == expected
-
-
-def test_translate_legacy_mc_pde_correction():
-
-    with pytest.raises(ValueError, match="pde_drop_factor"):
-        translate_legacy_calibration_config({"NsbCalibrator": {"mc_correction_for_PDE": True}})
-
-
-def test_config_without_legacy_settings_is_unchanged():
-
-    config = {"R0R1Calibrator": {"flag_bad_calibration_pixels": False}, "NsbCalibrator": {}}
-
-    assert translate_legacy_calibration_config(config) == config
 
 
 def test_default_config_settings():
@@ -430,39 +423,12 @@ def test_static_bad_pixels_of_simulations(mc_subarray):
     assert np.flatnonzero(flagged).tolist() == BAD_PIXELS
     assert np.all(event.simulation.tel[1].true_image[BAD_PIXELS] == 0)
     assert event.simulation.tel[1].true_image.sum() == 1296 - len(BAD_PIXELS)
-    # the R1 waveforms are kept, the charges of the bad pixels are interpolated
-    np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
+    # the R1 waveforms are kept, those of the bad pixels set to 0 (their charges are interpolated)
+    assert np.all(event.r1.tel[1].waveform[:, BAD_PIXELS] == 0)
+    assert event.r1.tel[1].waveform.sum() == (1296 - len(BAD_PIXELS)) * event.r1.tel[1].waveform.shape[-1]
     # no bad pixels in tel 2
     assert not event.monitoring.tel[2].camera.coefficients.outlier_mask.any()
     assert event.simulation.tel[2].true_image.sum() == 1296
-
-
-@pytest.mark.parametrize("calibrator_settings, expected", [
-    ({}, [["type", "*", []], ["id", 22, [5, 7]]]),
-    # the R0R1Calibrator section is used
-    ({"R0R1Calibrator": {"bad_pixels": [["id", 21, [1]]]}}, [["id", 21, [1]]]),
-])
-def test_translate_legacy_bad_pixels(calibrator_settings, expected):
-
-    legacy = {
-        "analysis": {"bad_pixels": {"tel_021": [], "tel_022": [5, 7]}, "off_regions": 5},
-        "telescope_calibration": {"tel_021": None, "tel_022": None, "bad_calib_px_interpolation": True},
-        **calibrator_settings,
-    }
-    config = translate_legacy_calibration_config(legacy)
-
-    assert config["analysis"] == {"off_regions": 5}
-    assert config["R0R1Calibrator"]["bad_pixels"] == expected
-    if not calibrator_settings:
-        # the other legacy settings are translated too
-        assert config["R0R1Calibrator"]["flag_bad_calibration_pixels"]
-
-
-def test_translate_legacy_empty_bad_pixels():
-
-    config = translate_legacy_calibration_config({"analysis": {"bad_pixels": {"tel_021": [], "tel_022": []}}})
-
-    assert config == {"analysis": {}}
 
 
 # window transmittance correction
@@ -503,16 +469,6 @@ def test_window_transmittance_not_applied_to_simulations(mc_subarray):
     mc_calibrator(mc_subarray)(event)
 
     np.testing.assert_array_equal(event.r1.tel[1].waveform, 1)
-
-
-def test_translate_legacy_window_transmittance(window_file_of_ones):
-
-    config = translate_legacy_calibration_config(
-        {"window_transmittance": {"tel_021": None, "tel_022": window_file_of_ones}}
-    )
-
-    assert config == {"R0R1Calibrator": {"window_transmittance_file": [["type", "*", None], ["id", 22, window_file_of_ones]]}}
-    assert translate_legacy_calibration_config({"window_transmittance": {"tel_021": None, "tel_022": None}}) == {}
 
 
 # saturation correction

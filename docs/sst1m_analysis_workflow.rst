@@ -112,7 +112,7 @@ contain any Cherenkov photons), and parametrizes the shower images with Hillas e
 
   The corrections which need the pedestal events are the camera calibration coefficients computed by ``sst1mpipe-monitoring`` (``CameraCoefficientsCalculator`` of the monitoring config, see :ref:`sst1mpipe_monitoring`): ``voltage_drop_correction`` (``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB: the charges are divided by the charge drop of the ``SiPMVoltageDropModel``, see :ref:`nsb_level`) and ``flag_dead_pixels`` (the pixels without statistics of the ADC samples of the pedestal events are flagged as outliers and interpolated).
 
-  Config files with the former ``telescope_calibration``, ``NsbCalibrator.apply_*_Vdrop_correction``, ``analysis.bad_pixels`` and ``window_transmittance`` settings are still read (translated with a warning). ``NsbCalibrator.mc_correction_for_PDE`` must be replaced by ``pde_drop_factor``.
+  The former ``telescope_calibration``, ``NsbCalibrator.*``, ``analysis.bad_pixels`` and ``window_transmittance`` settings are no longer read.
 
 * ``NsbCalibrator.intensity_correction`` - global scale of the Hillas intensity per telescope. It is not applied at this step, but in ``sst1mpipe_dl1_dl2`` with ``--scale-intensities``
 

@@ -131,6 +131,11 @@ class SiPMVoltageDropModel(TelescopeComponent):
         tck = (np.asarray(spline["knots"], dtype=float), np.asarray(spline["coefficients"], dtype=float), int(spline["degree"]))
         return interpolate.splev(variance, tck)
 
+    def variance_range(self, tel_id):
+        """Range of the variance (ADC²) of the baseline shift spline (its first and last knots): out of it, the spline is extrapolated"""
+        knots = self._parameter("baseline_shift_spline", tel_id)["knots"]
+        return float(knots[0]), float(knots[-1])
+
     def gain_drop(self, tel_id, variance):
         """Factor by which the gain is reduced"""
         return 1 + self._parameter("gain_drop_slope", tel_id) * self.baseline_shift(tel_id, variance)

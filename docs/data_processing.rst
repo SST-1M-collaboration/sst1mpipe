@@ -265,8 +265,8 @@ e.g. ``"gain_drop_slope": [["id", 21, -0.00487], ["id", 22, -0.00118]]``) and on
 tools which use it (``sst1mpipe-process``, ``sst1mpipe-monitoring``), with tuples:
 ``--SiPMVoltageDropModel.gain_drop_slope='[("id", 21, -0.00487), ("id", 22, -0.00118)]'`` (a single value
 applies to all the telescopes). As for every ctapipe telescope parameter, a value replaces the whole
-default list, so give the values of all the telescopes. The spline is extrapolated out of the range of its
-knots (variance above 74 ADC² for tel 21, 340 ADC² for tel 22).
+default list, so give the values of all the telescopes. Out of the range of the knots of the spline (variance above 74 ADC² for tel 21, 340 ADC² for tel 22),
+the voltage drop correction uses the variance at the limit of the range (no extrapolation, warning).
 
 
 .. _merging_step:

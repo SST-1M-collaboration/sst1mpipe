@@ -183,7 +183,8 @@ class R0R1Calibrator(TelescopeComponent):
     4. bad pixels: the pixels with bad calibration parameters (``flag_bad_calibration_pixels``)
        and the ``bad_pixels`` are added to ``event.monitoring.tel[tel_id].camera.coefficients.outlier_mask``,
        so that their charge is interpolated by the ``invalid_pixel_handler`` of
-       `~ctapipe.calib.CameraCalibrator`
+       `~ctapipe.calib.CameraCalibrator`. The R1 waveforms of all the outliers (these pixels and
+       the dead pixels of the monitoring) are set to 0.
     5. saturated pixels: the pixels whose maximum ADC sample (pedestal subtracted) is above
        ``saturation_threshold``, with more than ``saturation_width_threshold`` samples above
        ``saturation_width_level``, are flagged with `~ctapipe.containers.PixelStatus.SATURATED`
@@ -198,7 +199,7 @@ class R0R1Calibrator(TelescopeComponent):
 
     ``calibrate_r0`` false (by default for the simulated telescopes 1 and 2): the R1 waveforms
     given by the event source are kept, and the ``bad_pixels`` are added to the outliers (and set
-    to 0 in the true image of the simulations).
+    to 0 in the R1 waveforms and in the true image of the simulations).
 
     PDE drop correction (``pde_drop_factor``): the ``factor`` of the camera calibration coefficients
     is divided by it, i.e. the charges. The simulations use PDE files which include the drop for a
@@ -384,6 +385,11 @@ class R0R1Calibrator(TelescopeComponent):
         mask_bad = self.bad_pixel_mask(tel_id, n_pixels)
         self.n_bad_pixels[tel_id] = int(mask_bad.sum())
         self._update_coefficients(event, tel_id, mask_bad)
+        # the outliers (bad pixels, dead pixels of the monitoring) are also set to 0 in the R1
+        # waveforms: their signal is not used by what reads the waveforms
+        outliers = np.atleast_2d(event.monitoring.tel[tel_id].camera.coefficients.outlier_mask)[0]
+        if outliers.any():
+            event.r1.tel[tel_id].waveform[:, outliers] = 0
         if event.simulation is not None and event.simulation.tel[tel_id].true_image is not None:
             event.simulation.tel[tel_id].true_image[mask_bad] = 0
 

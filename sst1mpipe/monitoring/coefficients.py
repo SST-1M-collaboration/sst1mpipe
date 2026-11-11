@@ -27,7 +27,8 @@ class CameraCoefficientsCalculator(TelescopeComponent):
     - ``factor``: 1 / charge drop due to the voltage drop of the SiPMs with the NSB
       (``voltage_drop_correction``, `~sst1mpipe.utils.nsb_tools.SiPMVoltageDropModel`), from the std
       of the ADC samples: ``global`` with the median variance of the camera, ``pixelwise`` with the
-      variance of each pixel, ``none`` 1. The ctapipe CameraCalibrator multiplies the charges by it.
+      variance of each pixel, ``none`` 1. The variance is limited to the range of the spline of
+      the model (no extrapolation, warning). The ctapipe CameraCalibrator multiplies the charges by it.
     - ``outlier_mask``: the dead pixels (``flag_dead_pixels``), i.e. the pixels without statistics
       (outliers of the monitoring), whose charge is interpolated by the CameraCalibrator
     - ``pedestal_offset`` and ``time_shift``: 0 (the pedestal is subtracted by the R0R1Calibrator)
@@ -63,6 +64,16 @@ class CameraCoefficientsCalculator(TelescopeComponent):
         variance = np.asarray(pedestal_std, dtype=np.float64) ** 2
         if correction == "none":
             return np.ones_like(variance)
+        # the spline of the model is not extrapolated: above its range (e.g. a pixel with a bright
+        # star) the charge drop would become negative. The variance is limited to the range.
+        low, high = self.voltage_drop_model.variance_range(tel_id)
+        n_out_of_range = int(np.sum((variance < low) | (variance > high)))
+        if n_out_of_range > 0:
+            self.log.warning(
+                "Telescope %d: %d pedestal variances out of the range of the voltage drop model"
+                " (%g to %g ADC²), limited to it", tel_id, n_out_of_range, low, high,
+            )
+        variance = np.clip(variance, low, high)
         if correction == "global":
             # without the pixels without statistics (outliers of the monitoring)
             median = np.nanmedian(variance, axis=(-2, -1), keepdims=True)
