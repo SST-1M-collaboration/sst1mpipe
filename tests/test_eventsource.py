@@ -30,6 +30,7 @@ from sst1mpipe.io.sst1m_event_source import (
     tel_id_from_file_name,
     trigger_patch_order,
 )
+from sst1mpipe.instrument.camera import DigiCam
 from sst1mpipe.time import camera_clock_to_time
 from sst1mpipe.io.containers import CameraEventType, DigicamCardType, DigicamConfigContainer, SST1MR0CameraContainer
 from sst1mpipe.resources import DATA_CONFIG_FILE, SUBARRAY_FILE
@@ -453,6 +454,94 @@ def test_swap_modules_trigger_traces():
         for name in TRIGGER_TRACES:
             np.testing.assert_array_equal(getattr(r0, name), getattr(r0_ref, name)[order])
         assert not np.array_equal(r0.trigger_input_traces, r0_ref.trigger_input_traces)
+
+
+def r0_with_outputs(event_type, **outputs):
+    """R0 data of a camera event with trigger outputs (432 clusters, 50 samples), inactive if not given"""
+    r0 = SST1MR0CameraContainer(event_type=event_type)
+    for name in sst1m_event_source.TRIGGER_ALGORITHM_OUTPUTS.values():
+        output = np.zeros((432, 50), dtype=bool)
+        for cluster in outputs.get(name, ()):
+            output[cluster, 10] = True
+        setattr(r0, name, output)
+    return r0
+
+
+def central_patch_pixels(*patches):
+    return np.sort(np.concatenate([DigiCam.patch_matrix[patch].indices for patch in patches]))
+
+
+@pytest.mark.parametrize("event_type, expected_patches", [
+    # only the outputs of the algorithms which triggered the event
+    (CameraEventType.PATCH7, [3]),
+    (CameraEventType.PATCH19, [100]),
+    (CameraEventType.MUON_TRIGGER, [200, 201]),
+    # several algorithms: the clusters of all of them
+    (CameraEventType.PATCH7 | CameraEventType.MUON_TRIGGER, [3, 200, 201]),
+    (CameraEventType.PATCH7 | CameraEventType.PATCH19 | CameraEventType.MUON_TRIGGER, [3, 100, 200, 201]),
+    # no trigger algorithm (pedestal events): no pixel
+    (CameraEventType.INTERNAL, []),
+    (CameraEventType.UNKNOWN, []),
+])
+def test_trigger_pixels_of_the_algorithms(event_type, expected_patches):
+    """the central patch of the active clusters of the outputs of the algorithms of the event type"""
+    r0 = r0_with_outputs(
+        event_type, trigger_output_patch7=[3], trigger_output_patch19=[100], trigger_output_muon=[200, 201],
+    )
+    pixels = np.sort(sst1m_event_source.trigger_pixels(r0))
+    expected = central_patch_pixels(*expected_patches) if expected_patches else np.array([], dtype=int)
+    np.testing.assert_array_equal(pixels, expected)
+
+
+def test_pixels_in_patch():
+    """the 3 pixels of each patch, all the pixels once"""
+    assert sst1m_event_source.PIXELS_IN_PATCH.shape == (432, 3)
+    assert sorted(sst1m_event_source.PIXELS_IN_PATCH.ravel().tolist()) == list(range(1296))
+
+
+def test_trigger_pixels_without_output():
+    """the output of an algorithm which triggered is not in the data: unknown trigger pixels"""
+    r0 = r0_with_outputs(CameraEventType.PATCH7 | CameraEventType.PATCH19, trigger_output_patch7=[3])
+    r0.trigger_output_patch19 = None
+    assert sst1m_event_source.trigger_pixels(r0) is None
+    # the output of an algorithm which did not trigger is not needed
+    r0.event_type = CameraEventType.PATCH7
+    np.testing.assert_array_equal(np.sort(sst1m_event_source.trigger_pixels(r0)), central_patch_pixels(3))
+
+
+@pytest.mark.parametrize("tel_id", [21, 22])
+def test_trigger_pixels(tel_id):
+    """trigger pixels of the events of the test runs: patch7 events, and pedestal events without pixel"""
+    source = SST1MEventSource(input_url=OBSERVATION_RUNS[tel_id]["path"], max_events=50)
+    for event in source:
+        r0, trigger = event.r0.tel[tel_id], event.trigger.tel[tel_id]
+        assert trigger.n_trigger_pixels == len(trigger.trigger_pixels)
+        if CameraEventType.PATCH7 in r0.event_type:
+            fired = np.flatnonzero(r0.trigger_output_patch7.any(axis=1))
+            np.testing.assert_array_equal(np.sort(trigger.trigger_pixels), central_patch_pixels(*fired))
+            assert trigger.n_trigger_pixels >= 3
+        else:
+            assert event.trigger.event_type != EventType.SUBARRAY
+            assert trigger.n_trigger_pixels == 0
+
+
+def test_trigger_pixels_with_swapped_modules():
+    """the trigger pixels follow the pixels of the wrongly connected modules, as the trigger outputs"""
+    tel_id = 21
+    path = OBSERVATION_RUNS[tel_id]["path"]
+    swapped_modules = [{"tel_id": tel_id, "start": "2026-01-20T00:00:00", "stop": "2026-01-22T00:00:00", "modules": [8, 9]}]
+    n_events = 60
+    reference = [event.trigger.tel[tel_id].trigger_pixels.copy() for event in SST1MEventSource(input_url=path, max_events=n_events)]
+    source = SST1MEventSource(input_url=path, max_events=n_events, swapped_modules=swapped_modules)
+    n_moved = 0
+    for event, pixels_ref in zip(source, reference, strict=True):
+        [(pixels_1, pixels_2)] = source.swapped_pixels(tel_id, event.trigger.time)
+        new_position = np.arange(1296)
+        new_position[pixels_1], new_position[pixels_2] = pixels_2, pixels_1
+        pixels = np.sort(event.trigger.tel[tel_id].trigger_pixels)
+        np.testing.assert_array_equal(pixels, np.sort(new_position[pixels_ref]))
+        n_moved += not np.array_equal(pixels, np.sort(pixels_ref))
+    assert n_moved > 0
 
 
 def test_swapped_modules_period():

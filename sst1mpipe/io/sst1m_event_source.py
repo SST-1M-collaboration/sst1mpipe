@@ -374,10 +374,48 @@ def read_trigger_traces(traces, prepare, name, n_samples, sort_ids, patch_order=
     return traces if patch_order is None else traces[patch_order]
 
 
+#: trigger output of each trigger algorithm (bit of the camera event type)
+TRIGGER_ALGORITHM_OUTPUTS = {
+    CameraEventType.PATCH7: "trigger_output_patch7",
+    CameraEventType.PATCH19: "trigger_output_patch19",
+    CameraEventType.MUON_TRIGGER: "trigger_output_muon",
+}
+
+
+#: pixels of each trigger patch (n_patches, 3), patch_sw_id order
+PIXELS_IN_PATCH = DigiCam.patch_matrix.indices.reshape(DigiCam.patch_matrix.shape[0], -1)
+
+
+def trigger_pixels(r0):
+    """
+    Pixels which triggered the camera event: the 3 pixels of the central patch of each cluster
+    active at least once in the trigger output of the algorithms which triggered the event.
+
+    The algorithms are those of the event type (``r0.event_type``: ``PATCH7``, ``PATCH19``,
+    ``MUON_TRIGGER``, several for some events); the outputs of the other algorithms are not used,
+    even if active. The trigger outputs are in patch_sw_id order of the central patch of the
+    clusters, on the pixels of the waveforms (as filled by `fill_r0_event`).
+
+    Returns
+    -------
+    numpy.ndarray or None
+        indices of the pixels, empty if no algorithm triggered (e.g. pedestal events); None if the
+        output of an algorithm which triggered is not in the data
+    """
+    triggered_patches = np.zeros(len(PIXELS_IN_PATCH), dtype=bool)
+    for algorithm, name in TRIGGER_ALGORITHM_OUTPUTS.items():
+        if algorithm in r0.event_type:
+            trigger_output = getattr(r0, name)
+            if trigger_output is None:
+                return None
+            triggered_patches |= np.any(trigger_output, axis=-1)
+    return PIXELS_IN_PATCH[triggered_patches].ravel()
+
+
 def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType.SKY_PEDESTAL):
     """
     Fill the R0 data of the telescope (``event.r0``) and the trigger (time, telescope,
-    event type) of ``array_event`` with a DigiCam camera event (``DataModel.CameraEvent``
+    event type, trigger pixels: `trigger_pixels`) of ``array_event`` with a DigiCam camera event (``DataModel.CameraEvent``
     protobuf message, converted by `protozfits.make_namedtuple` as in the zfits files).
     The event index is not filled.
 
@@ -433,6 +471,10 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
     array_event.trigger.time = local_time
     array_event.trigger.tel[tel_id].time = local_time
     array_event.trigger.tels_with_trigger = [tel_id]
+    pixels = trigger_pixels(r0)
+    if pixels is not None:
+        array_event.trigger.tel[tel_id].trigger_pixels = pixels
+        array_event.trigger.tel[tel_id].n_trigger_pixels = len(pixels)
     event_type = camera_event_type_to_event_type(r0.event_type, pedestal_type=pedestal_type)
     array_event.trigger.event_type = event_type
     array_event.trigger.tel[tel_id].event_type = event_type
