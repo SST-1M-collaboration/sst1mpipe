@@ -2,7 +2,6 @@
 import logging
 import os
 import re
-import warnings
 from itertools import islice
 
 import numpy as np
@@ -317,7 +316,7 @@ def prepare_trigger_output(traces):
     traces = np.unpackbits(traces.reshape(-1, N_SECTORS, n_bytes, 1), axis=-1)
     traces = traces[..., ::-1]
     traces = traces.reshape(-1, N_PATCHES)
-    return traces.T
+    return traces.T.astype(bool)
 
 
 # trigger traces of the camera events: R0 field, conversion to (432, n_samples) in readout order,
@@ -366,11 +365,11 @@ def read_trigger_traces(traces, prepare, name, n_samples, sort_ids, patch_order=
     """
     Trigger traces of a camera event (432, n_samples) in patch_sw_id order: ``sort_ids`` puts the
     readout order in patch_sw_id order, ``patch_order`` (see `trigger_patch_order`) moves the
-    patches of the wrongly connected modules. nan if the traces are not in the camera event.
+    patches of the wrongly connected modules. None if the traces are not in the camera event
+    (the field is missing or empty: a camera can be configured not to send them).
     """
-    if len(traces) == 0:
-        warnings.warn(f'{name} does not exist: --> nan', stacklevel=3)
-        return np.full((N_PATCHES, n_samples), np.nan)
+    if traces is None or len(traces) == 0:
+        return None
     traces = prepare(traces)[sort_ids]
     return traces if patch_order is None else traces[patch_order]
 
@@ -411,8 +410,9 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
 
     r0 = array_event.r0.tel[tel_id]
     r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
-    # baseline of DigiCam in 1/16 ADC; negative for the pixels without data (dead modules): 0
-    r0.pedestal = np.maximum(camera_event.hiGain.waveforms.baselines[sort_ids] / 16, 0)
+    # baseline of DigiCam in 1/16 ADC (int16); negative for the pixels without data (dead modules): 0.
+    # float32 holds it exactly (float16 would not: 11 bits of mantissa)
+    r0.pedestal = np.maximum(camera_event.hiGain.waveforms.baselines[sort_ids], 0).astype(np.float32) / 16
     r0.camera_event_number = camera_event.eventNumber
     r0.pixel_flags = camera_event.pixels_flags[sort_ids]
     r0.event_time = local_time
@@ -440,10 +440,48 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
 
 class SST1MEventSource(EventSource):
     """
-    https://github.com/cta-observatory/ctapipe_io_lst/blob/0f8b8cd39403f51dc8b1b0e1eb5a6045ea5deb15/src/ctapipe_io_lst/__init__.py#L13
-    EventSource for SST1M R0 data.
+    Event source of the SST-1M raw data (R0) files.
 
-    Reimplementation of CTAPIPE_IO_LST for SST1M which also uses fits input files which are not readable by a default ctapipe
+    The raw data are the zfits files ``SST1M<telescope>_<date>_<run>.fits.fz`` written by the
+    DigiCam camera server: one file per run and telescope, with an ``Events`` table of DigiCam
+    camera events (``DataModel.CameraEvent`` protobuf messages). A single file is read.
+
+    `SST1MEventSource` is a ctapipe I/O plugin (entry point ``ctapipe_io``):
+    `ctapipe.io.EventSource` opens the SST-1M files with it by itself (see `is_compatible`).
+
+    For each camera event, it fills:
+
+    - ``event.index``: ``obs_id`` from the date and run number of the file name, and ``event_id``,
+      the SWAT array event id if the file has them (see `swat_event_ids_available`), the camera
+      event number otherwise;
+    - ``event.r0.tel[tel_id]`` (``SST1MR0CameraContainer``): the waveforms,
+      DigiCam baselines and flags of the pixels in pixel id order, the camera event type and number,
+      the event times, and the trigger traces in patch order (see ``fill_r0_event``);
+    - ``event.trigger``: the time (White Rabbit, TAI), the telescope and the event type. The internal
+      triggers of the camera are pedestal events of the type of the run (`pedestal_event_type`);
+    - ``event.monitoring.pointing``: the right ascension and declination of the pointing. The
+      altitude and azimuth come from the monitoring data
+      (``SST1MMonitoringSource`` of ``sst1mpipe.io.monitoring_source``).
+
+    The run information is read from the file: target, wobble and pointing from its TARGET field
+    (`target`, `wobble`, `pointing`), start and duration from its header (`scheduling_blocks`,
+    `observation_blocks`), and the configuration of the DigiCam boards (`digicam_config`). The
+    subarray is the telescope of the file, from ``sst1m_array.h5``.
+
+    The wrongly connected modules of a period (`swapped_modules`) are moved back, for the pixels
+    and the trigger traces.
+
+    Examples
+    --------
+    >>> from ctapipe.io import EventSource
+    >>> with EventSource("SST1M2_20260120_1102.fits.fz", max_events=10) as source:  # doctest: +SKIP
+    ...     for event in source:
+    ...         r0 = event.r0.tel[source.tel_id]
+    ...         print(event.index.event_id, event.trigger.event_type, r0.waveform.shape)
+
+    See Also
+    --------
+    sst1mpipe.io.zmq_event_source.ZMQEventSource : the same camera events, received in a ZMQ stream
     """
 
     pointing_ra = Float(
@@ -564,6 +602,7 @@ class SST1MEventSource(EventSource):
 
     @property
     def subarray(self):
+        """The telescope of the file, from ``sst1m_array.h5``"""
         return self._subarray
 
     @property
@@ -602,7 +641,7 @@ class SST1MEventSource(EventSource):
     def swapped_pixels(self, tel_id, time):
         """
         Pixel ids of the wrongly connected modules (pairs) of the telescope ``tel_id``
-        at the time ``local_camera_clock`` (ns, TAI), see ``swapped_modules``
+        at the time ``time``, see `swapped_modules`
         """
         return swapped_pixels(self._pixel_swaps, tel_id, time)
 
@@ -626,6 +665,7 @@ class SST1MEventSource(EventSource):
 
     @property
     def is_simulation(self):
+        """False: the raw data are not simulations"""
         return False
 
     # @property
@@ -635,18 +675,22 @@ class SST1MEventSource(EventSource):
 
     @property
     def observation_blocks(self):
+        """The observation block of the run, by obs_id: target, wobble, pointing, start and duration"""
         return self._observation_blocks
 
     @property
     def scheduling_blocks(self):
+        """The scheduling block of the run, by sb_id: its type from the target, pointing and observing modes"""
         return self._scheduling_blocks
 
     @property
     def datalevels(self):
+        """The data level of the file: R0"""
         return (DataLevel.R0, )
 
     @property
     def swat_event_ids_available(self):
+        """True if the events of the file have an array event id written by SWAT"""
         return self._swat_event_ids_available
 
     def _generator(self):

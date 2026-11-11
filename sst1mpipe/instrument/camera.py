@@ -1,4 +1,4 @@
-from cts_core import camera
+from sst1m_cts_core import camera
 from scipy.sparse import csr_matrix
 
 from sst1mpipe.instrument import geometry
@@ -6,16 +6,16 @@ from sst1mpipe.resources import CAMERA_CONFIG_FILE
 
 
 class Camera(camera.Camera):
-    ''' cts_core.camera.Camera with ctapipe.instrument.camera.CameraGeometry
+    ''' sst1m_cts_core.camera.Camera with ctapipe.instrument.camera.CameraGeometry
 
     Helper class, for easier construction and use of
-    `cts_core.camera.Camera`.
+    `sst1m_cts_core.camera.Camera`.
 
     It can be constucted without a path, it will then use the
     file sst1mpipe/resources/instrument/camera_config.cfg,
     which is delivered with sst1mpipe.
 
-    It does exactly the same as cts_core.camera.Camera but it has
+    It does exactly the same as sst1m_cts_core.camera.Camera but it has
     an *additional* member: `.geometry`
     of type: ctapipe.instrument.camera.CameraGeometry
     which is created immediateyl on construction.

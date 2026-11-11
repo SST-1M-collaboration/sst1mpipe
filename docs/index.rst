@@ -25,6 +25,9 @@ Github `repository <https://github.com/SST-1M-collaboration/sst1mpipe>`_
 
    introduction
    data_processing
+   event_sources
+   event_stream
+   camera_event_type
    sst1mpipe_monitoring
    sst1m_analysis_workflow
    tutorials/index

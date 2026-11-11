@@ -84,6 +84,7 @@ Key workflows include:
 
 * [ci.yml](.github/workflows/ci.yml) — Continuous integration (tests, linting, and quality checks)
 * [documentation.yml](.github/workflows/documentation.yml) — Builds and deploys the project documentation
+* [release.yml](.github/workflows/release.yml) — Builds the package and publishes it on PyPI when a version tag is pushed, see [Making a release](#making-a-release)
 
 ---
 
@@ -102,6 +103,12 @@ It is used to configure:
 * **Pytest** (test configuration and options)
 * **Coverage.py** (test coverage thresholds and reporting)
 * Potentially other tools used in the development workflow
+
+### `MANIFEST.in`
+
+The [MANIFEST.in](MANIFEST.in) file selects the files of the source distribution (`.tar.gz`) published on
+PyPI. It removes the test data (`sst1mpipe/resources/test_data`, ~550 MB of Git LFS files) from it; the
+wheel excludes them in `pyproject.toml`.
 
 ### `environment.yml`
 
@@ -177,3 +184,35 @@ git lfs install
 
 Large file tracking rules are defined in `.gitattributes`, which specifies which file types should be handled by Git LFS instead of standard Git storage.
 
+## Making a release
+
+Versions follow ctapipe (`sst1mpipe` 0.32.x uses ctapipe 0.32) and [PEP 440](https://peps.python.org/pep-0440/):
+`0.32.0a1` (alpha), `0.32.0b1` (beta), `0.32.0rc1`, `0.32.0`, `0.32.1` (bug fix). Pre-releases are installed
+with `pip install --pre sst1mpipe`.
+
+Pushing a tag `v<version>` runs [release.yml](.github/workflows/release.yml): it checks that the tag matches
+the version of `pyproject.toml`, builds the package and publishes it on PyPI (trusted publishing, no token).
+The test data are excluded from the package (`pyproject.toml` and `MANIFEST.in`).
+
+1. In a pull request, set the new `version` in `pyproject.toml` (and the ctapipe pin in `pyproject.toml`
+   and `environment.yml` for a new ctapipe version).
+2. Check the package locally, since a version can never be uploaded twice on PyPI:
+   ```bash
+   python -m build
+   twine check --strict dist/*
+   ```
+3. Once merged, tag the merge commit:
+   ```bash
+   git tag v0.32.0a2
+   git push origin v0.32.0a2
+   ```
+4. Create the GitHub release of the tag (pre-release for alpha, beta and rc versions).
+
+If the tag does not match the version, nothing is published: delete the tag
+(`git push origin :refs/tags/v0.32.0a2`), fix it and push it again. A failed upload can be retried with
+"Re-run failed jobs".
+
+The PyPI project needs a trusted publisher (once, on pypi.org, Account settings → Publishing): owner
+`SST-1M-collaboration`, repository `sst1mpipe`, workflow `release.yml`, environment `pypi`.
+The dependency [sst1m-cts](https://pypi.org/project/sst1m-cts/) is released the same way from the
+[CTS](https://github.com/SST-1M-collaboration/CTS) repository.
