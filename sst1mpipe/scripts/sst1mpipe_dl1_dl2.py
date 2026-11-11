@@ -41,6 +41,7 @@ from sst1mpipe.utils import (
     energy_min_cut,
     get_closest_rf_model,
     get_telescopes,
+    read_subarray,
 )
 
 
@@ -130,6 +131,7 @@ def main():
     shutil.copyfile(input_file, output_file)
 
     ismc = check_mc(input_file)
+    subarray = read_subarray(input_file)
 
     # Cut on minimum mc_energy in the output file, which is needed if we want to safely combine MC from different productions
     # NOTE: This doesn't change the mc and histogram tab in the output files and this must be taken care of in performance
@@ -153,7 +155,7 @@ def main():
             """
             models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
-                dl2_0 = pd.concat([dl2_0, apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)])
+                dl2_0 = pd.concat([dl2_0, apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc, subarray=subarray)])
             except Exception:
                 logging.error('RF application failed.')
                 os.remove(output_file)
@@ -163,7 +165,7 @@ def main():
         # Now we need to group everything per event and calculate averages.
         # For arrival dirrection, we apply MARS like reconstruction
         #try:
-        dl2 = stereo_reconstruction(dl2_0, config=config, ismc=ismc, telescopes=telescopes)
+        dl2 = stereo_reconstruction(dl2_0, config=config, ismc=ismc, telescopes=telescopes, subarray=subarray)
         #except:
         #    logging.error('Stereo reconstruction failed.')
         #    os.remove(output_file)
@@ -192,7 +194,7 @@ def main():
             """
             models_dir_auto = get_closest_rf_model(dl1, models_dir=models_dir)
             try:
-                dl2 = apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc)
+                dl2 = apply_models(dl1, models_dir=models_dir_auto, config=config, telescope=tel, stereo=stereo, mc=ismc, subarray=subarray)
             except Exception:
                 logging.error('RF application failed.')
                 os.remove(output_file)

@@ -27,6 +27,7 @@ from sst1mpipe.io.containers import DL1_info, DL2_info
 from sst1mpipe.monitoring import last_chunk_index
 from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
+    SIMULATION_OBSTIME,
     add_disp,
     add_features,
     add_log_true_energy,
@@ -36,10 +37,12 @@ from sst1mpipe.utils.utils import (
     add_true_impact,
     event_selection,
     get_finite,
-    get_horizon_frame,
     get_pointing_radec,
+    get_tel_id,
     get_telescopes,
     join_in_order,
+    read_subarray,
+    telescope_location,
     stereo_var_cuts,
 )
 
@@ -247,7 +250,7 @@ def write_dl2(
 
 def write_photon_list(
         pl_table, output_file=None, telescope=None,
-        config=None):
+        config=None, subarray=None):
     """
     Helper function to write PL file
 
@@ -258,6 +261,8 @@ def write_photon_list(
     output_file: string
     telescope: string
     config: dict
+    subarray: ctapipe.instrument.SubarrayDescription
+        subarray of the DL2 file, written in the photon list (telescope positions)
 
     Returns
     -------
@@ -269,6 +274,8 @@ def write_photon_list(
         table_path='/photon_list', table_name=telescope,
         config=config, mode='w'
         )
+    if subarray is not None:
+        subarray.to_hdf(output_file)
 
 
 def write_extra_parameters(
@@ -307,7 +314,8 @@ def write_extra_parameters(
             merged_table = join(params, simulation, keys=['obs_id', 'event_id'])
             configuration = read_table(file, "/configuration/instrument/telescope/optics")
             merged_table['equivalent_focal_length'] = configuration['equivalent_focal_length'] * np.ones(len(merged_table))
-            merged_table = add_disp(merged_table, get_horizon_frame(config=config, telescope=tel))
+            location = telescope_location(read_subarray(file), tel)
+            merged_table = add_disp(merged_table, AltAz(location=location, obstime=SIMULATION_OBSTIME))
             merged_table = add_miss(merged_table)
             merged_table = add_true_impact(merged_table, input_file=file, tel=tel)
             merged_table = add_log_true_energy(merged_table)
@@ -422,7 +430,7 @@ def read_trigger_time(input_file, tel):
     """
 
     trigger = read_table(input_file, '/dl1/event/telescope/trigger')
-    trigger = trigger[trigger['tel_id'] == int(tel.split('_')[-1])]
+    trigger = trigger[trigger['tel_id'] == get_tel_id(tel)]
     return Table({
         'obs_id': trigger['obs_id'],
         'event_id': trigger['event_id'],
