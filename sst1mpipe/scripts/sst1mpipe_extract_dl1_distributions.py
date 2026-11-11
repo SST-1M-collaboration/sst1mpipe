@@ -25,6 +25,7 @@ import pandas as pd
 from astropy.io.misc.hdf5 import write_table_hdf5
 from astropy.table import QTable
 from gammapy.data import DataStore
+from traitlets.config import Config
 
 from sst1mpipe.io import (
     check_outdir,
@@ -205,8 +206,9 @@ def load_data(files, config=None, tel=None, data_level='dl1'):
     recleaned_fractions = []
     times = []
     nsb = []
-    # NSB rate from the pedestal events (voltage drop model of the SiPMs, default parameters)
-    nsb_model = default_model()
+    # NSB rate from the pedestal events: voltage drop model of the SiPMs, configured by the
+    # config if given (default parameters otherwise)
+    nsb_model = default_model(Config(config) if config else None)
 
     for input_file in files:
         try:
