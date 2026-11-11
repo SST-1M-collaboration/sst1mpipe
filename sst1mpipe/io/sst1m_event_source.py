@@ -2,7 +2,6 @@
 import logging
 import os
 import re
-import warnings
 from itertools import islice
 
 import numpy as np
@@ -366,11 +365,11 @@ def read_trigger_traces(traces, prepare, name, n_samples, sort_ids, patch_order=
     """
     Trigger traces of a camera event (432, n_samples) in patch_sw_id order: ``sort_ids`` puts the
     readout order in patch_sw_id order, ``patch_order`` (see `trigger_patch_order`) moves the
-    patches of the wrongly connected modules. nan if the traces are not in the camera event.
+    patches of the wrongly connected modules. None if the traces are not in the camera event
+    (the field is missing or empty: a camera can be configured not to send them).
     """
-    if len(traces) == 0:
-        warnings.warn(f'{name} does not exist: --> nan', stacklevel=3)
-        return np.full((N_PATCHES, n_samples), np.nan)
+    if traces is None or len(traces) == 0:
+        return None
     traces = prepare(traces)[sort_ids]
     return traces if patch_order is None else traces[patch_order]
 

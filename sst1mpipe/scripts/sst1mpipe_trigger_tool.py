@@ -140,7 +140,12 @@ class TriggerTool(Tool):
         self.counts[tel_id, "tdscan"] += result.tdscan
 
         if self.compare_camera:
-            camera_output = np.asarray(event.r0.tel[tel_id].trigger_output_patch7).astype(bool)
+            camera_output = event.r0.tel[tel_id].trigger_output_patch7
+            if camera_output is None:
+                raise ValueError(
+                    f"Telescope {tel_id}: no trigger_output_patch7 in this file (None in the R0 data), "
+                    "the emulated trigger cannot be compared to the camera"
+                )
             result.camera_patch7 = bool(camera_output.any())
             result.camera_patch7_mismatches = int(np.sum(camera_output != patch7_output))
             self.counts[tel_id, "camera_patch7"] += result.camera_patch7
