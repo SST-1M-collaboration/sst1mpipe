@@ -166,15 +166,15 @@ class SST1MR0CameraContainer(R0CameraContainer):
     """
 
     pixel_flags = Field(None, "numpy array containing pixel flags (n_pixels)")
-    pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels), 0 for the pixels without data")
+    pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels, float32, a multiple of 1/16), 0 for the pixels without data")
     camera_event_number = Field(None, "event number within the first trigger of operation")
     event_time = Field(None, "White Rabbit timestamp of the event (ns, TAI)")
     gps_time = Field(None, "timestamp from a precise external clock (ns)")
     _event_type = Field(None, "camera event type")
-    trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples), patch_sw_id order")
-    trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples), central patch_sw_id order")
-    trigger_output_patch19 = Field(None, "trigger 19 patch cluster traces (n_clusters, n_samples), central patch_sw_id order")
-    trigger_output_muon = Field(None, "trigger muon cluster traces (n_clusters, n_samples), central patch_sw_id order")
+    trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples), uint8, patch_sw_id order; None if not in the data")
+    trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples), bool, central patch_sw_id order; None if not in the data")
+    trigger_output_patch19 = Field(None, "trigger 19 patch cluster traces (n_clusters, n_samples), bool, central patch_sw_id order; None if not in the data")
+    trigger_output_muon = Field(None, "trigger muon cluster traces (n_clusters, n_samples), bool,  central patch_sw_id order; None if not in the data")
 
     @property
     def event_type(self):

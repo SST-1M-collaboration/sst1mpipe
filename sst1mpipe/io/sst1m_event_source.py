@@ -2,7 +2,6 @@
 import logging
 import os
 import re
-import warnings
 from itertools import islice
 
 import numpy as np
@@ -317,7 +316,7 @@ def prepare_trigger_output(traces):
     traces = np.unpackbits(traces.reshape(-1, N_SECTORS, n_bytes, 1), axis=-1)
     traces = traces[..., ::-1]
     traces = traces.reshape(-1, N_PATCHES)
-    return traces.T
+    return traces.T.astype(bool)
 
 
 # trigger traces of the camera events: R0 field, conversion to (432, n_samples) in readout order,
@@ -366,11 +365,11 @@ def read_trigger_traces(traces, prepare, name, n_samples, sort_ids, patch_order=
     """
     Trigger traces of a camera event (432, n_samples) in patch_sw_id order: ``sort_ids`` puts the
     readout order in patch_sw_id order, ``patch_order`` (see `trigger_patch_order`) moves the
-    patches of the wrongly connected modules. nan if the traces are not in the camera event.
+    patches of the wrongly connected modules. None if the traces are not in the camera event
+    (the field is missing or empty: a camera can be configured not to send them).
     """
-    if len(traces) == 0:
-        warnings.warn(f'{name} does not exist: --> nan', stacklevel=3)
-        return np.full((N_PATCHES, n_samples), np.nan)
+    if traces is None or len(traces) == 0:
+        return None
     traces = prepare(traces)[sort_ids]
     return traces if patch_order is None else traces[patch_order]
 
@@ -411,8 +410,9 @@ def fill_r0_event(array_event, camera_event, order=None, pedestal_type=EventType
 
     r0 = array_event.r0.tel[tel_id]
     r0.waveform = samples[sort_ids].reshape(1, n_pixels, n_samples)
-    # baseline of DigiCam in 1/16 ADC; negative for the pixels without data (dead modules): 0
-    r0.pedestal = np.maximum(camera_event.hiGain.waveforms.baselines[sort_ids] / 16, 0)
+    # baseline of DigiCam in 1/16 ADC (int16); negative for the pixels without data (dead modules): 0.
+    # float32 holds it exactly (float16 would not: 11 bits of mantissa)
+    r0.pedestal = np.maximum(camera_event.hiGain.waveforms.baselines[sort_ids], 0).astype(np.float32) / 16
     r0.camera_event_number = camera_event.eventNumber
     r0.pixel_flags = camera_event.pixels_flags[sort_ids]
     r0.event_time = local_time
