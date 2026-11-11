@@ -13,9 +13,7 @@ from gammapy.data import DataStore
 
 from sst1mpipe.analysis import add_reco_ra_dec
 from sst1mpipe.io import check_outdir, load_config, load_more_dl2_files
-from sst1mpipe.utils import (
-    get_horizon_frame,
-)
+from sst1mpipe.utils import read_subarray, telescope_location
 
 
 def photon_df_to_fits(dl2_photons,
@@ -28,6 +26,7 @@ def photon_df_to_fits(dl2_photons,
                       end_t   = None,
                       gammaness_cuts = None,
                       event_class    = None,
+                      subarray       = None,
                       ):
     """
     Create HDU list to be stored in the DL3 fits file
@@ -55,6 +54,9 @@ def photon_df_to_fits(dl2_photons,
         cut from the config file is applied.
     event_class: int
         Event class in given photon list to find a proper IRF
+    subarray: ctapipe.instrument.SubarrayDescription
+        subarray of the DL2 files (``SubarrayDescription.from_hdf(dl2_file)``): array centre
+        of the header, position of the telescope for the reco RA/Dec
     Returns
     -------
     hdu_list:
@@ -62,6 +64,8 @@ def photon_df_to_fits(dl2_photons,
 
     """
 
+    if subarray is None:
+        raise ValueError("subarray is required (SubarrayDescription.from_hdf(dl2_file)): array centre, telescope positions")
     tel_setup = dl2_photons['tel_setup'].iloc[0]
     instrument = "SST1M_"+tel_setup
     if tel_setup=='stereo':
@@ -103,7 +107,8 @@ def photon_df_to_fits(dl2_photons,
     #                                       az =  np.array(dl2_photons['reco_az'])*u.deg))
 
     if ('reco_ra' not in dl2_photons.keys()) or ('reco_dec' not in dl2_photons.keys()):
-        horizon_frame = get_horizon_frame(config=config, telescope='tel_021', times=Time(dl2_photons['local_time'], format='unix'))
+        horizon_frame = AltAz(location=telescope_location(subarray, tel_setup),
+                              obstime=Time(dl2_photons['local_time'], format='unix'))
         dl2_photons = add_reco_ra_dec(dl2_photons, horizon_frame=horizon_frame)
         logging.info('Calculated reco RA and DEC, which were missing in the photon list')
 
@@ -195,11 +200,10 @@ def photon_df_to_fits(dl2_photons,
     fbt_events.header['OBSERVER'] = ('SST1M Collaboration','Observer')
     fbt_events.header['N_TELS']   = (NTEL, 'Number of telescopes in event list')
     fbt_events.header['TELLIST']  = ('21-22','Telescope IDs')
-    ## subarray.reference_location.to_geodetic()
-    ## lon=<Longitude 14.782501 deg>, lat=<Latitude 49.912442 deg>, height=<Quantity 511.195 m>)
-    fbt_events.header['GEOLAT']  =    (config['array_center_coords']['lat_deg'], '[deg] Geographic latitude of array centre')
-    fbt_events.header['GEOLON']  =    (config['array_center_coords']['long_deg'], '[deg] Geographic longitude of array centre')
-    fbt_events.header['ALTITUDE']=    (config['array_center_coords']['height_m'],  '[km] Altitude of array centre')
+    array_centre = subarray.reference_location.geodetic
+    fbt_events.header['GEOLAT']  =    (array_centre.lat.to_value(u.deg), '[deg] Geographic latitude of array centre')
+    fbt_events.header['GEOLON']  =    (array_centre.lon.to_value(u.deg), '[deg] Geographic longitude of array centre')
+    fbt_events.header['ALTITUDE']=    (array_centre.height.to_value(u.m),  '[m] Altitude of array centre')
 
     fbt_events.header['EUNIT']   = ('TeV',           'Energy unit')
     fbt_events.header['EVTVER']  = (pipeline_version,        'Event list version number')
@@ -351,6 +355,7 @@ def dl2_dir_to_dl3(target_name   = None,
                 gammaness_cut=gammaness_cuts
                 )
     df_dl2 = df_dl2_unsort.copy().sort_values("local_time").reset_index()
+    subarray = read_subarray(all_files[0])
     #times = np.array(times_unsort)
     #times.sort()
 
@@ -411,6 +416,7 @@ def dl2_dir_to_dl3(target_name   = None,
                                                     end_t            = end_t,
                                                     gammaness_cuts   = gammaness_cuts,
                                                     event_class      = evtclass,
+                                                    subarray         = subarray,
                                                     )
                         outname = os.path.join(out_dir_c,f"SST1M_{target_name}_obs_id_{obs_id}_dl3.fits")
                         fits.HDUList(hdulist).writeto(outname, overwrite=True)
@@ -431,7 +437,8 @@ def dl2_dir_to_dl3(target_name   = None,
                                                     RF_used          = RF_used,
                                                     start_t          = start_t,
                                                     end_t            = end_t,
-                                                    gammaness_cuts = gammaness_cuts
+                                                    gammaness_cuts = gammaness_cuts,
+                                                    subarray         = subarray,
                                                     )
                     outname = os.path.join(out_dir,f"SST1M_{target_name}_obs_id_{obs_id}_dl3.fits")
                     fits.HDUList(hdulist).writeto(outname, overwrite=True)

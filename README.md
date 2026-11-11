@@ -1,4 +1,7 @@
-[![documentation](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/documentation.yml/badge.svg)](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/documentation.yml) [![ci](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml/badge.svg)](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml)
+[![ci](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml/badge.svg)](https://github.com/SST-1M-collaboration/sst1mpipe/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/sst1mpipe)](https://pypi.org/project/sst1mpipe/) 
+[![license](https://img.shields.io/github/license/SST-1M-collaboration/sst1mpipe)](LICENSE)
+[![docs](https://img.shields.io/badge/docs-github.io-blue)](https://sst-1m-collaboration.github.io/sst1mpipe/)
 # SST-1M pipeline 
 
 The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository is used for processing and analyzing data from the <b>SST-1M</b> prototype. Currently, two SST-1M telescopes are installed in Ondrejov, Czech Republic, operation in both mono and stereo observation modes. The <b>SST-1M</b> pipeline is based on [ctapipe](https://github.com/cta-observatory/ctapipe) and draws inspiration from [cta-lstchain](https://github.com/cta-observatory/cta-lstchain). Some funcionalities for stereoscopic reconstruction are inspired by [magic-cta-pipe](https://github.com/cta-observatory/magic-cta-pipe).
@@ -6,7 +9,7 @@ The [sst1mpipe](https://github.com/SST-1M-collaboration/sst1mpipe) repository is
 sst1mpipe provides tools for low-level data analysis up to DL3, which can be further analyzed using standard tools such as [gammapy](https://github.com/gammapy).
 
 - **Source code:** https://github.com/SST-1M-collaboration/sst1mpipe
-- **Documentation:** https://sst1mpipe.readthedocs.io/
+- **Documentation:** https://sst-1m-collaboration.github.io/sst1mpipe/
 
 
 **NOTE ON OLD RELEASES**
@@ -14,6 +17,18 @@ sst1mpipe provides tools for low-level data analysis up to DL3, which can be fur
 v0.3.5 of *sst1mpipe* was the last one before the repository was made public. Old releases are available only to the members of SST-1M Consortium and can be found in a privare repository [sst1mpipe-old](https://github.com/SST-1M-collaboration/sst1mpipe-old).
 
 # Installation
+
+## From PyPI
+
+Since 0.32, the versions of *sst1mpipe* follow the versions of [ctapipe](https://github.com/cta-observatory/ctapipe)
+(*sst1mpipe* 0.32.x uses ctapipe 0.32). The 0.32.0aN versions are alpha releases: the DL1 to DL3 steps and the
+stereo matching are not migrated to the new ctapipe tools yet.
+
+```
+pip install --pre sst1mpipe
+```
+
+## With conda
 
 The advanced package and environment management system, [Anaconda](https://www.anaconda.com/distribution/#download-section), [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Mamba](https://anaconda.org/conda-forge/mamba), need to be installed first.
 
@@ -32,11 +47,11 @@ Install miniforge by following the instructions
 bash Miniforge3-$(uname)-$(uname -m).sh
 ````
 
-- download stable version of <b>sst1mpipe</b> (latest version = 0.9.0)
+- download stable version of <b>sst1mpipe</b>
 - create and activate <b>mamba</b> environment
 - install <b>sst1mpipe</b>
 ```
-SST1MPIPE_VER=0.9.0
+SST1MPIPE_VER=0.9.1
 
 wget https://github.com/SST-1M-collaboration/sst1mpipe/archive/refs/tags/v$SST1MPIPE_VER.tar.gz
 tar -xvf v$SST1MPIPE_VER.tar.gz

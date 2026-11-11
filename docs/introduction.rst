@@ -6,6 +6,29 @@ Introduction
 Installation
 ------------
 
+Versions
+~~~~~~~~
+
+Since 0.32, the versions of **sst1mpipe** follow the versions of
+`ctapipe <https://github.com/cta-observatory/ctapipe>`_: **sst1mpipe** 0.32.x uses ctapipe 0.32.
+The 0.32.0aN versions are alpha releases: the R0 to DL1 processing (``sst1mpipe-monitoring``,
+``sst1mpipe-process``) uses the new ctapipe tools, while the DL1 to DL3 steps and the stereo
+matching are not migrated yet.
+
+From PyPI
+~~~~~~~~~
+
+.. code-block:: console
+
+    pip install --pre sst1mpipe
+
+``--pre`` is needed for the alpha releases (or give the version, e.g. ``pip install sst1mpipe==0.32.0a1``).
+Python 3.12 is required. The test data are not in the package: the tests are run from the git
+repository (see `For developers`_).
+
+With conda (environment.yml)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 The advanced package and environment management system, `Anaconda <https://www.anaconda.com/distribution/#download-section>`_, `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`_ or `Mamba <https://anaconda.org/conda-forge/mamba>`_, is needed to be installed first.
 
 The Mamba is recomended due to some (quite often occured) stucks at solving environment on Anaconda. Up to now Mamba works well.
