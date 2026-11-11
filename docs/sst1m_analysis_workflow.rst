@@ -20,7 +20,7 @@ Products of automatic processing (all data levels up to DL3) can be found in:
 
 Those are sorted by date, source observed, and the telescope used (``cs1``, ``cs2`` and ``stereo`` for coincident events).
 All data level directories also contain configuration file and log file for each processed run, so 
-user can easily check if the processing went OK and which version of ``sst1mpipe``wasused. Random Forest models used in authomatic analysis 
+user can easily check if the processing went OK and which version of ``sst1mpipe`` was used. Random Forest models used in authomatic analysis 
 can be found in
 
 ``/data/work/analysis/MC/prod_january_2023/``
@@ -67,11 +67,16 @@ There are two slightly different configuration files. One is to be used for MC p
 for real data processing. These contain configuration for all reconstruction/analysis steps 
 from R0 to DL3 (or performance evaluation in case of MC).
 
-Default config file for MC:
+Config files for MC, for the simulations at low and high NSB (they differ by the PDE drop correction factors):
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config.json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_low_nsb.json
+       :code: json
+
+.. toggle:: 
+
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_high_nsb.json
        :code: json
 
 Default config file for data:
@@ -85,29 +90,32 @@ Default config file for data:
 R0 to DL1
 ~~~~~~~~~
 
-To calibrate raw data (R0) or MC (R1) and process them to DL1, one may run ``sst1mpipe_r0_dl1`` script. Inputs are a single raw 
-``.fits.fz`` data file (containing single telescope data) or ``.simtel.gz`` output file of sim_telarray (may contain mono and coincident events 
-triggering more telescopes).
-Output is ``HDF5`` file with a table of DL1 parameters, one output file per run (about 40 seconds of data) and per telescope (DL1 files from individual 
-telescopes searched for coincidences and merged for stereoscopic reconstruction in the next step :ref:`dl1_dl1_stereo`).
+The raw data (R0) are monitored with the ctapipe tool ``sst1mpipe-monitoring`` (statistics of the
+pedestal events and pointing of each run, see :ref:`sst1mpipe_monitoring`), then the raw data (R0) and the
+simulations (R1) are processed to DL1 with ``sst1mpipe-process``, see :ref:`data_processing`. The output is a ``HDF5`` file with a table of DL1
+parameters, one output file per run (about 40 seconds of data) and per telescope (DL1 files from individual
+telescopes searched for coincidences and merged for stereoscopic reconstruction in the next step
+:ref:`dl1_dl1_stereo`).
 
-It applies dc to p.e. calibration on raw R0 waveforms, integrates them, cleans the images (gets rid of the noisy pixels which likely do not 
+It applies dc to p.e. calibration on raw R0 waveforms, integrates them, cleans the images (gets rid of the noisy pixels which likely do not
 contain any Cherenkov photons), and parametrizes the shower images with Hillas ellipses.
-See ``--help`` for possible inputs. Some of them, which might not be obvious:
-
-* ``--px-charges`` - the script stores also distribution of all integrated charges in individual pixels for all events merged. This is useful for further MC/data tunning and to get some impression on the level of NSB in the data.
-
-* ``--precise-timestamps`` - stores also White Rabbit timestamps in the DL1 output with the precision needed for coincident events matching. Keep it on for all data taken after 25th September 2023, when WR was deployed.
-
-* ``--pointing-ra/dec`` and ``--force-pointing`` - allows to specify the telescope pointing direction. To process data taken after begining of September 2023 it can be ignored (i.e. do not use it for any new data), because the pointing coordinates are being written automaticaly in the fits file header during the datataking and the script understands where to look for it.
-
-* ``—-reclean`` - experimental method of data re-cleaning based on pixel charge variation. For now it needs distribution of pixel charges stored in the first pass of the script (``--px-charges``). I.e. to apply re-cleaning, one has to run the script for the second time with the ``—-reclean`` switch.
 
 **Relevant parts of the config file** applied in this analysis step:
 
-* ``telescope_calibration`` - calibration files based on analysis of dark runs. Should be taken relatively close to the date of observation
+* ``R0R1Calibrator`` - R0 -> R1 calibration (``sst1mpipe.calib.R0R1Calibrator``): the corrections which do not need the pedestal events. All settings can be given per telescope, e.g. ``[["type", "*", []], ["id", 22, [3, 1201]]]``:
 
-* ``window_transmittance`` - files with for camera window transmittance correction (measured in the lab and can be kept default)
+  * ``calibration_file`` - calibration files based on analysis of dark runs (``null``: default file of the telescope). Should be taken relatively close to the date of observation
+  * ``window_transmittance_file`` - camera window transmittance correction factors of the pixels, measured in the lab (``null``: default file of the telescope, can be kept)
+  * ``flag_bad_calibration_pixels`` - the pixels with bad calibration parameters are flagged as outliers and interpolated
+  * ``bad_pixels`` - ids of pixels always flagged as outliers and interpolated (data and MC)
+  * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the charges are divided by this factor (``factor`` of the camera calibration coefficients), which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.json`` and ``sst1mpipe_mc_config_high_nsb.json`` have the factors of the low and high NSB simulations
+
+  The corrections which need the pedestal events are the camera calibration coefficients computed by ``sst1mpipe-monitoring`` (``CameraCoefficientsCalculator`` of the monitoring config, see :ref:`sst1mpipe_monitoring`): ``voltage_drop_correction`` (``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB: the charges are divided by the charge drop of the ``SiPMVoltageDropModel``, see :ref:`nsb_level`) and ``flag_dead_pixels`` (the pixels without statistics of the ADC samples of the pedestal events are flagged as outliers and interpolated).
+
+  The former ``telescope_calibration``, ``NsbCalibrator.*``, ``analysis.bad_pixels`` and ``window_transmittance`` settings are no longer read.
+
+* ``NsbCalibrator.intensity_correction`` - global scale of the Hillas intensity per telescope. It is not applied at this step, but in ``sst1mpipe_dl1_dl2`` with ``--scale-intensities``
+
 
 * ``CameraCalibrator`` - Pulse integration settings
 
@@ -123,7 +131,7 @@ Random Forest training
 
     In most cases, **analyser does not need to train dedicated Random Forest models and this step can be safely skipped** using pre-trained RFs 
     referenced in :ref:`dl1_dl2`. Training of dedicated RFs is, however, necessary in some performance studies if one wants to use different 
-    configuration for ``sst1mpipe_r0_dl1`` than MC was processed with (e.g. cleaning, peak integration, ..).
+    configuration for ``sst1mpipe-process`` than MC was processed with (e.g. cleaning, peak integration, ..).
 
 Random Forests can be trained on **DL1 MC diffuse gammas and diffuse proton** files using ``sst1mpipe_mc_train_rfs`` script (see 
 ``--help`` for possible inputs). Before running ``sst1mpipe_mc_train_rfs`` it is useful to merge many small DL1 files in given MC production (which resulted 
@@ -163,7 +171,7 @@ options are:
 
 * ``SlidingWindow`` - For analysis of the data without precise White Rabbit timestamps (i.e. taken before 25th September 2023) one needs to use this method. It first searches for the time offset between the two DL1 tables providing maximum number of coindicent events and then selects the closest ones.
 
-* ``WhiteRabbitClosest`` - Works on data with precise WR timestamps in the DL1 table, i.e. all data taken after 25th September 2023. It only finds the closest tel2 event to each tel1 event (precision of WR is high enough to avoid random coincidences for usual trigger rates of the telescopes).
+* ``WhiteRabbitClosest`` - Works on data with precise WR timestamps, i.e. all data taken after 25th September 2023. The trigger times are read with ns precision from the DL1 trigger tables (``/dl1/event/telescope/trigger``). It finds the closest tel2 event to each tel1 event, within a maximum time difference set by ``max_time_diff_ns`` in the ``stereo.WhiteRabbitClosest`` section of the config file (10 µs in ``sst1mpipe_data_config.json``). The precision of WR is high enough to avoid random coincidences at the usual trigger rates of the telescopes.
 
 * ``SWATEventIDs`` - After 30th January 2024 the coincident events are tagged by SWAT, providing them with the same ``arrayEvtNum``, resulting in the same ``event_id`` in the DL1 files. The DL1 events can be then matched just based on their ``event_id``.
 
@@ -179,7 +187,7 @@ DL1 to DL2
 ~~~~~~~~~~
 
 This step uses pre-trained Random Forests to reconstruct parameters of primary gamma-ray photon (gammaness, direction and energy) using Hillas parameters stored in 
-the DL1 files as features. One can run ``sst1mpipe_data_dl1_dl2`` stript on either mono DL1 files (outputs of ``sst1mpipe_r0_dl1``) for each telescope separately (using RFs for mono reconstruction), 
+the DL1 files as features. One can run ``sst1mpipe_data_dl1_dl2`` stript on either mono DL1 files (outputs of ``sst1mpipe-process``) for each telescope separately (using RFs for mono reconstruction), 
 or on stereo DL1 containing coincident events only (outputs of ``sst1mpipe_data_dl1_dl1_stereo``). The script can handle both types of DL1, 
 but stereo reconstruction has to be requested explicitely using ``-—stereo`` switch. RFs trained on MC can be found on **Calculus** for both mono and stereo 
 reconstruction and different zenith angles:

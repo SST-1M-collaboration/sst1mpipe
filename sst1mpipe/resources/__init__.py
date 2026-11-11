@@ -1,7 +1,8 @@
 """
 Files distributed with sst1mpipe:
 
-- ``config``: configuration files of the analysis (data, MC, RTA, trigger emulator)
+- ``config``: configuration files of the analysis (data, MC at low and high NSB, RTA, monitoring,
+  trigger emulator)
 - ``calibration``: camera calibration (dc_to_pe from dark runs, window transmittance,
   PDE drop correction of the simulations, fits of dark runs)
 - ``instrument``: description of the telescopes and of the camera (subarray, pixel mapping)
@@ -18,8 +19,9 @@ __all__ = [
     "INSTRUMENT_DIR",
     "TEST_DATA_DIR",
     "DATA_CONFIG_FILE",
-    "MC_CONFIG_FILE",
+    "MC_CONFIG_FILES",
     "RTA_CONFIG_FILE",
+    "MONITORING_CONFIG_FILE",
     "PDE_CORRECTION_FACTORS_FILE",
     "SUBARRAY_FILE",
     "PIXEL_MAPPING_FILE",
@@ -37,8 +39,9 @@ INSTRUMENT_DIR = RESOURCES_DIR / "instrument"
 TEST_DATA_DIR = RESOURCES_DIR / "test_data"
 
 DATA_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_data_config.json"
-MC_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_mc_config.json"
+MC_CONFIG_FILES = {nsb: CONFIG_DIR / f"sst1mpipe_mc_config_{nsb}_nsb.json" for nsb in ("low", "high")}
 RTA_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_rta_config.json"
+MONITORING_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_monitoring_config.json"
 # TPointPointingModel of the SST-1M drives (AzElCorrCoefTel<n>.conf), periods from noon to noon UTC: tel 21 from
 # the night 20230420 (same coefficients in its three files, PMAz2 and PMEl2 from 0 to -1 on 20230612); tel 22 for
 # the nights 20240430 to 20260313 and from 20260317 (new mirrors). The other times use the latest coefficients of

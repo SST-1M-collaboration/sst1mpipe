@@ -1,11 +1,36 @@
 import logging
 
+import astropy.units as u
 import numpy as np
 import pandas as pd
 
-from sst1mpipe.resources import CALIBRATION_DIR, WINDOW_DIR
-from sst1mpipe.utils import VAR_to_Idrop, get_tel_string
+from ctapipe.containers import PixelStatus, R1CameraContainer
+from ctapipe.core import TelescopeComponent
+from ctapipe.core.traits import (
+    BoolTelescopeParameter,
+    Float,
+    FloatTelescopeParameter,
+    Int,
+    IntTelescopeParameter,
+    List,
+    Path,
+    TelescopeParameter,
+)
 
+from sst1mpipe.resources import CALIBRATION_DIR, WINDOW_DIR
+
+
+
+# Transmittance correction factors of the camera windows, measured in the lab
+DEFAULT_WINDOW_FILES = {
+    21: 'corr_factor_1st_wdw.txt',
+    22: 'corr_factor_2nd_wdw.txt',
+}
+
+
+def read_window_transmittance(window_file):
+    """Correction factor of the window transmittance of each pixel (file with pixel_id, correction_factor)"""
+    return np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
 
 
 def get_default_window(telescope=None):
@@ -18,7 +43,7 @@ def get_default_window(telescope=None):
     ----------
     telescope: int
         Telescope number as in
-        event.sst1m.r0.tels_with_data
+        event.trigger.tels_with_trigger (1, 2 for the simulations)
 
     Returns
     -------
@@ -26,411 +51,398 @@ def get_default_window(telescope=None):
     window_file: string
 
     """
-
-    if (telescope == 21) or (telescope == 1):
-        default_window_file_tel1 = 'corr_factor_1st_wdw.txt'
-        logging.info('Window file used: ' + default_window_file_tel1)
-        window_file = WINDOW_DIR / default_window_file_tel1
-    elif (telescope == 22) or (telescope == 2):
-        default_window_file_tel2 = 'corr_factor_2nd_wdw.txt'
-        logging.info('Window file used: ' + default_window_file_tel2)
-        window_file = WINDOW_DIR / default_window_file_tel2
-    else:
-        logging.error(f'Telescope {telescope} not known')
-    window_corr = np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
-    return window_corr, window_file
+    window_file = (WINDOW_DIR / DEFAULT_WINDOW_FILES[{1: 21, 2: 22}.get(telescope, telescope)])
+    logging.info('Window file used: %s', window_file)
+    return read_window_transmittance(window_file), window_file
 
 
-def get_window_corr_factors(telescope=None, config=None):
-    """
-    Finds and reads the window transmissivity file.
-
-    Parameters
-    ----------
-    telescope: int
-        Telescope number as in
-        event.sst1m.r0.tels_with_data
-    config: dict
-
-    Returns
-    -------
-    window_corr: numpy.ndarray
-    window_file: string
-
-    """
-
-    if "window_transmittance" in config:
-        if config["window_transmittance"]["tel_" + str(telescope).zfill(3)]:
-            window_file = config["window_transmittance"]["tel_" + str(telescope).zfill(3)]
-            window_corr = np.loadtxt(window_file, unpack=True, skiprows=1, usecols=1)
-            logging.info("Window File for Tel %s: %s", telescope, window_file)
-        else:
-            logging.info("NO WINDOW TRANSMITTANCE FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT WINDOW USED.", telescope)
-            window_corr, window_file = get_default_window(telescope=telescope)
-    else:
-        logging.info("NO WINDOW TRANSMITTANCE FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT WINDOW USED.", telescope)
-        window_corr, window_file = get_default_window(telescope=telescope)
-
-    return window_corr, window_file
-
-
-def window_transmittance_correction(
-        event, window_corr_factors=None,
-        telescope=None,
-        swapped_modules=None
-        ):
-    """
-    Applies window transmittance correction
-    on the integrated waveforms (images)
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-    window_corr_factors: numpy.ndarray
-    telescope: int
-        Telescope number as in
-        event.sst1m.r0.tels_with_data
-    swapped_modules: list
-        list of masks
-
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    """
-
-    if swapped_modules is None:
-        swapped_modules = []
-
-    for mask_1,mask_2 in swapped_modules:
-
-        # module 1
-        window_corr_1 = window_corr_factors[mask_1]
-
-        # module 2
-        window_corr_2 = window_corr_factors[mask_2]
-
-        window_corr_factors[mask_1] = window_corr_2
-        window_corr_factors[mask_2] = window_corr_1
-
-    image_corrected = event.dl1.tel[telescope].image / window_corr_factors
-    event.dl1.tel[telescope].image = image_corrected.astype(np.float32)
-
-    return event
-
-
-def saturated_charge_correction(event, processing_info=None):
+class ImageSaturationCorrector(TelescopeComponent):
     r"""
-    Finds saturated waveforms and applies different peak integration on
-    them, as the standard one does not perform well in such cases. This
-    method integrates the peak above 20\% of the amplitude.
-    Peak time for saturated events is also corrected as the middle of
-    the integration window.
+    Correction of the charges and peak times of the saturated pixels, applied after the
+    image extraction (`~ctapipe.calib.CameraCalibrator`).
 
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
+    The saturated pixels are the pixels flagged with `~ctapipe.containers.PixelStatus.SATURATED`
+    in the pixel status of R1 (by the `R0R1Calibrator`). The standard integration window does
+    not perform well for these pulses: their charge is the sum of the R1 waveform (p.e.) from the
+    first sample above ``integration_level`` times the maximum, to the first sample below it after
+    the maximum (or the end of the readout window), multiplied by the ``factor`` of the camera
+    calibration coefficients (voltage drop correction), as the charges of the CameraCalibrator.
+    Their peak time is the middle of the ADC samples (``event.r0``, pedestal subtracted) above
+    ``peak_time_level``. The saturated pixels which are outliers (dead or bad pixels) keep the
+    charge interpolated by the CameraCalibrator.
 
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
+    ``integration_level`` or ``peak_time_level`` ``null``: the saturated pixels of the telescope are
+    not corrected (simulated telescopes 1 and 2 in the MC configurations).
     """
 
-    saturated_threshold = 3000
-    width_level = 2500
-    width_threshold = 5
-    integration_level = 0.2
+    integration_level = TelescopeParameter(
+        trait=Float(allow_none=True),
+        default_value=0.2,
+        allow_none=True,
+        help=(
+            "Fraction of the maximum defining the integration window of the saturated pulses."
+            " None: no correction of the telescope"
+        ),
+    ).tag(config=True)
 
-    telescope = event.sst1m.r0.tels_with_data[0]
-    r0data = event.sst1m.r0.tel[telescope]
-    adc_samples = (r0data.adc_samples.T - r0data.digicam_baseline)
+    peak_time_level = TelescopeParameter(
+        trait=Float(allow_none=True),
+        default_value=2500.0,
+        allow_none=True,
+        help=(
+            "ADC (pedestal subtracted): the peak time of a saturated pulse is the middle"
+            " of its R0 samples above this level. None: no correction of the telescope"
+        ),
+    ).tag(config=True)
 
-    # saturated pixels
-    mask_saturated = np.max(adc_samples, axis=0) > saturated_threshold
-    saturated = False
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
+        super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
+        self.n_saturated_events = {}
 
-    if sum(mask_saturated) > 0:
+    def __call__(self, event):
+        """Correct the saturated pixels of the telescopes of the event"""
+        for tel_id in event.dl1.tel.keys():
+            if self._correct_telescope(event, tel_id):
+                self.n_saturated_events[tel_id] = self.n_saturated_events.get(tel_id, 0) + 1
 
-        image_new = event.dl1.tel[telescope].image
-        peaktime_new = event.dl1.tel[telescope].peak_time
+    @staticmethod
+    def saturated_pixels(event, tel_id):
+        """Pixels flagged as saturated in the pixel status of R1, without the outliers"""
+        pixel_status = event.r1.tel[tel_id].pixel_status
+        if pixel_status is None:
+            return np.array([], dtype=int)
+        saturated = (pixel_status & PixelStatus.SATURATED).astype(bool)
+        outlier_mask = event.monitoring.tel[tel_id].camera.coefficients.outlier_mask
+        if outlier_mask is not None:
+            saturated &= ~np.atleast_2d(outlier_mask)[0]
+        return np.flatnonzero(saturated)
 
-        # iterate over baseline subtracted waveforms and correct integration of those peaking above
-        # saturation threshold and with larger width
-        for k, w in enumerate(adc_samples.T):
+    def _correct_telescope(self, event, tel_id):
+        integration_level = self.integration_level.tel[tel_id]
+        peak_time_level = self.peak_time_level.tel[tel_id]
+        # the peak times are computed from the R0 waveforms: none for the R1 events of a stream
+        if integration_level is None or peak_time_level is None or tel_id not in event.r0.tel:
+            return False
+        saturated = self.saturated_pixels(event, tel_id)
+        if len(saturated) == 0:
+            return False
 
-            if mask_saturated[k]:
-                mask_width = w > width_level
+        sample_time = (1 / self.subarray.tel[tel_id].camera.readout.sampling_rate).to_value(u.ns)
+        factor = event.monitoring.tel[tel_id].camera.coefficients.factor
+        factor = np.ones(len(event.dl1.tel[tel_id].image)) if factor is None else np.atleast_2d(factor)[0]
 
-                n_samples = mask_width.shape[0]
+        dl1 = event.dl1.tel[tel_id]
+        r0 = event.r0.tel[tel_id]
+        r1_waveform = event.r1.tel[tel_id].waveform[0]
+        for pixel in saturated:
+            # the R1 waveform is proportional to the ADC samples of the pixel: same window
+            w = r1_waveform[pixel]
+            max_charge = w.max()
+            index_max = np.argmax(w)
+            integration_start = np.flatnonzero(w >= integration_level * max_charge)[0]
+            # first drop below the level after the maximum, to avoid secondary peaks.
+            # If there is none, the pulse extends over the readout window
+            after_max = np.flatnonzero((w < integration_level * max_charge) & (np.arange(len(w)) > index_max))
+            integration_stop = after_max[0] if len(after_max) > 0 else len(w) - 1
+            dl1.image[pixel] = w[integration_start:integration_stop + 1].sum() * factor[pixel]
 
-                max_adc = max(w)
-                mask_integration = w >= integration_level * max_adc
-                integration_start = np.arange(0, n_samples)[mask_integration][0]
-
-                # This is needed to avoid secondary peaks (it looks for first drop below 20 percent after maximum)
-                # We also select the first one, if there is a plato in the small peak in the wavefrom, which sometimes happen
-                index_max = np.arange(0, n_samples)[w == max_adc][0]
-                int_stop = np.arange(0, n_samples)[(w < integration_level * max_adc) & (np.arange(0, n_samples) > index_max)]
-                # If it does not find where to stop it means the waveform extends over the readout window
-                if len(int_stop) > 0:
-                    integration_stop = int_stop[0]
-                else:
-                    integration_stop = n_samples-1
-
-                width = sum(mask_width)
-                peak_sample = width/2 + np.arange(0, n_samples)[mask_width][0]
-                peak_time = peak_sample * 4
-
-                if width > width_threshold:
-
-                    # Peak integration correction
-                    image_new[k] = sum(event.r1.tel[telescope].waveform[k][integration_start:integration_stop+1])
-                    peaktime_new[k] = peak_time
-                    saturated = True
-
-        if saturated:
-            event.dl1.tel[telescope].image = image_new
-            event.dl1.tel[telescope].peak_time = peaktime_new
-            processing_info.n_saturated += 1
-
-    return event
+            adc = r0.waveform[0, pixel] - r0.pedestal[pixel]
+            above_level = np.flatnonzero(adc > peak_time_level)
+            dl1.peak_time[pixel] = (len(above_level) / 2 + above_level[0]) * sample_time
+        return True
 
 
-def correct_MC_for_PDE_drop(event, simtel_config_qe=None, pde_corr_factors=None):
+# Calibration parameters averaged from all darks taken between
+# March 2023 and June 2024 (TEL1) and Sep 2023 and June 2024 (TEL2).
+# Based on TT's study, there is a relative difference in the dc_to_pe
+# factor between individual darks on the level of 5%, showing a
+# slowly decreasing trend. In the future, we may start producing
+# calibration files "per season" to mitigate the systematic uncertainty,
+# but per-night is not necessary. TT also confirms that dc_to_pe
+# does not depend on the level of DCR (the camera temperature).
+DEFAULT_CALIBRATION_FILES = {
+    21: 'averaged_calib_param_v2_2023_2024_tel1.h5',
+    22: 'averaged_calib_param_v2_2023_2024_tel2.h5',
+}
+DEFAULT_CALIBRATION_FILES[1] = DEFAULT_CALIBRATION_FILES[21]
+DEFAULT_CALIBRATION_FILES[2] = DEFAULT_CALIBRATION_FILES[22]
+
+
+class R0R1Calibrator(TelescopeComponent):
     """
-    Performs correction of the MC signal for the PDE (QE) drop.
+    R0 -> R1 calibration of the SST-1M telescopes: the corrections which do not need the pedestal
+    events, so that it can be done without monitoring data (e.g. the ZMQ streams of the real-time
+    analysis). For the observed data, fills ``event.r1.tel[tel_id]``
+    (`~ctapipe.containers.R1CameraContainer`, waveform in p.e. of shape
+    (n_channels=1, n_pixels, n_samples)) from ``event.r0.tel[tel_id]``:
 
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
+    1. subtraction of the pedestal computed by DigiCam (``r0.pedestal``)
+    2. conversion from ADC to p.e. with the ``dc_to_pe`` of the calibration file
+    3. window transmittance correction: division by the correction factor of each pixel
+       of ``window_transmittance_file``
+    4. bad pixels: the pixels with bad calibration parameters (``flag_bad_calibration_pixels``)
+       and the ``bad_pixels`` are added to ``event.monitoring.tel[tel_id].camera.coefficients.outlier_mask``,
+       so that their charge is interpolated by the ``invalid_pixel_handler`` of
+       `~ctapipe.calib.CameraCalibrator`. The R1 waveforms of all the outliers (these pixels and
+       the dead pixels of the monitoring) are set to 0.
+    5. saturated pixels: the pixels whose maximum ADC sample (pedestal subtracted) is above
+       ``saturation_threshold``, with more than ``saturation_width_threshold`` samples above
+       ``saturation_width_level``, are flagged with `~ctapipe.containers.PixelStatus.SATURATED`
+       in the pixel status of R1. Their charge is corrected after the image extraction by the
+       `ImageSaturationCorrector`.
 
-    simtel_config_qe: numpy.array
-        Different PDEs (QEs) found in the simtel file header
+    The corrections which need the pedestal events (voltage drop correction, dead pixels) are the
+    camera calibration coefficients computed by sst1mpipe-monitoring
+    (`~sst1mpipe.monitoring.CameraCoefficientsCalculator`), filled in
+    ``event.monitoring.tel[tel_id].camera.coefficients`` by the monitoring source and applied by the
+    CameraCalibrator. Without them (no monitoring source), they are not applied (warning).
 
-    pde_corr_factors: dict
-        Correction factors for different MC productions (it is NSB dependent)
-        stored in ../data/mc_pde_correction_factors.json
+    ``calibrate_r0`` false (by default for the simulated telescopes 1 and 2): the R1 waveforms
+    given by the event source are kept, and the ``bad_pixels`` are added to the outliers (and set
+    to 0 in the R1 waveforms and in the true image of the simulations).
 
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
+    PDE drop correction (``pde_drop_factor``): the ``factor`` of the camera calibration coefficients
+    is divided by it, i.e. the charges. The simulations use PDE files which include the drop for a
+    given NSB level, while the observed data are corrected for it by the voltage drop correction:
+    the factor must match the PDE file of the simulation (see ``mc_pde_correction_factors.json``
+    and the sst1mpipe_mc_config_low_nsb.json and sst1mpipe_mc_config_high_nsb.json configs).
+    ``null`` (the default, and for the real telescopes 21 and 22) applies no correction.
 
+    All the parameters can be set per telescope,
+    e.g. ``"bad_pixels": [["type", "*", []], ["id", 22, [3, 1201]]]``.
     """
 
-    for tel in event.r1.tel:
+    calibrate_r0 = BoolTelescopeParameter(
+        default_value=[("type", "*", True), ("id", 1, False), ("id", 2, False)],
+        help=(
+            "Calibrate the R0 waveforms of the telescope (raw data). False: the R1 waveforms of the"
+            " event source are kept (simulations, by default for the telescopes 1 and 2)"
+        ),
+    ).tag(config=True)
 
+    calibration_file = TelescopeParameter(
+        trait=Path(exists=True, directory_ok=False, allow_none=True),
+        default_value=None,
+        allow_none=True,
+        help=(
+            "HDF5 file with the calibration parameters (dc_to_pe, calib_flag) from the"
+            " dark runs. If None, the default calibration file of the telescope is used."
+        ),
+    ).tag(config=True)
+
+    window_transmittance_file = TelescopeParameter(
+        trait=Path(exists=True, directory_ok=False, allow_none=True),
+        default_value=None,
+        allow_none=True,
+        help=(
+            "File with the transmittance correction factor of the camera window of each pixel"
+            " (pixel_id, correction_factor), measured in the lab: the charges are divided by it."
+            " If None, the default file of the telescope (21, 22) is used."
+        ),
+    ).tag(config=True)
+
+    flag_bad_calibration_pixels = BoolTelescopeParameter(
+        default_value=True,
+        help=(
+            "Flag the pixels with bad calibration parameters (calib_flag != 1), whose charge is"
+            " interpolated. Otherwise they are calibrated with the mean dc_to_pe of the good pixels."
+        ),
+    ).tag(config=True)
+
+    saturation_threshold = FloatTelescopeParameter(
+        default_value=3000.0,
+        help="ADC (pedestal subtracted) above which the maximum of a saturated pulse is",
+    ).tag(config=True)
+
+    saturation_width_level = FloatTelescopeParameter(
+        default_value=2500.0,
+        help="ADC (pedestal subtracted) level used to compute the width of the saturated pulses",
+    ).tag(config=True)
+
+    saturation_width_threshold = IntTelescopeParameter(
+        default_value=5,
+        help="Minimum number of samples above saturation_width_level of a saturated pulse",
+    ).tag(config=True)
+
+    bad_pixels = TelescopeParameter(
+        trait=List(Int()),
+        default_value=[("type", "*", [])],
+        help=(
+            "Ids of the pixels always flagged (e.g. broken pixels), whose charge is interpolated, for"
+            " the observed and simulated events, e.g. [[\"type\", \"*\", []], [\"id\", 22, [3, 1201]]]"
+        ),
+    ).tag(config=True)
+
+    pde_drop_factor = TelescopeParameter(
+        trait=Float(allow_none=True),
+        default_value=None,
+        allow_none=True,
+        help=(
+            "The charges are divided by this factor (factor of the camera calibration coefficients)"
+            " to correct the simulations for the PDE drop due to the NSB. It must match the PDE file"
+            " of the simulation, see mc_pde_correction_factors.json. None: no correction (real telescopes)."
+        ),
+    ).tag(config=True)
+
+    def __init__(self, subarray, config=None, parent=None, **kwargs):
+        super().__init__(subarray=subarray, config=config, parent=parent, **kwargs)
+        self._calibration = {}
+        self._window_transmittance = {}
+        self.n_bad_pixels = {}
+        self._without_coefficients = set()
+
+    def calibration_file_path(self, tel_id):
+        """Calibration file used for the telescope ``tel_id``"""
         try:
-            stored_qe = pde_corr_factors['mc_correction_for_PDE'][get_tel_string(tel, mc=True)].keys()
-            mask = [i in simtel_config_qe for i in stored_qe]
-            VI = pde_corr_factors['mc_correction_for_PDE'][get_tel_string(tel, mc=True)][np.array(list(stored_qe))[mask][0]]
-            event.r1.tel[tel].waveform /= VI
-        except (KeyError, IndexError, TypeError, ZeroDivisionError):
-            logging.error('PDE correction factors in the calibration file were not found in the simtel file header. Are you sure that you have listed the correct PDE factor in the mc_pde_correction_factors.json file?')
-            exit()
+            path = self.calibration_file.tel[tel_id]
+        except KeyError:
+            path = None
+        if path is not None:
+            return path
+        if tel_id not in DEFAULT_CALIBRATION_FILES:
+            raise ValueError(f"No default calibration file for telescope {tel_id}, set calibration_file")
+        return (CALIBRATION_DIR / DEFAULT_CALIBRATION_FILES[tel_id])
 
-    return event
+    def window_transmittance_file_path(self, tel_id):
+        """Window transmittance file used for the telescope ``tel_id``"""
+        try:
+            path = self.window_transmittance_file.tel[tel_id]
+        except KeyError:
+            path = None
+        if path is not None:
+            return path
+        if tel_id not in DEFAULT_WINDOW_FILES:
+            raise ValueError(f"No default window transmittance file for telescope {tel_id}, set window_transmittance_file")
+        return (WINDOW_DIR / DEFAULT_WINDOW_FILES[tel_id])
 
+    def window_transmittance(self, tel_id):
+        """Correction factor of the window transmittance of each pixel of the telescope ``tel_id``"""
+        if tel_id not in self._window_transmittance:
+            path = self.window_transmittance_file_path(tel_id)
+            self._window_transmittance[tel_id] = read_window_transmittance(path)
+            self.log.info("Telescope %d: window transmittance file %s", tel_id, path)
+        return self._window_transmittance[tel_id]
 
-class Calibrator_R0_R1:
-
-    """
-    R0 -> R1 calibration
-
-    Attributes
-    ----------
-        calibration_parameters: Pandas DataFrame
-            Calibration parameters
-        calibration_file: string
-            File with calibration parameters
-        dc_to_pe: numpy array
-            ADC -> p.e. conversion factors
-            (no gain drop)
-        telescope: int
-            Telescope number: 21/22
-        config: dict
-            Configuration
-        mask_bad: numpy array
-            Mask of bad pixels (True if bad)
-
-    """
-
-    def __init__(self, config=None, telescope=None):
-
-        self.calibration_parameters = pd.DataFrame()
-        self.calibration_file = ''
-        self.dc_to_pe = np.array([])
-        self.telescope = telescope
-        self.config = config
-        self.mask_bad = np.array([])
-        self.pixels_removed = 0
-
-        if self.config["telescope_calibration"]["bad_calib_px_interpolation"]:
-            logging.info("Charge in pixels with bad calibration parameters are interpolated.")
-            if self.config["telescope_calibration"]["dynamic_dead_px_interpolation"]:
-                logging.info("Charge in dead pixels are interpolated (if pedestal info is provided).")
-        else:
-            logging.info("No pixel charge interpolation is applied. Gain in pixels with wrong calibration is calcualted as a global average of all gains.")
-
-        # get calibration parameters during initialization
-        self.get_calibration_parameters()
-        self.get_dc_to_pe()
-
-
-    def calibrate(self, event, pedestal_info=None):
-
+    def calibration_parameters(self, tel_id):
         """
-        Runs the calibration.
-
-        Parameters
-        ----------
-        event:
-            sst1mpipe.io.containers.SST1MArrayEventContainer
-        pedestal_info:
-            class handling the parameters of pedesta events
-            in a sliding window
-
-        Returns
-        -------
-        event:
-            sst1mpipe.io.containers.SST1MArrayEventContainer
+        dc_to_pe (with the mean of the good pixels for the bad pixels) and
+        mask of the pixels with bad calibration parameters of the telescope ``tel_id``
         """
+        if tel_id not in self._calibration:
+            path = self.calibration_file_path(tel_id)
+            parameters = pd.read_hdf(path)
+            mask_bad = np.asarray(parameters['calib_flag'] != 1)
+            dc_to_pe = np.array(parameters['dc_to_pe'], dtype=np.float64)
+            dc_to_pe[mask_bad] = dc_to_pe[~mask_bad].mean()
+            self._calibration[tel_id] = (dc_to_pe, mask_bad)
+            self.log.info(
+                "Telescope %d: calibration file %s, flag bad calibration pixels: %s",
+                tel_id, path, self.flag_bad_calibration_pixels.tel[tel_id],
+            )
+        return self._calibration[tel_id]
 
-        r0data = event.sst1m.r0.tel[self.telescope]
-        baseline_subtracted = (r0data.adc_samples.T - r0data.digicam_baseline)
+    def bad_pixel_mask(self, tel_id, n_pixels):
+        """Mask of the pixels flagged by the calibrator: bad calibration parameters (data) and ``bad_pixels``"""
+        mask_bad = np.zeros(n_pixels, dtype=bool)
+        if self.calibrate_r0.tel[tel_id] and self.flag_bad_calibration_pixels.tel[tel_id]:
+            mask_bad |= self.calibration_parameters(tel_id)[1]
+        mask_bad[self.static_bad_pixels(tel_id)] = True
+        return mask_bad
 
-        ## Apply (or not) pixel wise Voltage drop correction, VN: now also global
-        ## TODO ?? TOTEST
-        if pedestal_info is not None:
-            if self.config['NsbCalibrator']['apply_pixelwise_Vdrop_correction']:
-                VI = VAR_to_Idrop(pedestal_info.get_charge_std()**2, self.telescope)
-            elif self.config['NsbCalibrator']['apply_global_Vdrop_correction']:
-                VI = VAR_to_Idrop(np.median(pedestal_info.get_charge_std()**2), self.telescope)
-            else:
-                VI = 1.0
-        else:
-            VI = 1.0
+    def static_bad_pixels(self, tel_id):
+        """Ids of the ``bad_pixels`` of the telescope ``tel_id``"""
+        try:
+            return np.asarray(self.bad_pixels.tel[tel_id], dtype=int)
+        except KeyError:
+            return np.array([], dtype=int)
 
-        event.r1.tel[self.telescope].waveform = (baseline_subtracted / self.dc_to_pe / VI ).T
+    def pde_drop(self, tel_id):
+        """PDE drop factor by which the charges are divided, None if not corrected"""
+        try:
+            return self.pde_drop_factor.tel[tel_id]
+        except KeyError:
+            return None
 
-        # This function removes bad pixels
-        # - with not well determined dc_to_pe
-        # - based on pedestal variation, i.e. dynamicaly
-        # Charges in these pixels are then interpolated using method set in cfg: invalid_pixel_handler_type
-        # Default is NeighborAverage, but can be turned off with 'null'
-        if self.config["telescope_calibration"]["bad_calib_px_interpolation"]:
-            event = self.remove_bad_pixels_calib(event, pedestal_info=pedestal_info)
-
+    def __call__(self, event):
+        """
+        Calibrate the telescopes of the event: from their R0 waveforms if ``calibrate_r0``,
+        otherwise the R1 waveforms of the event source are kept. The bad pixels are added to the
+        outliers and the PDE drop to the factor of the camera calibration coefficients.
+        """
+        for tel_id in sorted(event.r0.tel.keys() | event.r1.tel.keys()):
+            self._calibrate_telescope_event(event, tel_id)
         return event
 
+    def _calibrate_telescope_event(self, event, tel_id):
+        if self.calibrate_r0.tel[tel_id]:
+            # the R1 events of a ZMQ stream have no R0 waveforms: nothing to calibrate
+            if tel_id not in event.r0.tel:
+                return
+            self._calibrate_telescope(event, tel_id)
+        elif tel_id not in event.r1.tel:
+            return
+        n_pixels = event.r1.tel[tel_id].waveform.shape[1]
+        mask_bad = self.bad_pixel_mask(tel_id, n_pixels)
+        self.n_bad_pixels[tel_id] = int(mask_bad.sum())
+        self._update_coefficients(event, tel_id, mask_bad)
+        # the outliers (bad pixels, dead pixels of the monitoring) are also set to 0 in the R1
+        # waveforms: their signal is not used by what reads the waveforms
+        outliers = np.atleast_2d(event.monitoring.tel[tel_id].camera.coefficients.outlier_mask)[0]
+        if outliers.any():
+            event.r1.tel[tel_id].waveform[:, outliers] = 0
+        if event.simulation is not None and event.simulation.tel[tel_id].true_image is not None:
+            event.simulation.tel[tel_id].true_image[mask_bad] = 0
 
-    def get_calibration_parameters(self):
-
+    def _update_coefficients(self, event, tel_id, mask_bad):
         """
-        Finds and reads the calibration file.
-
+        Add the bad pixels to the outliers and the PDE drop to the factor of the camera calibration
+        coefficients of the event (new arrays: the coefficients of the monitoring are not modified)
         """
-
-        if "telescope_calibration" in self.config:
-            if self.config["telescope_calibration"]["tel_" + str(self.telescope).zfill(3)]:
-                self.calib_file = self.config["telescope_calibration"]["tel_" + str(self.telescope).zfill(3)]
-                self.calibration_parameters = pd.read_hdf(self.calib_file)
-                logging.info("Calibration File for Tel %s: %s", self.telescope, self.calib_file)
-            else:
-                logging.info("NO CALIBRATION FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT CALIBRATION USED.", self.telescope)
-                self.get_default_calibration()
+        coefficients = event.monitoring.tel[tel_id].camera.coefficients
+        if coefficients.outlier_mask is None:
+            coefficients.outlier_mask = mask_bad[np.newaxis]
         else:
-            logging.info("NO CALIBRATION FILE FOR TELESCOPE %s FOUND IN THE CFG FILE, DEFAULT CALIBRATION USED.", self.telescope)
-            self.get_default_calibration()
+            coefficients.outlier_mask = np.asarray(coefficients.outlier_mask, dtype=bool) | mask_bad
+        pde_drop = self.pde_drop(tel_id)
+        if pde_drop is not None:
+            factor = np.ones((1, len(mask_bad))) if coefficients.factor is None else coefficients.factor
+            coefficients.factor = factor / pde_drop
 
+    def _calibrate_telescope(self, event, tel_id):
+        r0 = event.r0.tel[tel_id]
+        if getattr(r0, "pedestal", None) is None:
+            raise ValueError(
+                f"Telescope {tel_id}: no DigiCam pedestal in the R0 data (simulation?),"
+                " set R0R1Calibrator.calibrate_r0 to false for it"
+            )
+        if event.monitoring.tel[tel_id].camera.coefficients.factor is None and tel_id not in self._without_coefficients:
+            self._without_coefficients.add(tel_id)
+            self.log.warning(
+                "Telescope %d: no camera calibration coefficients of the pedestal events (no monitoring"
+                " source?): no voltage drop correction and no dead pixels", tel_id,
+            )
+        dc_to_pe, _ = self.calibration_parameters(tel_id)
 
-    def get_default_calibration(self):
-        """
-        Provides default calibration file, used in
-        the case when it is not defined in the
-        configuration file.
+        # the R0 waveforms are kept: they are used afterwards by the R0 pedestal monitor
+        waveform = (r0.waveform - r0.pedestal[:, np.newaxis]) / dc_to_pe[:, np.newaxis]
+        waveform /= self.window_transmittance(tel_id)[:, np.newaxis]
 
-        """
+        n_pixels = waveform.shape[1]
+        pixel_status = np.full(n_pixels, PixelStatus.HIGH_GAIN_STORED, dtype=np.uint8)
+        pixel_status[self.saturated_pixel_mask(tel_id, r0)] |= PixelStatus.SATURATED
+        event.r1.tel[tel_id] = R1CameraContainer(
+            event_type=event.trigger.event_type,
+            event_time=event.trigger.tel[tel_id].time,
+            waveform=waveform,
+            selected_gain_channel=np.zeros(n_pixels, dtype=np.int8),
+            pixel_status=pixel_status,
+        )
 
-        # Calibration parameters averaged from all darks taken between
-        # March 2023 and June 2024 (TEL1) and Sep 2023 and June 2024 (TEL2).
-        # Based on TT's study, there is a relative difference in the dc_to_pe
-        # factor between individual darks on the level of 5%, showing a
-        # slowly decreasing trend. In the future, we may start producing
-        # calibration files "per season" to mitigate the systematic uncertainty,
-        # but per-night is not necessary. TT also confirms that dc_to_pe
-        # does not depend on the level of DCR (the camera temperature).
-        default_calib_file_tel1 = 'averaged_calib_param_v2_2023_2024_tel1.h5'
-        default_calib_file_tel2 = 'averaged_calib_param_v2_2023_2024_tel2.h5'
-
-        if (self.telescope == 21) or (self.telescope == 1):
-            logging.info('Calib file used: ' + default_calib_file_tel1)
-            self.calibration_file = CALIBRATION_DIR / default_calib_file_tel1
-        elif (self.telescope == 22) or (self.telescope == 2):
-            logging.info('Calib file used: ' + default_calib_file_tel2)
-            self.calibration_file = CALIBRATION_DIR / default_calib_file_tel2
-        else:
-            logging.error(f'Telescope {self.telescope} not known')
-        self.calibration_parameters = pd.read_hdf(self.calibration_file)
-
-
-    def get_dc_to_pe(self):
-        """
-        Gets ADC -> p.e. conversion factor from the
-        calibration file. Gain drop is not taken
-        int account!
-
-        """
-
-        self.dc_to_pe = np.array(self.calibration_parameters['dc_to_pe'])
-        # masking pixels with bad calibration parameters
-        self.mask_bad = self.calibration_parameters['calib_flag'] != 1
-        self.dc_to_pe[self.mask_bad] = self.dc_to_pe[~self.mask_bad].mean()
-
-
-    def remove_bad_pixels_calib(self, event, pedestal_info=None):
-        """
-        Fills bad pixel waveforms with zeros and
-        flags them in proper containers. Charges in
-        these pixels are then interpolated using method
-        set in cfg: invalid_pixel_handler_type
-        Default is NeighborAverage, but can be turned
-        off with 'null'
-
-        Parameters
-        ----------
-        event:
-            sst1mpipe.io.containers.SST1MArrayEventContainer
-
-        Returns
-        -------
-        event:
-            sst1mpipe.io.containers.SST1MArrayEventContainer
-
-        """
-
-        # masking pixels with bad calibration parameters
-        mask_bad_calib = self.mask_bad.astype(bool)
-
-        # masking pixels with too low baseline std
-        if pedestal_info is not None and self.config["telescope_calibration"]["dynamic_dead_px_interpolation"]:
-            mask_bad_std = pedestal_info.get_charge_std() < 2.5
-            mask_bad = mask_bad_calib + mask_bad_std
-        else:
-            mask_bad = mask_bad_calib
-        self.pixels_removed = sum(mask_bad)
-
-        N_samples = event.r0.tel[self.telescope].waveform[0].shape[1]
-        event.r0.tel[self.telescope].waveform[0][mask_bad] = np.zeros(N_samples)
-        event.r1.tel[self.telescope].waveform[mask_bad] = np.zeros(N_samples)
-        event.mon.tel[self.telescope].pixel_status['hardware_failing_pixels'] = np.array([mask_bad])
-        event.mon.tel[self.telescope].pixel_status['flatfield_failing_pixels'] = np.array([mask_bad])
-        event.mon.tel[self.telescope].pixel_status['pedestal_failing_pixels'] = np.array([mask_bad])
-
-        return event
+    def saturated_pixel_mask(self, tel_id, r0):
+        """Mask of the saturated pixels, from the ADC samples (pedestal subtracted)"""
+        adc = r0.waveform[0] - r0.pedestal[:, np.newaxis]
+        n_above_width_level = (adc > self.saturation_width_level.tel[tel_id]).sum(axis=1)
+        return (
+            (adc.max(axis=1) > self.saturation_threshold.tel[tel_id])
+            & (n_above_width_level > self.saturation_width_threshold.tel[tel_id])
+        )

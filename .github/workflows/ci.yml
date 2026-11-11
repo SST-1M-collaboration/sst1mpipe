@@ -55,17 +55,10 @@ jobs:
         shell: micromamba-shell {0}
         run: ruff check .
       # ----------------------------
-      # Execute pytests look at pyproject.toml to see which tests are executed and options are used
+      # Run the tests once, under coverage, and print the report
+      # (tests and options in pyproject.toml: [tool.pytest] and [tool.coverage])
       # ----------------------------
-      - name: Run tests with pytest
-        shell: micromamba-shell {0}
-        run : | 
-              pytest
-      # ----------------------------
-      # Runs the code coverage of the tests (see pyproject.toml for options)
-      # Print the report
-      # ----------------------------
-      - name: Run test with coverage analysis
+      - name: Run tests with coverage
         shell: micromamba-shell {0}
         run: |
               coverage run

@@ -37,6 +37,7 @@ from astropy.table import vstack
 from astropy.time import Time
 from gammapy.maps import MapAxis
 from PIL import Image
+from traitlets.config import Config
 
 import sst1mpipe
 from sst1mpipe.analysis import get_theta2_from_dl3, plot_theta2_dl3
@@ -44,13 +45,13 @@ from sst1mpipe.io import (
     check_outdir,
     load_config,
     load_distributions_sst1m,
-    load_dl1_pedestals,
+    load_r0_pedestals,
     load_dl1_sst1m,
     load_dl2_sst1m,
     load_source_catalog,
 )
-from sst1mpipe.utils import get_moon_params, get_sources_in_dir, get_wr_timestamp
-from sst1mpipe.utils.NSB_tools import plot_average_nsb_VS_time
+from sst1mpipe.utils import get_moon_params, get_sources_in_dir, get_trigger_time_ns, read_subarray, telescope_location
+from sst1mpipe.utils.nsb_tools import default_model, plot_nsb_rate
 
 
 def parse_args():
@@ -121,7 +122,8 @@ def load_files(files, config=None, tel=None, level='dl1', stereo=False):
                 df = load_dl1_sst1m(input_file, tel=tel, config=config, table='pandas', stereo=stereo)
                 if not stereo:
                     try:
-                        pt = load_dl1_pedestals(input_file)
+                        # std of the ADC samples of the pedestal events (R0 statistics), needed by VAR_to_NSB
+                        pt = load_r0_pedestals(input_file)
                     except Exception:
                         pass
             elif level == 'dl2':
@@ -252,6 +254,8 @@ def main():
     sources = get_sources_in_dir(base_path + '/' + date + '/')
 
     config = load_config(config_file)
+    # NSB rate from the pedestal events: voltage drop model of the SiPMs, configured by the config file
+    nsb_model = default_model(Config(config))
 
     is_catalog = False
     if len(source_catalog_file):
@@ -370,6 +374,8 @@ def main():
                 dl1_files = make_file_list(dl1_path, stereo=stereo, level=dl1_tab_data_level)
             if is_dl2:
                 dl2_files = make_file_list(dl2_path, stereo=stereo, level='dl2')
+                # telescope positions, for the Moon (read once per telescope)
+                subarray = read_subarray(dl2_files[0]) if len(dl2_files) > 0 else None
 
             if '1' in telescope:
                 tel = 'tel_021'
@@ -399,7 +405,7 @@ def main():
                             h_tot += h1[0]
                             # pedestal table
                             if len(ped_table) > 0:
-                                plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=None)
+                                plot_nsb_rate(ped_table, tt, model=nsb_model, ax=ax3, color=rate_colors[tel], label=None)
                             # CoGs - DL1 mono, survived cleaning
                             if tel == 'tel_021':
                                 h11, xedges, yedges = np.histogram2d(dl1['camera_frame_hillas_x'].dropna(), dl1['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
@@ -418,7 +424,7 @@ def main():
                     median1.append(np.median(h_tot/10.))
                     # pedestal table
                     if len(ped_table) > 0:
-                        plot_average_nsb_VS_time(ped_table,tt,ax=ax3, color=rate_colors[tel], label=tel)
+                        plot_nsb_rate(ped_table, tt, model=nsb_model, ax=ax3, color=rate_colors[tel], label=tel)
                         # CoGs - DL1 mono, survived cleaning
                     X, Y = np.meshgrid(xedges, yedges)
                     if tel == 'tel_021':
@@ -445,9 +451,9 @@ def main():
                             h22, xedges, yedges = np.histogram2d(dl1_stereo_2['camera_frame_hillas_x'].dropna(), dl1_stereo_2['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
                             h11_tot += h11
                             h22_tot += h22
-                            # WR timestamps
-                            t_t1 = get_wr_timestamp(dl1_stereo_1)
-                            t_t2 = get_wr_timestamp(dl1_stereo_2)
+                            # trigger times (ns)
+                            t_t1 = get_trigger_time_ns(dl1_stereo_1)
+                            t_t2 = get_trigger_time_ns(dl1_stereo_2)
                             dt = t_t1 - t_t2
                             t_diff_all.append(dt)
                             times_all.append(dl1_stereo_1.local_time.to_numpy())
@@ -464,9 +470,9 @@ def main():
                         h22, xedges, yedges = np.histogram2d(dl1_stereo_2['camera_frame_hillas_x'].dropna(), dl1_stereo_2['camera_frame_hillas_y'].dropna(), bins=100, range=[[-0.5, 0.5], [-0.5, 0.5]])
                         h11_tot += h11
                         h22_tot += h22
-                        # WR timestamps
-                        t_t1 = get_wr_timestamp(dl1_stereo_1)
-                        t_t2 = get_wr_timestamp(dl1_stereo_2)
+                        # trigger times (ns)
+                        t_t1 = get_trigger_time_ns(dl1_stereo_1)
+                        t_t2 = get_trigger_time_ns(dl1_stereo_2)
                         dt = t_t1 - t_t2
                         t_diff_all.append(dt)
                         times_all.append(dl1_stereo_1.local_time.to_numpy())
@@ -513,7 +519,7 @@ def main():
 
                     # moon
                     if (not moon_done) and (len(dl2) > 0):
-                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
+                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, location=telescope_location(subarray, tel), thinning=100)
                         time_all.append(np.array(time.unix))
                         moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
                         moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))
@@ -550,7 +556,7 @@ def main():
                     ax7[1].plot(local_time, zenith_time, '.', label=tel, alpha=0.7)
                 if not moon_done:
                     if len(dl2) > 0:
-                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, config=config, tel=tel, thinning=100)
+                        time, moon_altaz, moon_separation, moon_phase_angle = get_moon_params(dl2, location=telescope_location(subarray, tel), thinning=100)
                         time_all.append(np.array(time.unix))
                         moon_altaz_all.append(np.array(moon_altaz.alt.to_value(u.deg)))
                         moon_separation_all.append(np.array(moon_separation.to_value(u.deg)))

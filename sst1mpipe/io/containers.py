@@ -4,10 +4,11 @@ Containers of the SST-1M data. The events are ctapipe `~ctapipe.containers.Array
 the ADC samples of the pedestal events in the camera monitoring. The other data levels follow ctapipe.
 The PyTables descriptions are those of the tables written by sst1mpipe in the DL1/DL2 files.
 """
-from enum import Flag
+from enum import Flag, IntEnum
 from functools import partial
 
 import numpy as np
+from astropy.time import TimeDelta
 from ctapipe.containers import (
     ArrayEventContainer,
     CameraMonitoringContainer,
@@ -32,6 +33,7 @@ from tables import (
 
 __all__ = [
     "CameraEventType",
+    "DigicamCardType",
     "PEDESTAL_EVENT_TYPES",
     "SST1MR0CameraContainer",
     "SST1MR0Container",
@@ -49,7 +51,82 @@ __all__ = [
 
 
 class CameraEventType(Flag):
-    # from https://github.com/cta-sst-1m/digicampipe/issues/244
+    """
+    Event type of a DigiCam camera event: a bit mask of the trigger conditions of the event.
+
+    Each trigger condition is one bit and the event type is the sum of the bits of the event:
+
+    =====  ===========  ================  ==================================================
+    Bit    Value        Member            Meaning
+    =====  ===========  ================  ==================================================
+    0      ``0x1``      ``PATCH7``        algorithm 0 trigger (patch7)
+    1      ``0x2``      ``PATCH19``       algorithm 1 trigger (patch19)
+    2      ``0x4``      ``MUON_TRIGGER``  algorithm 2 trigger (muon)
+    3      ``0x8``      ``INTERNAL``      internal trigger (the pedestal events)
+    4      ``0x10``     ``EXTMSTR``       external trigger, on the master only
+    5, 6   ``0x20``,    ``BIT5``,         unused
+           ``0x40``     ``BIT6``
+    7      ``0x80``     ``CONTINUOUS``    continuous readout marker
+    16     ``0x10000``  ``MUON_DETECT``   muon detected by the camera server
+    17     ``0x20000``  ``HILLAS``        Hillas parameters computed by the camera server
+    =====  ===========  ================  ==================================================
+
+    E.g. ``5 = 0x1 + 0x4`` is an event triggered by both the patch7 and the muon triggers,
+    ``PATCH7|MUON_TRIGGER``.
+
+    The readers (`~sst1mpipe.io.sst1m_event_source.SST1MEventSource`, `~sst1mpipe.io.zmq_event_source.ZMQEventSource`) store it in
+    ``event.r0.tel[tel_id].event_type``: the container converts the integer of the file or
+    stream to a ``CameraEventType``.
+
+    Notes
+    -----
+    - ``==`` compares the whole mask: ``CameraEventType(5) == CameraEventType.PATCH7`` is False.
+      To test if an event has a trigger condition, whatever the other bits, use ``in`` (or ``&``).
+    - ``UNKNOWN`` (0) is in every event type, as the empty mask of a ``Flag``: test
+      ``not event_type`` for an event without any bit.
+    - A bit which is not a member (bits 8 to 15, above 17) raises a ``ValueError``.
+    - The ctapipe event type of the event (``event.trigger.event_type``) is a pedestal event for
+      an event type equal to ``INTERNAL``, ``SUBARRAY`` otherwise, see
+      ``sst1mpipe.io.sst1m_event_source.camera_event_type_to_event_type``.
+
+    Examples
+    --------
+    Test the trigger conditions of an event, e.g. of type 5:
+
+    >>> from sst1mpipe.io.containers import CameraEventType
+    >>> event_type = CameraEventType(5)  # e.g. event.r0.tel[tel_id].event_type
+    >>> event_type
+    <CameraEventType.PATCH7|MUON_TRIGGER: 5>
+    >>> CameraEventType.PATCH7 in event_type, CameraEventType.MUON_TRIGGER in event_type
+    (True, True)
+    >>> CameraEventType.PATCH19 in event_type
+    False
+    >>> event_type == CameraEventType.PATCH7
+    False
+
+    Any of several trigger conditions:
+
+    >>> bool(event_type & (CameraEventType.PATCH7 | CameraEventType.PATCH19))
+    True
+
+    Bits, name and value of the event type:
+
+    >>> list(event_type)
+    [<CameraEventType.PATCH7: 1>, <CameraEventType.MUON_TRIGGER: 4>]
+    >>> event_type.name, event_type.value
+    ('PATCH7|MUON_TRIGGER', 5)
+    >>> CameraEventType.PATCH7 | CameraEventType.MUON_TRIGGER == event_type
+    True
+
+    The integers of a table (e.g. the ``event_type`` column of ``sst1mpipe-trigger``) are tested
+    with the values of the bits:
+
+    >>> import numpy as np
+    >>> event_types = np.array([1, 5, 8, 4])
+    >>> (event_types & CameraEventType.MUON_TRIGGER.value) != 0
+    array([False,  True, False,  True])
+    """
+
     UNKNOWN = 0x0
     PATCH7 = 0x1  # algorithm 0 trigger - PATCH7
     PATCH19 = 0x2  # algorithm 1 trigger - PATCH19
@@ -61,6 +138,14 @@ class CameraEventType(Flag):
     CONTINUOUS = 0x80  # continuous readout marker
     MUON_DETECT = 0x10000  # camera server detected muon
     HILLAS = 0x20000  # camera server computed Hillas parametrs
+
+
+class DigicamCardType(IntEnum):
+    """Type of a DigiCam board (``DigicamCardType`` enum of the ``DigicamConfig`` protobuf message)"""
+
+    TRIGGER = 0
+    FADC_ANALOG = 1
+    FADC_INTERSIL = 2
 
 
 # ctapipe event types of the SST-1M pedestal events: SKY_PEDESTAL, DARK_PEDESTAL in the dark runs
@@ -80,17 +165,16 @@ class SST1MR0CameraContainer(R0CameraContainer):
     the trigger cluster and patch matrices in `sst1mpipe.instrument.camera.DigiCam`.
     """
 
-    pixel_flags = Field(None, "numpy array containing pixel flags (n_pixels)")
-    pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels)")
+    pixel_flags = Field(None, "pixels with data (n_pixels), bool: False for the DigiCam flag EMPTY (0), True for VALID (1)")
+    pedestal = Field(None, "baseline computed by DigiCam from 1024 pre-samples, in ADC (n_pixels, float32, a multiple of 1/16), 0 for the pixels without data")
     camera_event_number = Field(None, "event number within the first trigger of operation")
-    event_time = Field(None, "timestamp from the internal DigiCam clock (ns, TAI)")
+    event_time = Field(None, "White Rabbit timestamp of the event (ns, TAI)")
     gps_time = Field(None, "timestamp from a precise external clock (ns)")
-    white_rabbit_time = Field(None, "precise White Rabbit based timestamp")
     _event_type = Field(None, "camera event type")
-    trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples)")
-    trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples)")
-    trigger_output_patch19 = Field(None, "trigger 19 patch cluster traces (n_clusters, n_samples)")
-    trigger_output_muon = Field(None, "trigger muon cluster traces (n_clusters, n_samples)")
+    trigger_input_traces = Field(None, "trigger patch traces (n_patches, n_samples), uint8, patch_sw_id order; None if not in the data")
+    trigger_output_patch7 = Field(None, "trigger 7 patch cluster traces (n_clusters, n_samples), bool, central patch_sw_id order; None if not in the data")
+    trigger_output_patch19 = Field(None, "trigger 19 patch cluster traces (n_clusters, n_samples), bool, central patch_sw_id order; None if not in the data")
+    trigger_output_muon = Field(None, "trigger muon cluster traces (n_clusters, n_samples), bool,  central patch_sw_id order; None if not in the data")
 
     @property
     def event_type(self):
@@ -164,29 +248,33 @@ class SST1MMonitoringContainer(MonitoringContainer):
 
 
 class DigicamConfigContainer(Container):
-    """
-    Configuration of the DigiCam boards of the camera (``DigicamConfig`` table of the
-    raw data file). The arrays have one entry per board slot (n_boards, 39), 0 for
-    the empty slots.
-    """
+    """Configuration of the DigiCam"""
 
     default_prefix = "digicam"
 
     protocol_vers = Field(None, "Protocol version of each board (n_boards)")
-    sn = Field(None, "Serial number of each board (n_boards)")
-    hv = Field(None, "High voltage status of each board (n_boards)")
+    sn = Field(None, "Serial number of each board (n_boards), 0 for the empty board slots")
+    hv = Field(None, "Hardware version of each board (n_boards)")
     gateware_rev = Field(None, "Gateware revision of each board (n_boards)")
     gateware_vers = Field(None, "Gateware version of each board (n_boards)")
     gateware_code = Field(None, "Gateware code of each board (n_boards)")
-    gateware_card_type = Field(None, "Card type of the gateware of each board (n_boards)")
+    gateware_card_type = Field(None, "Gateware card type of each board, `DigicamCardType` (n_boards)")
     firmware_rev = Field(None, "Firmware revision of each board (n_boards)")
     firmware_vers = Field(None, "Firmware version of each board (n_boards)")
     firmware_code = Field(None, "Firmware code of each board (n_boards)")
-    firmware_card_type = Field(None, "Card type of the firmware of each board (n_boards)")
-    operation_id = Field(-1, "Id of the operation of DigiCam")
-    operation_data = Field(-1, "Data of the operation of DigiCam")
-    digicam_time_sec = Field(-1, "DigiCam time of the configuration, seconds")
-    digicam_time_nanosec = Field(-1, "DigiCam time of the configuration, nanoseconds")
+    firmware_card_type = Field(None, "Firmware card type of each board, `DigicamCardType` (n_boards)")
+    operation_id = Field(-1, "Operation id (reserved)")
+    operation_data = Field(-1, "Operation data (reserved)")
+    digicam_time_sec = Field(-1, "DigiCam internal clock, seconds")
+    digicam_time_nanosec = Field(-1, "DigiCam internal clock, nanoseconds")
+
+    @property
+    def digicam_time(self):
+        """
+        DigiCam internal clock as an astropy `~astropy.time.TimeDelta`, with ns precision:
+        a duration since the origin of the clock, without absolute reference
+        """
+        return TimeDelta(self.digicam_time_sec, self.digicam_time_nanosec / 1e9, format="sec")
 
 
 class StreamCameraConfigContainer(Container):
@@ -254,6 +342,7 @@ class DL1_info(IsDescription):
     n_saturated          = Int64Col()
     n_pedestal           = Int64Col()
     n_survived_pedestals = Float64Col()
+    raised_threshold_fraction = Float64Col()
     n_triggered_tel1     = Int64Col()
     n_triggered_tel2     = Int64Col()
     swat_event_ids_used  = BoolCol()

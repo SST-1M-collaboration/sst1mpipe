@@ -7,8 +7,11 @@ import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from astropy.coordinates import AltAz
 from astropy.table import QTable
 from astropy.time import Time
+from ctapipe.core import Provenance
+from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import DataWriter, HDF5EventSource
 from ctapipe.reco import ShowerProcessor
 from ctaplot.ana import angular_separation_altaz, logbin_mean
@@ -20,10 +23,13 @@ from sst1mpipe.io import (
     check_outdir,
     get_dl1_info,
     load_dl1_pedestals,
+    load_r0_pedestals,
     load_dl1_sst1m,
     load_more_dl1_tables_mono,
     write_dl1_pedestals,
+    write_r0_pedestals,
 )
+from sst1mpipe.resources import SUBARRAY_FILE
 from sst1mpipe.utils import (
     camera_to_altaz,
     disp_to_pos,
@@ -31,10 +37,14 @@ from sst1mpipe.utils import (
     event_hillas_add_units,
     get_event_sample,
     get_finite,
-    get_horizon_frame,
+    SIMULATION_OBSTIME,
     get_stereo_method,
+    merge_subarrays,
+    read_subarray,
+    telescope_location,
+    get_tel_id,
     get_telescopes,
-    get_wr_timestamp,
+    get_trigger_time_ns,
     mix_gamma_proton,
     remove_stereo,
 )
@@ -87,10 +97,10 @@ def plot_feature_importance(
 def reco_source_position_sky(
         cog_x, cog_y, disp_dx, disp_dy,
         focal_length, pointing_alt, pointing_az,
-        config=None, telescope=None, times=None):
+        location, times=None):
 
     src_x, src_y = disp_to_pos(disp_dx, disp_dy, cog_x, cog_y)
-    return camera_to_altaz(src_x, src_y, focal_length, pointing_alt, pointing_az, config=config, telescope=telescope, times=times)
+    return camera_to_altaz(src_x, src_y, focal_length, pointing_alt, pointing_az, location=location, times=times)
 
 
 def train_rf_energy(
@@ -523,7 +533,7 @@ def classify_evt_types(dl2, edges=None):
 
 def apply_models(
         dl1, models_dir=None, config=None,
-        telescope=None, stereo=False, mc=True):
+        telescope=None, stereo=False, mc=True, subarray=None):
     """
     Applies all RF models from models directory to reconstruct
     all events from DL1 to DL2. Works on both MC/data, mono/stereo.
@@ -542,12 +552,16 @@ def apply_models(
     telescope: str (tel_001/tel_002)
     stereo: bool
     mc: bool
+    subarray: ctapipe.instrument.SubarrayDescription
+        subarray of the input file (``SubarrayDescription.from_hdf(input_file)``), for the telescope position
 
     Returns
     -------
     pandas.DataFrame
 
     """
+    if subarray is None:
+        raise ValueError("subarray is required (SubarrayDescription.from_hdf(input_file)): the telescope positions")
 
     if not mc:
         if '1' in telescope:
@@ -672,8 +686,7 @@ def apply_models(
                                                     dl2.equivalent_focal_length.values * u.m,
                                                     dl2.true_alt_tel.values * u.deg,
                                                     dl2.true_az_tel.values * u.deg,
-                                                    config=config,
-                                                    telescope=telescope,
+                                                    location=telescope_location(subarray, telescope),
                                                     times=times)
 
         dl2['reco_alt'] = src_pos_reco.alt.deg
@@ -696,7 +709,7 @@ def apply_models(
 
 def stereo_reconstruction(
         params, config=None,
-        ismc=False, telescopes=None):
+        ismc=False, telescopes=None, subarray=None):
     """
     Averages energy and gammaness stereoscopicly reconstructed for
     each telescope to get final stereo quantities for each event.
@@ -712,12 +725,16 @@ def stereo_reconstruction(
     config: dict
     ismc: bool
     telescopes: list of strings
+    subarray: ctapipe.instrument.SubarrayDescription
+        subarray of the input file (``SubarrayDescription.from_hdf(input_file)``), for the telescope positions
 
     Returns
     -------
     pandas.DataFrame
 
     """
+    if subarray is None:
+        raise ValueError("subarray is required (SubarrayDescription.from_hdf(input_file)): the telescope positions")
 
     logging.info('Stereo reconstruction..')
     weights = config["analysis"]["stereo_reco_weights"]
@@ -778,7 +795,7 @@ def stereo_reconstruction(
         # This should hopefuly work on data as well (where we have tel_021, tel_022)
         for telescope in telescopes:
 
-            tel = int(telescope.split('_')[-1])
+            tel = get_tel_id(telescope)
             mask = params['tel_id'] == tel
 
             src_pos_reco = reco_source_position_sky(
@@ -789,8 +806,7 @@ def stereo_reconstruction(
                 params[mask].equivalent_focal_length.values * u.m,
                 params[mask].true_alt_tel.values * u.deg,
                 params[mask].true_az_tel.values * u.deg,
-                config=config,
-                telescope=telescope
+                location=subarray.tel_earth_locations[tel],
                 )
 
             azimuth_transformed = (src_pos_reco.az.to_value(u.deg) + 180) % 360 - 180
@@ -813,11 +829,13 @@ def stereo_reconstruction(
 
     dl2 = pd.merge(dl2, averaged_direction, on=["obs_id", "event_id"])
 
-    # Here we can use horizon frame of either of the telescopes
+    # Here we can use horizon frame of either of the telescopes. The simulations have no times:
+    # an arbitrary time is used
+    location = telescope_location(subarray, telescopes[0])
     if ismc:
-        horizon_frame = get_horizon_frame(config=config, telescope='tel_001')
+        horizon_frame = AltAz(location=location, obstime=SIMULATION_OBSTIME)
     else:
-        horizon_frame = get_horizon_frame(config=config, telescope='tel_021', times=Time(dl2['local_time'], format='unix'))
+        horizon_frame = AltAz(location=location, obstime=Time(dl2['local_time'], format='unix'))
     dl2 = add_reco_ra_dec(dl2, horizon_frame=horizon_frame)
 
     tel = []
@@ -1232,7 +1250,7 @@ def make_dl1_stereo(
 
     logging.info('Making stereo DL1 file...')
     telescope_list = []
-    telescope_list.append(int(get_telescopes(dl1_file_tel1)[0].split('_')[-1]))
+    telescope_list.append(get_tel_id(get_telescopes(dl1_file_tel1)[0]))
     telescope_list.append(dl1_data_tel2['tel_id'][0])
 
     dl1_info = get_dl1_info(dl1_file_tel1)
@@ -1265,15 +1283,17 @@ def make_dl1_stereo(
 
     if stereo_method == "WhiteRabbitClosest":
         dl1_data_tel1 = load_dl1_sst1m(dl1_file_tel1, tel='tel_021', table='pandas')
-        t_t1_all = get_wr_timestamp(dl1_data_tel1)
-        t_t2 = get_wr_timestamp(dl1_data_tel2)
+        t_t1_all = get_trigger_time_ns(dl1_data_tel1)
+        t_t2 = get_trigger_time_ns(dl1_data_tel2)
 
+    # the DataWriter writes the provenance of the current activity in the output file
+    Provenance().start_activity("sst1mpipe_dl1_stereo")
     with DataWriter(source,
                     output_path=output_path,
                     overwrite        = True,
-                    write_showers    = True,
-                    write_parameters = True,
-                    write_images     = True,
+                    write_dl2         = True,
+                    write_dl1_parameters = True,
+                    write_dl1_images         = True,
                     ) as writer:
 
 
@@ -1293,7 +1313,7 @@ def make_dl1_stereo(
 
             elif stereo_method == "WhiteRabbitClosest":
 
-                # Read ns timestamps from dl1 tab in tel1 file, which are not provided by HDF5EventSource()
+                # ns trigger times of the tel1 events (trigger_time, read from the DL1 trigger table by load_dl1_sst1m)
                 event_tel1_mask = dl1_data_tel1['event_id'] == evt.index.event_id
 
                 t_t1 = t_t1_all[event_tel1_mask]
@@ -1362,8 +1382,7 @@ def make_dl1_stereo(
                     evt.dl1.tel[tel_2] = evt_t2.dl1.tel[tel_2]
 
                     evt.trigger.tel[tel_2].time = evt_t2.trigger.tel[tel_2].time
-                    evt.pointing.tel[tel_2].azimuth  = evt_t2.pointing.tel[tel_2].azimuth
-                    evt.pointing.tel[tel_2].altitude = evt_t2.pointing.tel[tel_2].altitude
+                    evt.monitoring.tel[tel_2].pointing = evt_t2.monitoring.tel[tel_2].pointing
 
                     # add units to hillas parameters (important for stereo reconstruction with shower_processor)
                     evt = event_hillas_add_units(evt)
@@ -1387,13 +1406,25 @@ def make_dl1_stereo(
     logging.info(f"TEL {tel_1} mono events: {mono_events}")
     source.close()
 
+    # the subarray of the tel1 DL1 file has tel1 only: the stereo file has both telescopes, at the
+    # positions stored in their DL1 files (that of sst1mpipe for a telescope without file)
+    tel2_files = sorted(glob.glob(os.path.join(input_dir_tel2, f'SST1M2*{file_pattern}*.h5')))
+    subarrays = [read_subarray(path) for path in [dl1_file_tel1, *tel2_files[:1]]]
+    subarray = merge_subarrays([*subarrays, SubarrayDescription.from_hdf(SUBARRAY_FILE)])
+    subarray.select_subarray(telescope_list).to_hdf(output_path, overwrite=True)
+
     # Propagate tel1 pedestals
     # NOTE: We propagate only tel1 pedestals
     # Both could be stored, but I am afraid that /pedestal/tel_XX
     # table is not compatible with ctapipe readers
     logging.info('Propagating pedestals from mono tel1 DL1 to stereo DL1..')
     try:
+        pedestals = load_r0_pedestals(dl1_file_tel1)
+        write_r0_pedestals(output_path, pedestal_table=pedestals)
+    except Exception:
+        logging.warning('No pedestals found in tel1 DL1 file!')
+    try:
         pedestals = load_dl1_pedestals(dl1_file_tel1)
         write_dl1_pedestals(output_path, pedestal_table=pedestals)
     except Exception:
-        logging.warning('No pedestals found in tel1 DL1 file!')
+        logging.warning('No pedestal images found in tel1 DL1 file!')
