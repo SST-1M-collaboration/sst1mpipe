@@ -144,7 +144,7 @@ def test_patch7_output_from_camera_input(tel_id, path, threshold):
     n_events = 0
     for event in SST1MEventSource(input_url=path, max_events=500):
         r0 = event.r0.tel[tel_id]
-        output, _ = emu.trigger_output(np.asarray(r0.trigger_input_traces).astype(np.int64), tel_id)
+        output, _ = emu.trigger_output(r0.trigger_input_traces, tel_id)
         np.testing.assert_array_equal(output, np.asarray(r0.trigger_output_patch7).astype(bool))
         n_events += 1
     assert n_events > 0
@@ -207,6 +207,16 @@ def test_missing_trigger_traces_are_refused():
     event.r0.tel[22].trigger_input_traces = None   # what the reader stores
     with pytest.raises(ValueError, match="no trigger_input_traces"):
         tdscan().trigger_traces(event, 22)
+
+
+def test_trigger_traces_are_uint8():
+    """The trigger traces of the emulator are uint8: those of the camera, and those rebuilt from the waveforms"""
+    event = next(iter(SST1MEventSource(input_url=TRANSITION_FILES[21], max_events=1)))
+    traces = tdscan().trigger_traces(event, 21)
+    assert traces.dtype == np.uint8 and traces.shape == (432, event.r0.tel[21].waveform.shape[-1])
+    r0 = event.r0.tel[21]
+    rebuilt = TriggerEmulator._compute_trigger_traces(r0.waveform[0], r0.pedestal, pixel_flags=r0.pixel_flags)
+    assert rebuilt.dtype == np.uint8
 
 
 @pytest.mark.parametrize("traces", [None, np.empty(0, dtype=np.uint8)])

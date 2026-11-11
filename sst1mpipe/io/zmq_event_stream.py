@@ -1,35 +1,6 @@
 """
-Stream of the processed events of the pipeline (ZMQ), e.g. for the viewer of the events.
-
-The pipeline publishes its events (``ZMQEventPublisher``, PUB socket which *connects*) and a single
-subscriber gets them (``ZMQEventSubscriber``, SUB socket which *binds*): several processes of the
-pipeline (e.g. the workers of a telescope, which share its camera stream in PULL) can publish to
-the same subscriber, each event once. A publisher never waits for the subscriber: when the subscriber
-is absent or too slow, the messages are dropped (the subscriber counts them, see below).
-
-Messages
---------
-One message per telescope event and one per stereo event, multipart:
-
-1. the topic: ``tel<tel_id>`` (e.g. ``tel21``) or ``stereo``;
-2. the header (msgpack): format ``version``, ``source`` (name of the publisher), ``count``
-   (number of the message of the publisher for this topic: a gap is a lost message), ``obs_id``, ``event_id``,
-   ``tel_id`` (0 for stereo), and for each data level of the event its ``scalars``
-   ``{name: value}`` and the descriptions of its ``arrays`` ``[name, dtype, shape, frame]``
-   (``frame``: index of the frame of the array among the array frames: an array of several
-   levels, e.g. the DL0 waveform equal to the R1 waveform, is sent once);
-3. one frame per array, the raw bytes of the numpy array (no copy).
-
-The data levels are ``trigger``, ``r0``, ``r1``, ``dl0``, ``dl1``, ``dl2`` (of the telescope)
-and ``dl2_stereo``. Their fields have the names of the columns of the ctapipe ``DataWriter``
-(e.g. ``hillas_intensity``, ``camera_frame_hillas_intensity``, ``<algorithm>_tel_energy``,
-``<algorithm>_alt`` for stereo), with the quantities in the units of the ctapipe tables (deg, m,
-ns, TeV) and the times in unix seconds.
-
-To limit the bandwidth, the publisher sends the full events (waveforms, images) only every
-``full_event_period`` seconds: the first event after the period with a DL1 image (a finite Hillas
-intensity), or any event after two periods. The other events have their trigger, DL1 parameters and
-DL2 only (enough for the statistics and the rates).
+Stream of the processed events of the pipeline (ZMQ), e.g. for the viewer of the events: see the
+documentation, "Stream of the processed events" (``docs/event_stream.rst``).
 """
 
 import os

@@ -146,7 +146,6 @@ class TriggerTool(Tool):
                     f"Telescope {tel_id}: no trigger_output_patch7 in this file (None in the R0 data), "
                     "the emulated trigger cannot be compared to the camera"
                 )
-            camera_output = np.asarray(camera_output).astype(bool)
             result.camera_patch7 = bool(camera_output.any())
             result.camera_patch7_mismatches = int(np.sum(camera_output != patch7_output))
             self.counts[tel_id, "camera_patch7"] += result.camera_patch7

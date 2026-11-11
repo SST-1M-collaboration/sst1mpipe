@@ -82,7 +82,7 @@ class TriggerEmulator(TelescopeComponent):
 
         Each pixel: sample - floor(baseline), signed, clipped above at 4095 only; 0 for the pixels
         with a ``pixel_flags`` of 0 (pixels without data, real data only).
-        Each triplet: sum of its 3 pixels, clipped to [0, 255].
+        Each triplet: sum of its 3 pixels, clipped to [0, 255] (uint8, as the camera traces).
 
         The DigiCam baseline is updated continuously by the FPGA: with the baseline stored in the
         camera event (``r0.pedestal``), the traces are those of the camera exactly at the sample
@@ -92,7 +92,7 @@ class TriggerEmulator(TelescopeComponent):
         pixels = np.minimum(pixels, 4095)
         if pixel_flags is not None:
             pixels[np.asarray(pixel_flags) == 0] = 0
-        return np.clip(patch_matrix.dot(pixels), 0, 255)
+        return np.clip(patch_matrix.dot(pixels), 0, 255).astype(np.uint8)
 
     def trigger_traces(self, event, tel_id, pedestal=None):
         """
@@ -107,12 +107,12 @@ class TriggerEmulator(TelescopeComponent):
             return self._compute_trigger_traces(waveform, pedestal[0])
 
         traces = event.r0.tel[tel_id].trigger_input_traces
-        if traces is None or not np.all(np.isfinite(traces)):
+        if traces is None:
             raise ValueError(
                 f"Telescope {tel_id}: no trigger_input_traces in this file (None in the R0 data), "
                 "the trigger cannot be emulated on it"
             )
-        return np.asarray(traces).astype(np.int64)
+        return traces
 
     @abstractmethod
     def scores(self, traces):
