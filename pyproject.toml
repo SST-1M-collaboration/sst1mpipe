@@ -53,6 +53,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+opcua = [
+  "asyncua",  # OPCUAMonitoringSource (e.g. drive positions in the real-time analysis)
+]
 tests = [
   "coverage",
   "nbmake",
@@ -70,7 +73,7 @@ docs = [
   "sphinxcontrib-mermaid",
 ]
 dev = [
-  "sst1mpipe[tests,docs]",
+  "sst1mpipe[tests,docs,opcua]",
   "build",
   "ruff",
   "twine",
