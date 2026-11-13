@@ -163,71 +163,28 @@ DL1 to DL1 stereo
 
 The telescopes have no array trigger: each telescope writes its own events, one DL1 file per run and
 per telescope. The coincident events of the telescopes are combined into stereo events by the ctapipe
-tool ``sst1mpipe-stereo``, from the DL1 files of ``sst1mpipe-process`` (any number of files of each
-telescope, e.g. the runs of a night):
+tool ``sst1mpipe-stereo``, from the DL1 files of ``sst1mpipe-process`` of both telescopes:
 
 .. code-block:: bash
 
     sst1mpipe-stereo \
-        --input SST1M1_20260120_1179.dl1.h5 --input SST1M2_20260120_1102.dl1.h5 \
+        --input SST1M1_20260120_1179_W1.dl1.h5 --input SST1M2_20260120_1102_W1.dl1.h5 \
         --output SST1M_20260120_1179.stereo.dl1.h5 \
         [--combiner WhiteRabbitClosestCombiner] [--reference-tel 21] [--keep-mono]
 
-The coincident events are found from the trigger tables of the files (``/dl1/event/telescope/trigger``)
-by a ``StereoEventCombiner`` (``sst1mpipe.stereo``), chosen with ``--combiner``:
-
-* ``WhiteRabbitClosestCombiner`` (default) - Data with precise White Rabbit timestamps (taken after 25th
-  September 2023): closest trigger times (ns), within ``--WhiteRabbitClosestCombiner.max_time_diff``
-  (10 µs). An event and its closest event of the other telescope are matched only if each one is the
-  closest to the other.
-
-* ``SlidingWindowCombiner`` - Data without White Rabbit timestamps (taken before 25th September 2023):
-  the offset between the clocks of the telescopes giving the most coincident events is searched
-  (``offset_start``, ``offset_stop``, ``offset_step``: -10 ms to 10 ms in steps of 20 µs), or given by
-  ``time_offset``, then the trigger times within ``window_half_width`` (1 ms) are matched. Events with
-  several events of the other telescope in their window (ambiguous) are not matched.
-
-* ``SWATEventIdCombiner`` - Data taken after 30th January 2024: the coincident events have the same array
-  event id given by SWAT (``arrayEvtNum``), i.e. the same ``event_id`` in the DL1 files. Only the event ids
-  are used: events without the same id are not combined.
-
-A stereo event is an event of the reference telescope (``--reference-tel``, 21) with the coincident
-events of the other telescopes: it has the ``obs_id`` and ``event_id`` of the event of the reference
-telescope, the trigger time of the earliest telescope and the type ``SUBARRAY``. Only the events
-triggered by the cameras (``SUBARRAY``) are combined, and each event is in at most one stereo event.
-With more than two telescopes, the coincident events of the other telescopes without an event of the
-reference telescope are not combined. Each part of the event (trigger, R0, R1, DL0, DL1, DL2 and
-monitoring of each telescope) is combined by its own method of the ``StereoEventCombiner``
-(``combine_trigger``, ``combine_dl1``...), which a new combiner can override.
-
-The events are written in time order, with the ctapipe ``DataWriter`` (the data levels written are its
-settings, e.g. ``--DataWriter.write_dl1_images``). The events which are not combined (mono events) are
-written as they are with ``--keep-mono``, otherwise not. The output file has the subarray of all the
-telescopes, the observation and scheduling blocks of the runs and their monitoring data (pointing,
-statistics of the pedestal events, ``--StereoTool.copy_monitoring``). The stereo reconstruction (stereo
-DL2, e.g. the geometry of the showers with the ctapipe ``ShowerProcessor``) is not done, and the summary
-of the processing of the runs (``/dl1/info``) is not copied.
+The matching method is chosen with ``--combiner``: ``WhiteRabbitClosestCombiner`` (default, data with
+White Rabbit timestamps, after 25th September 2023), ``SlidingWindowCombiner`` (data without White Rabbit
+timestamps) or ``SWATEventIdCombiner`` (same SWAT array event id, after 30th January 2024). The stereo
+events have the ids of the event of the reference telescope, and the mono events are written only with
+``--keep-mono``. The stereo reconstruction is not done by this step. See :ref:`stereo_combination` for
+the matching methods, the combination of the events, the content of the output file and how to write a
+new combiner.
 
 .. note::
 
     ``sst1mpipe-stereo`` is **not intended to be run on MC**, as in MC DL1 the coincident events are already
     matched by their ``event_id`` (mono events are in MC DL1 tables as well, so those can be used for both
     mono and stereo analysis).
-
-.. autoclass:: sst1mpipe.stereo.StereoEventCombiner
-    :members:
-
-.. autoclass:: sst1mpipe.stereo.WhiteRabbitClosestCombiner
-
-.. autoclass:: sst1mpipe.stereo.SlidingWindowCombiner
-
-.. autoclass:: sst1mpipe.stereo.SWATEventIdCombiner
-
-.. note::
-
-    ``sst1mpipe_dl1_dl2 --stereo`` does not read the files of ``sst1mpipe-stereo`` yet: it needs the stereo
-    geometry reconstruction (``HillasReconstructor`` impact distances and ``h_max``, used as features of the
-    stereo models) and the ``/dl1/info`` table.
 
 
 .. _dl1_dl2:

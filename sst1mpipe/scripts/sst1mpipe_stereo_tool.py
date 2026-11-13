@@ -53,8 +53,23 @@ TELESCOPE_TRIGGER_TABLE = "/dl1/event/telescope/trigger"
 
 def read_telescope_triggers(files):
     """
-    Trigger table of the events of a telescope (``/dl1/event/telescope/trigger``) in its DL1 files,
-    with the column ``file_index`` (index of the file in ``files``) and ``time_ns`` (trigger time, ns)
+    Trigger table of the events of a telescope in its DL1 files.
+
+    Parameters
+    ----------
+    files : list of str or pathlib.Path
+        DL1 files of the telescope (e.g. written by sst1mpipe-process).
+
+    Returns
+    -------
+    astropy.table.Table
+        Rows of the tables ``/dl1/event/telescope/trigger`` of the files, one after the other
+        (columns ``obs_id``, ``event_id``, ``tel_id``, ``time``, ``event_type``,
+        ``n_trigger_pixels``), with the columns:
+
+        - ``file_index``: index of the file of the event in ``files``
+        - ``time_ns``: trigger time in integer ns (TAI, as `~sst1mpipe.utils.get_trigger_time_ns`),
+          with the precision of the White Rabbit timestamps
     """
     triggers = []
     for file_index, path in enumerate(files):
@@ -68,8 +83,35 @@ def read_telescope_triggers(files):
 
 class CombinedRuns:
     """
-    Run information of the input files of all the telescopes, given to the DataWriter in place of
-    an event source: subarray of the telescopes, observation and scheduling blocks
+    Run information of the input files of all the telescopes, given to the DataWriter in place of an event source.
+
+    The ctapipe `~ctapipe.io.DataWriter` takes the description of the data it writes (subarray,
+    observation and scheduling blocks...) from an event source, while the stereo events come from
+    the event sources of several files and telescopes.
+
+    Parameters
+    ----------
+    sources : list of ctapipe.io.EventSource
+        Event sources of the input files (observed data).
+    subarray : ctapipe.instrument.SubarrayDescription
+        Subarray of all the telescopes.
+
+    Attributes
+    ----------
+    subarray : ctapipe.instrument.SubarrayDescription
+        Subarray of all the telescopes.
+    observation_blocks : dict
+        Observation blocks of the sources by obs_id (the first one if several sources have it).
+    scheduling_blocks : dict
+        Scheduling blocks of the sources by sb_id (the first one if several sources have it).
+    obs_ids : list of int
+        Sorted obs_ids of the observation blocks.
+    is_simulation : bool
+        False: only observed data are combined.
+    simulation_config : dict
+        Empty (no simulations).
+    atmosphere_density_profile : None
+        No atmosphere profile (no simulations).
     """
 
     def __init__(self, sources, subarray):
@@ -88,8 +130,18 @@ class CombinedRuns:
 
 class TelescopeEventReader:
     """
-    Events of a telescope read from its DL1 files, by (file index, obs_id, event_id): the files are
-    read in order, the events read before they are asked for are kept until they are.
+    Events of a telescope read from its DL1 files, asked for by key.
+
+    The files are read once, in order. The events asked for are expected roughly in the order of
+    the files: the wanted events read before they are asked for are kept until they are, the other
+    events are dropped, so that only a few events are in memory.
+
+    Parameters
+    ----------
+    sources : list of ctapipe.io.EventSource
+        Event sources of the files of the telescope, in time order.
+    wanted : iterable of tuple
+        Keys of the events which will be asked for: (index of the file in ``sources``, obs_id, event_id).
     """
 
     def __init__(self, sources, wanted):
@@ -104,7 +156,24 @@ class TelescopeEventReader:
                 yield (file_index, event.index.obs_id, event.index.event_id), event
 
     def get(self, key):
-        """Event ``key`` (file index, obs_id, event_id)"""
+        """
+        Event of a key, read from the files if it is not read yet.
+
+        Parameters
+        ----------
+        key : tuple
+            (index of the file in ``sources``, obs_id, event_id), one of ``wanted``.
+
+        Returns
+        -------
+        ctapipe.containers.ArrayEventContainer
+            Event, which is then forgotten by the reader: an event is asked for once.
+
+        Raises
+        ------
+        KeyError
+            If the event is not in the files after the events already read.
+        """
         while key not in self._cache:
             try:
                 read_key, event = next(self._events)
@@ -116,7 +185,41 @@ class TelescopeEventReader:
 
 
 class StereoTool(Tool):
-    """Combination of the coincident events of the SST-1M telescopes into stereo events"""
+    """
+    Combination of the coincident events of the SST-1M telescopes into stereo events (``sst1mpipe-stereo``).
+
+    The input files are DL1 files of a single telescope each (sst1mpipe-process), any number of
+    files per telescope (e.g. the runs of a night), of at least two telescopes including the
+    reference telescope of the combiner.
+
+    1. ``setup``: the input files are grouped by telescope and sorted by time, the trigger tables of
+       the telescopes are read (`read_telescope_triggers`) and the output file is opened with the
+       ctapipe `~ctapipe.io.DataWriter`.
+    2. ``start``: the coincident events are matched by the combiner (``combiner_type``,
+       `~sst1mpipe.stereo.StereoEventCombiner.match`), then the events are read from the files
+       (`TelescopeEventReader`), combined (`~sst1mpipe.stereo.StereoEventCombiner.combine`) and
+       written in time order, with the mono events if ``keep_mono``.
+    3. ``finish``: the output file is closed, the monitoring tables of the input files which have
+       events in the output are appended (``copy_monitoring``, `~sst1mpipe.io.append_monitoring_tables`)
+       and the numbers of stereo and mono events are logged.
+
+    The pointing of the telescopes interpolated at the time of each event by the HDF5EventSource
+    (monitoring data of the files) is not written in the output file: an event out of the time range
+    of its pointing table gets a NaN pointing instead of stopping the tool
+    (``PointingInterpolator.bounds_error`` is False unless configured).
+
+    Attributes
+    ----------
+    combiner : sst1mpipe.stereo.StereoEventCombiner
+        Combiner of the events.
+    files : dict[int, list]
+        Input files by telescope id, in time order (first trigger time).
+    triggers : dict[int, astropy.table.Table]
+        Trigger table of each telescope (`read_telescope_triggers`).
+    counts : collections.Counter
+        Numbers of events: ``stereo``, and ``mono_tel_XXX`` for each telescope (events not
+        combined, written only with ``keep_mono``).
+    """
 
     name = "sst1mpipe-stereo"
     description = __doc__
@@ -156,6 +259,15 @@ class StereoTool(Tool):
     classes = [DataWriter] + classes_with_traits(StereoEventCombiner)
 
     def setup(self):
+        """
+        Input files by telescope, trigger tables, event sources and output file.
+
+        Raises
+        ------
+        ctapipe.core.ToolConfigurationError
+            Without input files, with an input file of several telescopes, with files of a single
+            telescope or without files of the reference telescope, or with simulated files.
+        """
         if len(self.input_files) == 0:
             raise ToolConfigurationError("No input files (--input)")
         self.combiner = StereoEventCombiner.from_name(self.combiner_type, parent=self)
@@ -216,6 +328,7 @@ class StereoTool(Tool):
         self.used_files = set()
 
     def _close_writer(self):
+        """Close the DataWriter once: in finish(), or when the tool exits if it fails before"""
         if not self._writer_closed:
             self._writer_closed = True
             self.writer.finish()
@@ -253,6 +366,7 @@ class StereoTool(Tool):
         return int(row["obs_id"]), int(row["event_id"])
 
     def _check_unique_ids(self, events):
+        """Raise a ToolConfigurationError if two output events have the same obs_id and event_id"""
         ids = Counter(self._event_id(event) for event in events)
         duplicated = [event_id for event_id, n in ids.items() if n > 1]
         if duplicated:
@@ -262,10 +376,12 @@ class StereoTool(Tool):
             )
 
     def _key(self, tel_id, row):
+        """Key of the event of a row of the trigger table of a telescope, for its TelescopeEventReader"""
         trigger = self.triggers[tel_id][row]
         return int(trigger["file_index"]), int(trigger["obs_id"]), int(trigger["event_id"])
 
     def start(self):
+        """Matching of the coincident events, combination and writing of the events in time order"""
         events = self._output_events()
         readers = {}
         for tel_id in self.files:
@@ -285,6 +401,7 @@ class StereoTool(Tool):
             self.writer(event)
 
     def finish(self):
+        """Closing of the output file, copy of the monitoring data of the input files and summary in the log"""
         self._close_writer()
         if self.copy_monitoring:
             for path in [path for files in self.files.values() for path in files if path in self.used_files]:

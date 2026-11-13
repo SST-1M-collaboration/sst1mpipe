@@ -29,6 +29,7 @@ Github `repository <https://github.com/SST-1M-collaboration/sst1mpipe>`_
    event_stream
    camera_event_type
    sst1mpipe_monitoring
+   stereo_combination
    sst1m_analysis_workflow
    tutorials/index
 
