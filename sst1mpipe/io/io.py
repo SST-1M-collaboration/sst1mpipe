@@ -37,7 +37,6 @@ from sst1mpipe.utils.utils import (
     add_true_impact,
     event_selection,
     get_finite,
-    get_pointing_radec,
     get_tel_id,
     get_telescopes,
     join_in_order,
@@ -248,65 +247,6 @@ def write_extra_parameters(
 
 
 
-def add_pointing_dl1_stereo(file, dl1_data_tabs=None):
-    """
-    Opens the DL1 stereo file after coincident event matching and
-    adds the telescope pointing (true_az_tel, true_alt_tel), which is
-    stored in mono DL1 tables of both telescopes. This is neccessary
-    because we use ctapipe DataWriter to store DL1 stereo file, but
-    ctapipe containers ignore these columns.
-
-    Parameters
-    ----------
-    file: string
-        Path
-    dl1_data_tabs: list of pandas.DataFrame
-        Mono DL1 tables of tel1 and tel2
-
-    Returns
-    -------
-
-    """
-
-    if dl1_data_tabs is None:
-        dl1_data_tabs = []
-
-    logging.info('Adding pointing back into the DL1 stereo file...')
-    telescopes = get_telescopes(file)
-
-    if len(telescopes) == len(dl1_data_tabs):
-
-        for tel in telescopes:
-
-            params = read_table(file, "/dl1/event/telescope/parameters/" + tel)
-            merged = params.copy()
-            merged['true_az_tel'] = np.zeros(len(merged)).astype(np.float64)
-            merged['true_alt_tel'] = np.zeros(len(merged)).astype(np.float64)
-
-            if tel == 'tel_021':
-                params_tel = dl1_data_tabs[0]
-            elif tel == 'tel_022':
-                params_tel = dl1_data_tabs[1]
-
-            # we cannot merge based on obs_id/event_id, because tel1/tel2 data has the same ids in the output file, but not in the input ones!
-            # We also cannot merge based on only one parameter, because it turned out that the probability od having e.g. two events with the
-            # very same (float64) intensity in data from a signle night is quite high
-            params_tel_small = params_tel[['camera_frame_hillas_intensity', 'camera_frame_hillas_r', 'camera_frame_hillas_skewness', 'true_az_tel', 'true_alt_tel']]
-
-            for i, (intensity, r, skew) in enumerate(zip(np.array(params['camera_frame_hillas_intensity']), np.array(params['camera_frame_hillas_r']), np.array(params['camera_frame_hillas_skewness']), strict=True)):
-                mask = (intensity == params_tel_small['camera_frame_hillas_intensity']) & (r == params_tel_small['camera_frame_hillas_r']) & (skew == params_tel_small['camera_frame_hillas_skewness'])
-
-                if sum(mask) == 1:
-                    merged[i]['true_az_tel'] = params_tel_small[mask]['true_az_tel']
-                    merged[i]['true_alt_tel'] = params_tel_small[mask]['true_alt_tel']
-
-            merged.write(file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
-            logging.info('Pointing added to ' + tel + ' param table.')
-
-    else:
-        logging.error('Different number of telescopes in the output file than number of provided DL1 tabs.')
-
-
 def read_trigger_time(input_file, tel):
     """
     Reads the trigger times of the telescope from the DL1 file
@@ -334,98 +274,6 @@ def read_trigger_time(input_file, tel):
         'event_id': trigger['event_id'],
         'trigger_time': trigger['time'],
     })
-
-
-def load_more_dl1_tables_mono(
-        file_list, config=None, check_finite=False,
-        time_min=0, time_max=np.inf, quality_cuts=False,
-        pointing_sel=None):
-    """
-    Loads and merges DL1 tables from multiple HDF DL1 mono files.
-    Tables are joined according to different criteria, such as
-    time window or telescope pointing direction.
-
-    Parameters
-    ----------
-    file_list: list of strings
-    config: dict
-    check_finite: bool
-        If True finite check of RF features is
-        performed.
-    time_min: float
-        Adds DL1 table from given file to the merged table
-        only if it at least partially overlaps with the
-        time interval specified by \'time_min\' and
-        \'time_max\'. Unix time in seconds.
-    time_max: float
-        See \'time_min\'
-    quality_cuts: bool
-        If True event selection from the config
-        file is applied.
-    pointing_sel: astropy.coordinates.SkyCoord
-        Adds DL1 table from given file to the merged table
-        only if the telescope pointing was within 0.2 deg
-        from the \'pointing_sel\' direction
-
-    Returns
-    -------
-    dl1_data: pandas.DataFrame
-
-    """
-
-    good_files = 0
-    bad_files = 0
-    tel_file_list = []
-
-    for dl1_file in file_list:
-
-        tel = get_telescopes(dl1_file)
-
-        if len(tel) == 1:
-
-            df = load_dl1_sst1m(dl1_file, tel=tel[0], config=config, table='pandas', check_finite=check_finite, stereo=False, quality_cuts=quality_cuts)
-            if len(df) > 0:
-
-                if (min(df['local_time']) <= time_max) & (max(df['local_time']) >= time_min):
-
-                    logging.info('Overlapping file with requested time interval found.')
-
-                    if pointing_sel is not None:
-                        pointing = get_pointing_radec(dl1_file)
-                        if pointing.separation(pointing_sel) > 0.2 * u.deg:
-                            logging.info('Skipping file with diferent pointing than requested.')
-                            continue
-
-                    if good_files == 0:
-                        dl1_data = df
-                        good_files += 1
-                        tel_file_list.append(dl1_file)
-                    else:
-                        try:
-                            dl1_data = pd.concat([dl1_data, df])
-                            good_files += 1
-                            tel_file_list.append(dl1_file)
-                        except Exception:
-                            logging.warning("Skipping broken file: " + dl1_file)
-                            bad_files += 1
-                else:
-                    logging.info('No overlap with requested time interval file, file skipped.')
-            else:
-                logging.info('No events left in the file, skipped.')
-                bad_files += 1
-
-        elif len(tel) == 0:
-            logging.warning('No data in the file: ' + dl1_file)
-            bad_files += 1
-        else:
-            logging.error('Data from more than one telescope already in the DL1 file! This is probably unexpected.')
-            exit()
-
-    logging.info('Data from ' + str(good_files) + ' good files merged.')
-    logging.info('Bad files skipped:' + str(bad_files))
-    logging.info('Total events: ' + str(len(dl1_data)))
-
-    return dl1_data.reset_index()
 
 
 def interpolate_pointing(input_file, tel, time):
@@ -820,6 +668,41 @@ def attach_monitoring_file(monitoring_file, output_file):
         if parent not in output:
             output.create_group(*parent.rsplit("/", 1), createparents=True)
         source.copy_node(R0_PIXEL_STATISTICS_GROUP, newparent=output.get_node(parent), recursive=True, overwrite=True)
+
+
+#: groups of the monitoring data in the event files (ctapipe and sst1mpipe)
+MONITORING_GROUPS = ("/r0/monitoring", "/dl0/monitoring", "/dl1/monitoring")
+
+
+def append_monitoring_tables(input_file, output_file):
+    """
+    Append the monitoring tables of a file (``MONITORING_GROUPS``: pointing, statistics of the
+    pedestal events...) to those of another file: a table which is not in the output file is
+    copied, the rows of a table which is in it are appended. Used for the stereo files, whose
+    telescopes come from different files (one telescope each): the ctapipe HDF5Merger only attaches
+    the monitoring data of a file with the same telescopes.
+
+    Parameters
+    ----------
+    input_file: string
+        Path
+    output_file: string
+        Path
+    """
+    with tables.open_file(input_file) as source, tables.open_file(output_file, mode="a") as output:
+        for group in MONITORING_GROUPS:
+            if group not in source:
+                continue
+            for table in source.get_node(group)._f_walknodes("Table"):
+                path = table._v_pathname
+                if path in output:
+                    output_table = output.get_node(path)
+                    output_table.append(table[:].astype(output_table.dtype))
+                else:
+                    parent = path.rsplit("/", 1)[0]
+                    if parent not in output:
+                        output.create_group(*parent.rsplit("/", 1), createparents=True)
+                    source.copy_node(path, newparent=output.get_node(parent))
 
 
 def load_pedestals(input_file, group, tel=None):

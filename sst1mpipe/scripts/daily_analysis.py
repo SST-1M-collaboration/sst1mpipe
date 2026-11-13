@@ -77,13 +77,18 @@ def r0_dl1_1file(arg):
 
 def dl1_dl1_1file(arg):
         """
-        python binding of sst1mpipe_data_dl1_dl1_stereo
+        python binding of sst1mpipe-stereo: stereo events of a tel1 DL1 file with the tel2 DL1
+        files of the same night (date of the tel1 file name, SST1M1_{DATE}_*)
         """
-        cmd = f'sst1mpipe_data_dl1_dl1_stereo \
-               --input-file {arg.input_file} \
-               --config {arg.config_file} \
-               --input-dir-tel2 {arg.tel2_dir} \
-               --output-dir {arg.out_dir}'
+        name = os.path.basename(arg.input_file)
+        date = name.split('_')[1]
+        tel2_files = sorted(glob.glob(os.path.join(arg.tel2_dir, f'*{date}_*.h5')))
+        if len(tel2_files) == 0:
+            logging.error('No tel2 DL1 file of %s in %s', date, arg.tel2_dir)
+            return
+        inputs = ' '.join(f'--input {path}' for path in [arg.input_file, *tel2_files])
+        output = os.path.join(arg.out_dir, name.removesuffix('.h5') + '_stereo.h5')
+        cmd = f'sst1mpipe-stereo {inputs} --output {output} --overwrite'
         logging.info(cmd)
         os.system(cmd)
 
