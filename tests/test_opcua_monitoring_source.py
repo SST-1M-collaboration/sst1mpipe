@@ -44,7 +44,17 @@ class DriveServer:
         for axis, value in ((1, 70.0), (2, 180.0)):
             node_id = ua.NodeId(f'Sercos,0,{axis}.ParameterSet."S-0-0386"', self.namespace)
             self.variables[axis] = objects.add_variable(node_id, f"axis_{axis}_position", value)
-        self.server.start()
+        # node with a text value
+        objects.add_variable(ua.NodeId("status", self.namespace), "status", "tracking")
+        # the port of a stopped server may take a moment to be free again
+        for attempt in range(20):
+            try:
+                self.server.start()
+                break
+            except OSError:
+                if attempt == 19:
+                    raise
+                time.sleep(0.25)
 
     def node_id(self, axis, parameter="S-0-0386"):
         return sercos_node_id(0, axis, parameter, namespace=self.namespace)
@@ -157,6 +167,44 @@ def test_scale_offset_and_unreadable_node(server):
         assert np.isnan(pointing.azimuth)
 
 
+def test_unusable_value_and_clock_offset(server):
+    server.set(2, 180.0)
+    config = pointing_config(server)
+    # text value of a node with a unit: only this field is missing
+    config["nodes"]["pointing.altitude"] = f"ns={server.namespace};s=status"
+    with OPCUAMonitoringSource(subarray=SUBARRAY, **config) as source:
+        assert source.is_connected
+        event = event_at(Time.now())
+        source.fill_monitoring_container(event)
+        pointing = event.monitoring.tel[TEL_ID].pointing
+        assert np.isnan(pointing.altitude)
+        assert u.isclose(pointing.azimuth, 180 * u.deg)
+        assert source.is_connected
+        assert source.n_events_without_values == 0
+        # events whose clock is 1 min apart from the computer: counted
+        source.fill_monitoring_container(event_at(Time.now() - 1 * u.min))
+        assert source.n_events_without_values == 1
+
+
+def test_buffer_order_and_arrays(server):
+    with OPCUAMonitoringSource(
+        subarray=SUBARRAY, host="127.0.0.1", port=server.port, polling_period=60, buffer_duration=10,
+        nodes={"pointing.altitude": server.node_id(1)},
+    ) as source:
+        source._times.clear()
+        source._samples.clear()
+        now = Time.now().unix
+        # clock stepped back: kept in time order; older than buffer_duration: removed
+        for offset, value in ((0, 1.0), (-5, 2.0), (2, 3.0), (-20, 4.0)):
+            source._add_sample(now + offset, [value])
+        assert source._times == [now - 5, now, now + 2]
+        times = Time([now - 5, now, now + 2, now + 100], format="unix")
+        values = source.get_values(MonitoringType.TELESCOPE_POINTINGS, times)
+        # without unit: numpy array
+        assert isinstance(values["altitude"], np.ndarray)
+        np.testing.assert_array_equal(values["altitude"], [2.0, 1.0, 3.0, np.nan])
+
+
 def test_server_not_reachable():
     with OPCUAMonitoringSource(
         subarray=SUBARRAY, host="127.0.0.1", port=free_port(), polling_period=POLLING_PERIOD, timeout=0.5,
@@ -191,3 +239,7 @@ def test_configuration_errors(server):
         OPCUAMonitoringSource(subarray=SUBARRAY, nodes={}, units={"pointing.altitude": "deg"})
     with pytest.raises(ValueError, match="tel_id"):
         OPCUAMonitoringSource(subarray=SUBARRAY_DESCRIPTION, nodes={})
+    with pytest.raises(ValueError, match="not in the subarray"):
+        OPCUAMonitoringSource(subarray=SUBARRAY, tel_id=22, nodes={})
+    with pytest.raises(ValueError, match="is a container"):
+        OPCUAMonitoringSource(subarray=SUBARRAY, nodes={"pointing": "ns=2;s=x"})

@@ -220,8 +220,10 @@ container mapped to them (``nodes``: path of the field in ``event.monitoring.tel
 the values read closest to the time of the event (within ``timestamp_tolerance``, 2 s; the values are kept
 ``buffer_duration`` seconds for the events processed later). A value is converted as
 ``value * scales[field] + offsets[field]`` in ``units[field]``. If the server cannot be reached (the
-connection is retried every ``reconnect_period`` seconds) or a node cannot be read, the field is not filled
-and the events are not skipped. E.g. in the configuration file:
+connection is retried every ``reconnect_period`` seconds) or a node cannot be read (or its value cannot be
+converted), the field is not filled and the events are not skipped. The values are timed with the clock of
+the computer: the events without values while values are read (e.g. clocks of the events and of the
+computer apart by more than ``timestamp_tolerance``) are counted, with a warning in the log. E.g. in the configuration file:
 
 .. code-block:: json
 

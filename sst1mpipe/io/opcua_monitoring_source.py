@@ -12,13 +12,13 @@ monitoring containers of the events with the values read closest to the time of 
 import bisect
 import threading
 import time as clock
-from collections import deque
 
 import astropy.units as u
 import numpy as np
 from astropy.table import Table
 from astropy.time import Time
 from ctapipe.containers import TelescopeMonitoringContainer
+from ctapipe.core import Container, Map
 from ctapipe.core.traits import AstroQuantity, Dict, Float, Int, Unicode
 from ctapipe.io import MonitoringSource
 from ctapipe.io.monitoringtypes import MonitoringType
@@ -59,6 +59,8 @@ def check_field(field):
         container = container[parent]
     if name not in container.fields:
         raise ValueError(f"{field!r}: {name!r} is not a field of {type(container).__name__}")
+    if isinstance(container[name], Container | Map):
+        raise ValueError(f"{field!r} is a container, not a value field: give the path of one of its fields")
 
 
 def set_field(container, field, value):
@@ -158,6 +160,10 @@ class OPCUAMonitoringSource(MonitoringSource):
                 raise ValueError("OPCUAMonitoringSource.tel_id must be given for a subarray of several telescopes")
             self._tel_id = int(self.subarray.tel_ids[0])
         else:
+            if self.subarray is not None and self.tel_id not in self.subarray.tel_ids:
+                raise ValueError(
+                    f"OPCUAMonitoringSource.tel_id {self.tel_id} is not in the subarray {self.subarray.tel_ids.tolist()}"
+                )
             self._tel_id = self.tel_id
         if self.timestamp_tolerance.to_value(u.s) < self.polling_period:
             self.log.warning(
@@ -166,8 +172,10 @@ class OPCUAMonitoringSource(MonitoringSource):
             )
         self._fields = list(self.nodes)
         # samples (unix time of the reading, values of the fields), in time order
-        self._times = deque()
-        self._samples = deque()
+        self._times = []
+        self._samples = []
+        # events without values while values were read (e.g. clocks of the events and of the computer apart)
+        self.n_events_without_values = 0
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._first_poll = threading.Event()
@@ -242,12 +250,25 @@ class OPCUAMonitoringSource(MonitoringSource):
                     self._unreadable.add(field)
                 values.append(np.nan)
                 continue
+            try:
+                value = self._convert(field, data_value.Value.Value)
+            except (TypeError, ValueError) as error:
+                # e.g. empty, text or array value of a node with a unit: this field only is missing
+                if field not in self._unreadable:
+                    self.log.warning(
+                        "Value of the OPC UA node %s (%s) not usable: %s", self.nodes[field], field, error,
+                    )
+                    self._unreadable.add(field)
+                values.append(np.nan)
+                continue
             self._unreadable.discard(field)
-            values.append(self._convert(field, data_value.Value.Value))
+            values.append(value)
         return read_time, values
 
     def _convert(self, field, value):
         if field in self.scales or field in self.offsets or field in self._units:
+            if value is None:
+                raise ValueError("no value")
             value = float(value) * self.scales.get(field, 1.0) + self.offsets.get(field, 0.0)
         if field in self._units:
             value = u.Quantity(value, self._units[field])
@@ -256,7 +277,8 @@ class OPCUAMonitoringSource(MonitoringSource):
     def _poll_loop(self):
         from asyncua.sync import ThreadLoop
 
-        self._tloop = ThreadLoop(timeout=self.timeout + 1)
+        # timeout of the synchronous calls: the connection makes several requests, each within ``timeout``
+        self._tloop = ThreadLoop(timeout=5 * self.timeout + 1)
         self._tloop.start()
         try:
             self._poll()
@@ -297,11 +319,14 @@ class OPCUAMonitoringSource(MonitoringSource):
 
     def _add_sample(self, read_time, values):
         with self._lock:
-            self._times.append(read_time)
-            self._samples.append(values)
-            while self._times and self._times[0] < read_time - self.buffer_duration:
-                self._times.popleft()
-                self._samples.popleft()
+            # kept in time order if the clock of the computer is stepped back
+            index = bisect.bisect_right(self._times, read_time)
+            self._times.insert(index, read_time)
+            self._samples.insert(index, values)
+            n_old = bisect.bisect_left(self._times, self._times[-1] - self.buffer_duration)
+            if n_old > 0:
+                del self._times[:n_old]
+                del self._samples[:n_old]
 
     # ---------------------------------------------------------------- access to the values
 
@@ -363,20 +388,42 @@ class OPCUAMonitoringSource(MonitoringSource):
             values = [row.get(field, np.nan) for row in rows]
             if unit is not None:
                 values = u.Quantity([v if isinstance(v, u.Quantity) else v * unit for v in values], unit)
+            else:
+                values = np.asarray(values)
             result[name] = values[0] if time.isscalar else values
         return result
 
     def fill_monitoring_container(self, event):
         """Fill the monitoring container of the telescope with the values read closest to the time of the event"""
         values = self.values_at(event.trigger.time)
+        if not values:
+            self._warn_no_values(event.trigger.time)
         monitoring = event.monitoring.tel[self._tel_id]
         for field, value in values.items():
             if isinstance(value, float) and np.isnan(value):
                 continue
             set_field(monitoring, field, value)
 
+    def _warn_no_values(self, time):
+        """Count the events without values while values are read, with a warning at the first one"""
+        with self._lock:
+            last = self._times[-1] if self._times else None
+        if last is None:
+            return
+        self.n_events_without_values += 1
+        if self.n_events_without_values == 1:
+            self.log.warning(
+                "Event at %s without OPC UA values: the last values were read %.1f s from it (more than"
+                " timestamp_tolerance, %s). Check the clocks of the events and of the computer.",
+                time.utc.isot, last - time.unix, self.timestamp_tolerance,
+            )
+
     def close(self):
         """Stop the reading of the server and disconnect"""
+        if self._stop.is_set():
+            return
+        if self.n_events_without_values > 0:
+            self.log.warning("%d events without OPC UA values", self.n_events_without_values)
         self._stop.set()
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(self.timeout + self.polling_period + 1)
