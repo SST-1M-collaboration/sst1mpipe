@@ -2,8 +2,8 @@
 Stereo events of the SST-1M telescopes, from the DL1 files of each telescope (sst1mpipe-process):
 the coincident events of the telescopes are combined into stereo events.
 
-The telescopes have no array trigger: each telescope writes its own events (one DL1 file per run
-and per telescope). The events of each telescope are read from its DL1 files (any number of files
+The telescopes have no array trigger: each telescope writes its own events (one raw data zfits file
+per run and per telescope, processed into one DL1 file each by sst1mpipe-process). The events of each telescope are read from its DL1 files (any number of files
 of each telescope, e.g. the runs of a night), the coincident events are found from the trigger
 tables of the files and combined into one event with a StereoEventCombiner, chosen by
 ``--combiner``:
@@ -16,7 +16,7 @@ tables of the files and combined into one event with a StereoEventCombiner, chos
 A stereo event is an event of the reference telescope (``--reference-tel``, 21 by default) with
 the coincident events of the other telescopes, and has the obs_id and event_id of the event of
 the reference telescope. Each event is in at most one stereo event. Only the events triggered by the
-cameras (SUBARRAY) are combined, the stereo events are SUBARRAY events at the earliest trigger
+trigger of the cameras (trigger patch7, trigger patch19 or muon trigger: SUBARRAY) are combined, the stereo events are SUBARRAY events at the earliest trigger
 time of their telescopes. The other events (mono events) are written as they are with
 ``--keep-mono``, otherwise not. The events are written in time order, with the ctapipe DataWriter
 (which data levels are written: ``DataWriter.write_dl1_images``, ``write_dl1_parameters``, ...).

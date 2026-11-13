@@ -4,7 +4,8 @@ Combining the stereo events: ``sst1mpipe-stereo``
 =================================================
 
 The SST-1M telescopes have no array trigger: each telescope triggers and writes its own events,
-one DL1 file per run and per telescope (``sst1mpipe-process``, see :ref:`data_processing`). The
+one raw data (zfits) file per run and per telescope, processed into one DL1 file each by
+``sst1mpipe-process`` (see :ref:`data_processing`). The
 events of a shower seen by both telescopes are found afterwards, from the trigger times or the
 array event ids of the events, and combined into stereo events by the ctapipe tool
 ``sst1mpipe-stereo``:
@@ -98,8 +99,10 @@ The coincident events are matched from the trigger tables of the DL1 files
 precision of White Rabbit, ``event_type``), by the method of the combiner. For all the
 combiners:
 
-* Only the events triggered by the cameras (``event_type`` SUBARRAY) are matched. The pedestal
-  events (SKY_PEDESTAL, ...) are never combined; ``sst1mpipe-process`` does not write them anyway.
+* Only the events triggered by the trigger of the camera (trigger patch7, trigger patch19 or muon
+  trigger: ``event_type`` SUBARRAY) are matched. The pedestal events (internal trigger of the camera,
+  ``CameraEventType.INTERNAL``: ``event_type`` SKY_PEDESTAL, ...) are never combined;
+  ``sst1mpipe-process`` does not write them anyway.
 * The events of each telescope are matched to those of the reference telescope (see
   :ref:`stereo_reference_telescope`).
 * Each event is in at most one stereo event.
@@ -184,7 +187,21 @@ telescope (e.g. 22 and 23 without 21) is not a stereo event: its events are mono
 
 ``StereoEventCombiner.match`` returns the stereo events as groups of events (one row per stereo
 event, the row of the event of each telescope or -1): a matching of all the telescopes at once can
-be implemented by overriding ``match`` in a new combiner, without changing the tool.
+be implemented by overriding ``match`` in a child combiner, without changing the tool.
+
+.. warning::
+
+    The combination of more than two telescopes is tested with three telescopes on made-up trigger
+    tables only (the real data have two telescopes), and is not tested with more than three telescopes:
+    it may not be ready for such arrays.
+
+    TODO:
+
+    * test the combination of more than three telescopes, and of three telescopes on real data;
+    * match the coincidences of telescopes without an event of the reference telescope (matching of
+      all the telescopes at once, e.g. groups of trigger times within the window, one event per
+      telescope);
+    * define the combination of different array pointings (``combine_array_pointing``).
 
 
 .. _stereo_combination_of_events:
@@ -235,8 +252,8 @@ each stereo event is a new ``SST1MArrayEventContainer`` (``sst1mpipe.io.containe
      - ``simulation``
      - Raises ``NotImplementedError`` (simulated events are combined by sim_telarray).
 
-The data of each telescope are those of its mono event, unchanged. A new combiner can change the
-combination of any part of the event by overriding its method, see :ref:`stereo_new_combiner`.
+The data of each telescope are those of its mono event, unchanged. A child combiner can override the
+method of any part of the event to change its combination, see :ref:`stereo_new_combiner`.
 
 
 .. _stereo_mono_events:
@@ -308,10 +325,10 @@ copied monitoring data).
 
 .. _stereo_new_combiner:
 
-Writing a new combiner
-----------------------
+Writing a child combiner
+------------------------
 
-A combiner is a subclass of ``StereoEventCombiner`` which implements ``match_pair``: the coincident
+A combiner is a child class of ``StereoEventCombiner`` which implements ``match_pair``: the coincident
 events of the reference telescope and of another telescope, from their events of type SUBARRAY sorted
 by trigger time (tables with the columns ``obs_id``, ``event_id``, ``tel_id``, ``event_type`` and
 ``time_ns``, the trigger time in integer ns). It returns the rows of the coincident events in each

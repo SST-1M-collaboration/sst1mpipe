@@ -2,7 +2,8 @@
 Combination of the events of the SST-1M telescopes into stereo events.
 
 The SST-1M telescopes have no array trigger: each telescope triggers and writes its own events
-(one DL1 file per run and per telescope), and the events of a shower seen by several telescopes
+(one raw data zfits file per run and per telescope, processed into one DL1 file each by
+sst1mpipe-process), and the events of a shower seen by several telescopes
 are found afterwards, from the trigger times or the array event ids of the events. A
 `StereoEventCombiner` does it in two steps, used by the tool ``sst1mpipe-stereo``
 (`~sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool`):
@@ -24,7 +25,8 @@ are found afterwards, from the trigger times or the array event ids of the event
 The events are matched to those of a reference telescope (``reference_tel_id``): a stereo event is
 an event of the reference telescope with the events of the other telescopes coincident with it.
 A coincidence of other telescopes without the reference telescope is not a stereo event. Only the
-events of type SUBARRAY (triggered by the camera) are matched, and each event is in at most one
+events of type SUBARRAY (triggered by the trigger of the camera: trigger patch7, trigger patch19 or
+muon trigger) are matched, and each event is in at most one
 stereo event.
 
 Examples
@@ -151,6 +153,11 @@ class StereoEventCombiner(Component):
     See Also
     --------
     WhiteRabbitClosestCombiner, SlidingWindowCombiner, SWATEventIdCombiner
+
+    Warnings
+    --------
+    The combination of more than two telescopes is tested with three telescopes on made-up trigger
+    tables only, and not with more than three telescopes: it may not be ready for such arrays.
     """
 
     reference_tel_id = Int(
@@ -219,11 +226,14 @@ class StereoEventCombiner(Component):
         ValueError
             If ``tables`` has no table of the reference telescope.
         """
+        # TODO: test with more than three telescopes (and with three on real data)
+        # TODO: match the coincidences of telescopes without an event of the reference telescope
+        #       (matching of all the telescopes at once): they are mono events
         if self.reference_tel_id not in tables:
             raise ValueError(f"No events of the reference telescope {self.reference_tel_id}")
         rows = {}
         for tel_id, table in tables.items():
-            # only the events triggered by the camera, sorted by time
+            # only the events triggered by the trigger of the camera (patch7, patch19 or muon), sorted by time
             selected = np.flatnonzero(np.asarray(table["event_type"]) == EventType.SUBARRAY.value)
             rows[tel_id] = selected[np.argsort(np.asarray(table["time_ns"])[selected], kind="stable")]
 
@@ -463,6 +473,7 @@ class StereoEventCombiner(Component):
         NotImplementedError
             If the array pointings of the events differ (NaN values are equal).
         """
+        # TODO: define the combination of different array pointings, then call this method in combine()
         pointings = [event.monitoring.pointing for event in events.values()]
         first = pointings[0]
         for pointing in pointings[1:]:

@@ -161,8 +161,8 @@ obtained as weighted average of the values for each telescope (except for direct
 DL1 to DL1 stereo
 ~~~~~~~~~~~~~~~~~
 
-The telescopes have no array trigger: each telescope writes its own events, one DL1 file per run and
-per telescope. The coincident events of the telescopes are combined into stereo events by the ctapipe
+The telescopes have no array trigger: each telescope writes its own events, one raw data (zfits) file per
+run and per telescope, processed into one DL1 file each by ``sst1mpipe-process``. The coincident events of the telescopes are combined into stereo events by the ctapipe
 tool ``sst1mpipe-stereo``, from the DL1 files of ``sst1mpipe-process`` of both telescopes:
 
 .. code-block:: bash
@@ -174,11 +174,18 @@ tool ``sst1mpipe-stereo``, from the DL1 files of ``sst1mpipe-process`` of both t
 
 The matching method is chosen with ``--combiner``: ``WhiteRabbitClosestCombiner`` (default, data with
 White Rabbit timestamps, after 25th September 2023), ``SlidingWindowCombiner`` (data without White Rabbit
-timestamps) or ``SWATEventIdCombiner`` (same SWAT array event id, after 30th January 2024). The stereo
+timestamps) or ``SWATEventIdCombiner`` (same SWAT array event id, after 30th January 2024). Only the events triggered by the trigger
+of the cameras (trigger patch7, trigger patch19 or muon trigger) are combined. The stereo
 events have the ids of the event of the reference telescope, and the mono events are written only with
 ``--keep-mono``. The stereo reconstruction is not done by this step. See :ref:`stereo_combination` for
-the matching methods, the combination of the events, the content of the output file and how to write a
-new combiner.
+the matching methods, the combination of the events (each part of the event by its own method, which a
+child combiner can override), the content of the output file and how to write a child combiner.
+
+.. warning::
+
+    The combination is tested on real data with two telescopes and on made-up data with three
+    telescopes: it is not tested with more than three telescopes and may not be ready for them
+    (see the TODOs in :ref:`stereo_combination`).
 
 .. note::
 
