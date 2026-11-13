@@ -12,8 +12,8 @@ Versions
 Since 0.32, the versions of **sst1mpipe** follow the versions of
 `ctapipe <https://github.com/cta-observatory/ctapipe>`_: **sst1mpipe** 0.32.x uses ctapipe 0.32.
 The 0.32.0aN versions are alpha releases: the R0 to DL1 processing (``sst1mpipe-monitoring``,
-``sst1mpipe-process``) uses the new ctapipe tools, while the DL1 to DL3 steps and the stereo
-matching are not migrated yet.
+``sst1mpipe-process``) and the combination of the stereo events (``sst1mpipe-stereo``) use the new
+ctapipe tools, while the DL1 to DL3 steps are not migrated yet.
 
 From PyPI
 ~~~~~~~~~

@@ -37,22 +37,6 @@
       "tel_022": 5.6
     },
 
-    "stereo": {
-      "event_matching_method" : "WhiteRabbitClosest",
-      "SlidingWindow": {
-        "window_half_width": 1E-3,
-        "offset_search": {
-          "time_start": -1E-2,
-          "time_stop": 1E-2,
-          "time_step": 2E-5
-        }
-      },
-      "WhiteRabbitClosest": {
-        "max_time_diff_ns": 1E4
-      },
-      "SWATEventIDs": {}
-    },
-
     "analysis": {
       "global_theta_cut": 0.2,
       "global_gammaness_cut": 0.75,
