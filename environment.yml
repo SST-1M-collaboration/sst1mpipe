@@ -41,6 +41,7 @@ dependencies:
   - iminuit
   - pyzmq
   - msgpack-python
+  - asyncua # OPCUAMonitoringSource (optional dependency, sst1mpipe[opcua])
   - pip:
       # pip ignores the conda pins: without it, pip upgrades numpy to 2.x for pandas 3.1 (dependency
       # of ctaplot), and astropy 6.1 fails to import (np.in1d removed in numpy 2.4)

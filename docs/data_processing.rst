@@ -213,6 +213,36 @@ output file has no pointing (the event source gives the RA/Dec of the run only),
 reconstructed in DL2 by ``sst1mpipe_dl1_dl2``. This is used for the ZMQ streams of the real-time analysis
 (``sst1mpipe_rta_config.json``); a monitoring file can be given to the stream as well.
 
+**Monitoring from an OPC UA server** (e.g. the drive, for the real-time analysis): the monitoring source
+``OPCUAMonitoringSource`` (``pip install sst1mpipe[opcua]``) reads, read only, the values of OPC UA nodes
+every ``polling_period`` seconds in a background thread, and fills the fields of the telescope monitoring
+container mapped to them (``nodes``: path of the field in ``event.monitoring.tel[tel_id]`` -> node id) with
+the values read closest to the time of the event (within ``timestamp_tolerance``, 2 s; the values are kept
+``buffer_duration`` seconds for the events processed later). A value is converted as
+``value * scales[field] + offsets[field]`` in ``units[field]``. If the server cannot be reached (the
+connection is retried every ``reconnect_period`` seconds) or a node cannot be read (or its value cannot be
+converted), the field is not filled and the events are not skipped. The values are timed with the clock of
+the computer: the events without values while values are read (e.g. clocks of the events and of the
+computer apart by more than ``timestamp_tolerance``) are counted, with a warning in the log. E.g. in the configuration file:
+
+.. code-block:: json
+
+    {
+      "ProcessorTool": {"monitoring_source_list": ["OPCUAMonitoringSource"]},
+      "OPCUAMonitoringSource": {
+        "host": "localhost",
+        "port": 24840,
+        "polling_period": 1.0,
+        "nodes": {
+          "pointing.altitude": "ns=7;s=Sercos,0,1.ParameterSet.\"S-0-0386\"",
+          "pointing.azimuth": "ns=7;s=Sercos,0,2.ParameterSet.\"S-0-0386\""
+        },
+        "units": {"pointing.altitude": "deg", "pointing.azimuth": "deg"}
+      }
+    }
+
+``sercos_node_id(bus, axis, parameter)`` gives the node id of a Sercos parameter of an axis of the drive.
+
 **Simulations** (``.simtel.gz`` files) are processed without monitoring source, with the MC
 configuration files (``sst1mpipe_mc_config_low_nsb.json``, ``sst1mpipe_mc_config_high_nsb.json``). How
 each telescope is calibrated is set in the configuration: for the simulated telescopes 1 and 2, the R1

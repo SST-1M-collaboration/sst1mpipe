@@ -16,6 +16,7 @@ from sst1mpipe.calib import R0R1Calibrator, ImageSaturationCorrector
 from sst1mpipe.io import attach_monitoring_file, write_dl1_info
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
+from sst1mpipe.io.opcua_monitoring_source import OPCUAMonitoringSource
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
 from sst1mpipe.io.zmq_event_source import ZMQEventSource
 from sst1mpipe.io.zmq_event_stream import ZMQEventPublisher
@@ -118,7 +119,8 @@ class ProcessorTool(Tool):
         default_value=[],
         help=(
             "Monitoring sources filling the monitoring containers of the events before their"
-            " calibration, e.g. SST1MMonitoringSource (monitoring file of sst1mpipe-monitoring)."
+            " calibration, e.g. SST1MMonitoringSource (monitoring file of sst1mpipe-monitoring),"
+            " OPCUAMonitoringSource (values read from an OPC UA server, e.g. the drive)."
             " Later sources overwrite earlier ones if their monitoring types overlap."
         ),
     ).tag(config=True)
@@ -153,7 +155,7 @@ class ProcessorTool(Tool):
         [
             CameraCalibrator, ImageProcessor, DataWriter, DBSCANImageCleaner, TimeDBSCANImageCleaner,
             R0R1Calibrator, ImageSaturationCorrector, ShowerProcessor,
-            SST1MMonitoringSource, ZMQEventPublisher,
+            SST1MMonitoringSource, OPCUAMonitoringSource, ZMQEventPublisher,
         ]
         + classes_with_traits(EventSource)
         + classes_with_traits(MonitoringSource)
