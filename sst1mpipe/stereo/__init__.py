@@ -5,7 +5,6 @@ from .combiner import (
     SWATEventIdCombiner,
     WhiteRabbitClosestCombiner,
     nearest_index,
-    to_sst1m_event,
 )
 
 __all__ = [
@@ -14,5 +13,4 @@ __all__ = [
     "SWATEventIdCombiner",
     "WhiteRabbitClosestCombiner",
     "nearest_index",
-    "to_sst1m_event",
 ]

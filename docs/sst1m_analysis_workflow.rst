@@ -189,9 +189,10 @@ child combiner can override), the content of the output file and how to write a 
 
 .. note::
 
-    ``sst1mpipe-stereo`` is **not intended to be run on MC**, as in MC DL1 the coincident events are already
-    matched by their ``event_id`` (mono events are in MC DL1 tables as well, so those can be used for both
-    mono and stereo analysis).
+    ``sst1mpipe-stereo`` **does not run on MC**: it stops with an error if an input file is simulated
+    (``is_simulation`` of its event source), as in MC DL1 the coincident events are already matched by their
+    ``event_id`` (mono events are in MC DL1 tables as well, so those can be used for both mono and stereo
+    analysis).
 
 
 .. _dl1_dl2:
@@ -201,8 +202,8 @@ DL1 to DL2
 
 This step uses pre-trained Random Forests to reconstruct parameters of primary gamma-ray photon (gammaness, direction and energy) using Hillas parameters stored in 
 the DL1 files as features. One can run ``sst1mpipe_data_dl1_dl2`` stript on either mono DL1 files (outputs of ``sst1mpipe-process``) for each telescope separately (using RFs for mono reconstruction), 
-or on stereo DL1 containing coincident events only (outputs of ``sst1mpipe-stereo``, see :ref:`dl1_dl1_stereo`). The script can handle both types of DL1, 
-but stereo reconstruction has to be requested explicitely using ``-—stereo`` switch. RFs trained on MC can be found on **Calculus** for both mono and stereo 
+or on stereo DL1 containing coincident events only (outputs of ``sst1mpipe-stereo``, see :ref:`dl1_dl1_stereo`).
+RFs trained on MC can be found on **Calculus** for both mono and stereo 
 reconstruction and different zenith angles:
 
 * ``/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/models_mono_psf_vaod0.2/``

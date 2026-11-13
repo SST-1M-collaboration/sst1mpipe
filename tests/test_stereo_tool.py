@@ -15,6 +15,7 @@ from traitlets.config import Config
 
 from conftest import COINCIDENT_EVENTS, EVENTS_TEL_1, OBSERVATION_RUNS, run_process
 from sst1mpipe.io import MONITORING_GROUPS, attach_monitoring_file
+from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, TEST_DATA_DIR
 from sst1mpipe.scripts.sst1mpipe_stereo_tool import StereoTool
 from sst1mpipe.utils import get_trigger_time_ns
 
@@ -162,6 +163,23 @@ def test_data_writer_options(dl1_files, tmp_path):
     with tables.open_file(output) as f:
         assert "/dl1/event/telescope/parameters" not in f
         assert "/dl1/event/subarray/trigger" in f
+
+
+def test_data_config(dl1_files, tmp_path):
+    """the stereo settings of the data config (default combiner, reference telescope 21)"""
+    tool = run_stereo(dl1_files.values(), tmp_path / "stereo.dl1.h5", f"--config={DATA_CONFIG_FILE}")
+    assert type(tool.combiner).__name__ == "WhiteRabbitClosestCombiner"
+    assert tool.combiner.reference_tel_id == 21 and not tool.keep_mono
+    assert tool.counts["stereo"] == len(COINCIDENT_EVENTS)
+
+
+def test_simulation_error(tmp_path):
+    """simulated files are not combined (stereo events of sim_telarray): error before any other check"""
+    simulation = tmp_path / "gamma.dl1.h5"
+    simtel = TEST_DATA_DIR / "simtel" / "gamma_200_800E3GeV_20_20deg_ATM52_102168.corsika.gz.NSBmed4.simtel.gz"
+    run_process(simtel, simulation, "--max-events=3", config=MC_CONFIG_FILES["low"])
+    with pytest.raises(ToolConfigurationError, match="simulated events"):
+        run_stereo([simulation], tmp_path / "stereo.dl1.h5")
 
 
 def test_configuration_errors(dl1_files, tmp_path):

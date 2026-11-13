@@ -37,6 +37,28 @@
       "tel_022": 5.6
     },
 
+    "StereoTool": {
+      "combiner_type": "WhiteRabbitClosestCombiner",
+      "keep_mono": false,
+      "copy_monitoring": true
+    },
+
+    "StereoEventCombiner": {
+      "reference_tel_id": 21
+    },
+
+    "WhiteRabbitClosestCombiner": {
+      "max_time_diff": "10 us"
+    },
+
+    "SlidingWindowCombiner": {
+      "window_half_width": "1 ms",
+      "time_offset": null,
+      "offset_start": "-10 ms",
+      "offset_stop": "10 ms",
+      "offset_step": "20 us"
+    },
+
     "analysis": {
       "global_theta_cut": 0.2,
       "global_gammaness_cut": 0.75,

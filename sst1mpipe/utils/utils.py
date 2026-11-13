@@ -198,6 +198,32 @@ def merge_subarrays(subarrays, name=None):
                                reference_location=reference)
 
 
+def _round_ns(quantity):
+    """
+    Time quantity as an integer number of nanoseconds.
+
+    Used by the stereo combiners (`sst1mpipe.stereo`), which compare the trigger times of the
+    telescopes in integer ns (White Rabbit precision).
+
+    Parameters
+    ----------
+    quantity : astropy.units.Quantity
+        Time quantity (e.g. ``10 * u.us``).
+
+    Returns
+    -------
+    int
+        ``quantity`` in ns, rounded to the nearest integer.
+
+    Examples
+    --------
+    >>> import astropy.units as u
+    >>> _round_ns(1.5 * u.us)
+    1500
+    """
+    return int(round(quantity.to_value(u.ns)))
+
+
 def get_tel_string(tel, mc=True):
     """
     Makes string with telescope designation understandable

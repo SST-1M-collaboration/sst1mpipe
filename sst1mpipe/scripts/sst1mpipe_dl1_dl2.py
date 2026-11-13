@@ -4,8 +4,7 @@
 A script to reconstruct events with DL1 information using pre-trained RF models.
 Works on both MC and data, mono and stereo.
 - Inputs is a single DL1 file in HDF format (output of sst1mpipe-process or
-sst1mpipe-stereo; the stereo files of sst1mpipe-stereo have no stereo geometry
-reconstruction yet, needed by --stereo)
+sst1mpipe-stereo)
 - Output is hdf file with a table of DL2 parameters (energy, gammaness, src_x,
 src_y, ra, dec). This file still contains DL1 table for convenience.
 

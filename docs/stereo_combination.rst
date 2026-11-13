@@ -86,7 +86,8 @@ settings can be given in a configuration file (``--config``, JSON or YAML, see
 The settings of ``StereoEventCombiner`` apply to all the combiners.
 
 The simulations are not combined: their stereo events are already combined by sim_telarray (array
-trigger, same ``event_id`` in all the telescopes), and ``sst1mpipe-stereo`` refuses simulated files.
+trigger, same ``event_id`` in all the telescopes). ``sst1mpipe-stereo`` stops with an error if an input
+file is simulated (``is_simulation`` of its event source), before any other check.
 
 
 .. _stereo_matching:
@@ -314,14 +315,6 @@ The stereo files are read like the DL1 files of ``sst1mpipe-process``: by the ct
 ``load_dl1_sst1m`` for each telescope (``tel="tel_021"``, with the pointing of the telescope from the
 copied monitoring data).
 
-.. warning::
-
-    ``sst1mpipe_dl1_dl2 --stereo`` (and ``load_dl1_sst1m(..., stereo=True)``) do not read the files of
-    ``sst1mpipe-stereo`` yet. They need the stereo geometry reconstruction
-    (``/dl2/event/telescope/impact/HillasReconstructor/tel_XXX`` and
-    ``/dl2/event/subarray/geometry/HillasReconstructor``: impact distances, ``h_max`` and core, features
-    of the stereo models), done by a later step, and the ``/dl1/info`` table.
-
 
 .. _stereo_new_combiner:
 
@@ -423,7 +416,7 @@ Combiners
 .. autoclass:: sst1mpipe.stereo.SWATEventIdCombiner
    :members: match_pair
 
-.. autofunction:: sst1mpipe.stereo.to_sst1m_event
+.. autofunction:: sst1mpipe.io.containers.to_sst1m_event
 
 .. autofunction:: sst1mpipe.stereo.nearest_index
 

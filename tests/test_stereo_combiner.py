@@ -2,6 +2,8 @@
 StereoEventCombiner components (sst1mpipe.stereo): matching of the coincident events of the
 telescopes on made-up trigger tables, and combination of made-up events
 """
+import json
+
 import astropy.units as u
 import numpy as np
 import pytest
@@ -10,15 +12,16 @@ from astropy.time import Time
 from ctapipe.containers import ArrayEventContainer, EventType, ImageParametersContainer, SimulatedEventContainer
 from traitlets.config import Config
 
-from sst1mpipe.io.containers import SST1MArrayEventContainer
+from sst1mpipe.io.containers import SST1MArrayEventContainer, to_sst1m_event
+from sst1mpipe.resources import DATA_CONFIG_FILE
 from sst1mpipe.stereo import (
     SlidingWindowCombiner,
     StereoEventCombiner,
     SWATEventIdCombiner,
     WhiteRabbitClosestCombiner,
     nearest_index,
-    to_sst1m_event,
 )
+from sst1mpipe.utils.utils import _round_ns
 
 US = 1_000  # ns
 MS = 1_000_000  # ns
@@ -41,6 +44,21 @@ def pairs(combiner, reference, other):
     """matched (reference row, other row) of two telescopes, with match()"""
     groups = combiner.match({21: reference, 22: other})
     return sorted(zip(groups[21].tolist(), groups[22].tolist(), strict=True))
+
+
+def test_round_ns():
+    assert _round_ns(1.5 * u.us) == 1500
+    assert _round_ns(-10 * u.ms) == -10_000_000
+    assert _round_ns(0.4 * u.ns) == 0
+
+
+def test_data_config_defaults():
+    """the stereo settings of the data config are the defaults of the combiners"""
+    config = Config(json.loads(DATA_CONFIG_FILE.read_text()))
+    for cls in (WhiteRabbitClosestCombiner, SlidingWindowCombiner, SWATEventIdCombiner):
+        configured, default = cls(config=config), cls()
+        for name in cls.class_traits(config=True):
+            assert getattr(configured, name) == getattr(default, name), (cls.__name__, name)
 
 
 def test_nearest_index():

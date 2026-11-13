@@ -24,7 +24,9 @@ are found afterwards, from the trigger times or the array event ids of the event
 
 The events are matched to those of a reference telescope (``reference_tel_id``): a stereo event is
 an event of the reference telescope with the events of the other telescopes coincident with it.
-A coincidence of other telescopes without the reference telescope is not a stereo event. Only the
+A coincidence of other telescopes without the reference telescope is not a stereo event: with more
+than two telescopes, such stereo events are lost, so the combination does not work properly for more
+than two telescopes (see the warning of `StereoEventCombiner`). Only the
 events of type SUBARRAY (triggered by the trigger of the camera: trigger patch7, trigger patch19 or
 muon trigger) are matched, and each event is in at most one
 stereo event.
@@ -51,6 +53,7 @@ from ctapipe.core import Component
 from ctapipe.core.traits import AstroQuantity, Int
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer
+from sst1mpipe.utils.utils import _round_ns
 
 __all__ = [
     "SlidingWindowCombiner",
@@ -58,18 +61,22 @@ __all__ = [
     "SWATEventIdCombiner",
     "WhiteRabbitClosestCombiner",
     "nearest_index",
-    "to_sst1m_event",
 ]
-
-
-def _ns(quantity):
-    """Integer number of ns of a time quantity"""
-    return int(round(quantity.to_value(u.ns)))
 
 
 def nearest_index(sorted_values, values):
     """
     Index of the nearest element of a sorted array to each of the given values.
+
+    Used by `WhiteRabbitClosestCombiner` to find, for each trigger time of a telescope, the closest
+    trigger time of another telescope, for all the events at once (no loop over the events).
+
+    For each value, `numpy.searchsorted` gives the position where it would be inserted in
+    ``sorted_values``: the elements just before (left neighbour) and at (right neighbour) this
+    position are the two candidates, the smaller and the larger elements closest to the value. The
+    nearest of the two is kept, the left one if both are as near. A value below the first element
+    or above the last one has a single candidate, the first or the last element. The cost is
+    ``O(n log m)`` for ``n`` values and ``m`` sorted values.
 
     Parameters
     ----------
@@ -94,34 +101,6 @@ def nearest_index(sorted_values, values):
     left = np.clip(right - 1, 0, len(sorted_values) - 1)
     left_closer = np.abs(values - sorted_values[left]) <= np.abs(sorted_values[right] - values)
     return np.where(left_closer, left, right)
-
-
-def to_sst1m_event(event):
-    """
-    Event as a `~sst1mpipe.io.containers.SST1MArrayEventContainer`, with its content unchanged.
-
-    Used for the mono events written by ``sst1mpipe-stereo --keep-mono``: the events read from the
-    DL1 files by the ctapipe `~ctapipe.io.HDF5EventSource` are ctapipe
-    `~ctapipe.containers.ArrayEventContainer`.
-
-    Parameters
-    ----------
-    event : ctapipe.containers.ArrayEventContainer
-        Event, e.g. read by the HDF5EventSource.
-
-    Returns
-    -------
-    SST1MArrayEventContainer
-        ``event`` itself if it is already a SST1MArrayEventContainer, otherwise a new container with
-        the same fields (the same objects, not copies) and a copy of its ``meta``.
-    """
-    if isinstance(event, SST1MArrayEventContainer):
-        return event
-    sst1m_event = SST1MArrayEventContainer()
-    for name in event.fields:
-        sst1m_event[name] = event[name]
-    sst1m_event.meta = dict(event.meta)
-    return sst1m_event
 
 
 class StereoEventCombiner(Component):
@@ -156,8 +135,10 @@ class StereoEventCombiner(Component):
 
     Warnings
     --------
-    The combination of more than two telescopes is tested with three telescopes on made-up trigger
-    tables only, and not with more than three telescopes: it may not be ready for such arrays.
+    The combination does not work properly with more than two telescopes: the coincidences of
+    telescopes without an event of the reference telescope are not combined (they are mono events).
+    It is tested with three telescopes on made-up trigger tables only, and not with more than three
+    telescopes.
     """
 
     reference_tel_id = Int(
@@ -562,7 +543,7 @@ class WhiteRabbitClosestCombiner(StereoEventCombiner):
         index_2 = nearest_index(time_2, time_1)
         # mutual nearest events
         mutual = nearest_index(time_1, time_2)[index_2] == index_1
-        close = np.abs(time_2[index_2] - time_1) < _ns(self.max_time_diff)
+        close = np.abs(time_2[index_2] - time_1) < _round_ns(self.max_time_diff)
         keep = mutual & close
         return index_1[keep], index_2[keep]
 
@@ -653,7 +634,7 @@ class SlidingWindowCombiner(StereoEventCombiner):
             Number of events of ``time_2`` within ``window_half_width`` (strictly) of
             ``time_1 + offset_ns``, summed over the events of ``time_1``.
         """
-        return int(self._window(time_2, time_1 + offset_ns, _ns(self.window_half_width))[1].sum())
+        return int(self._window(time_2, time_1 + offset_ns, _round_ns(self.window_half_width))[1].sum())
 
     def find_time_offset(self, time_1, time_2):
         """
@@ -678,7 +659,7 @@ class SlidingWindowCombiner(StereoEventCombiner):
         ValueError
             If there is no offset between ``offset_start`` and ``offset_stop``.
         """
-        offsets = np.arange(_ns(self.offset_start), _ns(self.offset_stop), _ns(self.offset_step), dtype=np.int64)
+        offsets = np.arange(_round_ns(self.offset_start), _round_ns(self.offset_stop), _round_ns(self.offset_step), dtype=np.int64)
         if len(offsets) == 0:
             raise ValueError("SlidingWindowCombiner: no offset between offset_start and offset_stop")
         counts = [self.n_coincidences(time_1, time_2, offset) for offset in offsets]
@@ -709,8 +690,8 @@ class SlidingWindowCombiner(StereoEventCombiner):
         """
         time_1 = np.asarray(reference["time_ns"], dtype=np.int64)
         time_2 = np.asarray(other["time_ns"], dtype=np.int64)
-        offset = _ns(self.time_offset) if self.time_offset is not None else self.find_time_offset(time_1, time_2)
-        half_width = _ns(self.window_half_width)
+        offset = _round_ns(self.time_offset) if self.time_offset is not None else self.find_time_offset(time_1, time_2)
+        half_width = _round_ns(self.window_half_width)
         start_2, n_2 = self._window(time_2, time_1 + offset, half_width)
         _, n_1 = self._window(time_1, time_2 - offset, half_width)
         index_1 = np.flatnonzero(n_2 == 1)

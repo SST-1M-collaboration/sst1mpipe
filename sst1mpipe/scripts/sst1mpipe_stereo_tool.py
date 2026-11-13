@@ -43,7 +43,8 @@ from ctapipe.io import DataWriter, HDF5EventSource, read_table
 from tqdm import tqdm
 
 from sst1mpipe.io import append_monitoring_tables
-from sst1mpipe.stereo import StereoEventCombiner, to_sst1m_event
+from sst1mpipe.io.containers import to_sst1m_event
+from sst1mpipe.stereo import StereoEventCombiner
 from sst1mpipe.utils import get_trigger_time_ns, merge_subarrays
 
 __all__ = ["StereoTool", "CombinedRuns", "TelescopeEventReader", "read_telescope_triggers"]
@@ -265,11 +266,20 @@ class StereoTool(Tool):
         Raises
         ------
         ctapipe.core.ToolConfigurationError
-            Without input files, with an input file of several telescopes, with files of a single
-            telescope or without files of the reference telescope, or with simulated files.
+            Without input files, with a simulated input file (checked first: the stereo events of
+            the simulations are combined by sim_telarray), with an input file of several
+            telescopes, with files of a single telescope or without files of the reference telescope.
         """
         if len(self.input_files) == 0:
             raise ToolConfigurationError("No input files (--input)")
+        # the stereo events of the simulations are combined by sim_telarray (array trigger)
+        for path in self.input_files:
+            with HDF5EventSource(path, max_events=1) as source:
+                if source.is_simulation:
+                    raise ToolConfigurationError(
+                        f"{path}: simulated events, whose stereo events are combined by sim_telarray:"
+                        " sst1mpipe-stereo combines observed data only"
+                    )
         self.combiner = StereoEventCombiner.from_name(self.combiner_type, parent=self)
 
         # input files by telescope
@@ -315,10 +325,6 @@ class StereoTool(Tool):
             for tel_id, files in self.files.items()
         }
         all_sources = [source for sources in self.sources.values() for source in sources]
-        if any(source.is_simulation for source in all_sources):
-            raise ToolConfigurationError(
-                "Simulated input files: the stereo events of the simulations are combined by sim_telarray"
-            )
         subarray = merge_subarrays([subarrays[tel_id] for tel_id in sorted(subarrays)])
         self.writer = DataWriter(event_source=CombinedRuns(all_sources, subarray), parent=self)
         # closed in finish(), or when the tool exits if it fails before
