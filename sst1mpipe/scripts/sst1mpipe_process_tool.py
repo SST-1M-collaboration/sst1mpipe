@@ -146,7 +146,11 @@ class ProcessorTool(Tool):
             "progress",
             "ProcessorTool.progress_bar",
             "show a progress bar during event processing",
-            "don't show a progress bar during event processing",)
+            "don't show a progress bar during event processing",),
+        **flag("overwrite",
+               "DataWriter.overwrite",
+               "Overwrite the output file",
+               "Don't overwrite the output file"),
     }
 
     classes = (
