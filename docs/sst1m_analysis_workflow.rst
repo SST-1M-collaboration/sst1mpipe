@@ -162,37 +162,22 @@ DL1 to DL1 stereo
 ~~~~~~~~~~~~~~~~~
 
 The telescopes have no array trigger: each telescope writes its own events, one raw data (zfits) file per
-run and per telescope, processed into one DL1 file each by ``sst1mpipe-process``. The coincident events of the telescopes are combined into stereo events by the ctapipe
-tool ``sst1mpipe-stereo``, from the DL1 files of ``sst1mpipe-process`` of both telescopes:
+run and per telescope, processed into one DL1 file each by ``sst1mpipe-process``. The DL1 files of the runs
+of a night are merged for each telescope, and the coincident events of the telescopes are combined into
+stereo events by ``sst1mpipe-stereo``, a `ctapipe.core.Tool`:
 
 .. code-block:: bash
 
     sst1mpipe-stereo \
-        --input SST1M1_20260120_1179_W1.dl1.h5 --input SST1M2_20260120_1102_W1.dl1.h5 \
-        --output SST1M_20260120_1179.stereo.dl1.h5 \
-        [--combiner WhiteRabbitClosestCombiner] [--reference-tel 21] [--keep-mono]
+        --input SST1M1_20260120_merged.dl1.h5 --input SST1M2_20260120_merged.dl1.h5 \
+        --output SST1M_20260120_merged.stereo.dl1.h5
 
-The matching method is chosen with ``--combiner``: ``WhiteRabbitClosestCombiner`` (default, data with
-White Rabbit timestamps, after 25th September 2023), ``SlidingWindowCombiner`` (data without White Rabbit
-timestamps) or ``SWATEventIdCombiner`` (same SWAT array event id, after 30th January 2024). Only the events triggered by the trigger
-of the cameras (trigger patch7, trigger patch19 or muon trigger) are combined. The stereo
-events have the ids of the event of the reference telescope, and the mono events are written only with
-``--keep-mono``. The stereo reconstruction is not done by this step. See :ref:`stereo_combination` for
-the matching methods, the combination of the events (each part of the event by its own method, which a
-child combiner can override), the content of the output file and how to write a child combiner.
-
-.. warning::
-
-    The combination is tested on real data with two telescopes and on made-up data with three
-    telescopes: it is not tested with more than three telescopes and may not be ready for them
-    (see the TODOs in :ref:`stereo_combination`).
+The matching method is chosen with ``--combiner`` (``--help`` lists the options). See
+:ref:`stereo_combination`.
 
 .. note::
 
-    ``sst1mpipe-stereo`` **does not run on MC**: it stops with an error if an input file is simulated
-    (``is_simulation`` of its event source), as in MC DL1 the coincident events are already matched by their
-    ``event_id`` (mono events are in MC DL1 tables as well, so those can be used for both mono and stereo
-    analysis).
+    ``sst1mpipe-stereo`` **does not run on MC**: it stops with an error if an input file is simulated.
 
 
 .. _dl1_dl2:

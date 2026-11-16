@@ -116,7 +116,8 @@ class StereoEventCombiner(Component):
     (``reference_tel_id``): a stereo event is an event of the reference telescope with the
     coincident events of the other telescopes, and has the obs_id and event_id of the event of
     the reference telescope. Only the events of type SUBARRAY are matched, and each event is in at
-    most one stereo event.
+    most one stereo event. Swapping the reference telescope changes the ids of the stereo events;
+    the stereo events are the same with `WhiteRabbitClosestCombiner` and `SWATEventIdCombiner`.
 
     Parameters
     ----------
@@ -138,7 +139,12 @@ class StereoEventCombiner(Component):
     The combination does not work properly with more than two telescopes: the coincidences of
     telescopes without an event of the reference telescope are not combined (they are mono events).
     It is tested with three telescopes on made-up trigger tables only, and not with more than three
-    telescopes.
+    telescopes. TODO:
+
+    - test the combination of more than three telescopes, and of three telescopes on real data
+    - match the coincidences of telescopes without an event of the reference telescope (matching of
+      all the telescopes at once)
+    - define the combination of different array pointings (`combine_array_pointing`)
     """
 
     reference_tel_id = Int(
@@ -569,7 +575,8 @@ class SlidingWindowCombiner(StereoEventCombiner):
 
     With the default window (1 ms), the method gives random coincidences at the usual trigger
     rates: it is meant for data without precise timestamps, otherwise use
-    `WhiteRabbitClosestCombiner` (or a fixed ``time_offset`` with a narrow window).
+    `WhiteRabbitClosestCombiner` (or a fixed ``time_offset`` with a narrow window). With a searched
+    offset, swapping the reference telescope can give other stereo events.
 
     Parameters
     ----------

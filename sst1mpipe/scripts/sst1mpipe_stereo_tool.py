@@ -189,9 +189,16 @@ class StereoTool(Tool):
     """
     Combination of the coincident events of the SST-1M telescopes into stereo events (``sst1mpipe-stereo``).
 
-    The input files are DL1 files of a single telescope each (sst1mpipe-process), any number of
-    files per telescope (e.g. the runs of a night), of at least two telescopes including the
-    reference telescope of the combiner.
+    The input files are DL1 files of a single telescope each (sst1mpipe-process), e.g. the DL1 file
+    of a night of each telescope (runs merged with ctapipe-merge), any number of files per telescope,
+    of at least two telescopes including the reference telescope of the combiner. Simulated files
+    are refused.
+
+    The output file has the stereo events, and with ``keep_mono`` the events which are not combined
+    (mono events, unchanged), in time order; the data levels written are the settings of the
+    `~ctapipe.io.DataWriter`. It also has the subarray of all the telescopes, the observation and
+    scheduling blocks of the runs and, with ``copy_monitoring``, the monitoring data of the input
+    files. It has no stereo DL2 and no ``/dl1/info``.
 
     1. ``setup``: the input files are grouped by telescope and sorted by time, the trigger tables of
        the telescopes are read (`read_telescope_triggers`) and the output file is opened with the
