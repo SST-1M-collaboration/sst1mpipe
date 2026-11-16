@@ -214,7 +214,8 @@ class ProcessorTool(Tool):
 
     def write_provenance(self):
         """The provenance log is not written without output file, unless it is asked for (--provenance-log)"""
-        if self.writer is None and "provenance_log" not in self.config.get(type(self).__name__, {}):
+        # no writer: no output file, or the tool stopped before its setup (e.g. a bad configuration)
+        if getattr(self, "writer", None) is None and "provenance_log" not in self.config.get(type(self).__name__, {}):
             return
         super().write_provenance()
 

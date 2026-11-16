@@ -1,5 +1,6 @@
 """Stream of the processed events (ZMQEventPublisher -> ZMQEventSubscriber)"""
 
+import subprocess
 import threading
 import time
 
@@ -251,3 +252,15 @@ def test_process_without_output_writes_nothing(tmp_path, monkeypatch):
     assert tool.writer is None
     assert len(messages) > 0 and all("dl1" in levels for _, levels in messages)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_process_bad_configuration_error(tmp_path, monkeypatch):
+    """a bad configuration stops the tool before its setup: the configuration error, not another one"""
+    from ctapipe.core import run_tool
+
+    from sst1mpipe.scripts.sst1mpipe_process_tool import ProcessorTool
+
+    monkeypatch.chdir(tmp_path)
+    # the exit of the configuration error (before: AttributeError in write_provenance, no writer)
+    with pytest.raises(subprocess.CalledProcessError):
+        run_tool(ProcessorTool(), argv=["--log-level=NOT_A_LEVEL"])
