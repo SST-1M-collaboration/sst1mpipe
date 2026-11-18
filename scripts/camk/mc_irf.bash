@@ -1,0 +1,38 @@
+#!/bin/bash
+
+#######################
+#  IRFs (ctapipe)     #
+#######################
+# 1. ctapipe-optimize-event-selection: gammaness and direction cuts (point gammas, protons)
+# 2. ctapipe-compute-irf: point-like IRFs (point gammas, direction cut), and full enclosure IRFs
+#    (diffuse gammas), with the benchmarks (sensitivity, resolutions)
+# In the conda environment IRF_CONDA_ENV (ctapipe IRF tools: pyirf ~0.14, astropy >= 7).
+
+#SBATCH --job-name=mc-irf
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --time=0-04:00:00
+#SBATCH --qos=long
+#SBATCH --partition=pctacamk
+#SBATCH --mem-per-cpu=8GB
+#SBATCH --output=/home/%u/logs/%x-%j.out
+#SBATCH --error=/home/%u/logs/%x-%j.err
+
+CONDA_ENV_VARIABLE=IRF_CONDA_ENV source "${SST1MPIPE_ROOT:-${SLURM_SUBMIT_DIR:-.}}/scripts/camk/common.bash"
+
+DL2="${MC_DIRECTORY}/dl2"
+IRF="${MC_DIRECTORY}/irf"
+mkdir -p "${IRF}"
+
+ctapipe-optimize-event-selection --config "${OPTIMIZE_CUTS_CONFIG}" \
+  -g "${DL2}/gamma_point.dl2.h5" -p "${DL2}/proton_test.dl2.h5" -o "${IRF}/cuts.fits" --overwrite
+
+ctapipe-compute-irf --config "${COMPUTE_IRF_CONFIG}" --cuts "${IRF}/cuts.fits" \
+  --gamma-file "${DL2}/gamma_point.dl2.h5" --proton-file "${DL2}/proton_test.dl2.h5" \
+  --do-background --spatial-selection-applied --DefaultFoVOffsetBins.fov_offset_n_bins=1 \
+  --output "${IRF}/irf_point_like.fits.gz" --benchmark-output "${IRF}/benchmarks_point_like.fits.gz" --overwrite
+
+ctapipe-compute-irf --config "${COMPUTE_IRF_CONFIG}" --cuts "${IRF}/cuts.fits" \
+  --gamma-file "${DL2}/gamma_diffuse_test.dl2.h5" --proton-file "${DL2}/proton_test.dl2.h5" \
+  --do-background --no-spatial-selection-applied \
+  --output "${IRF}/irf_full_enclosure.fits.gz" --benchmark-output "${IRF}/benchmarks_full_enclosure.fits.gz" --overwrite
