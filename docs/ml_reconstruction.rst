@@ -51,7 +51,8 @@ of ``sst1mpipe_mc_config_low_nsb.json``:
     sst1mpipe-train-disp-reconstructor -i gamma_diffuse_train.dl1.h5 -o models/ze20_az0_nsb100/disp_reconstructor.pkl \
         --config sst1mpipe_train_disp_reconstructor.yaml --n-events 700000
 
-One model is trained per telescope type (the two SST-1M telescopes are two types in the subarray).
+ctapipe trains one model per telescope type: the two SST-1M telescopes are two types in the subarray
+(same name ``SST_1M_DigiCam``), so one model per telescope.
 The models are stereo models if the stereo features are in the configuration
 (``HillasReconstructor_tel_impact_distance``, ``HillasReconstructor_h_max``, commented out in the
 configurations).
@@ -62,12 +63,31 @@ with ctaplot:
 
 - ``<model name>_feature_importance.png``: feature importances of the model of each telescope type
   (the norm regressor and the sign classifier of the disp);
-- ``<model name>_performance.png``: performance from the cross validation of the training tools
-  (``CrossValidator.n_cross_validations``, 5 by default; its predictions are written in
-  ``<model name>_cv.h5`` in the plot directory if ``--cv-output`` is not given).
+- ``<model name>_performance.png``: performance from the out-of-fold predictions of the cross
+  validation (``CrossValidator.n_cross_validations``, 5 by default), one row per telescope id, and
+  a stereo row for the events with at least two telescopes, combined by the stereo combiner of the
+  model.
 
-The cross validation tables are per telescope type name: the two SST-1M telescopes, of the same
-type name, are in the same performance plot.
+Plots of the models trained on the three test simtel files (``tests``, a few hundred events: the
+statistics are low):
+
+.. image:: _static/ml/energy_regressor_feature_importance.png
+   :width: 100%
+
+.. image:: _static/ml/energy_regressor_performance.png
+   :width: 100%
+
+.. image:: _static/ml/particle_classifier_feature_importance.png
+   :width: 100%
+
+.. image:: _static/ml/particle_classifier_performance.png
+   :width: 100%
+
+.. image:: _static/ml/disp_reconstructor_feature_importance.png
+   :width: 100%
+
+.. image:: _static/ml/disp_reconstructor_performance.png
+   :width: 100%
 
 Application: the closest models
 -------------------------------

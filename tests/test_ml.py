@@ -21,13 +21,11 @@ from ctapipe.reco.stereo_combination import StereoCombiner
 
 from conftest import run_process
 from sst1mpipe.ml import StereoMARSCombiner, mars_directions
-from sst1mpipe.ml.tools import (
-    ApplyModels,
+from sst1mpipe.scripts.sst1mpipe_apply_models_tool import ApplyModels, closest_model_node, find_model_nodes
+from sst1mpipe.scripts.sst1mpipe_train_models_tool import (
     TrainDispReconstructor,
     TrainEnergyRegressor,
     TrainParticleClassifier,
-    closest_model_node,
-    find_model_nodes,
 )
 from sst1mpipe.resources import MC_CONFIG_FILES, TEST_DATA_DIR, TRAIN_CONFIG_FILES
 
@@ -57,12 +55,15 @@ def test_mars_directions():
         [unit_vector(alt, np.deg2rad(5.0)), unit_vector(alt, np.deg2rad(6.0))],
     ])
     weights = np.array([1.0, 3.0, 1.0])
-    mean, distance, chosen = mars_directions(candidates, weights, np.array([0, 0, 1]))
-    np.testing.assert_allclose(chosen, candidates[[0, 1, 2], [1, 1, 0]])
-    expected = candidates[0, 1] + 3 * candidates[1, 1]
-    np.testing.assert_allclose(mean[0], expected)
+    alt_reco, az_reco, spread, distance = mars_directions(candidates, weights, np.array([0, 0, 1]), 3)
+    mean = candidates[0, 1] + 3 * candidates[1, 1]
+    np.testing.assert_allclose(alt_reco[:2], np.arcsin([mean[2] / np.linalg.norm(mean), candidates[2, 0, 2]]))
+    np.testing.assert_allclose(az_reco[:2], np.deg2rad([(1.0 + 3 * 1.02) / 4, 5.0]), atol=1e-4)
     separation = np.arccos(np.dot(candidates[0, 1], candidates[1, 1]))
-    np.testing.assert_allclose(distance, [separation, 0], atol=1e-12)
+    np.testing.assert_allclose(distance[:2], [separation, 0], atol=1e-12)
+    assert spread[1] < 1e-6
+    # array event 2 without telescope event
+    assert np.isnan(alt_reco[2]) and np.isnan(distance[2])
 
 
 def mono_table(n_events=40, n_tel=2, seed=0):
@@ -229,7 +230,7 @@ def test_train_tools_plots(models, name):
     assert sorted(p.name for p in tools[name].plots) == [f"{name}_feature_importance.png", f"{name}_performance.png"]
     for path in tools[name].plots:
         assert path.parent == plot_dir and path.stat().st_size > 0
-    assert (plot_dir / f"{name}_cv.h5").exists()
+    assert len(tools[name].model._models) == 2  # one model per telescope (two telescope types)
 
 
 def test_apply_models(models, dl1_files, tmp_path):
