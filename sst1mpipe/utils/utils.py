@@ -20,7 +20,6 @@ from astropy.coordinates import (
     SkyCoord,
     angular_separation,
     get_body,
-    get_moon,
     get_sun,
 )
 from astropy.io import fits
@@ -1275,7 +1274,7 @@ def moon_phase_angle(time):
 def get_moon_params(data, location, thinning=100):
     """Moon position, separation from the pointing and phase angle, for a telescope at ``location``"""
     time = Time(data.iloc[::thinning, :]['local_time'], format='unix', scale='utc')
-    moon = get_moon(time, location=location)
+    moon = get_body("moon", time, location=location)
     horizon_frame = AltAz(obstime=time, location=location)
     moon_altaz = moon.transform_to(horizon_frame)
 
@@ -1661,7 +1660,7 @@ def get_moon_phase(times=None, loc=None):
 
     """
     sun_vec_gcrs = get_sun(times).cartesian
-    moon_vec_gcrs = get_moon(times).cartesian
+    moon_vec_gcrs = get_body("moon", times).cartesian
     gnd_loc_gcrs = loc.get_gcrs(times).cartesian.without_differentials()
     sun_to_moon = sun_vec_gcrs - moon_vec_gcrs
     gnd_to_moon = gnd_loc_gcrs - moon_vec_gcrs

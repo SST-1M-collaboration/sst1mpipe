@@ -13,10 +13,11 @@ dependencies:
   - h5py
   - jupyter
   - protozfits # used to read zfits files and protocolbuffer messages
-  - astroquery=0.4.6
+  - astroquery>=0.4.6
   - matplotlib
-  - astropy<7 # astropy.coordinates.get_moon is removed in astropy 7 (sst1mpipe_obsplan)
-  - numpy<2 # astropy 6.1 fails to import with numpy 2.4 (np.in1d removed)
+  - astropy>=7 # required by pyirf 0.14
+  - ctaplot~=0.6.2
+  - pyirf~=0.14.0 # version of ctapipe[all]: IRF tools of ctapipe (ctapipe-compute-irf)
   - nbmake # used to pytest jupyter notebooks
   - pandas
   - pytables
@@ -42,9 +43,5 @@ dependencies:
   - pyzmq
   - msgpack-python
   - pip:
-      # pip ignores the conda pins: without it, pip upgrades numpy to 2.x for pandas 3.1 (dependency
-      # of ctaplot), and astropy 6.1 fails to import (np.in1d removed in numpy 2.4)
-      - numpy<2
-      - ctaplot~=0.6.2
-      - pyirf~=0.8.0
+      # not on conda-forge; sst1mpipe itself: pip install --no-deps -e . (the dependencies from conda)
       - sst1m-cts>=1.0 # sst1m_cts_core: camera configuration of DigiCam

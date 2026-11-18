@@ -67,7 +67,7 @@ For users
     cd sst1mpipe-$SST1MPIPE_VER
     conda env create -n sst1m-$SST1MPIPE_VER -f environment.yml
     conda activate sst1m-$SST1MPIPE_VER
-    pip install -e .
+    pip install --no-deps -e .
 
     rm environment.yml
 
@@ -84,7 +84,7 @@ For developers
     git clone git@github.com:SST-1M-collaboration/sst1mpipe.git
     conda env create -f sst1mpipe/environment.yml
     conda activate sst1m-dev
-    pip install -e sst1mpipe
+    pip install --no-deps -e sst1mpipe
 
 
 Pre-installed conda environment on **Calculus**

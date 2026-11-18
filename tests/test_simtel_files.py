@@ -135,7 +135,9 @@ def test_events(simtel_file, events):
 
 def test_pointing_and_shower_directions(simtel_file, events):
     # both telescopes point to the same direction, zenith 20 deg
-    assert events["pointing"] == {(POINTING_ALT.to_value(u.deg), POINTING_AZ.to_value(u.deg))}
+    assert len(events["pointing"]) == 1
+    np.testing.assert_allclose(next(iter(events["pointing"])), (POINTING_ALT.to_value(u.deg), POINTING_AZ.to_value(u.deg)),
+                               rtol=1e-6)
 
     alt, az = np.array(events["directions"]).T * u.deg
     offset = angular_separation(az, alt, POINTING_AZ, POINTING_ALT)

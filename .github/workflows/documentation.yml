@@ -28,7 +28,7 @@ jobs:
           post-cleanup: 'all'
       - name: Pip install source
         shell: micromamba-shell {0}
-        run: pip install .
+        run: pip install --no-deps .
       - name: Sphinx build
         shell: micromamba-shell {0}
         run: |

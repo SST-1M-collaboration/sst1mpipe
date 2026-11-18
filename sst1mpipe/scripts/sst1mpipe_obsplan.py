@@ -34,7 +34,7 @@ import astropy.units as u
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.coordinates import AltAz, SkyCoord, get_moon, get_sun
+from astropy.coordinates import AltAz, SkyCoord, get_body, get_sun
 from astropy.time import Time
 from ctapipe.instrument import SubarrayDescription
 
@@ -163,7 +163,7 @@ def main():
     frame_night_sparse = AltAz(obstime=time_span_sparse, location=location)
 
     sun_altaz = get_sun(time_span).transform_to(frame_night)
-    moon_altaz = get_moon(time_span).transform_to(frame_night)
+    moon_altaz = get_body("moon", time_span).transform_to(frame_night)
     phase_angle_moon = get_moon_phase(times=midnight, loc=location)
 
     mask_sunset = sun_altaz.alt < -0*u.deg
@@ -228,7 +228,7 @@ def main():
 
             # Moon distance
             source_altaz_sparse = target_coords.transform_to(frame_night_sparse)
-            moon_distance = source_altaz_sparse.separation(get_moon(time_span_sparse).transform_to(frame_night_sparse))
+            moon_distance = source_altaz_sparse.separation(get_body("moon", time_span_sparse).transform_to(frame_night_sparse))
             color = p[0].get_color()
 
             for i in range(len(time_span_sparse.datetime)):
@@ -243,7 +243,7 @@ def main():
 
             # printing observability windows
             print('\n## '+source)
-            moon_distance_detailed = source_altaz.separation(get_moon(time_span).transform_to(frame_night))
+            moon_distance_detailed = source_altaz.separation(get_body("moon", time_span).transform_to(frame_night))
             mask_moon = moon_distance_detailed > min_moon_dist
             mask_zenith = source_altaz.alt > min_alt
             mask_astro = mask_moon * mask_zenith * mask_astronomical

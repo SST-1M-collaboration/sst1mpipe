@@ -47,7 +47,7 @@ jobs:
       - name: Install package
         shell: micromamba-shell {0}
         run : |
-          pip install .
+          pip install --no-deps .
       # ----------------------------
       # Execute ruff for static code analysis (rules in pyproject.toml)
       # ----------------------------
