@@ -42,6 +42,7 @@ __all__ = [
     "SST1MTelescopeMonitoringContainer",
     "SST1MMonitoringContainer",
     "SST1MArrayEventContainer",
+    "to_sst1m_event",
     "SST1MObservationBlockContainer",
     "DigicamConfigContainer",
     "StreamCameraConfigContainer",
@@ -328,6 +329,34 @@ class SST1MArrayEventContainer(ArrayEventContainer):
     """
     r0 = Field(default_factory=SST1MR0Container, description="Raw data of the SST-1M telescopes")
     monitoring = Field(default_factory=SST1MMonitoringContainer, description="Monitoring data")
+
+
+def to_sst1m_event(event):
+    """
+    Event as a `~sst1mpipe.io.containers.SST1MArrayEventContainer`, with its content unchanged.
+
+    Used for the mono events written by ``sst1mpipe-stereo --keep-mono``: the events read from the
+    DL1 files by the ctapipe `~ctapipe.io.HDF5EventSource` are ctapipe
+    `~ctapipe.containers.ArrayEventContainer`.
+
+    Parameters
+    ----------
+    event : ctapipe.containers.ArrayEventContainer
+        Event, e.g. read by the HDF5EventSource.
+
+    Returns
+    -------
+    SST1MArrayEventContainer
+        ``event`` itself if it is already a SST1MArrayEventContainer, otherwise a new container with
+        the same fields (the same objects, not copies) and a copy of its ``meta``.
+    """
+    if isinstance(event, SST1MArrayEventContainer):
+        return event
+    sst1m_event = SST1MArrayEventContainer()
+    for name in event.fields:
+        sst1m_event[name] = event[name]
+    sst1m_event.meta = dict(event.meta)
+    return sst1m_event
 
 
 class DL1_info(IsDescription):

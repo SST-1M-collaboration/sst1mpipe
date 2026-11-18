@@ -5,6 +5,6 @@ by the sst1mpipe tools (``sst1mpipe.scripts``): `StereoMARSCombiner` (stereo dir
 analysis) and the plots of the trained models. Importing this package makes `StereoMARSCombiner`
 available to the ctapipe reconstructors.
 """
-from .stereo_combination import StereoMARSCombiner, mars_directions
+from .stereo_combination import StereoMARSCombiner, mars_disp_signs
 
-__all__ = ["StereoMARSCombiner", "mars_directions"]
+__all__ = ["StereoMARSCombiner", "mars_disp_signs"]
