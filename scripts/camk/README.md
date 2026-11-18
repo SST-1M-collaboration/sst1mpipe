@@ -19,7 +19,7 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL2
 | Data | |
 |---|---|
 | `data_r0_dl1.bash` | `sst1mpipe-monitoring`, `sst1mpipe-process`, one raw file per array task, per telescope |
-| `data_dl1_stereo.bash` | `sst1mpipe_data_dl1_dl1_stereo` |
+| `data_dl1_stereo.bash` | `ctapipe-merge` of the night of each telescope, `sst1mpipe-stereo` |
 | `data_dl1_dl2.bash` | `sst1mpipe-apply-models` on every DL1 file (cs1, cs2, stereo) |
 
 `IRF_CONDA_ENV`: the IRF tools of ctapipe need pyirf ~0.14 (astropy >= 7), sst1mpipe pyirf ~0.8

@@ -29,4 +29,5 @@ dl1_dl2() {
 export -f dl1_dl2
 export MODELS_DIRECTORY
 
-find "${DATA_DIRECTORY}/dl1" -name "*.h5" | sort | xargs -r -P "${N_PARALLEL}" -I{} bash -c 'dl1_dl2 "$1"' _ {}
+# not the night files merged for the stereo (dl1/merged)
+find "${DATA_DIRECTORY}/dl1" -path "*/dl1/merged" -prune -o -name "*.h5" -print | sort | xargs -r -P "${N_PARALLEL}" -I{} bash -c 'dl1_dl2 "$1"' _ {}
