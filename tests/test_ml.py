@@ -1,5 +1,4 @@
 """Machine learning reconstruction with the ctapipe reconstructors (sst1mpipe.ml): MARS stereo combination, tools"""
-import itertools
 
 import astropy.units as u
 import numpy as np
@@ -17,10 +16,10 @@ from ctapipe.core import run_tool
 from ctapipe.io import read_table
 from ctapipe.reco.preprocessing import telescope_to_horizontal
 from ctapipe.reco.reconstructor import ReconstructionProperty
-from ctapipe.reco.stereo_combination import StereoCombiner
+from ctapipe.reco.stereo_combination import StereoCombiner, StereoMeanCombiner
 
 from conftest import OBSERVATION_RUNS, monitoring_source_args, run_process
-from sst1mpipe.ml import StereoMARSCombiner, mars_directions
+from sst1mpipe.ml import StereoMARSCombiner, mars_disp_signs
 from sst1mpipe.scripts.sst1mpipe_apply_models_tool import ApplyModels, closest_model_node, find_model_nodes
 from sst1mpipe.scripts.sst1mpipe_train_models_tool import (
     TrainDispReconstructor,
@@ -35,35 +34,29 @@ GAMMA_POINT = SIMTEL_DIR / "gamma_point_200_800E3GeV_20_20deg_ATM52_300669.corsi
 PROTON = SIMTEL_DIR / "proton_400_1300E3GeV_20_20deg_ATM52_204508.corsika.gz.NSBmed4.simtel.gz"
 
 
-def unit_vector(alt, az):
-    return np.array([np.cos(alt) * np.cos(az), np.cos(alt) * np.sin(az), np.sin(alt)])
-
-
 def test_stereo_mars_combiner_is_available():
     """the combiner can be chosen by name in the configuration of the reconstructors"""
     assert "StereoMARSCombiner" in StereoCombiner.non_abstract_subclasses()
 
 
-def test_mars_directions():
-    """the combination of signs whose positions are the closest is chosen, then weighted"""
-    alt = np.deg2rad(70)
-    # telescope 1: predicted position at az 0.0, other at az 1.0; telescope 2: predicted 2.0, other 1.02
-    candidates = np.array([
-        [unit_vector(alt, np.deg2rad(0.0)), unit_vector(alt, np.deg2rad(1.0))],
-        [unit_vector(alt, np.deg2rad(2.0)), unit_vector(alt, np.deg2rad(1.02))],
-        # array event 1: a single telescope keeps its predicted position
-        [unit_vector(alt, np.deg2rad(5.0)), unit_vector(alt, np.deg2rad(6.0))],
-    ])
-    weights = np.array([1.0, 3.0, 1.0])
-    alt_reco, az_reco, spread, distance = mars_directions(candidates, weights, np.array([0, 0, 1]), 3)
-    mean = candidates[0, 1] + 3 * candidates[1, 1]
-    np.testing.assert_allclose(alt_reco[:2], np.arcsin([mean[2] / np.linalg.norm(mean), candidates[2, 0, 2]]))
-    np.testing.assert_allclose(az_reco[:2], np.deg2rad([(1.0 + 3 * 1.02) / 4, 5.0]), atol=1e-4)
-    separation = np.arccos(np.dot(candidates[0, 1], candidates[1, 1]))
-    np.testing.assert_allclose(distance[:2], [separation, 0], atol=1e-12)
-    assert spread[1] < 1e-6
-    # array event 2 without telescope event
-    assert np.isnan(alt_reco[2]) and np.isnan(distance[2])
+def test_mars_disp_signs():
+    """each telescope takes the sign of its disp whose position is the closest to the crossing of the axes"""
+    # major axes crossing at (0, 0): tel 1 centroid (1, 0) along lon, tel 2 centroid (0, 2) along lat
+    hillas = [dict(fov_lon=1 * u.deg, fov_lat=0 * u.deg, psi=0 * u.deg),
+              dict(fov_lon=0 * u.deg, fov_lat=2 * u.deg, psi=90 * u.deg)]
+    for disps in ([0.9, 1.5], [-0.9, 1.5], [-0.9, -1.5]):
+        np.testing.assert_array_equal(mars_disp_signs(hillas, disps * u.deg), [-1, -1])
+    # crossing on the other side of the centroids
+    hillas[0]["fov_lon"], hillas[1]["fov_lat"] = -1 * u.deg, -2 * u.deg
+    np.testing.assert_array_equal(mars_disp_signs(hillas, [-0.9, -1.5] * u.deg), [1, 1])
+    # parallel axes: no crossing, the predicted signs
+    parallel = [dict(fov_lon=0, fov_lat=0, psi=30), dict(fov_lon=0, fov_lat=1, psi=30)]
+    np.testing.assert_array_equal(mars_disp_signs(parallel, [0.5, -0.5]), [1, -1])
+
+    with pytest.raises(ValueError, match="two telescopes"):
+        mars_disp_signs(hillas[:1], [0.9])
+    with pytest.raises(NotImplementedError, match="more than two telescopes"):
+        mars_disp_signs([*hillas, hillas[0]], [0.9, 1.5, 0.3])
 
 
 def mono_table(n_events=40, n_tel=2, seed=0):
@@ -83,69 +76,54 @@ def mono_table(n_events=40, n_tel=2, seed=0):
     for name in ("hillas_fov_lon", "hillas_fov_lat", "hillas_psi", "disp_tel_parameter",
                  "telescope_pointing_altitude", "telescope_pointing_azimuth"):
         table[name].unit = u.deg
+    table["disp_tel_alt"], table["disp_tel_az"] = direction(table, table["disp_tel_parameter"].quantity)
     return table
 
 
-def brute_force(table, weights="intensity"):
-    """stereo directions by explicit loops: (alt, az) in deg per event_id, NaN without valid telescope"""
-    result = {}
-    for event_id in np.unique(table["event_id"]):
-        rows = table[(table["event_id"] == event_id) & table["disp_tel_is_valid"]]
-        if len(rows) == 0:
-            result[event_id] = (np.nan, np.nan)
-            continue
-        positions = []
-        for row in rows:
-            candidates = []
-            for sign in (1, -1):
-                disp = sign * row["disp_tel_parameter"]
-                psi = np.deg2rad(row["hillas_psi"])
-                alt, az = telescope_to_horizontal(
-                    lon=(row["hillas_fov_lon"] + disp * np.cos(psi)) * u.deg,
-                    lat=(row["hillas_fov_lat"] + disp * np.sin(psi)) * u.deg,
-                    pointing_alt=row["telescope_pointing_altitude"] * u.deg,
-                    pointing_az=row["telescope_pointing_azimuth"] * u.deg,
-                )
-                candidates.append((alt, az))
-            positions.append(candidates)
-        # MARS sign choice for two telescopes only, the predicted signs otherwise
-        best, best_distance = [p[0] for p in positions], np.inf
-        for signs in itertools.product((0, 1), repeat=len(rows)) if len(rows) == 2 else []:
-            chosen = [positions[i][s] for i, s in enumerate(signs)]
-            distance = sum(
-                angular_separation(a[1], a[0], b[1], b[0]).to_value(u.rad)
-                for a, b in itertools.combinations(chosen, 2)
-            )
-            if distance < best_distance:
-                best, best_distance = chosen, distance
-        w = np.asarray(rows["hillas_intensity"]) if weights == "intensity" else np.ones(len(rows))
-        vector = sum(wi * unit_vector(alt.to_value(u.rad), az.to_value(u.rad)) for wi, (alt, az) in zip(w, best, strict=True))
-        result[event_id] = (np.rad2deg(np.arcsin(vector[2] / np.linalg.norm(vector))),
-                            np.rad2deg(np.arctan2(vector[1], vector[0])) % 360)
-    return result
-
-
-@pytest.mark.parametrize("n_tel", [2, 3])
-def test_stereo_mars_combiner_table(n_tel):
-    """stereo directions of a table, compared with explicit loops over the events and sign combinations"""
-    table = mono_table(n_tel=n_tel)
-    combiner = StereoMARSCombiner(prefix="disp", property=ReconstructionProperty.GEOMETRY, weights="intensity")
-    stereo = combiner.predict_table(table)
-    expected = brute_force(table)
-    assert len(stereo) == len(expected)
-    for row in stereo:
-        alt, az = expected[row["event_id"]]
-        if np.isnan(alt):
-            assert not row["disp_is_valid"]
-            continue
-        assert row["disp_is_valid"]
-        separation = angular_separation(row["disp_az"] * u.deg, row["disp_alt"] * u.deg, az * u.deg, alt * u.deg)
-        assert separation < 1e-6 * u.deg
-        assert np.isfinite(row["disp_goodness_of_fit"])
-    np.testing.assert_array_equal(
-        [len(t) for t in stereo["disp_telescopes"]],
-        [np.count_nonzero(table["disp_tel_is_valid"][table["event_id"] == e]) for e in stereo["event_id"]],
+def direction(table, disp):
+    psi = table["hillas_psi"].quantity
+    alt, az = telescope_to_horizontal(
+        lon=table["hillas_fov_lon"].quantity + disp * np.cos(psi),
+        lat=table["hillas_fov_lat"].quantity + disp * np.sin(psi),
+        pointing_alt=table["telescope_pointing_altitude"].quantity,
+        pointing_az=table["telescope_pointing_azimuth"].quantity,
     )
+    return alt.to(u.deg), az.to(u.deg)
+
+
+def test_stereo_mars_combiner_table():
+    """the StereoMeanCombiner of the directions with the MARS disp signs (events with two telescopes)"""
+    table = mono_table()
+    stereo = StereoMARSCombiner(prefix="disp", property=ReconstructionProperty.GEOMETRY,
+                                weights="intensity").predict_table(table)
+
+    corrected = table.copy()
+    for event_id in np.unique(table["event_id"]):
+        rows = np.flatnonzero((table["event_id"] == event_id) & table["disp_tel_is_valid"])
+        if len(rows) == 2:
+            hillas = [{name: table[f"hillas_{name}"].quantity[row] for name in ("fov_lon", "fov_lat", "psi")}
+                      for row in rows]
+            disp = table["disp_tel_parameter"].quantity[rows]
+            corrected["disp_tel_parameter"][rows] = (mars_disp_signs(hillas, disp) * np.abs(disp)).to_value(u.deg)
+    corrected["disp_tel_alt"], corrected["disp_tel_az"] = direction(corrected, corrected["disp_tel_parameter"].quantity)
+    expected = StereoMeanCombiner(prefix="disp", property=ReconstructionProperty.GEOMETRY,
+                                  weights="intensity").predict_table(corrected)
+
+    np.testing.assert_array_equal(stereo["disp_is_valid"], expected["disp_is_valid"])
+    valid = stereo["disp_is_valid"]
+    separation = angular_separation(stereo["disp_az"].quantity, stereo["disp_alt"].quantity,
+                                    expected["disp_az"].quantity, expected["disp_alt"].quantity)[valid]
+    assert np.all(separation < 1e-6 * u.deg)
+    # at least one sign corrected
+    assert np.any(corrected["disp_tel_parameter"] != table["disp_tel_parameter"])
+
+
+def test_stereo_mars_combiner_more_than_two_telescopes():
+    table = mono_table(n_events=2, n_tel=3)
+    table["disp_tel_is_valid"] = True
+    combiner = StereoMARSCombiner(prefix="disp", property=ReconstructionProperty.GEOMETRY)
+    with pytest.raises(NotImplementedError):
+        combiner.predict_table(table)
 
 
 def test_stereo_mars_combiner_event():
@@ -165,13 +143,16 @@ def test_stereo_mars_combiner_event():
         event.monitoring.tel[tel_id].pointing.altitude = row["telescope_pointing_altitude"] * u.deg
         event.monitoring.tel[tel_id].pointing.azimuth = row["telescope_pointing_azimuth"] * u.deg
         event.dl2.tel[tel_id].disp["disp"] = DispContainer(parameter=row["disp_tel_parameter"] * u.deg)
-        event.dl2.tel[tel_id].geometry["disp"] = ReconstructedGeometryContainer(is_valid=True)
+        event.dl2.tel[tel_id].geometry["disp"] = ReconstructedGeometryContainer(
+            alt=row["disp_tel_alt"] * u.deg, az=row["disp_tel_az"] * u.deg, is_valid=True)
     combiner(event)
     stereo = event.dl2.stereo.geometry["disp"]
     assert stereo.is_valid and stereo.telescopes == [1, 2]
     separation = angular_separation(stereo.az, stereo.alt, expected["disp_az"] * u.deg, expected["disp_alt"] * u.deg)
     assert separation < 1e-6 * u.deg
-    assert np.isclose(stereo.goodness_of_fit, expected["disp_goodness_of_fit"])
+    # the directions of the telescopes keep their predicted signs
+    for row in table:
+        assert event.dl2.tel[row["tel_id"]].geometry["disp"].alt == row["disp_tel_alt"] * u.deg
 
 
 def test_closest_model_node(tmp_path):
@@ -231,7 +212,8 @@ def test_train_tools_plots(models, name):
     assert sorted(p.name for p in tools[name].plots) == [f"{name}_feature_importance.png", f"{name}_performance.png"]
     for path in tools[name].plots:
         assert path.parent == plot_dir and path.stat().st_size > 0
-    assert len(tools[name].model._models) == 2  # one model per telescope (two telescope types)
+    model = {"energy_regressor": "regressor", "particle_classifier": "classifier", "disp_reconstructor": "models"}[name]
+    assert len(getattr(tools[name], model)._models) == 2  # one model per telescope (two telescope types)
 
 
 def test_apply_models(models, dl1_files, tmp_path):
@@ -254,7 +236,6 @@ def test_apply_models(models, dl1_files, tmp_path):
                     read_table(output, "/simulation/event/subarray/shower"), keys=["obs_id", "event_id"])
     stereo = geometry["disp_is_valid"] & (np.sum(geometry["disp_telescopes"], axis=1) == 2)
     assert np.count_nonzero(stereo) > 50
-    assert np.all(np.isfinite(geometry["disp_goodness_of_fit"][stereo]))
     separation = angular_separation(
         geometry["disp_az"].quantity, geometry["disp_alt"].quantity,
         geometry["true_az"].quantity, geometry["true_alt"].quantity,

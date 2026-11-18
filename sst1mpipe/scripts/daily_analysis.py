@@ -1,6 +1,6 @@
 """
 Daily analysis of the data of a night on Calculus, per target: R0 -> DL1 (``sst1mpipe-monitoring``,
-``sst1mpipe-process``) for each telescope, DL1 stereo (``sst1mpipe_data_dl1_dl1_stereo``), DL1 -> DL2
+``sst1mpipe-process``) for each telescope, DL1 stereo (``sst1mpipe-stereo``), DL1 -> DL2
 (``sst1mpipe-apply-models``, models of the closest node of ``mono_model_dir`` / ``stereo_model_dir``).
 
 TODO: DL2 -> DL3 and the DL1 distributions from the ctapipe DL2 (``sst1mpipe_data_dl2_dl3`` and
@@ -47,10 +47,17 @@ def r0_dl1(input_file, config_file, monitoring_config_file, out_dir):
          '--overwrite', '--no-progress'])
 
 
-def dl1_dl1_stereo(input_file, config_file, tel2_dir, out_dir):
-    """coincident events of a DL1 file of tel 1 with the DL1 files of tel 2"""
-    run(['sst1mpipe_data_dl1_dl1_stereo', '--input-file-tel1', input_file, '--config', config_file,
-         '--input-dir-tel2', tel2_dir, '--output-dir', out_dir])
+def dl1_dl1_stereo(input_file, tel2_dir, out_dir):
+    """stereo events of a DL1 file of tel 1 with the DL1 files of tel 2 of the same night (sst1mpipe-stereo)"""
+    name = Path(input_file).name
+    date = name.split('_')[1]
+    tel2_files = sorted(glob.glob(str(Path(tel2_dir) / f'*{date}_*.dl1.h5')))
+    if not tel2_files:
+        logging.error('No tel2 DL1 file of %s in %s', date, tel2_dir)
+        return
+    inputs = [arg for path in [input_file, *tel2_files] for arg in ('--input', path)]
+    run(['sst1mpipe-stereo', *inputs, '--output', Path(out_dir) / name.replace('.dl1.h5', '.stereo.dl1.h5'),
+         '--overwrite'])
 
 
 def dl1_dl2(input_file, models_dir, out_dir):
@@ -183,7 +190,7 @@ def run_daily_ana(daily_config):
                          monitoring_config_file=monitoring_config_file, out_dir=dirs[tel]["dl1"])
         if stereo and run_dl1:
             pool_map(n_proc, dl1_dl1_stereo, glob.glob(str(dirs["cs1"]["dl1"] / '*.dl1.h5')),
-                     config_file=config_file, tel2_dir=dirs["cs2"]["dl1"], out_dir=dirs["stereo"]["dl1"])
+                     tel2_dir=dirs["cs2"]["dl1"], out_dir=dirs["stereo"]["dl1"])
 
         if run_dl2:
             for tel in [tel for tel in dirs if dl2[tel]]:
