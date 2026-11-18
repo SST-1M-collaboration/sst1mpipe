@@ -15,7 +15,7 @@ sst1mpipe tool                           ctapipe tool                           
 ``sst1mpipe-train-particle-classifier``  ``ctapipe-train-particle-classifier``      plots: feature importances, gammaness, ROC curves
                                                                                     (all energies and per true energy)
 ``sst1mpipe-train-disp-reconstructor``   ``ctapipe-train-disp-reconstructor``       plots: feature importances, disp norm, sign accuracy
-``sst1mpipe-apply-models``               ``ctapipe-apply-models``                   models of the closest node of a production of models
+``sst1mpipe-apply-models``               ``ctapipe-apply-models``                   pointing of the target if no telescope pointing
 =======================================  =========================================  ===================================================
 
 The stereo direction of the MARS analysis (``StereoMARSCombiner``) is available in all of them.
@@ -42,12 +42,12 @@ of ``sst1mpipe_mc_config_low_nsb.json``:
 
 .. code-block:: console
 
-    sst1mpipe-train-energy-regressor -i gamma_diffuse_train.dl1.h5 -o models/ze20_az0_nsb100/energy_regressor.pkl \
+    sst1mpipe-train-energy-regressor -i gamma_diffuse_train.dl1.h5 -o models/nsb100/energy_regressor.pkl \
         --config sst1mpipe_train_energy_regressor.yaml --n-events 700000
     sst1mpipe-train-particle-classifier --signal gamma_diffuse_train.dl1.h5 --background proton_train.dl1.h5 \
-        -o models/ze20_az0_nsb100/particle_classifier.pkl --config sst1mpipe_train_particle_classifier.yaml \
+        -o models/nsb100/particle_classifier.pkl --config sst1mpipe_train_particle_classifier.yaml \
         --n-events 700000 --signal-fraction 0.5
-    sst1mpipe-train-disp-reconstructor -i gamma_diffuse_train.dl1.h5 -o models/ze20_az0_nsb100/disp_reconstructor.pkl \
+    sst1mpipe-train-disp-reconstructor -i gamma_diffuse_train.dl1.h5 -o models/nsb100/disp_reconstructor.pkl \
         --config sst1mpipe_train_disp_reconstructor.yaml --n-events 700000
 
 ctapipe trains one model per telescope type: the two SST-1M telescopes are two types in the subarray
@@ -57,7 +57,7 @@ The models are stereo models if the stereo features are in the configuration
 configurations).
 
 After the training, the plots of the models are made in ``--plot-dir`` (by default
-``<model name>_plots`` next to the model, e.g. ``models/ze20_az0_nsb100/energy_regressor_plots``),
+``<model name>_plots`` next to the model, e.g. ``models/nsb100/energy_regressor_plots``),
 with ctaplot:
 
 - ``<model name>_feature_importance.png``: feature importances of the model of each telescope type
@@ -88,20 +88,32 @@ statistics are low):
 .. image:: _static/ml/disp_reconstructor_performance.png
    :width: 100%
 
-Application: the closest models
--------------------------------
+Zenith angle and NSB
+--------------------
 
-A production of models has one subdirectory per node ``zeXX_azXX_nsbXX`` (zenith and azimuth in
-degrees, NSB rate in MHz) with the models of the node (``*.pkl``). ``sst1mpipe-apply-models``
-applies the models of the node closest to the pointing of the input file: the closest NSB rate if
-``--nsb-rate`` is given, then the closest zenith, then the closest azimuth (median pointing of the
-telescope events):
+The models of an NSB level are trained on the training files of all its simulated zenith angles
+merged, with the pointing of the telescope as feature (``cos_zenith``, from
+``telescope_pointing_altitude``; not the azimuth, the reconstruction is not sensitive to it): the
+same models for all the pointings, in ``models/nsb<rate>/``. The NSB level is chosen with the
+models given to ``sst1mpipe-apply-models``.
+
+A random forest does not extrapolate: the events of a zenith angle between two simulated ones are
+reconstructed close to the closest simulated one, and outside the simulated zenith angles as the
+closest one (e.g. 40 deg as 30 deg with simulations at 10, 20, 30 deg). The simulated zenith
+angles must cover the observations.
+
+Application
+-----------
 
 .. code-block:: console
 
-    sst1mpipe-apply-models -i run.dl1.h5 --models-directory models -o run.dl2.h5
+    sst1mpipe-apply-models -i run.dl1.h5 -o run.dl2.h5 -r models/nsb100/energy_regressor.pkl \
+        -r models/nsb100/particle_classifier.pkl -r models/nsb100/disp_reconstructor.pkl
 
-With ``--reconstructor`` (``-r``), the models given are used instead.
+The pointing of the telescopes is in the simulations, and in the data processed with the monitoring
+data (interpolated at the time of each event). Without it (data processed without monitoring
+data), the pointing of the target (RA/Dec of the run) transformed into alt/az at the time of each
+event is used, with a warning.
 
 Stereo direction of the MARS analysis
 -------------------------------------

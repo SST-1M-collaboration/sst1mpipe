@@ -1,7 +1,7 @@
 """
 Daily analysis of the data of a night on Calculus, per target: R0 -> DL1 (``sst1mpipe-monitoring``,
 ``sst1mpipe-process``) for each telescope, DL1 stereo (``sst1mpipe-stereo``), DL1 -> DL2
-(``sst1mpipe-apply-models``, models of the closest node of ``mono_model_dir`` / ``stereo_model_dir``).
+(``sst1mpipe-apply-models``, models ``*.pkl`` of ``mono_model_dir`` / ``stereo_model_dir``: an NSB level).
 
 TODO: DL2 -> DL3 and the DL1 distributions from the ctapipe DL2 (``sst1mpipe_data_dl2_dl3`` and
 ``sst1mpipe_extract_dl1_distributions`` read the DL2 of the former sst1mpipe random forests).
@@ -61,9 +61,10 @@ def dl1_dl1_stereo(input_file, tel2_dir, out_dir):
 
 
 def dl1_dl2(input_file, models_dir, out_dir):
-    """DL1 -> DL2 (ctapipe DL2) with the models of the node closest to the pointing"""
+    """DL1 -> DL2 (ctapipe DL2) with the models (*.pkl) of models_dir"""
     output = Path(out_dir) / Path(input_file).name.replace('dl1', 'dl2')
-    run(['sst1mpipe-apply-models', '-i', input_file, '-m', models_dir, '-o', output, '--overwrite',
+    models = [arg for path in sorted(Path(models_dir).glob('*.pkl')) for arg in ('-r', path)]
+    run(['sst1mpipe-apply-models', '-i', input_file, *models, '-o', output, '--overwrite',
          '--no-progress'])
 
 
