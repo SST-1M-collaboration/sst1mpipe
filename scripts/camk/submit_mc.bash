@@ -7,6 +7,7 @@
 # -> DL1 -> DL2 -> IRFs (per zenith angle)
 #   bash scripts/camk/submit_mc.bash
 # Paths and settings: scripts/camk/sst1mpipe.env (or SST1MPIPE_ENV=<file>).
+# MC_SKIP_DL1=1: from the merge, with the DL1 files already processed (lists of the previous submission).
 
 export SST1MPIPE_ROOT="${SST1MPIPE_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 CONDA_ENV="" source "${SST1MPIPE_ROOT}/scripts/camk/common.bash"
@@ -14,25 +15,29 @@ SCRIPTS="${SST1MPIPE_ROOT}/scripts/camk"
 mkdir -p "${MC_DIRECTORY}/lists"
 
 R0_JOBS=()
-for ZENITH in ${MC_ZENITHS}; do
-  for PARTICLE in gamma_diffuse gamma_point proton; do
-    LIST="${MC_DIRECTORY}/lists/${PARTICLE}_ze${ZENITH}.txt"
-    PATTERN=$(mc_pattern "${PARTICLE}" "${ZENITH}")
-    find "$(dirname "${PATTERN}")" -maxdepth 1 -name "$(basename "${PATTERN}")" 2>/dev/null | sort > "${LIST}" || true
-    N=$(wc -l < "${LIST}")
-    if (( N == 0 )); then
-      echo "No ${PARTICLE} file at zenith ${ZENITH} deg: $(mc_pattern "${PARTICLE}" "${ZENITH}")" >&2
-      exit 1
-    fi
-    N_TASKS=$(( (N + MC_FILES_PER_TASK - 1) / MC_FILES_PER_TASK ))
-    R0_JOBS+=("$(sbatch --parsable --array="0-$((N_TASKS - 1))" --export="ALL,PARTICLE=${PARTICLE},ZENITH=${ZENITH}" \
-      "${SCRIPTS}/mc_r0_dl1.bash")")
-    echo "${PARTICLE} zenith ${ZENITH} deg: ${N} files, ${N_TASKS} tasks, job ${R0_JOBS[-1]}"
+if [[ "${MC_SKIP_DL1:-0}" != 1 ]]; then
+  for ZENITH in ${MC_ZENITHS}; do
+    for PARTICLE in gamma_diffuse gamma_point proton; do
+      LIST="${MC_DIRECTORY}/lists/${PARTICLE}_ze${ZENITH}.txt"
+      PATTERN=$(mc_pattern "${PARTICLE}" "${ZENITH}")
+      find "$(dirname "${PATTERN}")" -maxdepth 1 -name "$(basename "${PATTERN}")" 2>/dev/null | sort > "${LIST}" || true
+      N=$(wc -l < "${LIST}")
+      if (( N == 0 )); then
+        echo "No ${PARTICLE} file at zenith ${ZENITH} deg: $(mc_pattern "${PARTICLE}" "${ZENITH}")" >&2
+        exit 1
+      fi
+      N_TASKS=$(( (N + MC_FILES_PER_TASK - 1) / MC_FILES_PER_TASK ))
+      R0_JOBS+=("$(sbatch --parsable --array="0-$((N_TASKS - 1))" --export="ALL,PARTICLE=${PARTICLE},ZENITH=${ZENITH}" \
+        "${SCRIPTS}/mc_r0_dl1.bash")")
+      echo "${PARTICLE} zenith ${ZENITH} deg: ${N} files, ${N_TASKS} tasks, job ${R0_JOBS[-1]}"
+    done
   done
-done
+fi
 
 # failed DL1 files are skipped by the merge (afterany)
-MERGE=$(sbatch --parsable --dependency="afterany:$(join_ids "${R0_JOBS[@]}")" "${SCRIPTS}/mc_merge.bash")
+DEPENDENCY=()
+(( ${#R0_JOBS[@]} > 0 )) && DEPENDENCY=(--dependency="afterany:$(join_ids "${R0_JOBS[@]}")")
+MERGE=$(sbatch --parsable "${DEPENDENCY[@]}" "${SCRIPTS}/mc_merge.bash")
 TRAIN=$(sbatch --parsable --array=0-2 --dependency="afterok:${MERGE}" "${SCRIPTS}/mc_train.bash")
 read -ra ZENITHS <<< "${MC_ZENITHS}"
 N_ZENITHS=${#ZENITHS[@]}
