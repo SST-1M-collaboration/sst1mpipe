@@ -732,7 +732,8 @@ class irf_maker:
                                energy_max     = sim_info.energy_max,
                                max_impact     = sim_info.max_impact,
                                spectral_index = sim_info.spectral_index,
-                               viewcone       = sim_info.viewcone) ## min & max in latter version
+                               viewcone_min   = sim_info.viewcone_min,
+                               viewcone_max   = sim_info.viewcone_max)
 
         dl2_mc_gamma  = load_dl2_sst1m(mc_gamma_filename,
                                        config=self.config,

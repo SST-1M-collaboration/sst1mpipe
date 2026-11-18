@@ -27,8 +27,7 @@ classifiers = [
 ]
 dependencies = [
   "ctapipe[eventio]~=0.32.0",
-  "astropy>=6.1,<7",  # astropy.coordinates.get_moon is removed in astropy 7 (sst1mpipe_obsplan)
-  "numpy<2",  # astropy 6.1 fails to import with numpy 2.4 (np.in1d removed)
+  "astropy>=7",  # pyirf 0.14 (IRF tools of ctapipe)
   "astroquery~=0.4.6",
   "click",
   "ctaplot~=0.6.2",
@@ -41,7 +40,7 @@ dependencies = [
   "pandas",
   "pillow",
   "protozfits",
-  "pyirf~=0.8.0",
+  "pyirf~=0.14.0",  # version of ctapipe[all]: ctapipe-optimize-event-selection, ctapipe-compute-irf
   "pyzmq",
   "scikit-learn",
   "scipy",
