@@ -6,6 +6,8 @@ set -euo pipefail
 export SST1MPIPE_ROOT="${SST1MPIPE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 source "${SST1MPIPE_ENV:-${SST1MPIPE_ROOT}/scripts/camk/sst1mpipe.env}"
 mkdir -p ~/logs
+# Python traceback in the log of the job when a compiled library crashes (segmentation fault)
+export PYTHONFAULTHANDLER=1
 
 if [[ -n "${CONDA_ENV}" ]]; then
   # a job is a new shell: mamba is initialised before "mamba activate", without "set -u"
