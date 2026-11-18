@@ -3,10 +3,11 @@
 
 from .drive import drive_radec, read_drive_logs
 from .io import (
-    add_pointing_dl1_stereo,
+    append_monitoring_tables,
     check_outdir,
     attach_monitoring_file,
     correct_shower_reuse,
+    MONITORING_GROUPS,
     DL1_PEDESTAL_GROUP,
     R0_PEDESTAL_GROUP,
     R0_PIXEL_STATISTICS_GROUP,
@@ -22,7 +23,6 @@ from .io import (
     read_trigger_time,
     load_drive_data,
     load_extra_table,
-    load_more_dl1_tables_mono,
     load_more_dl2_files,
     load_photon_list_sst1m,
     load_slow_data_bias_curve,
