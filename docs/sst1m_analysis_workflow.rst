@@ -162,8 +162,8 @@ The matching method is chosen with ``--combiner`` (``--help`` lists the options)
 DL1 to DL2
 ~~~~~~~~~~
 
-``sst1mpipe-apply-models`` applies the models of the node of a production of models closest to the
-pointing of the DL1 file (mono DL1 of ``sst1mpipe-process``, or stereo DL1 of
+``sst1mpipe-apply-models`` applies the models of an NSB level (pointing of the telescopes as
+feature) to the DL1 file (mono DL1 of ``sst1mpipe-process``, or stereo DL1 of
 ``sst1mpipe-stereo``, see :ref:`dl1_dl1_stereo`) and writes the ctapipe DL2, see :doc:`ml_reconstruction`.
 
 .. note::

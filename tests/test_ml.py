@@ -4,9 +4,11 @@ import astropy.units as u
 import numpy as np
 import pytest
 import tables
-from astropy.coordinates import angular_separation
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord, angular_separation
+from astropy.time import Time
 from astropy.table import Table, join
 from ctapipe.containers import (
+    CoordinateFrameType,
     ArrayEventContainer,
     DispContainer,
     ImageParametersContainer,
@@ -20,7 +22,7 @@ from ctapipe.reco.stereo_combination import StereoCombiner, StereoMeanCombiner
 
 from conftest import run_process
 from sst1mpipe.ml import StereoMARSCombiner, mars_disp_signs
-from sst1mpipe.scripts.sst1mpipe_apply_models_tool import ApplyModels, closest_model_node, find_model_nodes
+from sst1mpipe.scripts.sst1mpipe_apply_models_tool import ApplyModels, add_telescope_pointing
 from sst1mpipe.scripts.sst1mpipe_train_models_tool import (
     TrainDispReconstructor,
     TrainEnergyRegressor,
@@ -155,19 +157,24 @@ def test_stereo_mars_combiner_event():
         assert event.dl2.tel[row["tel_id"]].geometry["disp"].alt == row["disp_tel_alt"] * u.deg
 
 
-def test_closest_model_node(tmp_path):
-    for name in ("ze20_az0_nsb100", "ze20_az180_nsb100", "ze40_az0_nsb100", "ze20_az0_nsb200", "README"):
-        (tmp_path / name).mkdir()
-    nodes = find_model_nodes(tmp_path)
-    assert len(nodes) == 4
-    assert closest_model_node(nodes, zenith=22).name == "ze20_az0_nsb100"
-    assert closest_model_node(nodes, zenith=35).name == "ze40_az0_nsb100"
-    # azimuth through 360: 350 is closer to 0 than to 180
-    assert closest_model_node(nodes, zenith=20, azimuth=350).name in ("ze20_az0_nsb100", "ze20_az0_nsb200")
-    assert closest_model_node(nodes, zenith=20, azimuth=170).name == "ze20_az180_nsb100"
-    assert closest_model_node(nodes, zenith=20, nsb_rate=180).name == "ze20_az0_nsb200"
-    with pytest.raises(ValueError, match="No model node"):
-        closest_model_node({}, zenith=20)
+def test_add_telescope_pointing():
+    """pointing of the target, in alt/az at the time of the events, without pointing of the telescope"""
+    location = EarthLocation(lon=14.7825 * u.deg, lat=49.9124 * u.deg, height=511 * u.m)
+    time = Time(["2026-01-20T22:00:00", "2026-01-20T23:00:00"])
+    table = Table(dict(time=time, subarray_pointing_lon=[166.99, 166.99] * u.deg,
+                       subarray_pointing_lat=[38.11, 38.11] * u.deg,
+                       subarray_pointing_frame=[CoordinateFrameType.ICRS.value] * 2))
+    assert add_telescope_pointing(table, location)
+    expected = SkyCoord(ra=166.99 * u.deg, dec=38.11 * u.deg).transform_to(AltAz(obstime=time, location=location))
+    np.testing.assert_allclose(table["telescope_pointing_altitude"].quantity.to_value(u.deg), expected.alt.deg)
+    np.testing.assert_allclose(table["telescope_pointing_azimuth"].quantity.to_value(u.deg), expected.az.deg)
+    # the pointing of the telescope is kept
+    assert not add_telescope_pointing(table, location)
+    # pointing of the target in alt/az (simulations)
+    altaz = Table(dict(time=time, subarray_pointing_lon=[180, 180] * u.deg, subarray_pointing_lat=[70, 70] * u.deg,
+                       subarray_pointing_frame=[CoordinateFrameType.ALTAZ.value] * 2))
+    assert add_telescope_pointing(altaz, location)
+    np.testing.assert_allclose(altaz["telescope_pointing_altitude"].quantity.to_value(u.deg), 70)
 
 
 @pytest.fixture(scope="module")
@@ -183,11 +190,10 @@ def dl1_files(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def models(dl1_files, tmp_path_factory):
-    """the three models of the node ze20_az0_nsb100 of a production of models, trained with the sst1mpipe tools"""
+    """the three models of an NSB level, trained with the sst1mpipe tools"""
     directory = tmp_path_factory.mktemp("ml_models")
-    node = directory / "ze20_az0_nsb100"
+    node = directory / "nsb100"
     node.mkdir()
-    (directory / "ze50_az0_nsb100").mkdir()
     tools = {}
     for name, tool, inputs in (
         ("energy_regressor", TrainEnergyRegressor(), ["-i", dl1_files["gamma"]]),
@@ -206,7 +212,7 @@ def models(dl1_files, tmp_path_factory):
 def test_train_tools_plots(models, name):
     """the models, their cross validation and their plots (feature importances, performance)"""
     directory, tools = models
-    node = directory / "ze20_az0_nsb100"
+    node = directory / "nsb100"
     assert (node / f"{name}.pkl").exists()
     plot_dir = node / f"{name}_plots"
     assert sorted(p.name for p in tools[name].plots) == [f"{name}_feature_importance.png", f"{name}_performance.png"]
@@ -217,14 +223,12 @@ def test_train_tools_plots(models, name):
 
 
 def test_apply_models(models, dl1_files, tmp_path):
-    """the models of the closest node are applied: ctapipe DL2, MARS stereo direction"""
+    """the models (cos_zenith feature) are applied: ctapipe DL2, MARS stereo direction"""
     directory, _ = models
     output = tmp_path / "gamma_point.dl2.h5"
-    tool = ApplyModels()
-    argv = ["-i", str(dl1_files["gamma_point"]), "--models-directory", str(directory), "-o", str(output), "--no-progress"]
-    assert run_tool(tool, argv=argv, raises=True) == 0
-    assert {p.parent.name for p in tool.reconstructor_paths} == {"ze20_az0_nsb100"}
-    assert len(tool.reconstructor_paths) == 3
+    reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
+    argv = ["-i", str(dl1_files["gamma_point"]), *reconstructors, "-o", str(output), "--no-progress"]
+    assert run_tool(ApplyModels(), argv=argv, raises=True) == 0
 
     with tables.open_file(output) as h5file:
         paths = {node._v_pathname for node in h5file.walk_nodes("/dl2/event/subarray", "Table")}

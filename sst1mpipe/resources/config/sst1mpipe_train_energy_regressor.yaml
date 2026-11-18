@@ -26,6 +26,7 @@ TrainEnergyRegressor:
       - leakage_intensity_width_2
       - hillas_fov_lon         # camera_frame_hillas_x
       - hillas_fov_lat         # camera_frame_hillas_y
+      - cos_zenith             # pointing of the telescope (models of all the zenith angles)
       # stereo models (sst1mpipe --stereo): add
       # - HillasReconstructor_tel_impact_distance
       # - HillasReconstructor_h_max
@@ -33,6 +34,7 @@ TrainEnergyRegressor:
       features:
         - ["log_hillas_intensity", "log10(hillas_intensity)"]
         - ["hillas_wl", "hillas_width / hillas_length"]
+        - ["cos_zenith", "sin(telescope_pointing_altitude)"]
     MLQualityQuery:            # event_selection
       quality_criteria:
         - ["intensity", "(hillas_intensity > 0) & (hillas_intensity < 1e6)"]

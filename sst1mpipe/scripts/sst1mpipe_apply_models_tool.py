@@ -1,107 +1,74 @@
 """
-``sst1mpipe-apply-models``: ``ctapipe-apply-models`` with the models of the node of a production of
-models closest to the pointing of the input file. The output is the DL2 of ctapipe; the models can use
-the ``StereoMARSCombiner``.
+``sst1mpipe-apply-models``: ``ctapipe-apply-models`` (same options) for the SST-1M files. The output
+is the DL2 of ctapipe; the models can use the ``StereoMARSCombiner``.
 
-    sst1mpipe-apply-models -i run.dl1.h5 --models-directory models -o run.dl2.h5
+    sst1mpipe-apply-models -i run.dl1.h5 -o run.dl2.h5 \\
+        -r models/nsb100/energy_regressor.pkl -r models/nsb100/particle_classifier.pkl \\
+        -r models/nsb100/disp_reconstructor.pkl
+
+The models use the pointing of the telescopes (``telescope_pointing_altitude``,
+``telescope_pointing_azimuth``: e.g. the feature ``cos_zenith``, and the direction of the disp). Files
+without it (data processed without monitoring data) use the pointing of the target, see
+`add_telescope_pointing`.
 """
-import re
-from pathlib import Path as PathlibPath
-
 import astropy.units as u
-import numpy as np
-from ctapipe.core.traits import Float, Path
-from ctapipe.io import TableLoader
+from astropy.coordinates import AltAz, SkyCoord
+from astropy.time import Time
+from ctapipe.containers import CoordinateFrameType
 from ctapipe.tools.apply_models import ApplyModels as CtapipeApplyModels
 
 import sst1mpipe.ml  # noqa: F401 (StereoMARSCombiner)
 
-__all__ = ["ApplyModels", "find_model_nodes", "closest_model_node", "input_pointing"]
-
-#: subdirectories of a production of models: zenith, azimuth (deg), NSB rate (MHz)
-MODEL_NODE_PATTERN = re.compile(r"^ze(?P<zenith>[-\d.]+)_az(?P<azimuth>[-\d.]+)_nsb(?P<nsb>[-\d.]+)$")
+__all__ = ["ApplyModels", "add_telescope_pointing"]
 
 
-def find_model_nodes(models_directory):
-    """``{subdirectory: (zenith, azimuth, nsb)}`` of the subdirectories ``zeXX_azXX_nsbXX``"""
-    nodes = {}
-    for path in sorted(PathlibPath(models_directory).iterdir()):
-        match = MODEL_NODE_PATTERN.match(path.name)
-        if path.is_dir() and match:
-            nodes[path] = tuple(float(match[key]) for key in ("zenith", "azimuth", "nsb"))
-    return nodes
+def add_telescope_pointing(table, location):
+    """
+    Pointing of the telescope (``telescope_pointing_altitude``, ``telescope_pointing_azimuth``) of
+    the telescope events of ``table``, when it is not in the table: the pointing of the target (in
+    ICRS: ``subarray_pointing_lon`` / ``lat``, transformed into alt/az at the time of the events and
+    at ``location``; or in alt/az).
 
-
-def closest_model_node(nodes, zenith, azimuth=None, nsb_rate=None):
-    """The node closest in NSB rate (if given), then in zenith, then in azimuth (if given)"""
-    if not nodes:
-        raise ValueError("No model node (subdirectory zeXX_azXX_nsbXX)")
-
-    def distance(node):
-        ze, az, nsb = node[1]
-        return (
-            0 if nsb_rate is None else abs(nsb - nsb_rate),
-            abs(ze - zenith),
-            0 if azimuth is None else abs((az - azimuth + 180) % 360 - 180),
-        )
-
-    return min(nodes.items(), key=distance)[0]
-
-
-def input_pointing(path):
-    """Median zenith and circular mean azimuth (deg) of the pointing of the telescope events of a DL1 file"""
-    with TableLoader(path) as loader:
-        events = loader.read_telescope_events(dl1_parameters=False, pointing=True)
-    if "telescope_pointing_altitude" in events.colnames:
-        altitude, azimuth = events["telescope_pointing_altitude"], events["telescope_pointing_azimuth"]
+    Returns
+    -------
+    bool: whether the pointing of the target was added
+    """
+    if "telescope_pointing_altitude" in table.colnames or "subarray_pointing_frame" not in table.colnames:
+        return False
+    frame = CoordinateFrameType(int(table["subarray_pointing_frame"][0]))
+    lon, lat = u.Quantity(table["subarray_pointing_lon"], u.deg), u.Quantity(table["subarray_pointing_lat"], u.deg)
+    if frame is CoordinateFrameType.ICRS:
+        time = table["time"] if isinstance(table["time"], Time) else Time(table["time"])
+        altaz = SkyCoord(ra=lon, dec=lat, frame="icrs").transform_to(AltAz(obstime=time, location=location))
+        altitude, azimuth = altaz.alt, altaz.az
+    elif frame is CoordinateFrameType.ALTAZ:
+        altitude, azimuth = lat, lon
     else:
-        altitude, azimuth = events["subarray_pointing_lat"], events["subarray_pointing_lon"]
-    altitude = u.Quantity(altitude, u.deg).to_value(u.rad)
-    azimuth = u.Quantity(azimuth, u.deg).to_value(u.rad)
-    mean_azimuth = np.arctan2(np.nanmean(np.sin(azimuth)), np.nanmean(np.cos(azimuth)))
-    return 90 - np.rad2deg(np.nanmedian(altitude)), np.rad2deg(mean_azimuth) % 360
+        return False
+    table["telescope_pointing_altitude"] = altitude.to(u.rad)
+    table["telescope_pointing_azimuth"] = azimuth.to(u.rad)
+    return True
 
 
 class ApplyModels(CtapipeApplyModels):
     """
-    ``ctapipe-apply-models`` with the models (``*.pkl``) of the node of ``models_directory`` (one
-    subdirectory per node ``zeXX_azXX_nsbXX``: zenith, azimuth in deg, NSB rate in MHz) closest to
-    the pointing of the input file: closest NSB rate (if ``nsb_rate`` is given), then zenith, then
-    azimuth. With ``--reconstructor``, the models given are used instead.
+    ``ctapipe-apply-models`` with the pointing of the target for the telescope events without the
+    pointing of the telescope (warning), see `add_telescope_pointing`.
     """
 
     name = "sst1mpipe-apply-models"
 
-    models_directory = Path(
-        default_value=None,
-        allow_none=True,
-        exists=True,
-        file_ok=False,
-        help="Production of models: one subdirectory zeXX_azXX_nsbXX per node, with its models (*.pkl)",
-    ).tag(config=True)
-
-    nsb_rate = Float(
-        default_value=None,
-        allow_none=True,
-        help="NSB rate of the input file (MHz) to choose the models, not used if not given",
-    ).tag(config=True)
-
-    aliases = {
-        **CtapipeApplyModels.aliases,
-        ("m", "models-directory"): "ApplyModels.models_directory",
-        "nsb-rate": "ApplyModels.nsb_rate",
-    }
-
-    def setup(self):
-        if not self.reconstructor_paths and self.models_directory is not None and self.input_url is not None:
-            zenith, azimuth = input_pointing(self.input_url)
-            node = closest_model_node(find_model_nodes(self.models_directory), zenith, azimuth, self.nsb_rate)
-            self.reconstructor_paths = sorted(node.glob("*.pkl"))
-            self.log.info(
-                "Pointing zenith %.1f deg, azimuth %.1f deg: models of %s %s",
-                zenith, azimuth, node.name, [p.name for p in self.reconstructor_paths],
-            )
-        super().setup()
+    def _apply(self, reconstructor, tel_tables, start, stop):
+        subarray = self.loader.subarray
+        for tel_id, table in tel_tables.items():
+            location = subarray.tel_earth_locations.get(tel_id, subarray.reference_location)
+            if add_telescope_pointing(table, location) and not getattr(self, "_warned_pointing", False):
+                self.log.warning(
+                    "No pointing of the telescopes in %s: pointing of the target used (alt/az at the time"
+                    " of the events)", self.input_url,
+                )
+                self._warned_pointing = True
+        super()._apply(reconstructor, tel_tables, start, stop)
 
 
 def main():
