@@ -25,12 +25,11 @@ Input: DL1 with the telescope frame parameters
 
 The disp reconstructor and the intensity weights of the stereo combination use the Hillas
 parameters in the telescope frame (``hillas_fov_lon``, ``hillas_fov_lat``, ``hillas_psi``,
-``hillas_intensity``). The MC configurations of sst1mpipe write the camera frame parameters:
+``hillas_intensity``), written by the sst1mpipe configurations (``ImageProcessor.use_telescope_frame``):
 
 .. code-block:: console
 
-    sst1mpipe-process -i gamma.simtel.gz -o gamma.dl1.h5 --config sst1mpipe_mc_config_low_nsb.json \
-        --ImageProcessor.use_telescope_frame=True
+    sst1mpipe-process -i gamma.simtel.gz -o gamma.dl1.h5 --config sst1mpipe_mc_config_low_nsb.json
 
 The training files are merged with ``ctapipe-merge``.
 

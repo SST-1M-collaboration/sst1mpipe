@@ -13,7 +13,6 @@ import ctaplot
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import tables
 from astropy.coordinates import (
     AltAz,
@@ -760,69 +759,6 @@ def remove_stereo(features):
     return features
 
 
-def get_event_sample(params, max_events=None):
-    """
-    Randomly draw subsamble of events.
-
-    Parameters
-    ----------
-    params: pandas.DataFrame
-        Input DL1/DL2 table
-    max_events: int
-        Sample size
-
-    Returns
-    -------
-    pandas.DataFrame
-
-    """
-
-    if max_events is not None:
-        max_events = int(max_events)
-        if (len(params) < max_events):
-            logging.info("Diffuse gamma training sample: \
-                Requested number of training events cannot \
-                be fulfilled, too few events in training DL1 files.")
-        else:
-            params = params.copy().sample(n=max_events)
-        logging.info("Diffuse gamma training sample: N training gammas = %d", len(params))
-    return params
-
-
-def mix_gamma_proton(params_gammas, params_protons, max_events=None, gp_training_ratio=1.0):
-
-    if max_events is not None:
-        max_events = int(max_events)
-        if (len(params_gammas) < gp_training_ratio/(gp_training_ratio + 1) * max_events):
-            logging.info("GH classifier training: Requested number of training gammas cannot be fulfilled, too few events in training DL1 files.")
-            N_gammas = len(params_gammas)
-            if len(params_protons) < N_gammas / gp_training_ratio:
-                logging.info("GH classifier training: Requested number of training protons cannot be fulfilled, too few events in training DL1 files.")
-                N_protons = len(params_protons)
-            else:
-                N_protons = int(N_gammas / gp_training_ratio)
-
-        elif len(params_protons) < 1 / (1 + gp_training_ratio) * max_events:
-            logging.info("GH classifier training: Requested number of training protons cannot be fulfilled, too few events in training DL1 files.")
-            N_protons = len(params_protons)
-            if len(params_gammas) < N_protons * gp_training_ratio:
-                logging.info("GH classifier training: Requested number of training gammas cannot be fulfilled, too few events in training DL1 files.")
-                N_gammas = len(params_gammas)
-            else:
-                N_gammas = int(N_protons * gp_training_ratio)
-        else:
-            N_gammas = int(gp_training_ratio/(gp_training_ratio + 1) * max_events)
-            N_protons = int(1 / (1 + gp_training_ratio) * max_events)
-
-        params_gammas = params_gammas.copy().sample(n=N_gammas)
-        params_protons = params_protons.copy().sample(n=N_protons)
-        logging.info("GH classifier training: N training protons = %d, N training gammas = %d", N_protons, N_gammas)
-
-    mixed = pd.concat([params_gammas, params_protons], ignore_index=True)
-    mixed = mixed.sample(frac=1).reset_index(drop=True)
-    return mixed
-
-
 def check_output_dl1(file):
     """
     Checks if simulated shower distributions
@@ -845,6 +781,12 @@ def check_output_dl1(file):
         os.remove(file)
 
 
+def hillas_prefix(table):
+    """Prefix of the DL1 parameters: ``camera_frame_`` in the camera frame, empty in the telescope frame"""
+    columns = table.colnames if hasattr(table, "colnames") else table.keys()
+    return "camera_frame_" if "camera_frame_hillas_intensity" in columns else ""
+
+
 def add_features(data):
     """
     Add some extra parameters in the DL1 table.
@@ -859,8 +801,9 @@ def add_features(data):
 
     """
 
-    data['log_camera_frame_hillas_intensity'] = np.log10(data['camera_frame_hillas_intensity'])
-    data['camera_frame_hillas_wl'] = data['camera_frame_hillas_width']/data['camera_frame_hillas_length']
+    prefix = hillas_prefix(data)
+    data[f'log_{prefix}hillas_intensity'] = np.log10(data[f'{prefix}hillas_intensity'])
+    data[f'{prefix}hillas_wl'] = data[f'{prefix}hillas_width'] / data[f'{prefix}hillas_length']
 
     return data
 
@@ -1499,73 +1442,6 @@ def disp(
             disp_angle = np.arctan(disp_dy/disp_dx)
 
     return disp_dx, disp_dy, disp_norm, disp_angle, disp_sign
-
-
-def disp_to_pos(disp_dx, disp_dy, cog_x, cog_y):
-    """
-    Calculates source coordinates from DISP params
-    and CoG of the shower. This is a modification
-    of the same functions from lstchain
-    https://github.com/cta-observatory/cta-lstchain
-    Copyright (c) 2024 cta-lstchain developers
-    Licensed under the 3-clause BSD style license.
-
-    Parameters
-    ----------
-    disp_dx: astropy.units.quantity.Quantity
-        Distance of the source from shower CoG
-        along the x axis
-    disp_dy: astropy.units.quantity.Quantity
-        Distance of the source from shower CoG
-        along the y axis
-    cog_x: astropy.units.quantity.Quantity
-        x coordinate of the shower center of gravity
-    cog_y: astropy.units.quantity.Quantity
-        y coordinate of the shower center of gravity
-
-    Returns
-    -------
-    (source_pos_x, source_pos_y):
-        source_pos_x: astropy.units.quantity.Quantity
-        source_pos_y: astropy.units.quantity.Quantity
-
-    """
-
-    source_pos_x = cog_x + disp_dx
-    source_pos_y = cog_y + disp_dy
-
-    return source_pos_x, source_pos_y
-
-
-def disp_vector(disp_norm, disp_angle, disp_sign):
-    """
-    Calculates disp vector (source position relative
-    to the position of the shower) from RF reconstructed
-    quantities. This is a modification
-    of the same functions from lstchain
-    https://github.com/cta-observatory/cta-lstchain
-    Copyright (c) 2024 cta-lstchain developers
-    Licensed under the 3-clause BSD style license.
-
-    Parameters
-    ----------
-    disp_norm: numpy.ndarray
-        Absolute value of a distance of the source
-        from shower CoG. Should be in metres
-    disp_angle: pandas.core.series.Series
-        Hillas Psi angle in rad
-    disp_sign: numpy.ndarray
-        Defines on which side of the main axis the
-        source lies
-
-    Returns
-    -------
-    numpy.ndarray
-        DISP vector with [disp_dx, disp_dy]
-
-    """
-
-    return np.transpose(polar_to_cartesian(disp_norm, disp_angle, disp_sign))
 
 
 def polar_to_cartesian(norm, angle, sign):

@@ -106,8 +106,12 @@ class _PlotsMixin(Tool):
         super().finish()
         subarray = (self.signal_loader if hasattr(self, "signal_loader") else self.loader).subarray
         stem = PathlibPath(self.output_path).stem
+        models = {
+            f"{key} (tel {', '.join(map(str, subarray.get_tel_ids_for_type(key)))})": model
+            for key, model in self.model._models.items()
+        }
         self.plots = [plots.plot_feature_importances(
-            self.model._models, self.model.features, subarray, self.plot_dir / f"{stem}_feature_importance.png",
+            models, self.model.features, self.plot_dir / f"{stem}_feature_importance.png",
             title=f"{type(self.model).__name__}: feature importances",
         )]
         if self._cv_predictions:

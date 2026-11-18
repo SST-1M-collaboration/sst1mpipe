@@ -80,14 +80,13 @@ def _figure(n_rows, n_cols):
     return fig, axes
 
 
-def plot_feature_importances(models, features, subarray, path, title):
+def plot_feature_importances(models, features, path, title):
     """
-    Feature importances of the models of each telescope type, ``models``: {telescope type:
-    scikit-learn model, or (norm regressor, sign classifier) of the disp}
+    Feature importances of random forests, ``models``: {label: scikit-learn model, or (norm
+    regressor, sign classifier) of the disp}
     """
     rows = []
-    for key, model in models.items():
-        label = f"{key} (tel {', '.join(map(str, subarray.get_tel_ids_for_type(key)))})"
+    for label, model in models.items():
         if isinstance(model, tuple):
             rows += [(f"{label} disp norm", model[0]), (f"{label} disp sign", model[1])]
         else:

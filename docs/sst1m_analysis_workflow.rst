@@ -114,7 +114,7 @@ contain any Cherenkov photons), and parametrizes the shower images with Hillas e
 
   The former ``telescope_calibration``, ``NsbCalibrator.*``, ``analysis.bad_pixels`` and ``window_transmittance`` settings are no longer read.
 
-* ``NsbCalibrator.intensity_correction`` - global scale of the Hillas intensity per telescope. It is not applied at this step, but in ``sst1mpipe_dl1_dl2`` with ``--scale-intensities``
+* ``NsbCalibrator.intensity_correction`` - global scale of the Hillas intensity per telescope. It is not applied at this step, but by ``load_dl1_sst1m(scale_intensities=True)``; not yet by ``sst1mpipe-apply-models`` (TODO)
 
 
 * ``CameraCalibrator`` - Pulse integration settings
@@ -124,36 +124,13 @@ contain any Cherenkov photons), and parametrizes the shower images with Hillas e
 * ``ShowerProcessor`` - Method of shower geometry reconstruction. Only applied if event source contains data from more telescopes, i.e. it's only relevant for MC in this analysis step.
 
 
-Random Forest training
-~~~~~~~~~~~~~~~~~~~~~~
+Model training
+~~~~~~~~~~~~~~
 
-.. note::
-
-    In most cases, **analyser does not need to train dedicated Random Forest models and this step can be safely skipped** using pre-trained RFs 
-    referenced in :ref:`dl1_dl2`. Training of dedicated RFs is, however, necessary in some performance studies if one wants to use different 
-    configuration for ``sst1mpipe-process`` than MC was processed with (e.g. cleaning, peak integration, ..).
-
-Random Forests can be trained on **DL1 MC diffuse gammas and diffuse proton** files using ``sst1mpipe_mc_train_rfs`` script (see 
-``--help`` for possible inputs). Before running ``sst1mpipe_mc_train_rfs`` it is useful to merge many small DL1 files in given MC production (which resulted 
-from paralelized MC simulations) into a single file per particle with ``sst1mpipe_merge_hdf5`` script to reach satisfactory 
-statistics for RF training. Outputs are trained models in the ``scikit.learn`` format (.sav). There is RF classifier for gamma/hadron
-separation, RF regressor for energy reconstruction, and either RF regressor (``disp_vector``) or RF regressor+classifier (``disp_norm_sign``) 
-for arrival direction reconstruction depenting on the method selected (``disp_method`` field in the cfg file).
-
-RF are trained for each telescope, even in case of stereo reconstruction. In stereo, we only use extra stereo features, 
-which are reconstructed geometricaly, such as ``HillasReconstructor_h_max`` and ``HillasReconstructor_tel_impact_distance``. 
-Then, in :ref:`dl1_dl2`, reconstruction is performed for each telescope independently, and final reconstructed quantities are 
-obtained as weighted average of the values for each telescope (except for direction recontruction where MARS-like approach is adopted).
-
-**Relevant parts of the config file** applied in this analysis step:
-
-* Setup of the forests and training procedure ``random_forest_regressor_args``, ``random_forest_classifier_args``
-
-* Lists of Random Forest features used for the reconstruction - ``energy_regression_features``, ``disp_regression_features``, ``disp_classification_features``, ``particle_classification_features``. The very features used for the RF training have to be used later in :ref:`dl1_dl2` reconstruction!
-
-* ``n_training_events`` - Total number of events used for individual RF training. I.e. if ``n_training_events=200000``, 200k diffuse gammas are used for energy regressor and DISP regressor and classifier, and 100k diffuse gammas + 100k diffuse protons is used for particle classifier (if ``gamma_to_proton_training_ratio=1``).
-
-* ``gamma_to_proton_training_ratio`` - Ratio of gammas and protons in training sample for particle classifier.
+The random forests (energy regressor, particle classifier, disp reconstructor) are trained with the
+ctapipe training tools (``sst1mpipe-train-energy-regressor``, ``sst1mpipe-train-particle-classifier``,
+``sst1mpipe-train-disp-reconstructor``) on DL1 diffuse gammas and diffuse protons, see
+:doc:`ml_reconstruction`.
 
 
 .. _dl1_dl1_stereo:
@@ -186,27 +163,14 @@ options are:
 DL1 to DL2
 ~~~~~~~~~~
 
-This step uses pre-trained Random Forests to reconstruct parameters of primary gamma-ray photon (gammaness, direction and energy) using Hillas parameters stored in 
-the DL1 files as features. One can run ``sst1mpipe_data_dl1_dl2`` stript on either mono DL1 files (outputs of ``sst1mpipe-process``) for each telescope separately (using RFs for mono reconstruction), 
-or on stereo DL1 containing coincident events only (outputs of ``sst1mpipe_data_dl1_dl1_stereo``). The script can handle both types of DL1, 
-but stereo reconstruction has to be requested explicitely using ``-—stereo`` switch. RFs trained on MC can be found on **Calculus** for both mono and stereo 
-reconstruction and different zenith angles:
-
-* ``/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/models_mono_psf_vaod0.2/``
-
-* ``/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/models_stereo_psf_vaod0.2/``
+``sst1mpipe-apply-models`` applies the models of the node of a production of models closest to the
+pointing of the DL1 file (mono DL1 of ``sst1mpipe-process``, or stereo DL1 of
+``sst1mpipe_data_dl1_dl1_stereo``) and writes the ctapipe DL2, see :doc:`ml_reconstruction`.
 
 .. note::
 
-    One should always use RF models trained with the same sst1mpipe version that is used for the analysis. 
-
-**Relevant parts of the config file** applied in this analysis step:
-
-* Random Forest features used for the reconstruction - ``energy_regression_features``, ``disp_regression_features``, ``disp_classification_features``, ``particle_classification_features``. These should be the very same features as those used for RF training (check cfg files stored in the directories together with the models)
-
-* ``disp_method`` - Direction reconstruction method used. For now we only use ``disp_norm_sign`` which requires RF regressor to reconstruct source distance from the image Center of Gravity, and RF classifier to determine on which side along the main axis of the Hillas ellipse the source lies.
-
-* ``stereo_reco_weights`` - Parameter used as a weight for averaging the stereo reconstructed parameters.
+    The DL2 -> DL3 and IRF steps below read the DL2 of the former sst1mpipe random forests; they are
+    to be migrated to the ctapipe DL2.
 
 
 .. _dl2_irfs:

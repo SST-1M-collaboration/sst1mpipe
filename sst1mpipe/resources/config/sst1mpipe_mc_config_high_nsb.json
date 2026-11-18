@@ -87,7 +87,7 @@
 
     "ImageProcessor": {
       "image_cleaner_type": "NSBImageCleaner",
-      "use_telescope_frame": false,
+      "use_telescope_frame": true,
       "TailcutsImageCleaner": {
           "picture_threshold_pe": [
             ["id", 1, 8],

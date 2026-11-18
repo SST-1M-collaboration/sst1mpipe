@@ -196,7 +196,7 @@ def dl1_files(tmp_path_factory):
     files = {}
     for name, path in (("gamma", GAMMA_DIFFUSE), ("gamma_point", GAMMA_POINT), ("proton", PROTON)):
         files[name] = directory / f"{name}.dl1.h5"
-        run_process(path, files[name], "--ImageProcessor.use_telescope_frame=True", config=MC_CONFIG_FILES["low"])
+        run_process(path, files[name], config=MC_CONFIG_FILES["low"])
     return files
 
 

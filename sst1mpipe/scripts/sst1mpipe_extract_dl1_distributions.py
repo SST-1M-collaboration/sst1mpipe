@@ -34,7 +34,7 @@ from sst1mpipe.io import (
     load_dl2_sst1m,
     pedestal_cleaning_fractions,
 )
-from sst1mpipe.utils import get_telescopes
+from sst1mpipe.utils import get_telescopes, hillas_prefix
 from sst1mpipe.utils.nsb_tools import default_model, mean_pedestal_std
 
 
@@ -145,7 +145,7 @@ def main():
 
             # get intensity distribution per obsid (wobble)
 
-            data, bin_edges = np.histogram(dl1_data[time_mask].camera_frame_hillas_intensity, bins=bins)
+            data, bin_edges = np.histogram(dl1_data[time_mask][f'{hillas_prefix(dl1_data)}hillas_intensity'], bins=bins)
             zenith = 90.-np.mean(dl1_data[time_mask].true_alt_tel)
 
             # elapsed time: sum of the time differences, excluding large ones

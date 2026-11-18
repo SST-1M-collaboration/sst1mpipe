@@ -181,7 +181,7 @@ def test_process_simtel_file(simtel_file, tmp_path):
         assert len(parameters) == n_triggered
         assert info[f"n_triggered_tel{tel_id}"][0] == n_triggered
         # showers survive the cleaning
-        intensity = parameters["camera_frame_hillas_intensity"]
+        intensity = parameters["hillas_intensity"]
         n_images = np.isfinite(intensity).sum()
         assert n_images > 0
         assert np.all(intensity[np.isfinite(intensity)] > 0)

@@ -197,8 +197,8 @@ def test_process_publishes_the_events(tmp_path):
         if levels is None:
             continue
         assert levels["dl1"]["tel_id"] == tel_id
-        np.testing.assert_allclose(levels["dl1"]["camera_frame_hillas_intensity"],
-                                   row["camera_frame_hillas_intensity"])
+        np.testing.assert_allclose(levels["dl1"]["hillas_intensity"],
+                                   row["hillas_intensity"])
         assert levels["dl1"]["image"].shape == (1296,) and "r0" in levels
         assert {"trigger", "r0", "r1", "dl1"} <= set(levels)
 

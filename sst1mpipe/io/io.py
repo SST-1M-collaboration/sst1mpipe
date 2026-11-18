@@ -40,6 +40,7 @@ from sst1mpipe.utils.utils import (
     get_pointing_radec,
     get_tel_id,
     get_telescopes,
+    hillas_prefix,
     join_in_order,
     read_subarray,
     telescope_location,
@@ -291,10 +292,13 @@ def add_pointing_dl1_stereo(file, dl1_data_tabs=None):
             # we cannot merge based on obs_id/event_id, because tel1/tel2 data has the same ids in the output file, but not in the input ones!
             # We also cannot merge based on only one parameter, because it turned out that the probability od having e.g. two events with the
             # very same (float64) intensity in data from a signle night is quite high
-            params_tel_small = params_tel[['camera_frame_hillas_intensity', 'camera_frame_hillas_r', 'camera_frame_hillas_skewness', 'true_az_tel', 'true_alt_tel']]
+            p = hillas_prefix(params)
+            columns = [f'{p}hillas_intensity', f'{p}hillas_r', f'{p}hillas_skewness']
+            params_tel_small = params_tel[columns + ['true_az_tel', 'true_alt_tel']]
 
-            for i, (intensity, r, skew) in enumerate(zip(np.array(params['camera_frame_hillas_intensity']), np.array(params['camera_frame_hillas_r']), np.array(params['camera_frame_hillas_skewness']), strict=True)):
-                mask = (intensity == params_tel_small['camera_frame_hillas_intensity']) & (r == params_tel_small['camera_frame_hillas_r']) & (skew == params_tel_small['camera_frame_hillas_skewness'])
+            for i, (intensity, r, skew) in enumerate(zip(*(np.array(params[c]) for c in columns), strict=True)):
+                mask = ((intensity == params_tel_small[columns[0]]) & (r == params_tel_small[columns[1]])
+                        & (skew == params_tel_small[columns[2]]))
 
                 if sum(mask) == 1:
                     merged[i]['true_az_tel'] = params_tel_small[mask]['true_az_tel']
@@ -462,7 +466,7 @@ def add_dl1_extra_parameters(events, input_file, tel):
     DL1 file, when they are not already in the table (DL1 files of the former sst1mpipe_r0_dl1,
     which wrote them in the file):
 
-    - ``log_camera_frame_hillas_intensity`` and ``camera_frame_hillas_wl``, always computed
+    - ``log_hillas_intensity`` and ``hillas_wl`` (``camera_frame_`` prefix in the camera frame), always computed
       (from the intensity scaled by load_dl1_sst1m)
     - ``equivalent_focal_length`` (m), from the subarray of the file
     - observed data: ``local_time`` (unix time of the trigger, s), ``date`` (date of the run:
@@ -470,7 +474,7 @@ def add_dl1_extra_parameters(events, input_file, tel):
       images of the chunk of pedestal events at the time of the event, in p.e., if the monitoring
       data are in the file)
     - simulations: the true parameters of the shower (/simulation/event/subarray/shower),
-      ``log_true_energy``, ``true_camera_x``/``true_camera_y``, the DISP parameters, ``miss``
+      ``log_true_energy``, ``true_camera_x``/``true_camera_y``, the DISP parameters, ``miss`` (camera frame)
       and ``true_tel_impact_distance``
 
     Parameters
@@ -503,7 +507,8 @@ def add_dl1_extra_parameters(events, input_file, tel):
             events = join_in_order(events, read_table(input_file, SIMULATION_SHOWER_TABLE))
         if "log_true_energy" not in events.keys():
             events = add_log_true_energy(events)
-        if "disp_norm" not in events.keys():
+        if "disp_norm" not in events.keys() and hillas_prefix(events):
+            # true disp and miss of the camera frame parameters (DL1 in the camera frame)
             # the camera coordinates do not depend on the location and time of the frame
             events = add_disp(events, AltAz(location=subarray.reference_location))
             events = add_miss(events)
@@ -578,7 +583,8 @@ def load_dl1_sst1m(
     if scale_intensities:
         I_corr = float(config["NsbCalibrator"]["intensity_correction"][tel])
         logging.info('Intensity correction of %f applied on %s data.', I_corr, tel)
-        events['camera_frame_hillas_intensity'] = events['camera_frame_hillas_intensity'] * I_corr
+        intensity = f'{hillas_prefix(events)}hillas_intensity'
+        events[intensity] = events[intensity] * I_corr
 
     # trigger time with ns precision, for the matching of the stereo events
     trigger_time = read_trigger_time(input_file, tel)
