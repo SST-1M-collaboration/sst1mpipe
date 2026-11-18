@@ -14,7 +14,7 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL2
 | `mc_merge.bash` | `ctapipe-merge`: training files of all the zenith angles (`MC_TRAIN_FRACTION`), test files per zenith angle |
 | `mc_train.bash` | `sst1mpipe-train-*`: energy, particle classifier, disp in `models/` (the NSB level, feature `cos_zenith`), with plots |
 | `mc_dl1_dl2.bash` | `sst1mpipe-apply-models` on the test files of each zenith angle |
-| `mc_irf.bash` | `ctapipe-optimize-event-selection`, `ctapipe-compute-irf`: point-like and full enclosure IRFs per zenith angle, in `IRF_CONDA_ENV` |
+| `mc_irf.bash` | `ctapipe-optimize-event-selection`, `ctapipe-compute-irf`: point-like and full enclosure IRFs per zenith angle |
 
 | Data | |
 |---|---|
@@ -22,5 +22,4 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL2
 | `data_dl1_stereo.bash` | `ctapipe-merge` of the night of each telescope, `sst1mpipe-stereo` |
 | `data_dl1_dl2.bash` | `sst1mpipe-apply-models` on every DL1 file (cs1, cs2, stereo) |
 
-`IRF_CONDA_ENV`: the IRF tools of ctapipe need pyirf ~0.14 (astropy >= 7), sst1mpipe pyirf ~0.8
-(astropy < 7). TODO: DL3 of the data.
+TODO: DL3 of the data.
