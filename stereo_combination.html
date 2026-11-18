@@ -1,0 +1,1253 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Combining the stereo events: sst1mpipe-stereo &mdash; sst1mpipe 0.32.0a1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/togglebutton.css?v=13237357" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5f9769cd"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script>let toggleHintShow = 'Click to show';</script>
+      <script>let toggleHintHide = 'Click to hide';</script>
+      <script>let toggleOpenOnPrint = 'true';</script>
+      <script src="_static/togglebutton.js?v=4a39c7ea"></script>
+      <script>var togglebuttonSelector = '.toggle, .admonition.dropdown';</script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="SST-1M analysis workflow" href="sst1m_analysis_workflow.html" />
+    <link rel="prev" title="Monitoring of a run: sst1mpipe-monitoring" href="sst1mpipe_monitoring.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            sst1mpipe
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_processing.html">Processing the data with the ctapipe tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="event_sources.html">Event sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="event_stream.html">Stream of the processed events</a></li>
+<li class="toctree-l1"><a class="reference internal" href="camera_event_type.html">Trigger type of the camera events</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sst1mpipe_monitoring.html">Monitoring of a run: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-monitoring</span></code></a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Combining the stereo events: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-stereo</span></code></a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#combiners">Combiners</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.reference_tel_id"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.reference_tel_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_array_pointing"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_array_pointing()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_dl0"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_dl0()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_dl1"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_dl1()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_dl2"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_dl2()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_index"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_index()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_monitoring"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_monitoring()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_muon"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_muon()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_r0"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_r0()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_r1"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_r1()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_simulation"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_simulation()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_trigger"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.combine_trigger()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.match"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.match()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.match_pair"><code class="docutils literal notranslate"><span class="pre">StereoEventCombiner.match_pair()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner"><code class="docutils literal notranslate"><span class="pre">WhiteRabbitClosestCombiner</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner.max_time_diff"><code class="docutils literal notranslate"><span class="pre">WhiteRabbitClosestCombiner.max_time_diff</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner.reference_tel_id"><code class="docutils literal notranslate"><span class="pre">WhiteRabbitClosestCombiner.reference_tel_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner.match_pair"><code class="docutils literal notranslate"><span class="pre">WhiteRabbitClosestCombiner.match_pair()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.offset_start"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner.offset_start</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.offset_step"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner.offset_step</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.offset_stop"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner.offset_stop</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.reference_tel_id"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner.reference_tel_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.time_offset"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner.time_offset</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.window_half_width"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner.window_half_width</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.find_time_offset"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner.find_time_offset()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.match_pair"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner.match_pair()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.n_coincidences"><code class="docutils literal notranslate"><span class="pre">SlidingWindowCombiner.n_coincidences()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.stereo.SWATEventIdCombiner"><code class="docutils literal notranslate"><span class="pre">SWATEventIdCombiner</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SWATEventIdCombiner.reference_tel_id"><code class="docutils literal notranslate"><span class="pre">SWATEventIdCombiner.reference_tel_id</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.stereo.SWATEventIdCombiner.match_pair"><code class="docutils literal notranslate"><span class="pre">SWATEventIdCombiner.match_pair()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#examples">Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#tool">Tool</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool"><code class="docutils literal notranslate"><span class="pre">StereoTool</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.combiner_type"><code class="docutils literal notranslate"><span class="pre">StereoTool.combiner_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.config_files"><code class="docutils literal notranslate"><span class="pre">StereoTool.config_files</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.copy_monitoring"><code class="docutils literal notranslate"><span class="pre">StereoTool.copy_monitoring</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.input_files"><code class="docutils literal notranslate"><span class="pre">StereoTool.input_files</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.keep_mono"><code class="docutils literal notranslate"><span class="pre">StereoTool.keep_mono</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_config"><code class="docutils literal notranslate"><span class="pre">StereoTool.log_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_datefmt"><code class="docutils literal notranslate"><span class="pre">StereoTool.log_datefmt</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_file"><code class="docutils literal notranslate"><span class="pre">StereoTool.log_file</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_file_level"><code class="docutils literal notranslate"><span class="pre">StereoTool.log_file_level</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_format"><code class="docutils literal notranslate"><span class="pre">StereoTool.log_format</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_level"><code class="docutils literal notranslate"><span class="pre">StereoTool.log_level</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.logging_config"><code class="docutils literal notranslate"><span class="pre">StereoTool.logging_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.overwrite"><code class="docutils literal notranslate"><span class="pre">StereoTool.overwrite</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.progress_bar"><code class="docutils literal notranslate"><span class="pre">StereoTool.progress_bar</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.provenance_log"><code class="docutils literal notranslate"><span class="pre">StereoTool.provenance_log</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.quiet"><code class="docutils literal notranslate"><span class="pre">StereoTool.quiet</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.show_config"><code class="docutils literal notranslate"><span class="pre">StereoTool.show_config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.show_config_json"><code class="docutils literal notranslate"><span class="pre">StereoTool.show_config_json</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.read_telescope_triggers"><code class="docutils literal notranslate"><span class="pre">read_telescope_triggers()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.TelescopeEventReader"><code class="docutils literal notranslate"><span class="pre">TelescopeEventReader</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.TelescopeEventReader.get"><code class="docutils literal notranslate"><span class="pre">TelescopeEventReader.get()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.CombinedRuns"><code class="docutils literal notranslate"><span class="pre">CombinedRuns</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.io.append_monitoring_tables"><code class="docutils literal notranslate"><span class="pre">append_monitoring_tables()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.io.containers.to_sst1m_event"><code class="docutils literal notranslate"><span class="pre">to_sst1m_event()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#sst1mpipe.stereo.nearest_index"><code class="docutils literal notranslate"><span class="pre">nearest_index()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sst1m_analysis_workflow.html">SST-1M analysis workflow</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorials/index.html">Tutorials</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">sst1mpipe</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Combining the stereo events: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-stereo</span></code></li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/stereo_combination.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="combining-the-stereo-events-sst1mpipe-stereo">
+<span id="stereo-combination"></span><h1>Combining the stereo events: <code class="docutils literal notranslate"><span class="pre">sst1mpipe-stereo</span></code><a class="headerlink" href="#combining-the-stereo-events-sst1mpipe-stereo" title="Link to this heading"></a></h1>
+<p>The SST-1M telescopes have no array trigger: each telescope writes its own events, one raw data
+(zfits) file per run and per telescope. Each run is processed into a DL1 file by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-process</span></code>
+(see <a class="reference internal" href="data_processing.html#data-processing"><span class="std std-ref">Processing the data with the ctapipe tools</span></a>), the DL1 files of the runs of a night are merged for each telescope
+(<code class="docutils literal notranslate"><span class="pre">ctapipe-merge</span></code>, see <a class="reference internal" href="data_processing.html#merging-step"><span class="std std-ref">3. Merging</span></a>), and the coincident events of the merged files of the
+telescopes are combined into stereo events by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-stereo</span></code>, a <a class="reference external" href="https://ctapipe.readthedocs.io/en/stable/api/ctapipe.core.Tool.html#ctapipe.core.Tool" title="(in ctapipe v0.33.0)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ctapipe.core.Tool</span></code></a>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>SST1M1_20260120_merged.dl1.h5 ─┐
+                               ├──► sst1mpipe-stereo ──► SST1M_20260120_merged.stereo.dl1.h5
+SST1M2_20260120_merged.dl1.h5 ─┘
+</pre></div>
+</div>
+<p>The coincident events are matched and combined by a <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner" title="sst1mpipe.stereo.StereoEventCombiner"><code class="xref py py-obj docutils literal notranslate"><span class="pre">StereoEventCombiner</span></code></a>. The
+stereo reconstruction (stereo DL2) is a later step.</p>
+<section id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sst1mpipe-stereo<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="w"> </span>SST1M1_20260120_merged.dl1.h5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--input<span class="w"> </span>SST1M2_20260120_merged.dl1.h5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output<span class="w"> </span>SST1M_20260120_merged.stereo.dl1.h5<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--config<span class="w"> </span>sst1mpipe/resources/config/sst1mpipe_data_config.json
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">sst1mpipe-stereo</span> <span class="pre">--help</span></code> lists the options (<code class="docutils literal notranslate"><span class="pre">--help-all</span></code> all the settings). The default settings
+are in <code class="docutils literal notranslate"><span class="pre">sst1mpipe_data_config.json</span></code>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The combination does not work properly with more than two telescopes, see
+<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner" title="sst1mpipe.stereo.StereoEventCombiner"><code class="xref py py-obj docutils literal notranslate"><span class="pre">StereoEventCombiner</span></code></a>.</p>
+</div>
+</section>
+<section id="combiners">
+<h2>Combiners<a class="headerlink" href="#combiners" title="Link to this heading"></a></h2>
+<p>The matching method is chosen with <code class="docutils literal notranslate"><span class="pre">--combiner</span></code>: each combiner implements the matching of the events
+of two telescopes, and the combination of each part of the event is a method of the base class, which a
+child combiner can override.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">sst1mpipe.stereo.</span></span><span class="sig-name descname"><span class="pre">StereoEventCombiner</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner" title="Link to this definition"></a></dt>
+<dd><p>Base class of the combination of the coincident events of the telescopes into stereo events.</p>
+<p>A combiner matches the coincident events of the telescopes (<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.match" title="sst1mpipe.stereo.StereoEventCombiner.match"><code class="xref py py-obj docutils literal notranslate"><span class="pre">match</span></code></a>, from their trigger
+tables) and combines the matched events into a stereo event (<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine" title="sst1mpipe.stereo.StereoEventCombiner.combine"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine</span></code></a>). The child classes
+implement the matching of the events of two telescopes (<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.match_pair" title="sst1mpipe.stereo.StereoEventCombiner.match_pair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">match_pair</span></code></a>), and can override the
+combination of any part of the event (<code class="docutils literal notranslate"><span class="pre">combine_&lt;part&gt;</span></code> methods).</p>
+<p>The events of each telescope are matched to those of the reference telescope
+(<code class="docutils literal notranslate"><span class="pre">reference_tel_id</span></code>): a stereo event is an event of the reference telescope with the
+coincident events of the other telescopes, and has the obs_id and event_id of the event of
+the reference telescope. Only the events of type SUBARRAY are matched, and each event is in at
+most one stereo event. Swapping the reference telescope changes the ids of the stereo events;
+the stereo events are the same with <a class="reference internal" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner" title="sst1mpipe.stereo.WhiteRabbitClosestCombiner"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WhiteRabbitClosestCombiner</span></code></a> and <a class="reference internal" href="#sst1mpipe.stereo.SWATEventIdCombiner" title="sst1mpipe.stereo.SWATEventIdCombiner"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SWATEventIdCombiner</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>config</strong><span class="classifier">traitlets.config.Config, optional</span></dt><dd><p>Configuration of the combiner, e.g.
+<code class="docutils literal notranslate"><span class="pre">Config({&quot;WhiteRabbitClosestCombiner&quot;:</span> <span class="pre">{&quot;max_time_diff&quot;:</span> <span class="pre">5</span> <span class="pre">*</span> <span class="pre">u.us}})</span></code>. The configuration
+of <code class="docutils literal notranslate"><span class="pre">StereoEventCombiner</span></code> (e.g. <code class="docutils literal notranslate"><span class="pre">reference_tel_id</span></code>) applies to all the combiners.</p>
+</dd>
+<dt><strong>parent</strong><span class="classifier">ctapipe.core.Component or ctapipe.core.Tool, optional</span></dt><dd><p>Parent of the combiner, whose configuration is used.</p>
+</dd>
+<dt><strong>**kwargs</strong></dt><dd><p>Values of the configuration options, e.g. <code class="docutils literal notranslate"><span class="pre">reference_tel_id=22</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The combination does not work properly with more than two telescopes: the coincidences of
+telescopes without an event of the reference telescope are not combined (they are mono events).
+It is tested with three telescopes on made-up trigger tables only, and not with more than three
+telescopes. TODO:</p>
+<ul class="simple">
+<li><p>test the combination of more than three telescopes, and of three telescopes on real data</p></li>
+<li><p>match the coincidences of telescopes without an event of the reference telescope (matching of
+all the telescopes at once)</p></li>
+<li><p>define the combination of different array pointings (<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_array_pointing" title="sst1mpipe.stereo.StereoEventCombiner.combine_array_pointing"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_array_pointing</span></code></a>)</p></li>
+</ul>
+</div>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner" title="sst1mpipe.stereo.WhiteRabbitClosestCombiner"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WhiteRabbitClosestCombiner</span></code></a>, <a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner" title="sst1mpipe.stereo.SlidingWindowCombiner"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SlidingWindowCombiner</span></code></a>, <a class="reference internal" href="#sst1mpipe.stereo.SWATEventIdCombiner" title="sst1mpipe.stereo.SWATEventIdCombiner"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SWATEventIdCombiner</span></code></a></dt><dd></dd>
+</dl>
+</div>
+<p class="rubric">Configuration options</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.reference_tel_id">
+<span class="sig-name descname"><span class="pre">reference_tel_id</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">21</span></span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.reference_tel_id" title="Link to this definition"></a></dt>
+<dd><p>Reference telescope: the stereo events are its events with the coincident events of the other telescopes, and have its obs_id and event_id</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine">
+<span class="sig-name descname"><span class="pre">combine</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine" title="Link to this definition"></a></dt>
+<dd><p>Stereo event from the coincident events of the telescopes.</p>
+<p>Calls, in this order, <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_index" title="sst1mpipe.stereo.StereoEventCombiner.combine_index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_index</span></code></a>, <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_trigger" title="sst1mpipe.stereo.StereoEventCombiner.combine_trigger"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_trigger</span></code></a>, <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_r0" title="sst1mpipe.stereo.StereoEventCombiner.combine_r0"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_r0</span></code></a>, <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_r1" title="sst1mpipe.stereo.StereoEventCombiner.combine_r1"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_r1</span></code></a>,
+<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_dl0" title="sst1mpipe.stereo.StereoEventCombiner.combine_dl0"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_dl0</span></code></a>, <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_dl1" title="sst1mpipe.stereo.StereoEventCombiner.combine_dl1"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_dl1</span></code></a>, <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_dl2" title="sst1mpipe.stereo.StereoEventCombiner.combine_dl2"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_dl2</span></code></a>, <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_muon" title="sst1mpipe.stereo.StereoEventCombiner.combine_muon"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_muon</span></code></a>, <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_monitoring" title="sst1mpipe.stereo.StereoEventCombiner.combine_monitoring"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_monitoring</span></code></a>, and
+<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_simulation" title="sst1mpipe.stereo.StereoEventCombiner.combine_simulation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_simulation</span></code></a> if an event is simulated. <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_array_pointing" title="sst1mpipe.stereo.StereoEventCombiner.combine_array_pointing"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_array_pointing</span></code></a> is not called:
+the array pointing of the stereo event is not filled.</p>
+<p>The data of each telescope are those of its event: they are not copied, the stereo event
+refers to the same objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id: one event per telescope (mono events, e.g. read
+from the DL1 file of the telescope by the HDF5EventSource), with the event of the
+reference telescope.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>SST1MArrayEventContainer</dt><dd><p>Stereo event.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>ValueError</dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">events</span></code> has no event of the reference telescope.</p>
+</dd>
+<dt>NotImplementedError</dt><dd><p>If an event is simulated (see <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_simulation" title="sst1mpipe.stereo.StereoEventCombiner.combine_simulation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_simulation</span></code></a>).</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_array_pointing">
+<span class="sig-name descname"><span class="pre">combine_array_pointing</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_array_pointing" title="Link to this definition"></a></dt>
+<dd><p>Array pointing of the stereo event (<code class="docutils literal notranslate"><span class="pre">stereo.monitoring.pointing</span></code>). Not called by <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine" title="sst1mpipe.stereo.StereoEventCombiner.combine"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine</span></code></a>.</p>
+<p>The array pointing of the events (filled by the HDF5EventSource from the observation block
+of their run) is kept if all the events have the same. The combination of different array
+pointings is not defined yet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>NotImplementedError</dt><dd><p>If the array pointings of the events differ (NaN values are equal).</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_dl0">
+<span class="sig-name descname"><span class="pre">combine_dl0</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_dl0" title="Link to this definition"></a></dt>
+<dd><p>DL0 of each telescope (<code class="docutils literal notranslate"><span class="pre">stereo.dl0.tel[tel_id]</span></code>), from its event if it has DL0 data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_dl1">
+<span class="sig-name descname"><span class="pre">combine_dl1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_dl1" title="Link to this definition"></a></dt>
+<dd><p>DL1 of each telescope (<code class="docutils literal notranslate"><span class="pre">stereo.dl1.tel[tel_id]</span></code>: image, peak time, image mask, parameters), from its event.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_dl2">
+<span class="sig-name descname"><span class="pre">combine_dl2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_dl2" title="Link to this definition"></a></dt>
+<dd><p>DL2 of each telescope (<code class="docutils literal notranslate"><span class="pre">stereo.dl2.tel[tel_id]</span></code>), from its event.</p>
+<p>The stereo DL2 (<code class="docutils literal notranslate"><span class="pre">stereo.dl2.stereo</span></code>) is not filled: the stereo reconstruction (e.g. the
+geometry of the shower with the ctapipe <a class="reference external" href="https://ctapipe.readthedocs.io/en/stable/api/ctapipe.reco.ShowerProcessor.html#ctapipe.reco.ShowerProcessor" title="(in ctapipe v0.33.0)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ShowerProcessor</span></code></a>) is a later step.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_index">
+<span class="sig-name descname"><span class="pre">combine_index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_index" title="Link to this definition"></a></dt>
+<dd><p>Index of the stereo event (<code class="docutils literal notranslate"><span class="pre">stereo.index</span></code>): obs_id and event_id of the event of the reference telescope.</p>
+<p>All the <code class="docutils literal notranslate"><span class="pre">combine_&lt;part&gt;</span></code> methods have the same parameters, and fill their part of
+<code class="docutils literal notranslate"><span class="pre">stereo</span></code> in place.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id, with the event of the reference telescope.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_monitoring">
+<span class="sig-name descname"><span class="pre">combine_monitoring</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_monitoring" title="Link to this definition"></a></dt>
+<dd><p>Monitoring of each telescope (<code class="docutils literal notranslate"><span class="pre">stereo.monitoring.tel[tel_id]</span></code>: pointing, camera monitoring), from its event.</p>
+<p>The array pointing (<code class="docutils literal notranslate"><span class="pre">stereo.monitoring.pointing</span></code>) is not filled, see
+<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine_array_pointing" title="sst1mpipe.stereo.StereoEventCombiner.combine_array_pointing"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine_array_pointing</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_muon">
+<span class="sig-name descname"><span class="pre">combine_muon</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_muon" title="Link to this definition"></a></dt>
+<dd><p>Muon parameters of each telescope (<code class="docutils literal notranslate"><span class="pre">stereo.muon.tel[tel_id]</span></code>), from its event.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_r0">
+<span class="sig-name descname"><span class="pre">combine_r0</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_r0" title="Link to this definition"></a></dt>
+<dd><p>R0 of each telescope (<code class="docutils literal notranslate"><span class="pre">stereo.r0.tel[tel_id]</span></code>), from its event if it has R0 data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_r1">
+<span class="sig-name descname"><span class="pre">combine_r1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_r1" title="Link to this definition"></a></dt>
+<dd><p>R1 of each telescope (<code class="docutils literal notranslate"><span class="pre">stereo.r1.tel[tel_id]</span></code>), from its event if it has R1 data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_simulation">
+<span class="sig-name descname"><span class="pre">combine_simulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_simulation" title="Link to this definition"></a></dt>
+<dd><p>Simulation of the stereo event: not implemented.</p>
+<p>Called by <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine" title="sst1mpipe.stereo.StereoEventCombiner.combine"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine</span></code></a> if an event is simulated. The stereo events of the simulations are
+already combined by sim_telarray (array trigger), with the same event_id in all the
+telescopes: they do not need to be matched.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>NotImplementedError</dt><dd><p>Always.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.combine_trigger">
+<span class="sig-name descname"><span class="pre">combine_trigger</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stereo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.combine_trigger" title="Link to this definition"></a></dt>
+<dd><p>Trigger of the stereo event (<code class="docutils literal notranslate"><span class="pre">stereo.trigger</span></code>).</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tels_with_trigger</span></code>: the telescopes of the events, sorted</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">time</span></code>: the earliest trigger time of the events</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">event_type</span></code>: SUBARRAY</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tel[tel_id]</span></code>: the trigger of each telescope (time, event type, trigger pixels), from its event</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>stereo</strong><span class="classifier">SST1MArrayEventContainer</span></dt><dd><p>Stereo event, filled in place.</p>
+</dd>
+<dt><strong>events</strong><span class="classifier">dict[int, ctapipe.containers.ArrayEventContainer]</span></dt><dd><p>Coincident events by telescope id.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.match">
+<span class="sig-name descname"><span class="pre">match</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tables</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.match" title="Link to this definition"></a></dt>
+<dd><p>Stereo events: the coincident events of the telescopes.</p>
+<p>The events of type SUBARRAY of each telescope are matched to those of the reference
+telescope by <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.match_pair" title="sst1mpipe.stereo.StereoEventCombiner.match_pair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">match_pair</span></code></a>. A stereo event is an event of the reference telescope with at
+least one coincident event of another telescope; with more than two telescopes, it has the
+coincident events of all the telescopes matched to the same event of the reference
+telescope.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>tables</strong><span class="classifier">dict[int, astropy.table.Table]</span></dt><dd><p>Events of each telescope by telescope id (e.g. the trigger tables of their DL1 files),
+in any order: columns <code class="docutils literal notranslate"><span class="pre">obs_id</span></code>, <code class="docutils literal notranslate"><span class="pre">event_id</span></code>, <code class="docutils literal notranslate"><span class="pre">event_type</span></code> (value of
+<a class="reference external" href="https://ctapipe.readthedocs.io/en/stable/api/ctapipe.containers.EventType.html#ctapipe.containers.EventType" title="(in ctapipe v0.33.0)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">EventType</span></code></a>) and <code class="docutils literal notranslate"><span class="pre">time_ns</span></code> (trigger time, integer ns).</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>dict[int, numpy.ndarray]</dt><dd><p>By telescope id, the row in its table of its event in each stereo event (one element
+per stereo event, in the time order of the reference telescope), -1 if the telescope
+has no event in the stereo event. The reference telescope has an event in every stereo
+event.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>ValueError</dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">tables</span></code> has no table of the reference telescope.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.StereoEventCombiner.match_pair">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">match_pair</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reference</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">other</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.StereoEventCombiner.match_pair" title="Link to this definition"></a></dt>
+<dd><p>Coincident events of the reference telescope and of another telescope (method of the child class).</p>
+<p>Called by <a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.match" title="sst1mpipe.stereo.StereoEventCombiner.match"><code class="xref py py-obj docutils literal notranslate"><span class="pre">match</span></code></a> for each telescope other than the reference telescope, with its events
+of type SUBARRAY only, sorted by trigger time. A child class implements its matching
+method here.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>reference</strong><span class="classifier">astropy.table.Table</span></dt><dd><p>Events of the reference telescope, sorted by trigger time, not empty: columns <code class="docutils literal notranslate"><span class="pre">obs_id</span></code>,
+<code class="docutils literal notranslate"><span class="pre">event_id</span></code>, <code class="docutils literal notranslate"><span class="pre">tel_id</span></code>, <code class="docutils literal notranslate"><span class="pre">event_type</span></code> and <code class="docutils literal notranslate"><span class="pre">time_ns</span></code> (trigger time, integer ns).</p>
+</dd>
+<dt><strong>other</strong><span class="classifier">astropy.table.Table</span></dt><dd><p>Events of the other telescope, sorted by trigger time, not empty, with the same columns.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>reference_index</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Rows of the coincident events in <code class="docutils literal notranslate"><span class="pre">reference</span></code>.</p>
+</dd>
+<dt><strong>other_index</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Rows of the coincident events in <code class="docutils literal notranslate"><span class="pre">other</span></code>, in the same order: <code class="docutils literal notranslate"><span class="pre">reference[reference_index[i]]</span></code>
+and <code class="docutils literal notranslate"><span class="pre">other[other_index[i]]</span></code> are coincident. Each row is at most once in each array.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.WhiteRabbitClosestCombiner">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">sst1mpipe.stereo.</span></span><span class="sig-name descname"><span class="pre">WhiteRabbitClosestCombiner</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner" title="Link to this definition"></a></dt>
+<dd><p>Coincident events: closest White Rabbit trigger times.</p>
+<p>For data with White Rabbit timestamps (ns precision, data taken after 25 September 2023). Each
+event of the reference telescope is matched to the event of the other telescope with the
+closest trigger time, if their trigger times differ by less than <code class="docutils literal notranslate"><span class="pre">max_time_diff</span></code>, and if it
+is also the closest event of the reference telescope to that event (mutual closest events):
+each event is matched at most once.</p>
+<p>The trigger times of the coincident events of the SST-1M telescopes differ by a few tens of ns
+(e.g. 32 and 48 ns in the test data), while the events of a telescope are hundreds of µs
+apart at the usual trigger rates: the default <code class="docutils literal notranslate"><span class="pre">max_time_diff</span></code> (10 µs) does not give random
+coincidences.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>config</strong><span class="classifier">traitlets.config.Config, optional</span></dt><dd><p>Configuration of the combiner.</p>
+</dd>
+<dt><strong>parent</strong><span class="classifier">ctapipe.core.Component or ctapipe.core.Tool, optional</span></dt><dd><p>Parent of the combiner, whose configuration is used.</p>
+</dd>
+<dt><strong>**kwargs</strong></dt><dd><p>Values of the configuration options, e.g. <code class="docutils literal notranslate"><span class="pre">max_time_diff=5</span> <span class="pre">*</span> <span class="pre">u.us</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Configuration options</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.WhiteRabbitClosestCombiner.max_time_diff">
+<span class="sig-name descname"><span class="pre">max_time_diff</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">AstroQuantity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;Quantity</span> <span class="pre">10.</span> <span class="pre">us&gt;</span></span><a class="headerlink" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner.max_time_diff" title="Link to this definition"></a></dt>
+<dd><p>Maximum difference of the trigger times of coincident events (strict)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.WhiteRabbitClosestCombiner.reference_tel_id">
+<span class="sig-name descname"><span class="pre">reference_tel_id</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">21</span></span><a class="headerlink" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner.reference_tel_id" title="Link to this definition"></a></dt>
+<dd><p>Reference telescope: the stereo events are its events with the coincident events of the other telescopes, and have its obs_id and event_id</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.WhiteRabbitClosestCombiner.match_pair">
+<span class="sig-name descname"><span class="pre">match_pair</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reference</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">other</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner.match_pair" title="Link to this definition"></a></dt>
+<dd><p>Mutual closest events of the two telescopes, within <code class="docutils literal notranslate"><span class="pre">max_time_diff</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>reference</strong><span class="classifier">astropy.table.Table</span></dt><dd><p>Events of the reference telescope, sorted by trigger time (column <code class="docutils literal notranslate"><span class="pre">time_ns</span></code>).</p>
+</dd>
+<dt><strong>other</strong><span class="classifier">astropy.table.Table</span></dt><dd><p>Events of the other telescope, sorted by trigger time (column <code class="docutils literal notranslate"><span class="pre">time_ns</span></code>).</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>reference_index, other_index</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Rows of the coincident events in each table.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">sst1mpipe.stereo.</span></span><span class="sig-name descname"><span class="pre">SlidingWindowCombiner</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner" title="Link to this definition"></a></dt>
+<dd><p>Coincident events: trigger times within a window, after the search of the offset between the clocks.</p>
+<p>For data without White Rabbit timestamps (taken before 25 September 2023), whose clocks have an
+offset. An event of the other telescope is coincident with an event of the reference telescope
+if its trigger time is within <code class="docutils literal notranslate"><span class="pre">window_half_width</span></code> (strictly) of the trigger time of the event
+of the reference telescope plus the offset of the clocks (time of the other telescope -
+time of the reference telescope).</p>
+<p>The offset is <code class="docutils literal notranslate"><span class="pre">time_offset</span></code> if given. Otherwise, it is the offset giving the most coincident
+events among the offsets from <code class="docutils literal notranslate"><span class="pre">offset_start</span></code> to <code class="docutils literal notranslate"><span class="pre">offset_stop</span></code> (excluded) in steps of
+<code class="docutils literal notranslate"><span class="pre">offset_step</span></code> (the first one if several give as many), kept in <code class="xref py py-obj docutils literal notranslate"><span class="pre">last_time_offset</span></code>.</p>
+<p>An event with several events of the other telescope in its window is ambiguous and not
+matched, in both directions: an event of the reference telescope is matched only if its window
+has a single event of the other telescope, whose window (time - offset) has a single event of
+the reference telescope.</p>
+<p>With the default window (1 ms), the method gives random coincidences at the usual trigger
+rates: it is meant for data without precise timestamps, otherwise use
+<a class="reference internal" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner" title="sst1mpipe.stereo.WhiteRabbitClosestCombiner"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WhiteRabbitClosestCombiner</span></code></a> (or a fixed <code class="docutils literal notranslate"><span class="pre">time_offset</span></code> with a narrow window). With a searched
+offset, swapping the reference telescope can give other stereo events.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>config</strong><span class="classifier">traitlets.config.Config, optional</span></dt><dd><p>Configuration of the combiner.</p>
+</dd>
+<dt><strong>parent</strong><span class="classifier">ctapipe.core.Component or ctapipe.core.Tool, optional</span></dt><dd><p>Parent of the combiner, whose configuration is used.</p>
+</dd>
+<dt><strong>**kwargs</strong></dt><dd><p>Values of the configuration options, e.g. <code class="docutils literal notranslate"><span class="pre">time_offset=0</span> <span class="pre">*</span> <span class="pre">u.s</span></code>.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Attributes<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>last_time_offset</strong><span class="classifier">int or None</span></dt><dd><p>Offset of the clocks (ns) used by the last call of <a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.match_pair" title="sst1mpipe.stereo.SlidingWindowCombiner.match_pair"><code class="xref py py-obj docutils literal notranslate"><span class="pre">match_pair</span></code></a>, None before.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Configuration options</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner.offset_start">
+<span class="sig-name descname"><span class="pre">offset_start</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">AstroQuantity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;Quantity</span> <span class="pre">-10.</span> <span class="pre">ms&gt;</span></span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner.offset_start" title="Link to this definition"></a></dt>
+<dd><p>First offset of the search</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner.offset_step">
+<span class="sig-name descname"><span class="pre">offset_step</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">AstroQuantity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;Quantity</span> <span class="pre">20.</span> <span class="pre">us&gt;</span></span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner.offset_step" title="Link to this definition"></a></dt>
+<dd><p>Step of the offsets of the search</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner.offset_stop">
+<span class="sig-name descname"><span class="pre">offset_stop</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">AstroQuantity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;Quantity</span> <span class="pre">10.</span> <span class="pre">ms&gt;</span></span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner.offset_stop" title="Link to this definition"></a></dt>
+<dd><p>End of the offsets of the search (excluded)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner.reference_tel_id">
+<span class="sig-name descname"><span class="pre">reference_tel_id</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">21</span></span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner.reference_tel_id" title="Link to this definition"></a></dt>
+<dd><p>Reference telescope: the stereo events are its events with the coincident events of the other telescopes, and have its obs_id and event_id</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner.time_offset">
+<span class="sig-name descname"><span class="pre">time_offset</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">AstroQuantity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner.time_offset" title="Link to this definition"></a></dt>
+<dd><p>Offset of the clock of the other telescope (its time - reference time), searched if None</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner.window_half_width">
+<span class="sig-name descname"><span class="pre">window_half_width</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">AstroQuantity</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;Quantity</span> <span class="pre">1.</span> <span class="pre">ms&gt;</span></span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner.window_half_width" title="Link to this definition"></a></dt>
+<dd><p>Half width of the coincidence window (strict)</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner.find_time_offset">
+<span class="sig-name descname"><span class="pre">find_time_offset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time_1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_2</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner.find_time_offset" title="Link to this definition"></a></dt>
+<dd><p>Offset of the clocks giving the most coincidences.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>time_1</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Trigger times of the reference telescope (integer ns).</p>
+</dd>
+<dt><strong>time_2</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Trigger times of the other telescope (integer ns), sorted.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>int</dt><dd><p>Offset (ns), from <code class="docutils literal notranslate"><span class="pre">offset_start</span></code> to <code class="docutils literal notranslate"><span class="pre">offset_stop</span></code> (excluded) in steps of
+<code class="docutils literal notranslate"><span class="pre">offset_step</span></code>, with the most coincidences (<a class="reference internal" href="#sst1mpipe.stereo.SlidingWindowCombiner.n_coincidences" title="sst1mpipe.stereo.SlidingWindowCombiner.n_coincidences"><code class="xref py py-obj docutils literal notranslate"><span class="pre">n_coincidences</span></code></a>): the first one if
+several give as many.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>ValueError</dt><dd><p>If there is no offset between <code class="docutils literal notranslate"><span class="pre">offset_start</span></code> and <code class="docutils literal notranslate"><span class="pre">offset_stop</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner.match_pair">
+<span class="sig-name descname"><span class="pre">match_pair</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reference</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">other</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner.match_pair" title="Link to this definition"></a></dt>
+<dd><p>Single events of the other telescope within the window of the events of the reference telescope.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>reference</strong><span class="classifier">astropy.table.Table</span></dt><dd><p>Events of the reference telescope, sorted by trigger time (column <code class="docutils literal notranslate"><span class="pre">time_ns</span></code>).</p>
+</dd>
+<dt><strong>other</strong><span class="classifier">astropy.table.Table</span></dt><dd><p>Events of the other telescope, sorted by trigger time (column <code class="docutils literal notranslate"><span class="pre">time_ns</span></code>).</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>reference_index, other_index</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Rows of the coincident events in each table.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>ValueError</dt><dd><p>If the offset is searched and there is no offset between <code class="docutils literal notranslate"><span class="pre">offset_start</span></code> and <code class="docutils literal notranslate"><span class="pre">offset_stop</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SlidingWindowCombiner.n_coincidences">
+<span class="sig-name descname"><span class="pre">n_coincidences</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time_1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">offset_ns</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.SlidingWindowCombiner.n_coincidences" title="Link to this definition"></a></dt>
+<dd><p>Number of coincidences for an offset of the clocks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>time_1</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Trigger times of the reference telescope (integer ns).</p>
+</dd>
+<dt><strong>time_2</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Trigger times of the other telescope (integer ns), sorted.</p>
+</dd>
+<dt><strong>offset_ns</strong><span class="classifier">int</span></dt><dd><p>Offset of the clocks (ns): time of the other telescope - time of the reference telescope.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>int</dt><dd><p>Number of events of <code class="docutils literal notranslate"><span class="pre">time_2</span></code> within <code class="docutils literal notranslate"><span class="pre">window_half_width</span></code> (strictly) of
+<code class="docutils literal notranslate"><span class="pre">time_1</span> <span class="pre">+</span> <span class="pre">offset_ns</span></code>, summed over the events of <code class="docutils literal notranslate"><span class="pre">time_1</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SWATEventIdCombiner">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">sst1mpipe.stereo.</span></span><span class="sig-name descname"><span class="pre">SWATEventIdCombiner</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.SWATEventIdCombiner" title="Link to this definition"></a></dt>
+<dd><p>Coincident events: same array event id given by SWAT.</p>
+<p>For data taken after 30 January 2024: SWAT gives the coincident events of the telescopes the
+same array event id (<code class="docutils literal notranslate"><span class="pre">arrayEvtNum</span></code> of the raw data), which is the <code class="docutils literal notranslate"><span class="pre">event_id</span></code> of the
+events in the DL1 files. Only the event ids are used: the events without the same id are not
+matched, whatever their trigger times, and nothing else is tried if the files have no SWAT
+event ids. An id found several times in the events of a telescope is not matched.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>config</strong><span class="classifier">traitlets.config.Config, optional</span></dt><dd><p>Configuration of the combiner.</p>
+</dd>
+<dt><strong>parent</strong><span class="classifier">ctapipe.core.Component or ctapipe.core.Tool, optional</span></dt><dd><p>Parent of the combiner, whose configuration is used.</p>
+</dd>
+<dt><strong>**kwargs</strong></dt><dd><p>Values of the configuration options, e.g. <code class="docutils literal notranslate"><span class="pre">reference_tel_id=22</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Configuration options</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SWATEventIdCombiner.reference_tel_id">
+<span class="sig-name descname"><span class="pre">reference_tel_id</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">21</span></span><a class="headerlink" href="#sst1mpipe.stereo.SWATEventIdCombiner.reference_tel_id" title="Link to this definition"></a></dt>
+<dd><p>Reference telescope: the stereo events are its events with the coincident events of the other telescopes, and have its obs_id and event_id</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.SWATEventIdCombiner.match_pair">
+<span class="sig-name descname"><span class="pre">match_pair</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reference</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">other</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.SWATEventIdCombiner.match_pair" title="Link to this definition"></a></dt>
+<dd><p>Events of the two telescopes with the same event id.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>reference</strong><span class="classifier">astropy.table.Table</span></dt><dd><p>Events of the reference telescope (column <code class="docutils literal notranslate"><span class="pre">event_id</span></code>).</p>
+</dd>
+<dt><strong>other</strong><span class="classifier">astropy.table.Table</span></dt><dd><p>Events of the other telescope (column <code class="docutils literal notranslate"><span class="pre">event_id</span></code>).</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>reference_index, other_index</strong><span class="classifier">numpy.ndarray</span></dt><dd><p>Rows of the coincident events in each table, without the ids found several times in
+a table.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="examples">
+<h2>Examples<a class="headerlink" href="#examples" title="Link to this heading"></a></h2>
+<p>Matching of the events of the merged files of a night, without the tool:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.scripts.sst1mpipe_stereo_tool</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_telescope_triggers</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.stereo</span><span class="w"> </span><span class="kn">import</span> <span class="n">StereoEventCombiner</span>
+
+<span class="n">triggers</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="mi">21</span><span class="p">:</span> <span class="n">read_telescope_triggers</span><span class="p">([</span><span class="s2">"SST1M1_20260120_merged.dl1.h5"</span><span class="p">]),</span>
+    <span class="mi">22</span><span class="p">:</span> <span class="n">read_telescope_triggers</span><span class="p">([</span><span class="s2">"SST1M2_20260120_merged.dl1.h5"</span><span class="p">]),</span>
+<span class="p">}</span>
+<span class="n">combiner</span> <span class="o">=</span> <span class="n">StereoEventCombiner</span><span class="o">.</span><span class="n">from_name</span><span class="p">(</span><span class="s2">"SWATEventIdCombiner"</span><span class="p">)</span>
+<span class="n">groups</span> <span class="o">=</span> <span class="n">combiner</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="n">triggers</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">triggers</span><span class="p">[</span><span class="mi">22</span><span class="p">][</span><span class="n">groups</span><span class="p">[</span><span class="mi">22</span><span class="p">]][[</span><span class="s2">"obs_id"</span><span class="p">,</span> <span class="s2">"event_id"</span><span class="p">]])</span>
+</pre></div>
+</div>
+<p>A child combiner overriding a part of the combination (it must be imported before the tool is
+configured, to be found by <code class="docutils literal notranslate"><span class="pre">--combiner</span></code>):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sst1mpipe.stereo</span><span class="w"> </span><span class="kn">import</span> <span class="n">WhiteRabbitClosestCombiner</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">LowestTelescopeIds</span><span class="p">(</span><span class="n">WhiteRabbitClosestCombiner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""stereo events with the ids of the event of the lowest telescope id"""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">combine_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stereo</span><span class="p">,</span> <span class="n">events</span><span class="p">):</span>
+        <span class="n">stereo</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">events</span><span class="p">[</span><span class="nb">min</span><span class="p">(</span><span class="n">events</span><span class="p">)]</span><span class="o">.</span><span class="n">index</span>
+</pre></div>
+</div>
+</section>
+<section id="tool">
+<h2>Tool<a class="headerlink" href="#tool" title="Link to this heading"></a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">sst1mpipe.scripts.sst1mpipe_stereo_tool.</span></span><span class="sig-name descname"><span class="pre">StereoTool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">t.Any</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool" title="Link to this definition"></a></dt>
+<dd><p>Combination of the coincident events of the SST-1M telescopes into stereo events (<code class="docutils literal notranslate"><span class="pre">sst1mpipe-stereo</span></code>).</p>
+<p>The input files are DL1 files of a single telescope each (sst1mpipe-process), e.g. the DL1 file
+of a night of each telescope (runs merged with ctapipe-merge), any number of files per telescope,
+of at least two telescopes including the reference telescope of the combiner. Simulated files
+are refused.</p>
+<p>The output file has the stereo events, and with <code class="docutils literal notranslate"><span class="pre">keep_mono</span></code> the events which are not combined
+(mono events, unchanged), in time order; the data levels written are the settings of the
+<a class="reference external" href="https://ctapipe.readthedocs.io/en/stable/api/ctapipe.io.DataWriter.html#ctapipe.io.DataWriter" title="(in ctapipe v0.33.0)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataWriter</span></code></a>. It also has the subarray of all the telescopes, the observation and
+scheduling blocks of the runs and, with <code class="docutils literal notranslate"><span class="pre">copy_monitoring</span></code>, the monitoring data of the input
+files. It has no stereo DL2 and no <code class="docutils literal notranslate"><span class="pre">/dl1/info</span></code>.</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">setup</span></code>: the input files are grouped by telescope and sorted by time, the trigger tables of
+the telescopes are read (<a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.read_telescope_triggers" title="sst1mpipe.scripts.sst1mpipe_stereo_tool.read_telescope_triggers"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_telescope_triggers</span></code></a>) and the output file is opened with the
+ctapipe <a class="reference external" href="https://ctapipe.readthedocs.io/en/stable/api/ctapipe.io.DataWriter.html#ctapipe.io.DataWriter" title="(in ctapipe v0.33.0)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataWriter</span></code></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">start</span></code>: the coincident events are matched by the combiner (<code class="docutils literal notranslate"><span class="pre">combiner_type</span></code>,
+<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.match" title="sst1mpipe.stereo.StereoEventCombiner.match"><code class="xref py py-obj docutils literal notranslate"><span class="pre">match</span></code></a>), then the events are read from the files
+(<a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.TelescopeEventReader" title="sst1mpipe.scripts.sst1mpipe_stereo_tool.TelescopeEventReader"><code class="xref py py-obj docutils literal notranslate"><span class="pre">TelescopeEventReader</span></code></a>), combined (<a class="reference internal" href="#sst1mpipe.stereo.StereoEventCombiner.combine" title="sst1mpipe.stereo.StereoEventCombiner.combine"><code class="xref py py-obj docutils literal notranslate"><span class="pre">combine</span></code></a>) and
+written in time order, with the mono events if <code class="docutils literal notranslate"><span class="pre">keep_mono</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">finish</span></code>: the output file is closed, the monitoring tables of the input files which have
+events in the output are appended (<code class="docutils literal notranslate"><span class="pre">copy_monitoring</span></code>, <a class="reference internal" href="#sst1mpipe.io.append_monitoring_tables" title="sst1mpipe.io.append_monitoring_tables"><code class="xref py py-obj docutils literal notranslate"><span class="pre">append_monitoring_tables</span></code></a>)
+and the numbers of stereo and mono events are logged.</p></li>
+</ol>
+<p>The pointing of the telescopes interpolated at the time of each event by the HDF5EventSource
+(monitoring data of the files) is not written in the output file: an event out of the time range
+of its pointing table gets a NaN pointing instead of stopping the tool
+(<code class="docutils literal notranslate"><span class="pre">PointingInterpolator.bounds_error</span></code> is False unless configured).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Attributes<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>combiner</strong><span class="classifier">sst1mpipe.stereo.StereoEventCombiner</span></dt><dd><p>Combiner of the events.</p>
+</dd>
+<dt><strong>files</strong><span class="classifier">dict[int, list]</span></dt><dd><p>Input files by telescope id, in time order (first trigger time).</p>
+</dd>
+<dt><strong>triggers</strong><span class="classifier">dict[int, astropy.table.Table]</span></dt><dd><p>Trigger table of each telescope (<a class="reference internal" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.read_telescope_triggers" title="sst1mpipe.scripts.sst1mpipe_stereo_tool.read_telescope_triggers"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_telescope_triggers</span></code></a>).</p>
+</dd>
+<dt><strong>counts</strong><span class="classifier">collections.Counter</span></dt><dd><p>Numbers of events: <code class="docutils literal notranslate"><span class="pre">stereo</span></code>, and <code class="docutils literal notranslate"><span class="pre">mono_tel_XXX</span></code> for each telescope (events not
+combined, written only with <code class="docutils literal notranslate"><span class="pre">keep_mono</span></code>).</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Configuration options</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.combiner_type">
+<span class="sig-name descname"><span class="pre">combiner_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">ComponentName</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'WhiteRabbitClosestCombiner'</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.combiner_type" title="Link to this definition"></a></dt>
+<dd><p>Method of the matching of the coincident events of the telescopes. Possible values: [‘WhiteRabbitClosestCombiner’, ‘SlidingWindowCombiner’, ‘SWATEventIdCombiner’]</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.config_files">
+<span class="sig-name descname"><span class="pre">config_files</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.config_files" title="Link to this definition"></a></dt>
+<dd><p>List of configuration files with parameters to load in addition to command-line parameters. The order listed is the order of precedence (later config parameters overwrite earlier ones), however parameters specified on the command line always have the highest precedence. Config files may be in JSON, YAML, TOML, or Python format</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.copy_monitoring">
+<span class="sig-name descname"><span class="pre">copy_monitoring</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.copy_monitoring" title="Link to this definition"></a></dt>
+<dd><p>Copy the monitoring data of the input files (pointing, statistics of the pedestal events)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.input_files">
+<span class="sig-name descname"><span class="pre">input_files</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.input_files" title="Link to this definition"></a></dt>
+<dd><p>DL1 files of the telescopes (one telescope per file), any number of files per telescope</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.keep_mono">
+<span class="sig-name descname"><span class="pre">keep_mono</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.keep_mono" title="Link to this definition"></a></dt>
+<dd><p>Write the events which are not combined (mono events), as they are</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_config">
+<span class="sig-name descname"><span class="pre">log_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_config" title="Link to this definition"></a></dt>
+<dd><p>(no description)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_datefmt">
+<span class="sig-name descname"><span class="pre">log_datefmt</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Unicode</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'%Y-%m-%d</span> <span class="pre">%H:%M:%S'</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_datefmt" title="Link to this definition"></a></dt>
+<dd><p>The date format used by logging formatters for <a class="reference external" href="https://docs.python.org/3/library/logging.html#logging.Formatter" title="(in Python v3.15)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">logging.Formatter</span></code></a> <code class="docutils literal notranslate"><span class="pre">datefmt</span></code> parameter</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_file">
+<span class="sig-name descname"><span class="pre">log_file</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Path</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_file" title="Link to this definition"></a></dt>
+<dd><p>Filename for the log</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_file_level">
+<span class="sig-name descname"><span class="pre">log_file_level</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Enum</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'INFO'</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_file_level" title="Link to this definition"></a></dt>
+<dd><p>Logging Level for File Logging</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_format">
+<span class="sig-name descname"><span class="pre">log_format</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Unicode</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'[%(name)s]%(highlevel)s</span> <span class="pre">%(message)s'</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_format" title="Link to this definition"></a></dt>
+<dd><p>The Logging format template</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_level">
+<span class="sig-name descname"><span class="pre">log_level</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Enum</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">30</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.log_level" title="Link to this definition"></a></dt>
+<dd><p>Set the log level by value or name.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.logging_config">
+<span class="sig-name descname"><span class="pre">logging_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Dict</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{}</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.logging_config" title="Link to this definition"></a></dt>
+<dd><p>Configure additional log handlers. The default stderr logs handler is configured by the log_level, log_datefmt and log_format settings. This configuration can be used to configure additional handlers (e.g. to output the log to a file) or for finer control over the default handlers. If provided this should be a logging configuration dictionary, for more information see: <a class="reference external" href="https://docs.python.org/3/library/logging.config.html#logging-config-dictschema">https://docs.python.org/3/library/logging.config.html#logging-config-dictschema</a> This dictionary is merged with the base logging configuration which defines the following: * A logging formatter intended for interactive use called <code class="docutils literal notranslate"><span class="pre">console</span></code>. * A logging handler that writes to stderr called <code class="docutils literal notranslate"><span class="pre">console</span></code> which uses the formatter <code class="docutils literal notranslate"><span class="pre">console</span></code>. * A logger with the name of this application set to <code class="docutils literal notranslate"><span class="pre">DEBUG</span></code> level. This example adds a new handler that writes to a file: .. code-block:: python c.Application.logging_config = { “handlers”: { “file”: { “class”: “logging.FileHandler”, “level”: “DEBUG”, “filename”: “&lt;path/to/file&gt;”, } }, “loggers”: { “&lt;application-name&gt;”: { “level”: “DEBUG”, # NOTE: if you don’t list the default “console” # handler here then it will be disabled “handlers”: [“console”, “file”], }, }, }</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.overwrite">
+<span class="sig-name descname"><span class="pre">overwrite</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.overwrite" title="Link to this definition"></a></dt>
+<dd><p>(no description)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.progress_bar">
+<span class="sig-name descname"><span class="pre">progress_bar</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.progress_bar" title="Link to this definition"></a></dt>
+<dd><p>Show a progress bar</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.provenance_log">
+<span class="sig-name descname"><span class="pre">provenance_log</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Path</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.provenance_log" title="Link to this definition"></a></dt>
+<dd><p>(no description)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.quiet">
+<span class="sig-name descname"><span class="pre">quiet</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.quiet" title="Link to this definition"></a></dt>
+<dd><p>(no description)</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.show_config">
+<span class="sig-name descname"><span class="pre">show_config</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.show_config" title="Link to this definition"></a></dt>
+<dd><p>Instead of starting the Application, dump configuration to stdout</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.show_config_json">
+<span class="sig-name descname"><span class="pre">show_config_json</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.StereoTool.show_config_json" title="Link to this definition"></a></dt>
+<dd><p>Instead of starting the Application, dump configuration to stdout (as JSON)</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.read_telescope_triggers">
+<span class="sig-prename descclassname"><span class="pre">sst1mpipe.scripts.sst1mpipe_stereo_tool.</span></span><span class="sig-name descname"><span class="pre">read_telescope_triggers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">files</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.read_telescope_triggers" title="Link to this definition"></a></dt>
+<dd><p>Trigger table of the events of a telescope in its DL1 files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>files</strong><span class="classifier">list of str or pathlib.Path</span></dt><dd><p>DL1 files of the telescope (e.g. written by sst1mpipe-process).</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>astropy.table.Table</dt><dd><p>Rows of the tables <code class="docutils literal notranslate"><span class="pre">/dl1/event/telescope/trigger</span></code> of the files, one after the other
+(columns <code class="docutils literal notranslate"><span class="pre">obs_id</span></code>, <code class="docutils literal notranslate"><span class="pre">event_id</span></code>, <code class="docutils literal notranslate"><span class="pre">tel_id</span></code>, <code class="docutils literal notranslate"><span class="pre">time</span></code>, <code class="docutils literal notranslate"><span class="pre">event_type</span></code>,
+<code class="docutils literal notranslate"><span class="pre">n_trigger_pixels</span></code>), with the columns:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">file_index</span></code>: index of the file of the event in <code class="docutils literal notranslate"><span class="pre">files</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">time_ns</span></code>: trigger time in integer ns (TAI, as <code class="xref py py-obj docutils literal notranslate"><span class="pre">get_trigger_time_ns</span></code>),
+with the precision of the White Rabbit timestamps</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.TelescopeEventReader">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">sst1mpipe.scripts.sst1mpipe_stereo_tool.</span></span><span class="sig-name descname"><span class="pre">TelescopeEventReader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sources</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wanted</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.TelescopeEventReader" title="Link to this definition"></a></dt>
+<dd><p>Events of a telescope read from its DL1 files, asked for by key.</p>
+<p>The files are read once, in order. The events asked for are expected roughly in the order of
+the files: the wanted events read before they are asked for are kept until they are, the other
+events are dropped, so that only a few events are in memory.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>sources</strong><span class="classifier">list of ctapipe.io.EventSource</span></dt><dd><p>Event sources of the files of the telescope, in time order.</p>
+</dd>
+<dt><strong>wanted</strong><span class="classifier">iterable of tuple</span></dt><dd><p>Keys of the events which will be asked for: (index of the file in <code class="docutils literal notranslate"><span class="pre">sources</span></code>, obs_id, event_id).</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.TelescopeEventReader.get">
+<span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.TelescopeEventReader.get" title="Link to this definition"></a></dt>
+<dd><p>Event of a key, read from the files if it is not read yet.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>key</strong><span class="classifier">tuple</span></dt><dd><p>(index of the file in <code class="docutils literal notranslate"><span class="pre">sources</span></code>, obs_id, event_id), one of <code class="docutils literal notranslate"><span class="pre">wanted</span></code>.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>ctapipe.containers.ArrayEventContainer</dt><dd><p>Event, which is then forgotten by the reader: an event is asked for once.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt>KeyError</dt><dd><p>If the event is not in the files after the events already read.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="sst1mpipe.scripts.sst1mpipe_stereo_tool.CombinedRuns">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">sst1mpipe.scripts.sst1mpipe_stereo_tool.</span></span><span class="sig-name descname"><span class="pre">CombinedRuns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sources</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subarray</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.scripts.sst1mpipe_stereo_tool.CombinedRuns" title="Link to this definition"></a></dt>
+<dd><p>Run information of the input files of all the telescopes, given to the DataWriter in place of an event source.</p>
+<p>The ctapipe <a class="reference external" href="https://ctapipe.readthedocs.io/en/stable/api/ctapipe.io.DataWriter.html#ctapipe.io.DataWriter" title="(in ctapipe v0.33.0)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DataWriter</span></code></a> takes the description of the data it writes (subarray,
+observation and scheduling blocks…) from an event source, while the stereo events come from
+the event sources of several files and telescopes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>sources</strong><span class="classifier">list of ctapipe.io.EventSource</span></dt><dd><p>Event sources of the input files (observed data).</p>
+</dd>
+<dt><strong>subarray</strong><span class="classifier">ctapipe.instrument.SubarrayDescription</span></dt><dd><p>Subarray of all the telescopes.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Attributes<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt><strong>subarray</strong><span class="classifier">ctapipe.instrument.SubarrayDescription</span></dt><dd><p>Subarray of all the telescopes.</p>
+</dd>
+<dt><strong>observation_blocks</strong><span class="classifier">dict</span></dt><dd><p>Observation blocks of the sources by obs_id (the first one if several sources have it).</p>
+</dd>
+<dt><strong>scheduling_blocks</strong><span class="classifier">dict</span></dt><dd><p>Scheduling blocks of the sources by sb_id (the first one if several sources have it).</p>
+</dd>
+<dt><strong>obs_ids</strong><span class="classifier">list of int</span></dt><dd><p>Sorted obs_ids of the observation blocks.</p>
+</dd>
+<dt><strong>is_simulation</strong><span class="classifier">bool</span></dt><dd><p>False: only observed data are combined.</p>
+</dd>
+<dt><strong>simulation_config</strong><span class="classifier">dict</span></dt><dd><p>Empty (no simulations).</p>
+</dd>
+<dt><strong>atmosphere_density_profile</strong><span class="classifier">None</span></dt><dd><p>No atmosphere profile (no simulations).</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="sst1mpipe.io.append_monitoring_tables">
+<span class="sig-prename descclassname"><span class="pre">sst1mpipe.io.</span></span><span class="sig-name descname"><span class="pre">append_monitoring_tables</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_file</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.io.append_monitoring_tables" title="Link to this definition"></a></dt>
+<dd><p>Append the monitoring tables of a file (<code class="docutils literal notranslate"><span class="pre">MONITORING_GROUPS</span></code>: pointing, statistics of the
+pedestal events…) to those of another file: a table which is not in the output file is
+copied, the rows of a table which is in it are appended. Used for the stereo files, whose
+telescopes come from different files (one telescope each): the ctapipe HDF5Merger only attaches
+the monitoring data of a file with the same telescopes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>input_file: string</strong></dt><dd><p>Path</p>
+</dd>
+<dt><strong>output_file: string</strong></dt><dd><p>Path</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="sst1mpipe.io.containers.to_sst1m_event">
+<span class="sig-prename descclassname"><span class="pre">sst1mpipe.io.containers.</span></span><span class="sig-name descname"><span class="pre">to_sst1m_event</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">event</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.io.containers.to_sst1m_event" title="Link to this definition"></a></dt>
+<dd><p>Event as a <code class="xref py py-obj docutils literal notranslate"><span class="pre">SST1MArrayEventContainer</span></code>, with its content unchanged.</p>
+<p>Used for the mono events written by <code class="docutils literal notranslate"><span class="pre">sst1mpipe-stereo</span> <span class="pre">--keep-mono</span></code>: the events read from the
+DL1 files by the ctapipe <a class="reference external" href="https://ctapipe.readthedocs.io/en/stable/api/ctapipe.io.HDF5EventSource.html#ctapipe.io.HDF5EventSource" title="(in ctapipe v0.33.0)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">HDF5EventSource</span></code></a> are ctapipe
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">ArrayEventContainer</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>event</strong><span class="classifier">ctapipe.containers.ArrayEventContainer</span></dt><dd><p>Event, e.g. read by the HDF5EventSource.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>SST1MArrayEventContainer</dt><dd><p><code class="docutils literal notranslate"><span class="pre">event</span></code> itself if it is already a SST1MArrayEventContainer, otherwise a new container with
+the same fields (the same objects, not copies) and a copy of its <code class="docutils literal notranslate"><span class="pre">meta</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="sst1mpipe.stereo.nearest_index">
+<span class="sig-prename descclassname"><span class="pre">sst1mpipe.stereo.</span></span><span class="sig-name descname"><span class="pre">nearest_index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sorted_values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sst1mpipe.stereo.nearest_index" title="Link to this definition"></a></dt>
+<dd><p>Index of the nearest element of a sorted array to each of the given values.</p>
+<p>Used by <a class="reference internal" href="#sst1mpipe.stereo.WhiteRabbitClosestCombiner" title="sst1mpipe.stereo.WhiteRabbitClosestCombiner"><code class="xref py py-obj docutils literal notranslate"><span class="pre">WhiteRabbitClosestCombiner</span></code></a> to find, for each trigger time of a telescope, the closest
+trigger time of another telescope, for all the events at once (no loop over the events).</p>
+<p>For each value, <a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.searchsorted.html#numpy.searchsorted" title="(in NumPy v2.5)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">numpy.searchsorted</span></code></a> gives the position where it would be inserted in
+<code class="docutils literal notranslate"><span class="pre">sorted_values</span></code>: the elements just before (left neighbour) and at (right neighbour) this
+position are the two candidates, the smaller and the larger elements closest to the value. The
+nearest of the two is kept, the left one if both are as near. A value below the first element
+or above the last one has a single candidate, the first or the last element. The cost is
+<code class="docutils literal notranslate"><span class="pre">O(n</span> <span class="pre">log</span> <span class="pre">m)</span></code> for <code class="docutils literal notranslate"><span class="pre">n</span></code> values and <code class="docutils literal notranslate"><span class="pre">m</span></code> sorted values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><dl class="simple">
+<dt><strong>sorted_values</strong><span class="classifier">array-like</span></dt><dd><p>Values sorted in increasing order, not empty.</p>
+</dd>
+<dt><strong>values</strong><span class="classifier">array-like</span></dt><dd><p>Values whose nearest element is searched.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><dl class="simple">
+<dt>numpy.ndarray</dt><dd><p>For each of <code class="docutils literal notranslate"><span class="pre">values</span></code>, the index of the nearest element of <code class="docutils literal notranslate"><span class="pre">sorted_values</span></code>: the first
+one if two elements are as near.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">nearest_index</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">],</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">100</span><span class="p">])</span>
+<span class="go">array([0, 0, 1, 2])</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sst1mpipe_monitoring.html" class="btn btn-neutral float-left" title="Monitoring of a run: sst1mpipe-monitoring" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sst1m_analysis_workflow.html" class="btn btn-neutral float-right" title="SST-1M analysis workflow" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, SST-1M collaboration.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
