@@ -108,8 +108,9 @@ def brute_force(table, weights="intensity"):
                 )
                 candidates.append((alt, az))
             positions.append(candidates)
-        best, best_distance = None, np.inf
-        for signs in itertools.product((0, 1), repeat=len(rows)):
+        # MARS sign choice for two telescopes only, the predicted signs otherwise
+        best, best_distance = [p[0] for p in positions], np.inf
+        for signs in itertools.product((0, 1), repeat=len(rows)) if len(rows) == 2 else []:
             chosen = [positions[i][s] for i, s in enumerate(signs)]
             distance = sum(
                 angular_separation(a[1], a[0], b[1], b[0]).to_value(u.rad)

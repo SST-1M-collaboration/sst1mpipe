@@ -9,13 +9,10 @@ Stereo direction of the MARS analysis for the ctapipe disp reconstructor, select
 ctapipe finds the combiners among the imported subclasses of ``StereoCombiner``: ``sst1mpipe.ml`` must
 be imported, as by the sst1mpipe tools.
 """
-import itertools
-
 import astropy.units as u
 import numpy as np
 from astropy.table import Table
 from ctapipe.containers import ArrayEventContainer, ReconstructedGeometryContainer
-from ctapipe.core.traits import Int
 from ctapipe.reco.preprocessing import telescope_to_horizontal
 from ctapipe.reco.reconstructor import ReconstructionProperty
 from ctapipe.reco.stereo_combination import StereoMeanCombiner
@@ -25,11 +22,13 @@ from ctapipe.reco.utils import add_defaults_and_meta
 __all__ = ["StereoMARSCombiner", "mars_directions"]
 
 
-def mars_directions(candidates, weights, groups, n_events, max_telescopes=10):
+def mars_directions(candidates, weights, groups, n_events):
     """
-    MARS stereo direction of array events: for each, the combination of the two possible positions
-    of its telescopes (signs of the disp) with the smallest sum of pairwise angular distances, and
-    the weighted mean of these positions.
+    MARS stereo direction of array events with two telescopes: the combination of the two possible
+    positions of each telescope (signs of the disp) with the smallest angular distance, and the
+    weighted mean of these positions.
+
+    Only two telescopes: with one telescope, or more than two, the predicted signs are kept.
 
     Parameters
     ----------
@@ -39,34 +38,31 @@ def mars_directions(candidates, weights, groups, n_events, max_telescopes=10):
         (n_telescope_events,) weight and array event index of each telescope event
     n_events: int
         number of array events
-    max_telescopes: int
-        array events with more telescopes keep the predicted signs (2 ** n combinations)
 
     Returns
     -------
     alt, az, spread, distance: numpy.ndarray
-        (n_events,) direction (rad), spread of the chosen positions and sum of their pairwise
-        distances (rad); NaN for the events without telescope event
+        (n_events,) direction (rad), spread of the chosen positions, angular distance of the
+        chosen positions of the two telescopes (rad, 0 otherwise); NaN without telescope event
     """
+    # TODO: more than two telescopes, e.g. the combination of signs with the smallest sum of the
+    #  pairwise distances (2 ** n_telescopes combinations)
     groups = np.asarray(groups, dtype=np.int64)  # ctapipe gives uint64 indices: not for bincount
+    multiplicity = np.bincount(groups, minlength=n_events)
     chosen = candidates[:, 0].copy()
     distance = np.zeros(n_events)
-    multiplicity = np.bincount(groups, minlength=n_events)
+
+    events = np.flatnonzero(multiplicity == 2)
     order = np.argsort(groups, kind="stable")
-    starts = np.concatenate([[0], np.cumsum(multiplicity)[:-1]])
-    for m in np.unique(multiplicity):
-        if m < 2 or m > max_telescopes:
-            continue
-        events = np.flatnonzero(multiplicity == m)
-        rows = order[starts[events][:, np.newaxis] + np.arange(m)]  # (n, m) telescope events
-        signs = np.array(list(itertools.product((0, 1), repeat=m)))  # (2 ** m, m)
-        positions = candidates[rows[:, np.newaxis, :], signs[np.newaxis]]  # (n, 2 ** m, m, 3)
-        i, j = np.triu_indices(m, k=1)
-        cos = np.einsum("nckx,nckx->nck", positions[:, :, i], positions[:, :, j])
-        total = np.arccos(np.clip(cos, -1, 1)).sum(axis=-1)
-        best = np.argmin(total, axis=1)
-        distance[events] = total[np.arange(len(events)), best]
-        chosen[rows] = positions[np.arange(len(events)), best]
+    start = np.cumsum(multiplicity) - multiplicity
+    first, second = order[start[events]], order[start[events] + 1]
+    # (n, 2, 2) distances of the positions of the first and second telescopes
+    cos = np.einsum("nix,njx->nij", candidates[first], candidates[second])
+    separation = np.arccos(np.clip(cos, -1, 1)).reshape(len(events), 4)
+    best = np.argmin(separation, axis=1)
+    chosen[first] = candidates[first, best // 2]
+    chosen[second] = candidates[second, best % 2]
+    distance[events] = separation[np.arange(len(events)), best]
 
     mean = np.zeros((n_events, 3))
     np.add.at(mean, groups, chosen * weights[:, np.newaxis])
@@ -97,21 +93,19 @@ def _candidates(disp, psi, fov_lon, fov_lat, pointing_alt, pointing_az):
 
 class StereoMARSCombiner(StereoMeanCombiner):
     """
-    Stereo combination of the MARS analysis (as ``sst1mpipe.reco.stereo_reconstruction``).
+    Stereo combination of the MARS analysis, for two telescopes.
 
     Geometry of the disp reconstructor: each telescope gives two possible positions (its disp norm
     on either side of the centroid along the major axis); the combination of signs whose positions
     are the closest to each other is chosen, and the direction is their weighted mean (``weights``).
-    Single telescope events keep the predicted sign. ``goodness_of_fit``: sum of the angular
-    distances of the chosen positions (deg). Energy and particle type: as the ``StereoMeanCombiner``.
+    ``goodness_of_fit``: angular distance of the chosen positions (deg). Energy and particle type:
+    as the ``StereoMeanCombiner``.
+
+    Not yet for more than two telescopes (TODO): events with one telescope, or more than two, keep
+    the predicted signs (weighted mean of the predicted positions).
 
     Needs the telescope frame Hillas parameters and the telescope pointing.
     """
-
-    max_telescopes = Int(
-        default_value=10,
-        help="Array events with more telescopes keep the predicted disp signs (2 ** n_telescopes combinations)",
-    ).tag(config=True)
 
     def predict_table(self, mono_predictions: Table) -> Table:
         if self.property is not ReconstructionProperty.GEOMETRY:
@@ -130,7 +124,7 @@ class StereoMARSCombiner(StereoMeanCombiner):
         )
         weights = np.asarray(self._calculate_weights(table), dtype=float)
         alt, az, spread, distance = mars_directions(
-            candidates, weights, indices[valid], len(obs_ids), self.max_telescopes,
+            candidates, weights, indices[valid], len(obs_ids),
         )
 
         telescopes = [[] for _ in obs_ids]
@@ -169,7 +163,7 @@ class StereoMARSCombiner(StereoMeanCombiner):
 
         if tel_ids:
             alt, az, spread, distance = (x[0] for x in mars_directions(
-                np.array(candidates), np.array(weights), np.zeros(len(tel_ids)), 1, self.max_telescopes,
+                np.array(candidates), np.array(weights), np.zeros(len(tel_ids)), 1,
             ))
         else:
             alt = az = spread = distance = np.nan

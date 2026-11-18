@@ -118,12 +118,11 @@ Stereo direction of the MARS analysis
         weights: intensity
 
 Each telescope gives two possible source positions: at the reconstructed disp norm on either side
-of the image centroid along its major axis. The combination of signs whose positions are the
-closest to each other (smallest sum of the pairwise angular distances; 4 combinations for 2
-telescopes) is chosen, and the stereo direction is the weighted mean of its positions. The disp sign
-predicted by the classifier is only used for the events of a single telescope. The
-``disp_goodness_of_fit`` of the stereo events is the sum of the angular distances of the chosen
-positions (deg). The energy and the gammaness are combined as by the ``StereoMeanCombiner``.
+of the image centroid along its major axis. For two telescopes, the combination of signs (4) whose
+positions are the closest to each other is chosen, and the stereo direction is the weighted mean of
+its positions; ``disp_goodness_of_fit`` is the angular distance of the chosen positions (deg).
+Events with one telescope keep the disp sign predicted by the classifier. More than two telescopes
+are not supported yet (TODO): their predicted signs are kept. The energy and the gammaness are combined as by the ``StereoMeanCombiner``.
 
 The combiner is a class of sst1mpipe (``sst1mpipe.ml``): the models using it are applied with the
 sst1mpipe tools (or any program importing ``sst1mpipe.ml``), not with ``ctapipe-apply-models``.
