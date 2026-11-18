@@ -1,0 +1,46 @@
+# sst1mpipe-train-particle-classifier: models of sst1mpipe_mc_config_low_nsb.json (RF settings, features, cuts)
+#   sst1mpipe-train-particle-classifier --signal gamma_diffuse_train.dl1.h5 --background proton_train.dl1.h5 \
+#     -o particle_classifier.pkl --config sst1mpipe_train_particle_classifier.yaml --n-events 700000 \
+#     --signal-fraction 0.5 --cv-output cv_classifier.h5
+# signal fraction = gamma_to_proton_training_ratio / (1 + gamma_to_proton_training_ratio) = 0.5 for 1.0
+TrainParticleClassifier:
+  random_seed: 42
+  ParticleClassifier:
+    model_cls: RandomForestClassifier
+    model_config:              # random_forest_classifier_args
+      n_estimators: 100
+      max_depth: 30
+      min_samples_leaf: 10
+      min_samples_split: 10
+      bootstrap: true
+      criterion: gini
+      random_state: 42
+    positive_class: 0          # gammas (true_shower_primary_id 0): the prediction is the gammaness
+    features:                  # particle_classification_features (telescope frame names)
+      - log_hillas_intensity
+      - hillas_width
+      - hillas_length
+      - hillas_wl
+      - hillas_skewness
+      - hillas_kurtosis
+      - timing_slope
+      - leakage_intensity_width_2
+      - hillas_fov_lon
+      - hillas_fov_lat
+      # stereo models: add HillasReconstructor_tel_impact_distance and HillasReconstructor_h_max
+      # with the reconstructed energy / disp as features (as sst1mpipe with log_reco_energy): apply the
+      # energy and disp models to the classifier training files first (ctapipe-apply-models), then add
+      # - log_reco_energy      (with ["log_reco_energy", "log10(RandomForestRegressor_tel_energy)"] below)
+      # - disp_tel_parameter
+    FeatureGenerator:
+      features:
+        - ["log_hillas_intensity", "log10(hillas_intensity)"]
+        - ["hillas_wl", "hillas_width / hillas_length"]
+    MLQualityQuery:
+      quality_criteria:
+        - ["intensity", "(hillas_intensity > 0) & (hillas_intensity < 1e6)"]
+        - ["width", "hillas_width > 0"]
+        - ["length", "hillas_length > 0"]
+        - ["leakage", "leakage_intensity_width_2 <= 1"]
+    StereoMeanCombiner:
+      weights: intensity
