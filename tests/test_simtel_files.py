@@ -6,10 +6,11 @@ import numpy as np
 import pytest
 from astropy.coordinates import angular_separation
 from ctapipe.containers import EventType
-from ctapipe.io import EventSource, SimTelEventSource, read_table
+from astropy.table import Table
+from ctapipe.io import EventSource, SimTelEventSource, read_table, write_table
 
 from conftest import run_process
-from sst1mpipe.io import get_dl1_info
+from sst1mpipe.io import correct_shower_reuse, get_dl1_info
 from sst1mpipe.resources import MC_CONFIG_FILES, TEST_DATA_DIR
 
 SIMTEL_DIR = TEST_DATA_DIR / "simtel"
@@ -178,6 +179,9 @@ def test_process_simtel_file(simtel_file, tmp_path):
     histogram = read_table(output, "/simulation/service/shower_distribution")
     assert run["shower_reuse"][0] == simtel_file["shower_reuse"]
     assert run["n_showers"][0] * run["shower_reuse"][0] == histogram["n_entries"].sum()
+    # the use of each event (event_id: shower * 100 + use) is below the number of uses written
+    use = shower["event_id"] % 100
+    assert use.max() < run["shower_reuse"][0] <= 100
 
     tel_trigger = read_table(output, "/dl1/event/telescope/trigger")
     info = get_dl1_info(output)
@@ -217,3 +221,29 @@ def test_process_simtel_file(simtel_file, tmp_path):
     distribution = read_table(output, "/simulation/service/shower_distribution")
     assert len(distribution) == 1
     assert distribution["n_entries"][0] > n_events
+
+
+def test_correct_shower_reuse(tmp_path):
+    """shower_reuse written in the file: from the histogram of each run when the header differs"""
+    path = tmp_path / "simulation.h5"
+    # obs_id 1: consistent; 2: 100 uses with 20 in the header; 3: histogram not a multiple of n_showers
+    runs = Table(dict(obs_id=[1, 2, 3], n_showers=[1000, 2000, 300], shower_reuse=[20, 20, 20],
+                      energy_range_min=[0.2, 0.4, 0.4]))
+    histograms = Table(dict(obs_id=[1, 2, 3], hist_id=[6, 6, 6], n_entries=[20000, 200000, 6001]))
+    write_table(runs, path, "/configuration/simulation/run")
+    write_table(histograms, path, "/simulation/service/shower_distribution")
+
+    assert correct_shower_reuse(path) == {2: (20, 100)}
+    written = read_table(path, "/configuration/simulation/run")
+    np.testing.assert_array_equal(written["shower_reuse"], [20, 100, 20])
+    np.testing.assert_array_equal(written["n_showers"], runs["n_showers"])
+    np.testing.assert_array_equal(written["energy_range_min"], runs["energy_range_min"])
+    # once corrected, the file is consistent: nothing more to correct
+    assert correct_shower_reuse(path) == {}
+
+
+def test_correct_shower_reuse_without_simulation(tmp_path):
+    path = tmp_path / "observation.h5"
+    write_table(Table(dict(obs_id=[1])), path, "/configuration/observation/observation_block")
+    assert correct_shower_reuse(path) == {}
+
