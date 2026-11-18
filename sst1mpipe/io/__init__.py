@@ -6,6 +6,7 @@ from .io import (
     add_pointing_dl1_stereo,
     check_outdir,
     attach_monitoring_file,
+    correct_shower_reuse,
     DL1_PEDESTAL_GROUP,
     R0_PEDESTAL_GROUP,
     R0_PIXEL_STATISTICS_GROUP,

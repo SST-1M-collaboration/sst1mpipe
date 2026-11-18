@@ -780,6 +780,49 @@ DL1_PEDESTAL_GROUP = DL1_SKY_PEDESTAL_IMAGE_GROUP
 R0_PEDESTAL_GROUP = f"{R0_PIXEL_STATISTICS_GROUP}/sky_pedestal_waveform"
 
 
+SIMULATION_RUN_TABLE = "/configuration/simulation/run"
+SHOWER_DISTRIBUTION_TABLE = "/simulation/service/shower_distribution"
+
+
+def correct_shower_reuse(path):
+    """
+    Number of uses of each shower (``shower_reuse``) of the simulation runs of a file from their
+    histogram of the thrown showers (``n_entries`` of ``/simulation/service/shower_distribution``),
+    when ``n_showers * shower_reuse`` of the run header differs from it.
+
+    CORSIKA stores at most 20 uses (CSCAT) in the run header: with more, ``shower_reuse`` is 20,
+    while the histogram (and the event ids, ``shower * 100 + use``) count all the uses. ctapipe
+    (``ctapipe-compute-irf``) refuses such files, and their number of simulated showers is wrong.
+
+    Returns
+    -------
+    dict: {obs_id: (header shower_reuse, corrected shower_reuse)} of the corrected runs
+    """
+    with tables.open_file(path, mode="r+") as h5file:
+        if SIMULATION_RUN_TABLE not in h5file or SHOWER_DISTRIBUTION_TABLE not in h5file:
+            return {}
+        runs = h5file.get_node(SIMULATION_RUN_TABLE)
+        n_entries = {}
+        for row in h5file.get_node(SHOWER_DISTRIBUTION_TABLE).iterrows():
+            n_entries[row["obs_id"]] = n_entries.get(row["obs_id"], 0) + row["n_entries"]
+        reuse = runs.col("shower_reuse")
+        corrected = {}
+        for i, (obs_id, n_showers) in enumerate(zip(runs.col("obs_id"), runs.col("n_showers"), strict=True)):
+            n_thrown = n_entries.get(obs_id)
+            if n_thrown is None or n_showers == 0 or n_thrown == n_showers * reuse[i]:
+                continue
+            if n_thrown % n_showers != 0:
+                logging.warning("obs_id %d: %d thrown showers, not a multiple of %d showers", obs_id, n_thrown, n_showers)
+                continue
+            corrected[int(obs_id)] = (int(reuse[i]), int(n_thrown // n_showers))
+            reuse[i] = n_thrown // n_showers
+        if corrected:
+            runs.modify_column(column=reuse, colname="shower_reuse")
+    for obs_id, (old, new) in corrected.items():
+        logging.warning("obs_id %d: shower_reuse %d of the run header corrected to %d (histogram)", obs_id, old, new)
+    return corrected
+
+
 def attach_monitoring_file(monitoring_file, output_file):
     """
     Copy the monitoring data of a run (file of sst1mpipe-monitoring) into another file of the

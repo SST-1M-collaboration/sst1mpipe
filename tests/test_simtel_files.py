@@ -25,17 +25,17 @@ FILES = {
     "gamma_diffuse": dict(
         name="gamma_200_800E3GeV_20_20deg_ATM52_102168.corsika.gz.NSBmed4.simtel.gz",
         run=102168, primary=GAMMA_ID, n_events=376, energy_range=(0.2, 800) * u.TeV,
-        viewcone=10 * u.deg, n_showers=3000, scatter_range=928 * u.m,
+        viewcone=10 * u.deg, n_showers=3000, scatter_range=928 * u.m, shower_reuse=20,
     ),
     "gamma_point": dict(
         name="gamma_point_200_800E3GeV_20_20deg_ATM52_300669.corsika.gz.NSBmed4.simtel.gz",
         run=300669, primary=GAMMA_ID, n_events=563, energy_range=(0.2, 800) * u.TeV,
-        viewcone=0 * u.deg, n_showers=1000, scatter_range=928 * u.m,
+        viewcone=0 * u.deg, n_showers=1000, scatter_range=928 * u.m, shower_reuse=20,
     ),
     "proton": dict(
         name="proton_400_1300E3GeV_20_20deg_ATM52_204508.corsika.gz.NSBmed4.simtel.gz",
         run=204508, primary=PROTON_ID, n_events=626, energy_range=(0.4, 1300) * u.TeV,
-        viewcone=10 * u.deg, n_showers=2000, scatter_range=1032 * u.m,
+        viewcone=10 * u.deg, n_showers=2000, scatter_range=1032 * u.m, shower_reuse=100,
     ),
 }
 
@@ -171,6 +171,13 @@ def test_process_simtel_file(simtel_file, tmp_path):
     assert len(trigger) == n_events
     assert len(shower) == n_events
     assert set(shower["true_shower_primary_id"]) == {simtel_file["primary"]}
+
+    # number of uses of the showers: from the histogram of the thrown showers when the CORSIKA
+    # run header has 20 (its maximum), e.g. 100 for the protons
+    run = read_table(output, "/configuration/simulation/run")
+    histogram = read_table(output, "/simulation/service/shower_distribution")
+    assert run["shower_reuse"][0] == simtel_file["shower_reuse"]
+    assert run["n_showers"][0] * run["shower_reuse"][0] == histogram["n_entries"].sum()
 
     tel_trigger = read_table(output, "/dl1/event/telescope/trigger")
     info = get_dl1_info(output)
