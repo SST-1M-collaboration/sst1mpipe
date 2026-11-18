@@ -6,6 +6,7 @@ from .io import (
     append_monitoring_tables,
     check_outdir,
     attach_monitoring_file,
+    correct_shower_reuse,
     MONITORING_GROUPS,
     DL1_PEDESTAL_GROUP,
     R0_PEDESTAL_GROUP,

@@ -13,7 +13,7 @@ from ctapipe.io import EventSource, DataWriter, MonitoringSource
 from ctapipe.reco import ShowerProcessor
 
 from sst1mpipe.calib import R0R1Calibrator, ImageSaturationCorrector
-from sst1mpipe.io import attach_monitoring_file, write_dl1_info
+from sst1mpipe.io import attach_monitoring_file, correct_shower_reuse, write_dl1_info
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.monitoring_source import SST1MMonitoringSource
 from sst1mpipe.utils.cleaning import DBSCANImageCleaner, TimeDBSCANImageCleaner
@@ -322,6 +322,9 @@ class ProcessorTool(Tool):
             self.writer.write_simulated_shower_distributions(self.event_source.simulated_shower_distributions)
         self._close_writer()
         output_path = None if self.writer is None else self.writer.output_path
+        if output_path is not None and self.event_source.is_simulation:
+            # more than 20 uses of the showers are not in the CORSIKA run header
+            correct_shower_reuse(output_path)
         if self.attach_monitoring and output_path is not None:
             for monitoring_source in self.monitoring_sources:
                 for monitoring_file in getattr(monitoring_source, "input_files", []):
