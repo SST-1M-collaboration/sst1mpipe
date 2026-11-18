@@ -28,6 +28,11 @@ OBSERVATION_RUNS = {
     21: dict(path=ZFITS_DIR / "SST1M1_20260120_1179.fits.fz", n_events=150, n_pedestals=40),
     22: dict(path=ZFITS_DIR / "SST1M2_20260120_1102.fits.fz", n_events=35, n_pedestals=13),
 }
+# coincident (stereo) events of the observation runs: the run of tel 22 is within the events
+# EVENTS_TEL_1 of tel 21, and has 2 coincident events, with the SWAT array event id ->
+# trigger time of tel 22 - trigger time of tel 21 (ns)
+EVENTS_TEL_1 = slice(4150, 4328)
+COINCIDENT_EVENTS = {25085157: 32, 25085168: 48}
 # dark run of tel 22: pedestal events only
 DARK_FILE = ZFITS_DIR / "SST1M2_20260119_0007.fits.fz"
 # runs of the transition between two wobbles (night of 2026-01-21)

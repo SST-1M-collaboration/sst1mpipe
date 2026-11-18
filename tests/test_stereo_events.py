@@ -5,16 +5,12 @@ of the test files: the run of tel 22 (35 events) is taken during the run of tel 
 import numpy as np
 import pytest
 
-from conftest import OBSERVATION_RUNS, read_zfits_events, run_process
+from conftest import COINCIDENT_EVENTS, EVENTS_TEL_1, OBSERVATION_RUNS, read_zfits_events, run_process
 from sst1mpipe.io import read_trigger_time
 from sst1mpipe.io.containers import CameraEventType
 from sst1mpipe.utils import get_trigger_time_ns
 
 FILE_TEL_1, FILE_TEL_2 = OBSERVATION_RUNS[21]["path"], OBSERVATION_RUNS[22]["path"]
-# events of tel 21 around the run of tel 22
-EVENTS_TEL_1 = slice(4150, 4328)
-# SWAT array event id -> trigger time of tel 22 - trigger time of tel 21 (ns)
-COINCIDENT_EVENTS = {25085157: 32, 25085168: 48}
 # maximum time difference of coincident events (stereo WhiteRabbitClosest method)
 MAX_TIME_DIFF_NS = 10_000
 
