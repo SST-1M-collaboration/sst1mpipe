@@ -107,29 +107,6 @@ def get_nsb_levels_rates(config):
     return nsb_levels, nsb_rates
 
 
-def get_stereo_method(config):
-    """
-    Reads method of coincidet event matching
-    from the config file.
-
-    Parameters
-    ----------
-    config: dict
-
-    Returns
-    -------
-    string
-        Selected method of stereo event matching
-
-    """
-    stereo_method = config['stereo']['event_matching_method']
-    if stereo_method not in ['SlidingWindow', 'WhiteRabbitClosest', 'SWATEventIDs']:
-        logging.error("Unknown event mathing method set in cfg file! Available options: SlidingWindow, WhiteRabbitClosest, SWATEventIDs.")
-        exit(-1)
-    else:
-        return stereo_method
-
-
 def get_trigger_time_ns(data):
     """
     Trigger times of the DL1 table (trigger_time column, see
@@ -221,6 +198,32 @@ def merge_subarrays(subarrays, name=None):
                                reference_location=reference)
 
 
+def _round_ns(quantity):
+    """
+    Time quantity as an integer number of nanoseconds.
+
+    Used by the stereo combiners (`sst1mpipe.stereo`), which compare the trigger times of the
+    telescopes in integer ns (White Rabbit precision).
+
+    Parameters
+    ----------
+    quantity : astropy.units.Quantity
+        Time quantity (e.g. ``10 * u.us``).
+
+    Returns
+    -------
+    int
+        ``quantity`` in ns, rounded to the nearest integer.
+
+    Examples
+    --------
+    >>> import astropy.units as u
+    >>> _round_ns(1.5 * u.us)
+    1500
+    """
+    return int(round(quantity.to_value(u.ns)))
+
+
 def get_tel_string(tel, mc=True):
     """
     Makes string with telescope designation understandable
@@ -290,40 +293,6 @@ def simbad_query(ra=None, dec=None, max_mag=8):
     logging.info(result_table)
 
     return result_table
-
-
-def event_hillas_add_units(event):
-    """
-    This returns units to Hillas parameters to
-    event which resulted from
-    ctapipe.io.HDF5EventSource
-
-    Parameters
-    ----------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-
-    Returns
-    -------
-    event:
-        sst1mpipe.io.containers.SST1MArrayEventContainer
-        Event with units added to Hillas
-        parameter
-    """
-
-    for tel in event.trigger.tels_with_trigger:
-        event.dl1.tel[tel].parameters.hillas.length = event.dl1.tel[tel].parameters.hillas.length * u.m
-        event.dl1.tel[tel].parameters.hillas.length_uncertainty = event.dl1.tel[tel].parameters.hillas.length_uncertainty * u.m
-        event.dl1.tel[tel].parameters.hillas.phi = event.dl1.tel[tel].parameters.hillas.phi * u.deg
-        event.dl1.tel[tel].parameters.hillas.psi = event.dl1.tel[tel].parameters.hillas.psi * u.deg
-        event.dl1.tel[tel].parameters.hillas.r = event.dl1.tel[tel].parameters.hillas.r * u.m
-        event.dl1.tel[tel].parameters.hillas.width = event.dl1.tel[tel].parameters.hillas.width * u.m
-        event.dl1.tel[tel].parameters.hillas.width_uncertainty = event.dl1.tel[tel].parameters.hillas.width_uncertainty * u.m
-        event.dl1.tel[tel].parameters.hillas.x = event.dl1.tel[tel].parameters.hillas.x * u.m
-        event.dl1.tel[tel].parameters.hillas.y = event.dl1.tel[tel].parameters.hillas.y * u.m
-        event.dl1.tel[tel].parameters.timing.slope = event.dl1.tel[tel].parameters.timing.slope * 1/u.m
-
-    return event
 
 
 def add_trigger_time(event, telescope=None):
