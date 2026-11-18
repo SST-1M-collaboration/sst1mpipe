@@ -62,10 +62,10 @@ with ctaplot:
 
 - ``<model name>_feature_importance.png``: feature importances of the model of each telescope type
   (the norm regressor and the sign classifier of the disp);
-- ``<model name>_performance.png``: performance from the out-of-fold predictions of the cross
-  validation (``CrossValidator.n_cross_validations``, 5 by default), one row per telescope id, and
-  a stereo row for the events with at least two telescopes, combined by the stereo combiner of the
-  model.
+- ``<model name>_performance.png``: performance from the cross validation of ctapipe
+  (``CrossValidator.n_cross_validations``, 5 by default; written in ``<model name>_cv.h5`` in the
+  plot directory if ``--cv-output`` is not given), one row per telescope. The stereo performance is
+  the one of the DL2 (benchmarks of ``ctapipe-compute-irf``).
 
 Plots of the models trained on the three test simtel files (``tests``, a few hundred events: the
 statistics are low):
@@ -117,11 +117,12 @@ Stereo direction of the MARS analysis
         weights: intensity
 
 Each telescope gives two possible source positions: at the reconstructed disp norm on either side
-of the image centroid along its major axis. For two telescopes, the combination of signs (4) whose
-positions are the closest to each other is chosen, and the stereo direction is the weighted mean of
-its positions; ``disp_goodness_of_fit`` is the angular distance of the chosen positions (deg).
-Events with one telescope keep the disp sign predicted by the classifier. More than two telescopes
-are not supported yet (TODO): their predicted signs are kept. The energy and the gammaness are combined as by the ``StereoMeanCombiner``.
+of the image centroid along its major axis. For two telescopes, ``mars_disp_signs`` computes the
+crossing of the two major axes, and each telescope takes the sign whose position is the closest to
+this crossing. The directions of the telescopes recomputed with these signs are combined as by the
+``StereoMeanCombiner`` (weighted mean, ``weights``). Events with one telescope keep the disp sign
+predicted by the classifier; more than two telescopes are not implemented yet (TODO,
+``NotImplementedError``). The energy and the gammaness are combined as by the ``StereoMeanCombiner``.
 
 The combiner is a class of sst1mpipe (``sst1mpipe.ml``): the models using it are applied with the
 sst1mpipe tools (or any program importing ``sst1mpipe.ml``), not with ``ctapipe-apply-models``.
