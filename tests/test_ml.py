@@ -19,7 +19,7 @@ from ctapipe.reco.preprocessing import telescope_to_horizontal
 from ctapipe.reco.reconstructor import ReconstructionProperty
 from ctapipe.reco.stereo_combination import StereoCombiner
 
-from conftest import run_process
+from conftest import OBSERVATION_RUNS, monitoring_source_args, run_process
 from sst1mpipe.ml import StereoMARSCombiner, mars_directions
 from sst1mpipe.scripts.sst1mpipe_apply_models_tool import ApplyModels, closest_model_node, find_model_nodes
 from sst1mpipe.scripts.sst1mpipe_train_models_tool import (
@@ -27,7 +27,7 @@ from sst1mpipe.scripts.sst1mpipe_train_models_tool import (
     TrainEnergyRegressor,
     TrainParticleClassifier,
 )
-from sst1mpipe.resources import MC_CONFIG_FILES, TEST_DATA_DIR, TRAIN_CONFIG_FILES
+from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, TEST_DATA_DIR, TRAIN_CONFIG_FILES
 
 SIMTEL_DIR = TEST_DATA_DIR / "simtel"
 GAMMA_DIFFUSE = SIMTEL_DIR / "gamma_200_800E3GeV_20_20deg_ATM52_102168.corsika.gz.NSBmed4.simtel.gz"
@@ -260,3 +260,21 @@ def test_apply_models(models, dl1_files, tmp_path):
         geometry["true_az"].quantity, geometry["true_alt"].quantity,
     )[stereo]
     assert np.median(separation) < 1 * u.deg
+
+
+def test_apply_models_to_observations(models, observation_monitoring, tmp_path):
+    """the models of the simulated telescope 1 are applied to the observations of telescope 21"""
+    run = OBSERVATION_RUNS[21]
+    dl1 = tmp_path / "observation.dl1.h5"
+    run_process(run["path"], dl1, f"--max-events={run['n_events']}", *monitoring_source_args(observation_monitoring[21]),
+                config=DATA_CONFIG_FILE)
+    directory, _ = models
+    output = tmp_path / "observation.dl2.h5"
+    tool = ApplyModels()
+    argv = ["-i", str(dl1), "--models-directory", str(directory), "-o", str(output), "--no-progress"]
+    assert run_tool(tool, argv=argv, raises=True) == 0
+    energy = read_table(output, "/dl2/event/telescope/energy/RandomForestRegressor/tel_021")
+    assert len(energy) > 0 and np.any(energy["RandomForestRegressor_tel_is_valid"])
+    geometry = read_table(output, "/dl2/event/subarray/geometry/disp")
+    assert np.any(geometry["disp_is_valid"])
+
