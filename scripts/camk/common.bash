@@ -28,3 +28,18 @@ join_ids() {
   local IFS=:
   echo "$*"
 }
+
+# -r <model> of the models (*.pkl) of a directory, for sst1mpipe-apply-models
+models_args() {
+  local model
+  for model in "$1"/*.pkl; do
+    printf -- '-r\n%s\n' "${model}"
+  done
+}
+
+# simtel files of a particle (MC_GAMMA_DIFFUSE, MC_GAMMA_POINT, MC_PROTON) at a zenith angle
+mc_pattern() {
+  local -A patterns=([gamma_diffuse]="${MC_GAMMA_DIFFUSE}" [gamma_point]="${MC_GAMMA_POINT}" [proton]="${MC_PROTON}")
+  local pattern="${patterns[$1]}"
+  echo "${pattern//%zenith%/$2}"
+}

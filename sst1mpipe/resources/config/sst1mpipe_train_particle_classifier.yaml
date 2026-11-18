@@ -27,6 +27,7 @@ TrainParticleClassifier:
       - leakage_intensity_width_2
       - hillas_fov_lon
       - hillas_fov_lat
+      - cos_zenith             # pointing of the telescope (models of all the zenith angles)
       # stereo models: add HillasReconstructor_tel_impact_distance and HillasReconstructor_h_max
       # with the reconstructed energy / disp as features (as sst1mpipe with log_reco_energy): apply the
       # energy and disp models to the classifier training files first (ctapipe-apply-models), then add
@@ -36,6 +37,7 @@ TrainParticleClassifier:
       features:
         - ["log_hillas_intensity", "log10(hillas_intensity)"]
         - ["hillas_wl", "hillas_width / hillas_length"]
+        - ["cos_zenith", "sin(telescope_pointing_altitude)"]
     MLQualityQuery:
       quality_criteria:
         - ["intensity", "(hillas_intensity > 0) & (hillas_intensity < 1e6)"]

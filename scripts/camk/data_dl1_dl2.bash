@@ -3,8 +3,8 @@
 #############################
 #  DL1 -> DL2 of the data   #
 #############################
-# Every DL1 file (cs1, cs2, stereo) with the models of the node of MODELS_DIRECTORY closest to its
-# pointing (sst1mpipe-apply-models), N_PARALLEL files at a time: dl2/<cs1, cs2, stereo>/.
+# Every DL1 file (cs1, cs2, stereo) with the models of MODELS_DIRECTORY (sst1mpipe-apply-models),
+# N_PARALLEL files at a time: dl2/<cs1, cs2, stereo>/.
 
 #SBATCH --job-name=data-dl1-dl2
 #SBATCH --nodes=1
@@ -24,9 +24,11 @@ dl1_dl2() {
   local output="${1/\/dl1\//\/dl2\/}"
   output="$(dirname "${output}")/$(basename "${output//dl1/dl2}")"
   mkdir -p "$(dirname "${output}")"
-  sst1mpipe-apply-models -i "$1" -m "${MODELS_DIRECTORY}" -o "${output}" --overwrite --no-progress
+  local models
+  mapfile -t models < <(models_args "${MODELS_DIRECTORY}")
+  sst1mpipe-apply-models -i "$1" "${models[@]}" -o "${output}" --overwrite --no-progress
 }
-export -f dl1_dl2
+export -f dl1_dl2 models_args
 export MODELS_DIRECTORY
 
 # not the night files merged for the stereo (dl1/merged)

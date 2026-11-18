@@ -6,6 +6,7 @@
 # 1. ctapipe-optimize-event-selection: gammaness and direction cuts (point gammas, protons)
 # 2. ctapipe-compute-irf: point-like IRFs (point gammas, direction cut), and full enclosure IRFs
 #    (diffuse gammas), with the benchmarks (sensitivity, resolutions)
+# One zenith angle of MC_ZENITHS per task of the job array, in irf/ze<zenith>/.
 # In the conda environment IRF_CONDA_ENV (ctapipe IRF tools: pyirf ~0.14, astropy >= 7).
 
 #SBATCH --job-name=mc-irf
@@ -15,13 +16,15 @@
 #SBATCH --qos=long
 #SBATCH --partition=pctacamk
 #SBATCH --mem-per-cpu=8GB
-#SBATCH --output=/home/%u/logs/%x-%j.out
-#SBATCH --error=/home/%u/logs/%x-%j.err
+#SBATCH --output=/home/%u/logs/%x-%A_%a.out
+#SBATCH --error=/home/%u/logs/%x-%A_%a.err
 
 CONDA_ENV_VARIABLE=IRF_CONDA_ENV source "${SST1MPIPE_ROOT:-${SLURM_SUBMIT_DIR:-.}}/scripts/camk/common.bash"
 
-DL2="${MC_DIRECTORY}/dl2"
-IRF="${MC_DIRECTORY}/irf"
+read -ra ZENITHS <<< "${MC_ZENITHS}"
+ZENITH=${ZENITHS[${SLURM_ARRAY_TASK_ID:-0}]}
+DL2="${MC_DIRECTORY}/dl2/ze${ZENITH}"
+IRF="${MC_DIRECTORY}/irf/ze${ZENITH}"
 mkdir -p "${IRF}"
 
 ctapipe-optimize-event-selection --config "${OPTIMIZE_CUTS_CONFIG}" \
