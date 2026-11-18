@@ -429,7 +429,7 @@ class R0R1Calibrator(TelescopeComponent):
 
         n_pixels = waveform.shape[1]
         pixel_status = np.full(n_pixels, PixelStatus.HIGH_GAIN_STORED, dtype=np.uint8)
-        pixel_status[self.saturated_pixel_mask(tel_id, r0)] |= PixelStatus.SATURATED
+        pixel_status[self.saturated_pixel_mask(tel_id, r0)] |= np.uint8(PixelStatus.SATURATED)
         event.r1.tel[tel_id] = R1CameraContainer(
             event_type=event.trigger.event_type,
             event_time=event.trigger.tel[tel_id].time,
