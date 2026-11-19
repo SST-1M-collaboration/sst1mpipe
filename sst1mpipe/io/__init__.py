@@ -23,7 +23,6 @@ from .io import (
     read_trigger_time,
     load_drive_data,
     load_extra_table,
-    load_more_dl2_files,
     load_photon_list_sst1m,
     load_slow_data_bias_curve,
     load_source_catalog,
@@ -31,5 +30,4 @@ from .io import (
     write_dl1_pedestals,
     write_r0_pedestals,
     write_extra_parameters,
-    write_photon_list,
 )

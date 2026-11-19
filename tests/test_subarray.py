@@ -12,7 +12,6 @@ from astropy.time import Time
 from ctapipe.instrument import SubarrayDescription
 
 from conftest import OBSERVATION_RUNS, run_process
-from sst1mpipe.io import write_photon_list
 from sst1mpipe.resources import MC_CONFIG_FILES, SUBARRAY_FILE, TEST_DATA_DIR
 from sst1mpipe.utils import camera_to_altaz, get_tel_id, merge_subarrays, read_subarray, telescope_location
 
@@ -74,13 +73,6 @@ def test_subarray_of_simulation(tmp_path):
     assert list(SubarrayDescription.from_hdf(output).tel_ids) == [1, 2]
 
 
-def test_photon_list_subarray(tmp_path):
-    """the photon lists store the subarray of their DL2 file"""
-    output = tmp_path / "events_pl.h5"
-    photons = pd.DataFrame({"event_id": [1, 2], "reco_alt": [70.0, 71.0]})
-    write_photon_list(photons, output_file=output, telescope="tel_021", subarray=SUBARRAY.select_subarray([21]))
-    assert list(SubarrayDescription.from_hdf(output).tel_ids) == [21]
-
 
 def test_get_tel_id():
     assert get_tel_id("tel_021") == 21 and get_tel_id("tel_001") == 1
@@ -98,7 +90,7 @@ def test_telescope_location():
 def test_read_subarray_of_old_file(tmp_path):
     """a file without subarray (written before the subarray was stored) gets the subarray of sst1mpipe"""
     output = tmp_path / "old_events_pl.h5"
-    write_photon_list(pd.DataFrame({"event_id": [1], "reco_alt": [70.0]}), output_file=output, telescope="tel_021")
+    pd.DataFrame({"event_id": [1], "reco_alt": [70.0]}).to_hdf(output, key="/dl2/event/telescope/parameters/tel_021")
     subarray = read_subarray(output)
     assert list(subarray.tel_ids) == list(SUBARRAY.tel_ids)
 

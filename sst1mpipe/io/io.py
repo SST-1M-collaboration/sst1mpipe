@@ -1,17 +1,14 @@
 import glob
 import json
 import logging
-import operator
 import os
 from datetime import datetime
 
 import astropy.units as u
 import numpy as np
-import pandas as pd
 import tables
-from astropy.coordinates import AltAz, SkyCoord
+from astropy.coordinates import AltAz
 from astropy.io import fits
-from astropy.io.misc.hdf5 import read_table_hdf5
 from astropy.table import Table, join, vstack
 from astropy.time import Time
 from ctapipe.instrument import SubarrayDescription
@@ -19,7 +16,6 @@ from ctapipe.io import HDF5Merger, read_table, write_table
 from ctapipe.io.hdf5dataformat import DL1_SKY_PEDESTAL_IMAGE_GROUP
 from ctapipe.monitoring.interpolation import PointingInterpolator
 from gammapy.data import DataStore
-from pyirf.cuts import evaluate_binned_cut
 from traitlets.config import Config
 
 import sst1mpipe
@@ -116,36 +112,6 @@ def check_outdir(outdir):
             logging.info("Ah, the directory appeared in the meantime... \
                 May happpen if you run more scripts in parallel terminals. \
                 Should not be an issue.")
-
-
-def write_photon_list(
-        pl_table, output_file=None, telescope=None,
-        config=None, subarray=None):
-    """
-    Helper function to write PL file
-
-    Parameters
-    ----------
-    pl_table: pandas.DataFrame
-        Photon list after gammaness cut
-    output_file: string
-    telescope: string
-    config: dict
-    subarray: ctapipe.instrument.SubarrayDescription
-        subarray of the DL2 file, written in the photon list (telescope positions)
-
-    Returns
-    -------
-
-    """
-
-    write_pl_table(
-        pl_table, output_file=output_file,
-        table_path='/photon_list', table_name=telescope,
-        config=config, mode='w'
-        )
-    if subarray is not None:
-        subarray.to_hdf(output_file)
 
 
 def write_extra_parameters(
@@ -834,62 +800,6 @@ def load_extra_table(input_file, key=None, remove_column=None):
     return table_pd
 
 
-def write_pl_table(
-        pl_table, output_file=None, table_path=None,
-        table_name=None, config=None, mode='a'):
-    """
-    Opens the HDF file and writes PL table
-    removing many keys from the DL2 table
-    which are not needed at this point.
-
-    Parameters
-    ----------
-    pl_table: pandas.DataFrame
-    output_file: string
-    table_path: string
-    table_name: string
-    config: dict
-    mode: string
-
-    Returns
-    -------
-
-    """
-
-    for key in pl_table.keys():
-
-        if key in [
-            'reco_disp_norm', 'reco_disp_sign', 'reco_disp_dx', 'reco_disp_dy',
-            'camera_frame_hillas_skewness', 'camera_frame_hillas_kurtosis',
-            'camera_frame_hillas_x', 'camera_frame_hillas_y', 'camera_frame_hillas_r', 'camera_frame_hillas_phi',
-            'camera_frame_hillas_length_uncertainty', 'camera_frame_hillas_width_uncertainty',
-            'camera_frame_hillas_psi', 'camera_frame_timing_intercept', 'camera_frame_timing_deviation', 'camera_frame_timing_slope',
-            'leakage_pixels_width_1', 'leakage_pixels_width_2', 'leakage_intensity_width_1',
-            'concentration_cog', 'concentration_core', 'concentration_pixel', 'morphology_n_pixels',
-            'morphology_n_small_islands', 'morphology_n_medium_islands', 'morphology_n_large_islands',
-            'intensity_max', 'intensity_min', 'intensity_mean', 'intensity_std', 'intensity_skewness', 'intensity_kurtosis',
-            'peak_time_max', 'peak_time_min', 'peak_time_mean', 'peak_time_std', 'peak_time_skewness', 'peak_time_kurtosis',
-            'core_psi', 'log_camera_frame_hillas_intensity', 'camera_frame_hillas_wl'
-        ]:
-            logging.info('Removing key: %s.', key)
-            del pl_table[key]
-            continue
-
-    logging.info('Writing Photon list in %s', output_file)
-
-    with tables.open_file(output_file, mode=mode) as f:
-
-        t = f.create_table(
-            table_path,
-            table_name,
-            pl_table.to_records(index=False),
-            createparents=True,
-        )
-
-        if config:
-            t.attrs["config"] = config
-
-
 def load_slow_data_bias_curve(file):
     """
     Reads slow control FITS file and extracts bias curve
@@ -1020,166 +930,6 @@ def pedestal_cleaning_fractions(dl1_file):
     ped_fraction = info['n_survived_pedestals'][0] / n_pedestal if n_pedestal > 0 else np.nan
     raised_fraction = info['raised_threshold_fraction'][0] if 'raised_threshold_fraction' in info.colnames else np.nan
     return ped_fraction, raised_fraction
-
-
-def load_more_dl2_files(files, config=None,
-                        gammaness_cut=None):
-    """
-    Loads and merges more DL2 hdf files. If config file is provided
-    event selection is applied. Along with a single merged DL2 table
-    the function returns also an array of Good Time Intervals, which
-    can be used to define \'observation blocks\' (e.g. wobbles) for
-    the purpose of DL3 creation.
-
-    Parameters
-    ----------
-    files: list of strings
-        List of paths to all dl2 files to be opened
-    config: dict
-    gammaness_cut: float or string
-        Gammaness cut to be applied when loading and merging
-        DL2 files (optional). If float, global gammaness cut
-        is applied. Alternatively, it can be a string with
-        path to the directory with gammaness cuts optimized
-        on MC. A set of gammaness cut for given zenith angle
-        and NSB is found authomaticaly. The subdir structure
-        should follow the same logic as the RF model directories.
-
-    Returns
-    -------
-    dl2_data: pandas.DataFrame
-    times_all:
-    GTI: numpy.ndarray
-        Good Time Intervals. The splitting criteria are defined
-        as follows ():
-            - pointing difference from previous DL2 file > 0.2 deg
-            - time difference from previous event > 2 sec
-            - RF used for for given DL2 file reconstruction is different
-            from the previous DL2 file.
-    """
-
-    dl2_data = None
-    pointing0 = None
-    times0 = None
-    GTI_start, GTI_stop = [], []
-    for input_file in files:
-
-        try:
-            tel_setup=get_telescopes(input_file, data_level="dl2")[0]
-        except Exception:
-            logging.warning(f"No DL2 data in file : {input_file}" )
-            continue
-
-        # Here we apply gammaness cut directly during the merge to save some memory.
-        # local_times are merged without gammaness cut, which allows to split the observation
-        # into different blocks later
-        try:
-            df0 = load_dl2_sst1m(input_file, tel=tel_setup, config=config, table='pandas', energy_min=0.0)
-
-            # If there is no event in the file after selection cuts we skip it completely.
-            if len(df0) == 0:
-                logging.warning(f"No events in the file {input_file} after selection cuts. SKIPPING (and not taking the time interval into account) ")
-                continue
-
-            times = df0['local_time']
-            info = read_table(input_file,path='/dl2/info')
-            RF_used = info['RF_used'][0].split('/')[-1]
-
-            ## adding pointing info
-            pointing = read_table(input_file,path='/dl1/monitoring/subarray/pointing')
-            p_ra = np.unique(pointing['array_ra'])
-            p_dec = np.unique(pointing['array_dec'])
-            if (p_ra.shape[0]>1) or (p_dec.shape[0]>1):
-                logging.warning(f'Multiple ra dec pointing in file {input_file} -- we expect ony one!')
-            df0['array_ra']  = (p_ra[0]  * pointing['array_ra' ].unit).to_value('deg')
-            df0['array_dec'] = (p_dec[0] * pointing['array_dec'].unit).to_value('deg')
-
-            # GTI split based on pointing direction
-            p_ra  = np.unique(df0['array_ra'])
-            p_dec = np.unique(df0['array_dec'])
-            pointing = SkyCoord(ra=p_ra * u.deg, dec=p_dec * u.deg, frame='icrs')
-
-            # first file
-            if pointing0 is None:
-                pointing0 = pointing
-                dt = 0
-                GTI_start.append(times.iloc[0])
-            else:
-                dt = times.iloc[0] - times0.iloc[-1]
-
-            # typical dt between events should be about 0.1 s, even for stereo it should not be higher that 0.5 s
-            # length of a typical file is about 20 s, depending on conditions
-            if (pointing.separation(pointing0) > 0.2 * u.deg) or (dt > 2):
-                GTI_stop.append(times0.iloc[-1])
-                GTI_start.append(times.iloc[0])
-                pointing0 = pointing
-
-            times0 = times
-
-            if gammaness_cut is not None:
-                if isfloat(gammaness_cut):
-                    logging.info(f'Global gammaness cut {gammaness_cut} applied.')
-                    mask = df0['gammaness'] > gammaness_cut
-                    df = df0[mask].copy()
-                    logging.info(f'N of events after gammaness cut: {len(df)}')
-                else:
-                    logging.info('Energy dependent gammaness cut applied.')
-
-                    # Find gammaness file, there is only base path stored in the variable
-                    if tel_setup[-1] == '1':
-                        tel_mc = 'tel_001'
-                    elif tel_setup[-1] == '2':
-                        tel_mc = 'tel_002'
-                    else:
-                        tel_mc = tel_setup
-                    try:
-                        cut_file = glob.glob(gammaness_cut + '/' + RF_used + '/gammaness_cuts_*' + tel_mc + '*.h5')[0]
-                        logging.info(f'Energy dendent cut table used: {cut_file}')
-                        cut_table = read_table_hdf5(cut_file, path='gammaness_cuts')
-                    except Exception:
-                        logging.warning(f"Cannot read gammaness cut file in the path: {cut_file}")
-                        cut_table = None
-
-                    # This works only on pandas dataframe
-                    df0_table = Table.from_pandas(df0)
-                    mask_gg = evaluate_binned_cut(
-                        df0_table["gammaness"],
-                        df0_table["reco_energy"] * u.TeV,
-                        cut_table,
-                        operator.ge,
-                    )
-                    df = df0[mask_gg].copy()
-                    logging.info(f'N of events after gammaness cut: {len(df)}')
-            else:
-                df = df0
-
-            ## adding pipeline info
-            df['RF_used'] = RF_used
-            v1 = info['sst1mpipe_version'][0].split('.')[0]
-            v2 = info['sst1mpipe_version'][0].split('.')[1]
-            df['sst1mpipe_version'] = f'{v1}_{v2}'
-            df['tel_setup'] = tel_setup
-        except Exception:
-            logging.warning(f"Some problem with file {input_file}")
-            continue
-
-        if dl2_data is None:
-            dl2_data = df
-            times_all = times
-        else:
-            try:
-                dl2_data = pd.concat([dl2_data, df])
-                times_all = pd.concat([times_all, times])
-            except Exception:
-                logging.warning("Broken file", input_file)
-                continue
-
-    GTI_stop.append(times.iloc[-1])
-
-    GTI = np.array([GTI_start * u.s,
-                    GTI_stop * u.s])
-
-    return dl2_data, times_all, GTI
 
 
 def isfloat(num):
