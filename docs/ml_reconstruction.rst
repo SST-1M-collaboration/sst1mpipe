@@ -37,8 +37,11 @@ Training
 --------
 
 The configurations ``sst1mpipe/resources/config/sst1mpipe_train_<model>.yaml``
-(``sst1mpipe.resources.TRAIN_CONFIG_FILES``) have the random forests, features and event selection
-of ``sst1mpipe_mc_config_low_nsb.json``:
+(``sst1mpipe.resources.TRAIN_CONFIG_FILES``) have the random forests and features of the former
+``sst1mpipe_mc_config_low_nsb.json``, and the event selection of the SST-1M Crab paper
+(arXiv:2506.01733): intensity > 45 p.e., ``leakage_intensity_width_2`` < 0.7 (``MLQualityQuery``,
+applied at the training and at the application of the models: the other telescope events have no
+DL2):
 
 .. code-block:: console
 

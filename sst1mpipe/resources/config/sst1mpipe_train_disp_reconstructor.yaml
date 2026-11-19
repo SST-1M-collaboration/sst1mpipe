@@ -44,10 +44,11 @@ TrainDispReconstructor:
         - ["cos_zenith", "sin(telescope_pointing_altitude)"]
     MLQualityQuery:
       quality_criteria:
-        - ["intensity", "(hillas_intensity > 0) & (hillas_intensity < 1e6)"]
+        # cuts of the SST-1M Crab paper (arXiv:2506.01733): intensity > 45 p.e., leakage2 < 0.7
+        - ["intensity", "(hillas_intensity > 45) & (hillas_intensity < 1e6)"]
         - ["width", "hillas_width > 0"]
         - ["length", "hillas_length > 0"]
-        - ["leakage", "leakage_intensity_width_2 <= 1"]
+        - ["leakage", "leakage_intensity_width_2 < 0.7"]
     # stereo direction of the MARS analysis (sst1mpipe.ml.StereoMARSCombiner)
     stereo_combiner_cls: StereoMARSCombiner
     StereoMARSCombiner:
