@@ -222,18 +222,29 @@ The figures of the IRFs and of the benchmarks are made by ``sst1mpipe-plot-irfs`
 DL2 to DL3
 ~~~~~~~~~~
 
-``sst1mpipe_data_dl2_dl3`` is a tool to create DL3 data files from DL2 data files. It is supposed to be provided with a directory with input DL2 files 
-(typicaly a directory with DL2 for one source observed in one night, but can be run on larger sample as well). It merges the DL2 ``HDF5`` per-run 
-files into per-wobble DL3 ``fits`` files containing only photon lists. It also finds proper IRF based on zenith, azimuth and NSB level for each input DL2 file. It creates 
-per-night index files needed for further analysis in gammapy. The script applies event selection cuts defined in the config file (``event_selection``), 
-including cut on gammaness, so **one should make sure that these are the same as used on MC to produce IRFs**. Energy dependent gammaness cuts can be used as well, following 
-the same rules described in :ref:`dl2_irfs`.
+``sst1mpipe-dl2-dl3`` writes the DL3 (GADF format of gammapy) of a DL2 file of ``sst1mpipe-apply-models``,
+with the cuts and the point-like IRFs of :ref:`dl2_irfs` (``--irf-directory``: a directory with
+``cuts.fits`` and ``irf_point_like.fits.gz``, or with such directories ``ze<zenith>``: the zenith angle
+closest to the mean pointing of each observation is used):
 
-.. warning::
+.. code-block:: console
 
-    ``sst1mpipe_data_dl2_dl3`` (and ``sst1mpipe_data_get_photon_list``) read the DL2 of the former
-    random forests of sst1mpipe, not the DL2 of ctapipe written by ``sst1mpipe-apply-models``: the
-    DL3 of the ctapipe DL2 is not implemented yet.
+    sst1mpipe-dl2-dl3 -i stereo/run.dl2.h5 --irf-directory irf/optimized/stereo -o dl3/
+
+- one DL3 file per observation (``SST1M_<obs_id>.dl3.fits.gz``): ``EVENTS`` (the events passing the
+  quality criteria and the gammaness cut of their reconstructed energy bin: reconstructed energy,
+  RA/Dec, alt/az, gammaness), ``GTI``, ``POINTING``, and the IRFs (``EFFECTIVE AREA``,
+  ``ENERGY DISPERSION``, ``RAD_MAX``, ``BACKGROUND``). The direction cut is not applied: the ``RAD_MAX``
+  of the IRFs is the ON region of the point-like analysis of gammapy.
+- the pointing of the telescopes (monitoring data), or of the target (warning) when the DL2 has no
+  monitoring data
+- the index files of gammapy (``hdu-index.fits.gz``, ``obs-index.fits.gz``) of all the DL3 files of the
+  output directory (``--no-index`` when several runs are processed in parallel in the same directory,
+  then ``create_hdu_indexes``)
+
+The models, the cuts and the IRFs must be the same (the same mode: ``tel1`` / ``tel2`` for the mono
+analysis of each telescope, ``stereo``). The dead time is not corrected yet (``DEADC = 1``), and the GTI
+of an observation is from its first to its last event (issue #252).
 
 
 .. _higher_level:
@@ -241,14 +252,26 @@ the same rules described in :ref:`dl2_irfs`.
 High level analysis
 ~~~~~~~~~~~~~~~~~~~
 
-Output DL3 files produced with ``sst1mpipe_data_dl2_dl3`` are fully compatible with gammapy and may be further analyzed using gammapy tools. See e.g. 
+The DL3 files of ``sst1mpipe-dl2-dl3`` are analysed with gammapy (point-like IRFs:
+``required_irf="point-like"``):
+
+.. code-block:: python
+
+    from gammapy.data import DataStore
+
+    observations = DataStore.from_dir("dl3/").get_observations(required_irf="point-like")
+
+See e.g.
 
 * `Tutorial on 1D spectral analysis <https://docs.gammapy.org/1.2/tutorials/analysis-1d/spectral_analysis.html>`_
 
 * `Tutorial on 2D ring background map <https://docs.gammapy.org/1.2/tutorials/analysis-2d/ring_background.html>`_
 
-A typical use case is to run joint gammapy analysis on data from several nights. In such case one has to run ``create_hdu_indexes`` script to create 
-HDU index files indexing all DL3s to be used in the final analysis.
+A joint analysis of several nights needs the index files of all their DL3 files:
+
+.. code-block:: console
+
+    create_hdu_indexes --input-files '/dl3/20260120/*.dl3.fits.gz /dl3/20260121/*.dl3.fits.gz' -o crab/
 
 
 .. _performance:
