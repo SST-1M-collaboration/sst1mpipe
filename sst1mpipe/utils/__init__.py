@@ -18,7 +18,6 @@ from .utils import (
     camera_to_altaz,
     check_mc,
     check_output_dl1,
-    check_same_shower_fraction,
     clip_alt,
     correct_number_simulated_showers,
     disp,

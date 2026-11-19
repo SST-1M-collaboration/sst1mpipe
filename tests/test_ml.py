@@ -299,3 +299,92 @@ def test_apply_models_one_telescope(models, dl1_files, tmp_path):
                                events["RandomForestRegressor_tel_energy"][valid], rtol=1e-6)
     assert np.all(np.asarray(stereo["RandomForestRegressor_telescopes"])[:, 1] == 0)
 
+
+
+def test_plot_irfs(models, dl1_files, tmp_path):
+    """IRFs of ctapipe (fixed cuts: few events) of the DL2 of the models, and their figures"""
+    from ctapipe.tools.compute_irf import IrfTool
+    from ctapipe.tools.optimize_event_selection import EventSelectionOptimizer
+
+    from sst1mpipe.resources import CONFIG_DIR
+    from sst1mpipe.scripts.sst1mpipe_plot_irfs_tool import main as plot_irfs
+
+    directory, _ = models
+    reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
+    dl2 = tmp_path / "dl2"
+    dl2.mkdir()
+    for name, particle in (("gamma_point", "gamma_point"), ("proton_test", "proton")):
+        argv = ["-i", str(dl1_files[particle]), *reconstructors, "-o", str(dl2 / f"{name}.dl2.h5"), "--no-progress"]
+        assert run_tool(ApplyModels(), argv=argv, raises=True) == 0
+
+    irf = tmp_path / "irf"
+    irf.mkdir()
+    configs = [f"--config={CONFIG_DIR / 'sst1mpipe_optimize_cuts.yaml'}",
+               f"--config={CONFIG_DIR / 'sst1mpipe_irf_paper_cuts.yaml'}"]
+    argv = [*configs, "-g", str(dl2 / "gamma_point.dl2.h5"), "-p", str(dl2 / "proton_test.dl2.h5"),
+            "-o", str(irf / "cuts.fits")]
+    assert run_tool(EventSelectionOptimizer(), argv=argv, raises=True) == 0
+    argv = [f"--config={CONFIG_DIR / 'sst1mpipe_compute_irf.yaml'}", "--cuts", str(irf / "cuts.fits"),
+            "--gamma-file", str(dl2 / "gamma_point.dl2.h5"), "--proton-file", str(dl2 / "proton_test.dl2.h5"),
+            "--do-background", "--spatial-selection-applied", "--DefaultFoVOffsetBins.fov_offset_n_bins=1",
+            "--output", str(irf / "irf_point_like.fits.gz"), "--benchmark-output", str(irf / "benchmarks_point_like.fits.gz")]
+    assert run_tool(IrfTool(), argv=argv, raises=True) == 0
+
+    plot_irfs(["--irf", f"stereo={irf}", "--dl2", f"stereo={dl2}", "-o", str(tmp_path / "plots")])
+    names = {path.stem for path in (tmp_path / "plots").glob("*.png")}
+    assert names == {"effective_area", "effective_area_protons", "energy_bias", "energy_resolution", "angular_resolution",
+                     "theta_cut", "gammaness_cut", "background", "sensitivity", "sensitivity_crab", "energy_migration",
+                     "gammaness", "roc"}
+    # comparison: one series per input
+    plot_irfs(["--irf", f"a={irf}", "--irf", f"b={irf}", "-o", str(tmp_path / "comparison")])
+    assert {"energy_migration_a", "energy_migration_b", "sensitivity"} <= {
+        path.stem for path in (tmp_path / "comparison").glob("*.png")}
+    # with the performance of the paper (IRF directories of the same format, some quantities only)
+    plot_irfs(["--irf", f"stereo={irf}", "--reference", "paper 30=ref:crab_paper_2025/strict_stereo/ze30",
+               "--reference", "paper 20=ref:crab_paper_2025/strict_stereo/ze20", "-o", str(tmp_path / "reference")])
+    assert {path.stem for path in (tmp_path / "reference").glob("*.png")} == names - {"gammaness", "roc"}
+    # the paper alone: its quantities only
+    plot_irfs(["--reference", "tel1=ref:crab_paper_2025/tel1/ze30", "--reference", "tel2=ref:crab_paper_2025/tel2/ze20",
+               "--reference", "ASTRI=ref:astri_50h", "-o", str(tmp_path / "paper")])
+    assert {path.stem for path in (tmp_path / "paper").glob("*.png")} == {
+        "effective_area", "energy_bias", "energy_resolution", "angular_resolution", "sensitivity", "sensitivity_crab"}
+
+
+def test_crab_paper_reference():
+    """Performance of the SST-1M Crab paper in IRF directories: sensible values"""
+    import astropy.units as u
+
+    from sst1mpipe.performance.irf_plots import REFERENCE_DIRECTORY, read_irf_directory
+
+    stereo = read_irf_directory(REFERENCE_DIRECTORY / "crab_paper_2025" / "strict_stereo" / "ze30")
+    assert set(stereo) == {"energy", "angular", "sensitivity"}
+    # best sensitivity of the stereo: ~2e-12 TeV cm-2 s-1 at ~10 TeV (Fig. 11)
+    sensitivity = stereo["sensitivity"]["ENERGY_FLUX_SENSITIVITY"].to_value(u.TeV / u.cm**2 / u.s)
+    assert 1.5e-12 < np.nanmin(sensitivity) < 2.5e-12
+    aeff = read_irf_directory(REFERENCE_DIRECTORY / "crab_paper_2025" / "tel2" / "ze20")["aeff"]["EFFAREA"].to_value(u.m**2)
+    assert 5e5 < np.nanmax(aeff) < 1e6
+
+
+@pytest.mark.parametrize("name", ["lhaaso_1yr", "hawc_1yr", "veritas_50h", "hess_50h", "astri_50h"])
+def test_instrument_sensitivities(name):
+    """Sensitivity of other instruments: E² dN/dE between 1e-14 and 1e-10 TeV cm-2 s-1"""
+    import astropy.units as u
+
+    from sst1mpipe.performance.irf_plots import REFERENCE_DIRECTORY, read_irf_directory
+
+    data = read_irf_directory(REFERENCE_DIRECTORY / name)
+    assert set(data) == {"sensitivity"}
+    sensitivity = data["sensitivity"]["ENERGY_FLUX_SENSITIVITY"].to_value(u.TeV / u.cm**2 / u.s)
+    assert np.all((sensitivity > 1e-14) & (sensitivity < 1e-10))
+
+
+def test_cut_without_n_events():
+    """the cuts of the optimization of the sensitivity have no n_events: all the bins drawn"""
+    from astropy.table import QTable
+
+    from sst1mpipe.performance.irf_plots import _cut
+
+    table = QTable({"low": [1, 2] * u.TeV, "high": [2, 4] * u.TeV, "cut": [0.2, 0.1] * u.deg})
+    np.testing.assert_allclose(_cut(table)[2], [0.2, 0.1])
+    table["n_events"] = [5, 20]
+    assert np.isnan(_cut(table)[2][0]) and _cut(table)[2][1] == 0.1
