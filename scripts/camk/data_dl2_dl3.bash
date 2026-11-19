@@ -13,7 +13,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=0-04:00:00
-#SBATCH --qos=normal
+#SBATCH --qos=long
 #SBATCH --partition=pctacamk
 #SBATCH --mem-per-cpu=4GB
 #SBATCH --output=/home/%u/logs/%x-%j.out
