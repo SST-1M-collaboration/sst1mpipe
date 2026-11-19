@@ -301,14 +301,18 @@ def test_apply_models_one_telescope(models, dl1_files, tmp_path):
 
 
 
-def test_plot_irfs(models, dl1_files, tmp_path):
-    """IRFs of ctapipe (fixed cuts: few events) of the DL2 of the models, and their figures"""
+@pytest.fixture(scope="module")
+def irfs(models, dl1_files, tmp_path_factory):
+    """
+    IRFs of ctapipe (fixed cuts: few events) of the DL2 of the models: (IRF directory: cuts.fits,
+    irf_point_like.fits.gz, benchmarks_point_like.fits.gz; DL2 directory)
+    """
     from ctapipe.tools.compute_irf import IrfTool
     from ctapipe.tools.optimize_event_selection import EventSelectionOptimizer
 
     from sst1mpipe.resources import CONFIG_DIR
-    from sst1mpipe.scripts.sst1mpipe_plot_irfs_tool import main as plot_irfs
 
+    tmp_path = tmp_path_factory.mktemp("irfs")
     directory, _ = models
     reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
     dl2 = tmp_path / "dl2"
@@ -329,7 +333,14 @@ def test_plot_irfs(models, dl1_files, tmp_path):
             "--do-background", "--spatial-selection-applied", "--DefaultFoVOffsetBins.fov_offset_n_bins=1",
             "--output", str(irf / "irf_point_like.fits.gz"), "--benchmark-output", str(irf / "benchmarks_point_like.fits.gz")]
     assert run_tool(IrfTool(), argv=argv, raises=True) == 0
+    return irf, dl2
 
+
+def test_plot_irfs(irfs, tmp_path):
+    """Figures of the IRFs, with references"""
+    from sst1mpipe.scripts.sst1mpipe_plot_irfs_tool import main as plot_irfs
+
+    irf, dl2 = irfs
     plot_irfs(["--irf", f"stereo={irf}", "--dl2", f"stereo={dl2}", "-o", str(tmp_path / "plots")])
     names = {path.stem for path in (tmp_path / "plots").glob("*.png")}
     assert names == {"effective_area", "effective_area_protons", "energy_bias", "energy_resolution", "angular_resolution",
@@ -377,6 +388,45 @@ def test_instrument_sensitivities(name):
     sensitivity = data["sensitivity"]["ENERGY_FLUX_SENSITIVITY"].to_value(u.TeV / u.cm**2 / u.s)
     assert np.all((sensitivity > 1e-14) & (sensitivity < 1e-10))
 
+
+def test_time_to_detection():
+    """Time to detection: Li & Ma, at least 10 signal events, signal at least 5 % of the background"""
+    from sst1mpipe.performance.detection import time_to_detection
+
+    rate = u.Unit("s-1")
+    # significance limited: the time scales as 1 / rate
+    time = time_to_detection(0.01 * rate, 0.1 * rate)
+    assert time.unit == u.h and 0 < time.value < np.inf
+    assert u.isclose(time_to_detection(0.02 * rate, 0.2 * rate), time / 2)
+    # time to 5 sigma for large counts: s t / sqrt(b t (1 + alpha)) ~ 5 (alpha = 1 / 5)
+    approximate = (25 * 0.1 * 1.2 / 0.01**2) * u.s
+    assert 0.8 < (time / approximate).to_value(u.one) < 1.2
+    # without background: 10 signal events
+    assert u.isclose(time_to_detection(0.01 * rate, 0 * rate), (10 / 0.01) * u.s)
+    # signal below 5 % of the background, no signal: never
+    assert np.isinf(time_to_detection(0.004 * rate, 0.1 * rate))
+    assert np.isinf(time_to_detection(0 * rate, 0.1 * rate))
+
+
+def test_time_to_detection_tool(irfs, tmp_path, capsys):
+    """sst1mpipe-time-to-detection with the IRFs of the test models: table and figure"""
+    from sst1mpipe.performance.detection import detection_rates, source_spectrum, time_to_detection_table
+    from sst1mpipe.scripts.sst1mpipe_time_to_detection_tool import main
+
+    irf, _ = irfs
+    rates = detection_rates(irf / "irf_point_like.fits.gz", source_spectrum("CRAB_HEGRA"))
+    assert len(rates.signal) == len(rates.background) == len(rates.energy_edges) - 1
+    assert np.all(rates.signal >= 0) and np.any(rates.signal > 0)
+    table = time_to_detection_table(irf / "irf_point_like.fits.gz", ["CRAB_HEGRA", "MRK421_VERITAS_LOW"], [1, 10])
+    assert len(table) == 4 and np.all(table["time"] > 0)
+    # the time to detection grows with the minimum energy
+    crab = table[table["source"] == "CRAB_HEGRA"]
+    assert crab["time"][1] >= crab["time"][0]
+    main(["--irf", str(irf), "--source", "CRAB_HEGRA", "-o", str(tmp_path / "time.png")])
+    assert "CRAB_HEGRA" in capsys.readouterr().out
+    assert (tmp_path / "time.png").is_file()
+    with pytest.raises(ValueError, match="Unknown source"):
+        source_spectrum("NOT_A_SOURCE")
 
 def test_cut_without_n_events():
     """the cuts of the optimization of the sensitivity have no n_events: all the bins drawn"""

@@ -284,3 +284,14 @@ scripts of ``scripts/reference``), with the quantities published only:
     sst1mpipe-plot-irfs --irf strict_stereo=irf/strict_stereo \
         --reference "paper, 30 deg=ref:crab_paper_2025/strict_stereo/ze30" \
         --reference "ASTRI Mini-Array=ref:astri_50h" -o plots_paper
+
+``sst1mpipe-time-to-detection`` gives the time to detect point sources at 5 sigma with the point-like
+IRFs (``irf_point_like.fits.gz``) above minimum reconstructed energies: the spectrum of the source
+(``sst1mpipe.performance.spectra``, ``--list-sources``) folded with the effective area and the energy
+dispersion, the background of the IRFs in the ON region (``RAD_MAX``), 5 OFF regions, and the conditions
+of the sensitivity of ctapipe (at least 10 signal events, signal at least 5 % of the background):
+
+.. code-block:: console
+
+    sst1mpipe-time-to-detection --irf irf/optimized/stereo/ze20 --source CRAB_HEGRA \
+        --source MRK421_VERITAS_LOW --energy-min 1 --energy-min 3 -o time_to_detection.png
