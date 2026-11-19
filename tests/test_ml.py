@@ -427,3 +427,14 @@ def test_time_to_detection_tool(irfs, tmp_path, capsys):
     assert (tmp_path / "time.png").is_file()
     with pytest.raises(ValueError, match="Unknown source"):
         source_spectrum("NOT_A_SOURCE")
+
+def test_cut_without_n_events():
+    """the cuts of the optimization of the sensitivity have no n_events: all the bins drawn"""
+    from astropy.table import QTable
+
+    from sst1mpipe.performance.irf_plots import _cut
+
+    table = QTable({"low": [1, 2] * u.TeV, "high": [2, 4] * u.TeV, "cut": [0.2, 0.1] * u.deg})
+    np.testing.assert_allclose(_cut(table)[2], [0.2, 0.1])
+    table["n_events"] = [5, 20]
+    assert np.isnan(_cut(table)[2][0]) and _cut(table)[2][1] == 0.1
