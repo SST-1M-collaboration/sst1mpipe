@@ -3,10 +3,9 @@
 ##########################################################
 #  Data of a night R0 -> DL2: submits the jobs (camk)    #
 ##########################################################
-# R0 -> DL1 (one job array per telescope) -> DL1 stereo -> DL2
+# R0 -> DL1 (one job array per telescope) -> DL1 stereo -> DL2 -> DL3
 #   DATE=20260120 bash scripts/camk/submit_data.bash
 # Paths and settings: scripts/camk/sst1mpipe.env (or SST1MPIPE_ENV=<file>).
-# TODO: DL2 -> DL3 with the ctapipe DL2.
 
 export SST1MPIPE_ROOT="${SST1MPIPE_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 CONDA_ENV="" source "${SST1MPIPE_ROOT}/scripts/camk/common.bash"
@@ -37,4 +36,6 @@ if (( ${#R0_JOBS[@]} == 2 )); then
   echo "stereo: job ${STEREO}"
 fi
 DL2=$(sbatch --parsable --dependency="${DEPENDENCY}" "${SCRIPTS}/data_dl1_dl2.bash")
-echo "DL2: job ${DL2}, outputs in ${DATA_DIRECTORY}"
+echo "DL2: job ${DL2}"
+DL3=$(sbatch --parsable --dependency="afterany:${DL2}" "${SCRIPTS}/data_dl2_dl3.bash")
+echo "DL3: job ${DL3}, outputs in ${DATA_DIRECTORY}"

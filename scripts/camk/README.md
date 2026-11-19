@@ -5,7 +5,7 @@ submit scripts run on the login node and submit the jobs with their dependencies
 
 ```bash
 bash scripts/camk/submit_mc.bash                  # simulations R0 -> IRFs
-DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL2
+DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL3
 ```
 
 | Simulations | |
@@ -22,6 +22,7 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL2
 | `data_r0_dl1.bash` | `sst1mpipe-monitoring`, `sst1mpipe-process`, one raw file per array task, per telescope |
 | `data_dl1_stereo.bash` | `ctapipe-merge` of the night of each telescope, `sst1mpipe-stereo` |
 | `data_dl1_dl2.bash` | `sst1mpipe-apply-models` on every DL1 file (cs1, cs2, stereo) |
+| `data_dl2_dl3.bash` | `sst1mpipe-dl2-dl3` on every DL2 file with the IRFs of `DATA_IRF_DIRECTORY` (cs1: `tel1`, cs2: `tel2`, stereo: `strict_stereo`, closest zenith angle), index files of gammapy per analysis in `dl3/<cs1, cs2, stereo>/` |
 
 
 IRFs: `IRF_CUTS=optimized` (best sensitivity) or `paper` (fixed cuts of arXiv:2506.01733: 60 % gamma
@@ -32,7 +33,7 @@ or `protons`). `MC_START=dl2` / `irf`: from the DL2 / IRFs of a previous submiss
 MC_START=irf IRF_CUTS=paper bash scripts/camk/submit_mc.bash
 ```
 
-TODO: DL3 of the data.
+DL3 (gammapy): `DataStore.from_dir("$DATA_DIRECTORY/dl3/stereo").get_observations(required_irf="point-like")`. TODO: dead time and GTI, issue #252.
 
 Comparison with the published performance (`ref:`: IRF directories of `sst1mpipe/resources/reference`,
 e.g. the SST-1M Crab paper, `crab_paper_2025/<mode>/ze<z>`, see `sst1mpipe-plot-irfs --help`):
