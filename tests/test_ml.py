@@ -268,3 +268,25 @@ def test_apply_models_to_observations(models, observation_monitoring, tmp_path, 
     assert len(energy) > 0 and np.any(energy["RandomForestRegressor_tel_is_valid"])
     geometry = read_table(output, "/dl2/event/subarray/geometry/disp")
     assert np.any(geometry["disp_is_valid"])
+
+
+def test_apply_models_one_telescope(models, dl1_files, tmp_path):
+    """telescopes=[1]: the DL2 of the subarray is the mono reconstruction of telescope 1"""
+    directory, _ = models
+    output = tmp_path / "gamma_point_tel1.dl2.h5"
+    reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
+    argv = ["-i", str(dl1_files["gamma_point"]), *reconstructors, "-o", str(output), "--no-progress",
+            "--ApplyModels.telescopes=[1]"]
+    assert run_tool(ApplyModels(), argv=argv, raises=True) == 0
+    stereo = read_table(output, "/dl2/event/subarray/energy/RandomForestRegressor")
+    # one row per triggered event, telescope 2 never valid
+    assert len(stereo) == len(read_table(output, "/dl1/event/subarray/trigger"))
+    tel2 = read_table(output, "/dl2/event/telescope/energy/RandomForestRegressor/tel_002")
+    assert not np.any(tel2["RandomForestRegressor_tel_is_valid"])
+    mono = read_table(output, "/dl2/event/telescope/energy/RandomForestRegressor/tel_001")
+    events = join(stereo, mono, keys=["obs_id", "event_id"])
+    valid = events["RandomForestRegressor_is_valid"]
+    assert np.count_nonzero(valid) > 0
+    np.testing.assert_allclose(events["RandomForestRegressor_energy"][valid],
+                               events["RandomForestRegressor_tel_energy"][valid], rtol=1e-6)
+    assert np.all(np.asarray(stereo["RandomForestRegressor_telescopes"])[:, 1] == 0)

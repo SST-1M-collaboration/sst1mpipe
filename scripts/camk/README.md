@@ -13,8 +13,8 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL2
 | `mc_r0_dl1.bash` | `sst1mpipe-process`, `MC_FILES_PER_TASK` simtel files per array task, per particle and zenith angle (`MC_ZENITHS`) |
 | `mc_merge.bash` | `ctapipe-merge`: training files of all the zenith angles (`MC_TRAIN_FRACTION`), test files per zenith angle |
 | `mc_train.bash` | `sst1mpipe-train-*`: energy, particle classifier, disp in `models/` (the NSB level, feature `cos_zenith`), with plots |
-| `mc_dl1_dl2.bash` | `sst1mpipe-apply-models` on the test files of each zenith angle |
-| `mc_irf.bash` | `ctapipe-optimize-event-selection`, `ctapipe-compute-irf`: point-like and full enclosure IRFs per zenith angle |
+| `mc_dl1_dl2.bash` | `sst1mpipe-apply-models` on the test files of each zenith angle: `dl2/ze<z>/stereo` (both telescopes), `tel1`, `tel2` (one telescope alone) |
+| `mc_irf.bash` | `ctapipe-optimize-event-selection`, `ctapipe-compute-irf`: point-like and full enclosure IRFs per zenith angle and mode (`tel1`, `tel2`, `stereo`, `strict_stereo`), in `irf/<IRF_CUTS>/<mode>/ze<z>/` |
 
 | Data | |
 |---|---|
@@ -22,8 +22,13 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL2
 | `data_dl1_stereo.bash` | `ctapipe-merge` of the night of each telescope, `sst1mpipe-stereo` |
 | `data_dl1_dl2.bash` | `sst1mpipe-apply-models` on every DL1 file (cs1, cs2, stereo) |
 
-`paper/mc_irf_paper.bash`: IRFs and sensitivity with the cuts of the SST-1M Crab paper
-(arXiv:2506.01733: 60 % gamma efficiency, 80 % theta containment, stereo only, protons weighted to
-protons + helium), in `irf_paper/ze<zenith>/`, from the DL2 of `submit_mc.bash`.
+
+IRFs: `IRF_CUTS=optimized` (best sensitivity) or `paper` (fixed cuts of arXiv:2506.01733: 60 % gamma
+efficiency, 80 % theta containment); background weighted to protons + helium (`IRF_BACKGROUND=p_he`,
+or `protons`). `MC_START=dl2` / `irf`: from the DL2 / IRFs of a previous submission, e.g.
+
+```bash
+MC_START=irf IRF_CUTS=paper bash scripts/camk/submit_mc.bash
+```
 
 TODO: DL3 of the data.

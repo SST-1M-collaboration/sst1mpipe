@@ -1,0 +1,12 @@
+# Overlay of sst1mpipe_optimize_cuts.yaml / sst1mpipe_compute_irf.yaml: stereo events only (both
+# telescopes in the three reconstructions)
+
+DL2EventPreprocessor:
+  DL2EventQualityQuery:
+    quality_criteria:
+      - ["valid classifier", "RandomForestClassifier_is_valid"]
+      - ["valid geom reco", "disp_is_valid"]
+      - ["valid energy reco", "RandomForestRegressor_is_valid"]
+      - ["stereo geom reco", "np.count_nonzero(disp_telescopes, axis=1) >= 2"]
+      - ["stereo energy reco", "np.count_nonzero(RandomForestRegressor_telescopes, axis=1) >= 2"]
+      - ["stereo classifier", "np.count_nonzero(RandomForestClassifier_telescopes, axis=1) >= 2"]

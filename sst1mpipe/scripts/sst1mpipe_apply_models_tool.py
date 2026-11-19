@@ -14,10 +14,11 @@ without it (data processed without monitoring data) use the pointing of the targ
 from unittest import mock
 
 import astropy.units as u
+import numpy as np
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
 from ctapipe.containers import CoordinateFrameType
-from ctapipe.core.traits import IntTelescopeParameter
+from ctapipe.core.traits import Int, IntTelescopeParameter, List
 from ctapipe.reco import Reconstructor
 from ctapipe.tools.apply_models import ApplyModels as CtapipeApplyModels
 
@@ -60,7 +61,8 @@ def add_telescope_pointing(table, location):
 class ApplyModels(CtapipeApplyModels):
     """
     ``ctapipe-apply-models`` with the pointing of the target for the telescope events without the
-    pointing of the telescope (warning), see `add_telescope_pointing`.
+    pointing of the telescope (warning), see `add_telescope_pointing`, and optionally only for some
+    telescopes (``telescopes``: e.g. the mono analysis of one telescope).
 
     The models are trained per telescope type of the simulations: each telescope of the input file
     uses the models of the simulated telescope ``model_telescopes`` (data telescopes 21, 22: the
@@ -68,6 +70,16 @@ class ApplyModels(CtapipeApplyModels):
     """
 
     name = "sst1mpipe-apply-models"
+
+    telescopes = List(
+        Int(),
+        default_value=[],
+        help=(
+            "Telescopes to which the models are applied (all if empty): e.g. [1] for the analysis of"
+            " telescope 1 alone, the DL2 of the subarray is then its mono reconstruction. The other telescopes"
+            " get invalid predictions (no Hillas parameters: the models must use one of them)"
+        ),
+    ).tag(config=True)
 
     model_telescopes = IntTelescopeParameter(
         default_value=[("type", "*", 0), ("id", 21, 1), ("id", 22, 2)],
@@ -97,6 +109,16 @@ class ApplyModels(CtapipeApplyModels):
         return reconstructor
 
     def _apply(self, reconstructor, tel_tables, start, stop):
+        if self.telescopes:
+            # the other telescopes: no Hillas parameters, invalid predictions (each subarray event keeps
+            # its row in the DL2 tables, invalid without the selected telescopes)
+            for tel_id, table in tel_tables.items():
+                if tel_id not in self.telescopes:
+                    for name in table.colnames:
+                        if name.startswith("hillas_"):
+                            nan = np.full(len(table), np.nan)
+                            unit = getattr(table[name], "unit", None)
+                            table[name] = nan if unit is None else u.Quantity(nan, unit)
         subarray = self.loader.subarray
         for tel_id, table in tel_tables.items():
             location = subarray.tel_earth_locations.get(tel_id, subarray.reference_location)
