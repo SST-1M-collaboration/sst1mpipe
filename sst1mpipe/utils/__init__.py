@@ -15,7 +15,6 @@ from .utils import (
     add_timing_features,
     add_trigger_time,
     add_true_impact,
-    calculate_misdirection,
     camera_to_altaz,
     check_mc,
     check_output_dl1,
@@ -47,7 +46,6 @@ from .utils import (
     get_telescopes,
     get_trigger_time_ns,
     mc_correct_shower_reuse,
-    polar_to_cartesian,
     simbad_query,
     stereo_var_cuts,
 )

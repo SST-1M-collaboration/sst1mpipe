@@ -23,7 +23,7 @@ from pyirf.cuts import evaluate_binned_cut
 from traitlets.config import Config
 
 import sst1mpipe
-from sst1mpipe.io.containers import DL1_info, DL2_info
+from sst1mpipe.io.containers import DL1_info
 from sst1mpipe.monitoring import last_chunk_index
 from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
@@ -116,33 +116,6 @@ def check_outdir(outdir):
             logging.info("Ah, the directory appeared in the meantime... \
                 May happpen if you run more scripts in parallel terminals. \
                 Should not be an issue.")
-
-
-def write_dl2(
-        dl2_table, output_file=None, telescope=None,
-        config=None, mode='w'):
-    """
-    Helper function to write DL2 file
-
-    Parameters
-    ----------
-    dl2_table: pandas.DataFrame
-    output_file: string
-    telescope: string
-    config: dict
-    mode: string
-
-    Returns
-    -------
-
-    """
-
-    write_dl2_table(
-        dl2_table, output_file=output_file,
-        table_path='/dl2/event/telescope/parameters',
-        table_name=telescope, config=config,
-        mode=mode
-        )
 
 
 def write_photon_list(
@@ -244,7 +217,6 @@ def write_extra_parameters(
         # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
         # then cannot merge the files and raise error...
         merged_table.write(file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
-
 
 
 def read_trigger_time(input_file, tel):
@@ -469,7 +441,6 @@ def load_dl1_sst1m(
     if quality_cuts & (config is not None):
         logging.info('Performing event selection.')
         events = event_selection(events, config=config)
-
 
 
     if stereo:
@@ -863,59 +834,6 @@ def load_extra_table(input_file, key=None, remove_column=None):
     return table_pd
 
 
-def write_dl2_table(
-        dl2, output_file=None, table_path=None,
-        table_name=None, config=None, mode='a'):
-    """
-    Opens the HDF file and writes DL2 table
-
-    Parameters
-    ----------
-    dl2: pandas.DataFrame
-    output_file: string
-    table_path: string
-    table_name: string
-    config: dict
-    mode: string
-
-    Returns
-    -------
-
-    """
-
-    for key in dl2.keys():
-
-        if dl2[key].dtypes is object:
-            logging.info('Removing key: %s, with content: %s', key, str(dl2[key].iloc[0]))
-            logging.info('Because object saving is not supported in table')
-            del dl2[key]
-            continue
-
-        # converting datatime columns in UNIX time in [ns]
-        if dl2[key].dtypes == np.dtype('datetime64[ns]'):
-            dl2[key] = dl2[key].astype('int')
-
-    logging.info('Writing DL2 in %s', output_file)
-
-    with tables.open_file(output_file, mode=mode) as f:
-
-        full_node_path = f"{table_path}/{table_name}"
-        if full_node_path in f:
-            logging.info("Removing existing node %s", full_node_path)
-            f.remove_node(table_path, name=table_name, recursive=True)
-
-        logging.info("Creating new node %s", full_node_path)
-        t = f.create_table(
-            table_path,
-            table_name,
-            dl2.to_records(index=False),
-            createparents=True,
-        )
-
-        if config:
-            t.attrs["config"] = config
-
-
 def write_pl_table(
         pl_table, output_file=None, table_path=None,
         table_name=None, config=None, mode='a'):
@@ -1049,36 +967,6 @@ def load_drive_data(file):
     merge_data['date'] = [datetime.fromtimestamp(float(k/1000)) for k in merge_data['TIMESTAMP']]
     hdul.close()
     return merge_data
-
-
-def write_dl2_info(dl2_file, rfs_used=None):
-    """
-    Stores info tab with RF used and sst1mpipe
-    version in the DL2 file. These are necesary
-    for DL3 production.
-
-    Parameters
-    ----------
-    dl2_file: string
-    rfs_used: string
-
-    Returns
-    -------
-
-    """
-
-    with tables.open_file(dl2_file, mode='a') as file:
-
-        table = file.create_table(
-            '/dl2',
-            'info',
-            DL2_info,
-            "DL2 production info"
-        )
-        info = table.row
-        info['sst1mpipe_version'] = sst1mpipe.__version__
-        info['RF_used'] = rfs_used
-        info.append()
 
 
 def write_dl1_info(dl1_file, info):

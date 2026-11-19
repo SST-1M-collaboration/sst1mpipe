@@ -20,7 +20,7 @@ from ctapipe.reco.preprocessing import telescope_to_horizontal
 from ctapipe.reco.reconstructor import ReconstructionProperty
 from ctapipe.reco.stereo_combination import StereoCombiner, StereoMeanCombiner
 
-from conftest import run_process
+from conftest import OBSERVATION_RUNS, monitoring_source_args, run_process
 from sst1mpipe.ml import StereoMARSCombiner, mars_disp_signs
 from sst1mpipe.scripts.sst1mpipe_apply_models_tool import ApplyModels, add_telescope_pointing
 from sst1mpipe.scripts.sst1mpipe_train_models_tool import (
@@ -28,7 +28,7 @@ from sst1mpipe.scripts.sst1mpipe_train_models_tool import (
     TrainEnergyRegressor,
     TrainParticleClassifier,
 )
-from sst1mpipe.resources import MC_CONFIG_FILES, TEST_DATA_DIR, TRAIN_CONFIG_FILES
+from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, TEST_DATA_DIR, TRAIN_CONFIG_FILES
 
 SIMTEL_DIR = TEST_DATA_DIR / "simtel"
 GAMMA_DIFFUSE = SIMTEL_DIR / "gamma_200_800E3GeV_20_20deg_ATM52_102168.corsika.gz.NSBmed4.simtel.gz"
@@ -253,3 +253,49 @@ def test_apply_models(models, dl1_files, tmp_path):
         geometry["true_az"].quantity, geometry["true_alt"].quantity,
     )[stereo]
     assert np.median(separation) < 1 * u.deg
+
+
+@pytest.mark.parametrize("with_monitoring", [True, False])
+def test_apply_models_to_observations(models, observation_monitoring, tmp_path, with_monitoring):
+    """
+    the models of the simulated telescope 1 are applied to the observations of telescope 21; without
+    monitoring data (no pointing of the telescope), with the pointing of the target (warning)
+    """
+    run = OBSERVATION_RUNS[21]
+    dl1 = tmp_path / "observation.dl1.h5"
+    monitoring = monitoring_source_args(observation_monitoring[21]) if with_monitoring else []
+    run_process(run["path"], dl1, f"--max-events={run['n_events']}", *monitoring, config=DATA_CONFIG_FILE)
+    directory, _ = models
+    output = tmp_path / "observation.dl2.h5"
+    reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
+    argv = ["-i", str(dl1), *reconstructors, "-o", str(output), "--no-progress"]
+    tool = ApplyModels()
+    assert run_tool(tool, argv=argv, raises=True) == 0
+    assert getattr(tool, "_warned_pointing", False) is not with_monitoring
+    energy = read_table(output, "/dl2/event/telescope/energy/RandomForestRegressor/tel_021")
+    assert len(energy) > 0 and np.any(energy["RandomForestRegressor_tel_is_valid"])
+    geometry = read_table(output, "/dl2/event/subarray/geometry/disp")
+    assert np.any(geometry["disp_is_valid"])
+
+
+def test_apply_models_one_telescope(models, dl1_files, tmp_path):
+    """telescopes=[1]: the DL2 of the subarray is the mono reconstruction of telescope 1"""
+    directory, _ = models
+    output = tmp_path / "gamma_point_tel1.dl2.h5"
+    reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
+    argv = ["-i", str(dl1_files["gamma_point"]), *reconstructors, "-o", str(output), "--no-progress",
+            "--ApplyModels.telescopes=[1]"]
+    assert run_tool(ApplyModels(), argv=argv, raises=True) == 0
+    stereo = read_table(output, "/dl2/event/subarray/energy/RandomForestRegressor")
+    # one row per triggered event, telescope 2 never valid
+    assert len(stereo) == len(read_table(output, "/dl1/event/subarray/trigger"))
+    tel2 = read_table(output, "/dl2/event/telescope/energy/RandomForestRegressor/tel_002")
+    assert not np.any(tel2["RandomForestRegressor_tel_is_valid"])
+    mono = read_table(output, "/dl2/event/telescope/energy/RandomForestRegressor/tel_001")
+    events = join(stereo, mono, keys=["obs_id", "event_id"])
+    valid = events["RandomForestRegressor_is_valid"]
+    assert np.count_nonzero(valid) > 0
+    np.testing.assert_allclose(events["RandomForestRegressor_energy"][valid],
+                               events["RandomForestRegressor_tel_energy"][valid], rtol=1e-6)
+    assert np.all(np.asarray(stereo["RandomForestRegressor_telescopes"])[:, 1] == 0)
+

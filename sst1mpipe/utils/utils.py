@@ -17,7 +17,6 @@ import tables
 from astropy.coordinates import (
     AltAz,
     SkyCoord,
-    angular_separation,
     get_body,
     get_sun,
 )
@@ -91,7 +90,6 @@ def get_target(file, force_pointing=False):
             logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
             target, ra, dec, wobble = None, None, None, None
     return target, ra, dec, wobble
-
 
 
 def get_trigger_time_ns(data):
@@ -304,7 +302,6 @@ def add_trigger_time(event, telescope=None):
         sst1mpipe.io.containers.SST1MArrayEventContainer
 
     """
-
 
 
     # We assume tai scale
@@ -1235,36 +1232,6 @@ def disp(
     return disp_dx, disp_dy, disp_norm, disp_angle, disp_sign
 
 
-def polar_to_cartesian(norm, angle, sign):
-    """
-    Polar to cartesian transformation.
-    As a convention, angle should be in
-    [-pi/2:pi/2]. This is a modification
-    of the same functions from lstchain
-    https://github.com/cta-observatory/cta-lstchain
-    Copyright (c) 2024 cta-lstchain developers
-    Licensed under the 3-clause BSD style license.
-
-    Parameters
-    ----------
-    norm: numpy.ndarray
-    angle: numpy.ndarray
-    sign: numpy.ndarray
-
-    Returns
-    -------
-    (x, y):
-        x: numpy.ndarray
-        y: numpy.ndarray
-
-    """
-
-    assert np.isfinite([norm, angle, sign]).all()
-    x = norm * sign * np.cos(angle)
-    y = norm * sign * np.sin(angle)
-    return x, y
-
-
 def get_pointing_radec(input_file):
     """
     Gets array poiting in ra,dec from DL1 data file
@@ -1419,15 +1386,3 @@ def plot_livetime(hdu_dir,objects=None,ignore_sources=None):
     plt.xticks(rotation=45)
     return f,ax
 
-def calculate_misdirection(dl2):
-
-    dl2['misdirection'] = angular_separation(
-        dl2['true_az'].values * u.deg,
-        dl2['true_alt'].values * u.deg,
-        dl2["reco_az"].values * u.deg,
-        dl2["reco_alt"].values * u.deg,
-    ).to_value(u.deg)
-
-    dl2['log_misdirection'] = np.log10(dl2['misdirection'])
-
-    return dl2
