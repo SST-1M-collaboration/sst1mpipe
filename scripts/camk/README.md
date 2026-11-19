@@ -14,7 +14,8 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL2
 | `mc_merge.bash` | `ctapipe-merge`: training files of all the zenith angles (`MC_TRAIN_FRACTION`), test files per zenith angle |
 | `mc_train.bash` | `sst1mpipe-train-*`: energy, particle classifier, disp in `models/` (the NSB level, feature `cos_zenith`), with plots |
 | `mc_dl1_dl2.bash` | `sst1mpipe-apply-models` on the test files of each zenith angle: `dl2/ze<z>/stereo` (both telescopes), `tel1`, `tel2` (one telescope alone) |
-| `mc_irf.bash` | `ctapipe-optimize-event-selection`, `ctapipe-compute-irf`: point-like and full enclosure IRFs per zenith angle and mode (`tel1`, `tel2`, `stereo`, `strict_stereo`), in `irf/<IRF_CUTS>/<mode>/ze<z>/` |
+| `mc_irf.bash` | `ctapipe-optimize-event-selection`, `ctapipe-compute-irf`: point-like and full enclosure IRFs per zenith angle and mode (`tel1`, `tel2`, `stereo`, `strict_stereo`), in `irf/<IRF_CUTS>/<mode>/ze<z>/`, with their figures (`plots/`, `sst1mpipe-plot-irfs`) |
+| `mc_irf_comparison.bash` | figures of the four modes together, in `irf/<IRF_CUTS>/comparison/ze<z>/` |
 
 | Data | |
 |---|---|

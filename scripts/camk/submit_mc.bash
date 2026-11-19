@@ -80,4 +80,6 @@ if run dl2; then
 fi
 # 4 modes (tel1, tel2, stereo, strict_stereo) per zenith angle
 IRF=$(submit "${DEPENDENCY}" --array="0-$((4 * N_ZENITHS - 1))" "${SCRIPTS}/mc_irf.bash")
-echo "IRFs (${IRF_CUTS} cuts): job ${IRF}, outputs in ${MC_DIRECTORY}"
+# figures with the four modes (afterany: the modes that succeeded)
+COMPARISON=$(submit "afterany:${IRF}" --array="0-$((N_ZENITHS - 1))" "${SCRIPTS}/mc_irf_comparison.bash")
+echo "IRFs (${IRF_CUTS} cuts): job ${IRF}, comparison ${COMPARISON}, outputs in ${MC_DIRECTORY}"

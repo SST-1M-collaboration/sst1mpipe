@@ -298,3 +298,43 @@ def test_apply_models_one_telescope(models, dl1_files, tmp_path):
     np.testing.assert_allclose(events["RandomForestRegressor_energy"][valid],
                                events["RandomForestRegressor_tel_energy"][valid], rtol=1e-6)
     assert np.all(np.asarray(stereo["RandomForestRegressor_telescopes"])[:, 1] == 0)
+
+
+def test_plot_irfs(models, dl1_files, tmp_path):
+    """IRFs of ctapipe (fixed cuts: few events) of the DL2 of the models, and their figures"""
+    from ctapipe.tools.compute_irf import IrfTool
+    from ctapipe.tools.optimize_event_selection import EventSelectionOptimizer
+
+    from sst1mpipe.resources import CONFIG_DIR
+    from sst1mpipe.scripts.sst1mpipe_plot_irfs_tool import main as plot_irfs
+
+    directory, _ = models
+    reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
+    dl2 = tmp_path / "dl2"
+    dl2.mkdir()
+    for name, particle in (("gamma_point", "gamma_point"), ("proton_test", "proton")):
+        argv = ["-i", str(dl1_files[particle]), *reconstructors, "-o", str(dl2 / f"{name}.dl2.h5"), "--no-progress"]
+        assert run_tool(ApplyModels(), argv=argv, raises=True) == 0
+
+    irf = tmp_path / "irf"
+    irf.mkdir()
+    configs = [f"--config={CONFIG_DIR / 'sst1mpipe_optimize_cuts.yaml'}",
+               f"--config={CONFIG_DIR / 'sst1mpipe_irf_paper_cuts.yaml'}"]
+    argv = [*configs, "-g", str(dl2 / "gamma_point.dl2.h5"), "-p", str(dl2 / "proton_test.dl2.h5"),
+            "-o", str(irf / "cuts.fits")]
+    assert run_tool(EventSelectionOptimizer(), argv=argv, raises=True) == 0
+    argv = [f"--config={CONFIG_DIR / 'sst1mpipe_compute_irf.yaml'}", "--cuts", str(irf / "cuts.fits"),
+            "--gamma-file", str(dl2 / "gamma_point.dl2.h5"), "--proton-file", str(dl2 / "proton_test.dl2.h5"),
+            "--do-background", "--spatial-selection-applied", "--DefaultFoVOffsetBins.fov_offset_n_bins=1",
+            "--output", str(irf / "irf_point_like.fits.gz"), "--benchmark-output", str(irf / "benchmarks_point_like.fits.gz")]
+    assert run_tool(IrfTool(), argv=argv, raises=True) == 0
+
+    plot_irfs(["--irf", f"stereo={irf}", "--dl2", f"stereo={dl2}", "-o", str(tmp_path / "plots")])
+    names = {path.stem for path in (tmp_path / "plots").glob("*.png")}
+    assert names == {"effective_area", "effective_area_protons", "energy_bias", "energy_resolution", "angular_resolution",
+                     "theta_cut", "gammaness_cut", "background", "sensitivity", "sensitivity_crab", "energy_migration",
+                     "gammaness", "roc"}
+    # comparison: one series per input
+    plot_irfs(["--irf", f"a={irf}", "--irf", f"b={irf}", "-o", str(tmp_path / "comparison")])
+    assert {"energy_migration_a", "energy_migration_b", "sensitivity"} <= {
+        path.stem for path in (tmp_path / "comparison").glob("*.png")}

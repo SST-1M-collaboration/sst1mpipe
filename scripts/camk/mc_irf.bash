@@ -11,6 +11,7 @@
 #    IRF_CUTS=optimized (best sensitivity) or paper (fixed: 60 % gammaness, 80 % theta)
 # 2. ctapipe-compute-irf: point-like IRFs (point gammas, direction cut), and full enclosure IRFs
 #    (diffuse gammas), with the benchmarks (sensitivity, resolutions)
+# 3. sst1mpipe-plot-irfs: one figure per quantity in plots/
 # Background: protons weighted to protons + helium (IRF_BACKGROUND, see run_irf_tool.py).
 # Task 4 i + j: zenith angle i, mode j.
 
@@ -64,3 +65,6 @@ python "${TOOL}" ctapipe-compute-irf --config "${COMPUTE_IRF_CONFIG}" "${CONFIGS
   --gamma-file "${DL2}/gamma_diffuse_test.dl2.h5" --proton-file "${DL2}/proton_test.dl2.h5" \
   --do-background --no-spatial-selection-applied \
   --output "${IRF}/irf_full_enclosure.fits.gz" --benchmark-output "${IRF}/benchmarks_full_enclosure.fits.gz" --overwrite
+
+sst1mpipe-plot-irfs --irf "${MODE}=${IRF}" --dl2 "${MODE}=${DL2}" -o "${IRF}/plots" \
+  --title "zenith ${ZENITH} deg, ${MODE}, ${IRF_CUTS} cuts"
