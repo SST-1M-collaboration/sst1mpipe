@@ -36,7 +36,6 @@ from sst1mpipe.utils.utils import (
     add_timing_features,
     add_true_impact,
     event_selection,
-    get_finite,
     get_tel_id,
     get_telescopes,
     hillas_prefix,
@@ -387,7 +386,7 @@ def pedestal_mean_charge(input_file, tel, times):
 
 def load_dl1_sst1m(
         input_file, tel=None, config=None,
-        table='astropy', check_finite=False,
+        table='astropy',
         stereo=False, quality_cuts=False, scale_intensities=False):
     """
     Reads DL1 table from the input HDF file.
@@ -402,9 +401,6 @@ def load_dl1_sst1m(
     table: string
         Type of the output table: \'astropy\'
         or \'pandas\'
-    check_finite: bool
-        If True finite check of RF features is
-        performed.
     stereo: bool
         If True, extra columns with geometricaly reconstructed
         stereo quantities are added to the output table
@@ -474,9 +470,6 @@ def load_dl1_sst1m(
         logging.info('Performing event selection.')
         events = event_selection(events, config=config)
 
-    if check_finite & (config is not None):
-        logging.info('Performing finite check.')
-        events = get_finite(events, config=config, stereo=stereo)
 
 
     if stereo:
