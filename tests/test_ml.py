@@ -301,14 +301,18 @@ def test_apply_models_one_telescope(models, dl1_files, tmp_path):
 
 
 
-def test_plot_irfs(models, dl1_files, tmp_path):
-    """IRFs of ctapipe (fixed cuts: few events) of the DL2 of the models, and their figures"""
+@pytest.fixture(scope="module")
+def irfs(models, dl1_files, tmp_path_factory):
+    """
+    IRFs of ctapipe (fixed cuts: few events) of the DL2 of the models: (IRF directory: cuts.fits,
+    irf_point_like.fits.gz, benchmarks_point_like.fits.gz; DL2 directory)
+    """
     from ctapipe.tools.compute_irf import IrfTool
     from ctapipe.tools.optimize_event_selection import EventSelectionOptimizer
 
     from sst1mpipe.resources import CONFIG_DIR
-    from sst1mpipe.scripts.sst1mpipe_plot_irfs_tool import main as plot_irfs
 
+    tmp_path = tmp_path_factory.mktemp("irfs")
     directory, _ = models
     reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
     dl2 = tmp_path / "dl2"
@@ -329,7 +333,14 @@ def test_plot_irfs(models, dl1_files, tmp_path):
             "--do-background", "--spatial-selection-applied", "--DefaultFoVOffsetBins.fov_offset_n_bins=1",
             "--output", str(irf / "irf_point_like.fits.gz"), "--benchmark-output", str(irf / "benchmarks_point_like.fits.gz")]
     assert run_tool(IrfTool(), argv=argv, raises=True) == 0
+    return irf, dl2
 
+
+def test_plot_irfs(irfs, tmp_path):
+    """Figures of the IRFs, with references"""
+    from sst1mpipe.scripts.sst1mpipe_plot_irfs_tool import main as plot_irfs
+
+    irf, dl2 = irfs
     plot_irfs(["--irf", f"stereo={irf}", "--dl2", f"stereo={dl2}", "-o", str(tmp_path / "plots")])
     names = {path.stem for path in (tmp_path / "plots").glob("*.png")}
     assert names == {"effective_area", "effective_area_protons", "energy_bias", "energy_resolution", "angular_resolution",
@@ -376,3 +387,60 @@ def test_instrument_sensitivities(name):
     assert set(data) == {"sensitivity"}
     sensitivity = data["sensitivity"]["ENERGY_FLUX_SENSITIVITY"].to_value(u.TeV / u.cm**2 / u.s)
     assert np.all((sensitivity > 1e-14) & (sensitivity < 1e-10))
+
+
+@pytest.mark.parametrize("with_monitoring", [True, False])
+def test_dl2_dl3(models, irfs, observation_monitoring, tmp_path, with_monitoring):
+    """
+    DL3 of an observation of telescope 21 (models and IRFs of telescope 1): read by gammapy with its
+    point-like IRFs; IRFs of the closest zenith angle; pointing of the target without monitoring data
+    """
+    import shutil
+
+    from astropy.coordinates import angular_separation
+    from ctapipe.irf import OptimizationResult
+    from gammapy.data import DataStore
+
+    from sst1mpipe.io.dl3 import select_irf_directory
+    from sst1mpipe.scripts.sst1mpipe_dl2_dl3_tool import DL2ToDL3
+
+    run = OBSERVATION_RUNS[21]
+    dl1 = tmp_path / "observation.dl1.h5"
+    monitoring = monitoring_source_args(observation_monitoring[21]) if with_monitoring else []
+    run_process(run["path"], dl1, f"--max-events={run['n_events']}", *monitoring, config=DATA_CONFIG_FILE)
+    directory, _ = models
+    dl2 = tmp_path / "observation.dl2.h5"
+    reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
+    assert run_tool(ApplyModels(), argv=["-i", str(dl1), *reconstructors, "-o", str(dl2), "--no-progress"],
+                    raises=True) == 0
+
+    # IRFs at two zenith angles; the ze40 ones without gammaness cut (the test models are poor)
+    irf, _ = irfs
+    irf_directories = tmp_path / "irf"
+    shutil.copytree(irf, irf_directories / "ze20")
+    shutil.copytree(irf, irf_directories / "ze40")
+    cuts = OptimizationResult.read(irf / "cuts.fits")
+    cuts.gh_cuts["cut"] = 0.0
+    cuts.write(irf_directories / "ze40" / "cuts.fits", overwrite=True)
+    assert select_irf_directory(irf_directories, 30.5 * u.deg).name == "ze40"
+    assert select_irf_directory(irf_directories, 25 * u.deg).name == "ze20"
+    assert select_irf_directory(irf, 60 * u.deg) == irf
+
+    output = tmp_path / "dl3"
+    argv = ["-i", str(dl2), "--irf-directory", str(irf_directories / "ze40"), "-o", str(output)]
+    assert run_tool(DL2ToDL3(), argv=argv, raises=True) == 0
+    store = DataStore.from_dir(output)
+    assert set(store.hdu_table["HDU_TYPE"]) == {"events", "gti", "pointing", "aeff", "edisp", "rad_max", "bkg"}
+    observation = store.get_observations(required_irf="point-like")[0]
+    events = observation.events.table
+    valid = read_table(dl2, "/dl2/event/subarray/particle_type/RandomForestClassifier")["RandomForestClassifier_is_valid"]
+    assert 0 < len(events) <= np.count_nonzero(valid)
+    assert observation.obs_id == read_table(dl2, "/dl1/event/subarray/trigger")["obs_id"][0]
+    assert observation.rad_max is not None and observation.aeff is not None
+    # events around the pointing (wobble of the observation)
+    pointing = observation.pointing.fixed_icrs
+    separation = angular_separation(events["RA"].quantity, events["DEC"].quantity, pointing.ra, pointing.dec)
+    assert np.all(separation < 5 * u.deg)
+    target = read_table(dl2, "/configuration/observation/observation_block")["target"][0]
+    assert store.obs_table["OBJECT"][0] == target
+    assert 0 < store.obs_table["ZEN_PNT"].quantity[0] < 90 * u.deg
