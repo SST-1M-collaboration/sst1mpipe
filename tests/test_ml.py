@@ -376,3 +376,15 @@ def test_instrument_sensitivities(name):
     assert set(data) == {"sensitivity"}
     sensitivity = data["sensitivity"]["ENERGY_FLUX_SENSITIVITY"].to_value(u.TeV / u.cm**2 / u.s)
     assert np.all((sensitivity > 1e-14) & (sensitivity < 1e-10))
+
+
+def test_cut_without_n_events():
+    """the cuts of the optimization of the sensitivity have no n_events: all the bins drawn"""
+    from astropy.table import QTable
+
+    from sst1mpipe.performance.irf_plots import _cut
+
+    table = QTable({"low": [1, 2] * u.TeV, "high": [2, 4] * u.TeV, "cut": [0.2, 0.1] * u.deg})
+    np.testing.assert_allclose(_cut(table)[2], [0.2, 0.1])
+    table["n_events"] = [5, 20]
+    assert np.isnan(_cut(table)[2][0]) and _cut(table)[2][1] == 0.1

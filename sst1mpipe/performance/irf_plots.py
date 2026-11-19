@@ -153,9 +153,13 @@ def write_reference_directory(directory, reference, true_energy_bins=None, reco_
 
 
 def _cut(table, min_events=10):
-    """Cut per reconstructed energy bin, NaN for the bins with the fill value (too few events)"""
+    """
+    Cut per reconstructed energy bin, NaN for the bins with the fill value (too few events: the percentile
+    cuts have the column ``n_events``, not the cuts of the optimization of the sensitivity)
+    """
     values = np.asarray(u.Quantity(table["cut"]).value, dtype=float)
-    values[np.asarray(table["n_events"]) < min_events] = np.nan
+    if "n_events" in table.colnames:
+        values[np.asarray(table["n_events"]) < min_events] = np.nan
     return table["low"].to_value(u.TeV), table["high"].to_value(u.TeV), values
 
 
