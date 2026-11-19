@@ -164,7 +164,7 @@ def test_process_zfits_file(zfits_file, tmp_path):
     assert info[f"n_triggered_tel{tel_id - 20}"][0] == n_events
 
     # images of Cherenkov events survive the cleaning
-    intensity = parameters["camera_frame_hillas_intensity"]
+    intensity = parameters["hillas_intensity"]
     assert np.isfinite(intensity).sum() > 0
     assert np.all(intensity[np.isfinite(intensity)] > 0)
 

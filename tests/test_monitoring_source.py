@@ -118,7 +118,7 @@ def test_process_with_monitoring_source(monitoring, tmp_path):
 
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{TEL_ID:03d}")
     assert len(parameters) == N_EVENTS - N_PEDESTALS
-    intensity = parameters["camera_frame_hillas_intensity"]
+    intensity = parameters["hillas_intensity"]
     assert np.isfinite(intensity).sum() > 0
 
     info = get_dl1_info(output)

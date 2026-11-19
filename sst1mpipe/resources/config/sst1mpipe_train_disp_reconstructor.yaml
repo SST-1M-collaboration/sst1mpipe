@@ -1,0 +1,55 @@
+# sst1mpipe-train-disp-reconstructor: models of sst1mpipe_mc_config_low_nsb.json (RF settings, features, cuts)
+# needs the telescope frame parameters (hillas_fov_lon / lat, hillas_psi): sst1mpipe-process ...
+# --ImageProcessor.use_telescope_frame=True
+#   sst1mpipe-train-disp-reconstructor -i gamma_diffuse_train.dl1.h5 -o disp_reconstructor.pkl \
+#     --config sst1mpipe_train_disp_reconstructor.yaml --n-events 700000 --cv-output cv_disp.h5
+TrainDispReconstructor:
+  random_seed: 42
+  DispReconstructor:
+    norm_cls: RandomForestRegressor
+    norm_config:               # random_forest_regressor_args
+      n_estimators: 150
+      max_depth: 30
+      min_samples_leaf: 10
+      min_samples_split: 10
+      bootstrap: true
+      criterion: squared_error
+      random_state: 42
+    sign_cls: RandomForestClassifier
+    sign_config:               # random_forest_classifier_args
+      n_estimators: 100
+      max_depth: 30
+      min_samples_leaf: 10
+      min_samples_split: 10
+      bootstrap: true
+      criterion: gini
+      random_state: 42
+    # the same features for the norm and the sign (sst1mpipe: disp_regression_features for the norm,
+    # disp_classification_features for the sign); no position in the camera (as sst1mpipe)
+    features:
+      - log_hillas_intensity
+      - hillas_width
+      - hillas_length
+      - hillas_wl
+      - hillas_skewness
+      - hillas_kurtosis
+      - timing_slope
+      - leakage_intensity_width_2
+      - cos_zenith             # pointing of the telescope (models of all the zenith angles)
+      # stereo models: add HillasReconstructor_tel_impact_distance and HillasReconstructor_h_max
+    FeatureGenerator:
+      features:
+        - ["log_hillas_intensity", "log10(hillas_intensity)"]
+        - ["hillas_wl", "hillas_width / hillas_length"]
+        - ["cos_zenith", "sin(telescope_pointing_altitude)"]
+    MLQualityQuery:
+      quality_criteria:
+        # cuts of the SST-1M Crab paper (arXiv:2506.01733): intensity > 45 p.e., leakage2 < 0.7
+        - ["intensity", "(hillas_intensity > 45) & (hillas_intensity < 1e6)"]
+        - ["width", "hillas_width > 0"]
+        - ["length", "hillas_length > 0"]
+        - ["leakage", "leakage_intensity_width_2 < 0.7"]
+    # stereo direction of the MARS analysis (sst1mpipe.ml.StereoMARSCombiner)
+    stereo_combiner_cls: StereoMARSCombiner
+    StereoMARSCombiner:
+      weights: intensity
