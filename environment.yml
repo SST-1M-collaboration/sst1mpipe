@@ -42,6 +42,7 @@ dependencies:
   - iminuit
   - pyzmq
   - msgpack-python
+  - asyncua # OPCUAMonitoringSource (optional dependency, sst1mpipe[opcua])
   - pip:
       # not on conda-forge; sst1mpipe itself: pip install --no-deps -e . (the dependencies from conda)
       - sst1m-cts>=1.0 # sst1m_cts_core: camera configuration of DigiCam
