@@ -109,7 +109,8 @@ def get_mc_info(input_file, config=None):
 
     simulated_event_info.energy_max = mc['energy_range_max'][0] * mc['energy_range_max'].unit
     simulated_event_info.spectral_index = mc['spectral_index'][0]
-    simulated_event_info.viewcone = mc['max_viewcone_radius'][0] * mc['max_viewcone_radius'].unit
+    simulated_event_info.viewcone_min = mc['min_viewcone_radius'][0] * mc['min_viewcone_radius'].unit
+    simulated_event_info.viewcone_max = mc['max_viewcone_radius'][0] * mc['max_viewcone_radius'].unit
     simulated_event_info.min_impact = mc['min_scatter_range'][0] * mc['min_scatter_range'].unit
     simulated_event_info.max_impact = mc['max_scatter_range'][0] * mc['max_scatter_range'].unit
 

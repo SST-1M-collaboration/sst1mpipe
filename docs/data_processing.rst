@@ -326,7 +326,7 @@ Reading the outputs
         table = loader.read_telescope_events([21], dl1_parameters=True, pointing=True)
 
 ``load_dl1_sst1m`` adds the parameters of the analysis which are not computed by ctapipe
-(``add_dl1_extra_parameters``): ``log_camera_frame_hillas_intensity``, ``camera_frame_hillas_wl``,
+(``add_dl1_extra_parameters``): ``log_hillas_intensity``, ``hillas_wl`` (``camera_frame_`` prefix for the camera frame),
 ``equivalent_focal_length``; for the observed data ``local_time``, ``date`` and ``meanQ`` (mean charge
 of the pedestal images); for the simulations the true parameters of the showers, ``log_true_energy``,
 the DISP parameters, ``miss`` and ``true_tel_impact_distance``. They are not written in the DL1 files.

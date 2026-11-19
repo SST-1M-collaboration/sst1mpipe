@@ -215,7 +215,15 @@ def test_train_tools_plots(models, name):
     node = directory / "nsb100"
     assert (node / f"{name}.pkl").exists()
     plot_dir = node / f"{name}_plots"
-    assert sorted(p.name for p in tools[name].plots) == [f"{name}_feature_importance.png", f"{name}_performance.png"]
+    # one figure per quantity and per telescope
+    quantities = {
+        "energy_regressor": ["feature_importance", "resolution", "bias", "migration"],
+        "particle_classifier": ["feature_importance", "gammaness", "roc", "roc_per_energy"],
+        "disp_reconstructor": ["feature_importance_norm", "feature_importance_sign", "disp_migration",
+                               "disp_resolution", "disp_bias", "disp_sign"],
+    }[name]
+    expected = {f"{name}_tel{tel_id}_{quantity}.png" for tel_id in (1, 2) for quantity in quantities}
+    assert {p.name for p in tools[name].plots} == expected
     for path in tools[name].plots:
         assert path.parent == plot_dir and path.stat().st_size > 0
     model = {"energy_regressor": "regressor", "particle_classifier": "classifier", "disp_reconstructor": "models"}[name]
