@@ -16,7 +16,7 @@ mkdir -p "${DATA_DIRECTORY}/lists"
 R0_JOBS=()
 for TEL in 1 2; do
   LIST="${DATA_DIRECTORY}/lists/cs${TEL}.txt"
-  find "${RAW_DIRECTORY}/cs${TEL}/data/raw/${DATE:0:4}/${DATE:4:2}/${DATE:6:2}/SST1M${TEL}" \
+  find "${RAW_DIRECTORY}/cs${TEL}/data/raw/${DATE:0:4}/${DATE:4:2}/${DATE:6:2}" \
     -name "SST1M${TEL}_*.fits.fz" 2>/dev/null | sort > "${LIST}" || true
   N=$(wc -l < "${LIST}")
   if (( N == 0 )); then

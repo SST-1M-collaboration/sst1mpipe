@@ -19,7 +19,7 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL3
 
 | Data | |
 |---|---|
-| `data_r0_dl1.bash` | `sst1mpipe-monitoring`, `sst1mpipe-process`, one raw file per array task, per telescope |
+| `data_r0_dl1.bash` | `sst1mpipe-monitoring`, `sst1mpipe-process`, one raw file per array task, per telescope (raw files: `RAW_DIRECTORY`, default `/work/se1/sst1m_data/cs<tel>/data/raw/YYYY/MM/DD`) |
 | `data_dl1_stereo.bash` | `ctapipe-merge` of the night of each telescope, `sst1mpipe-stereo` |
 | `data_dl1_dl2.bash` | `sst1mpipe-apply-models` on every DL1 file (cs1, cs2, stereo) |
 | `data_dl2_dl3.bash` | `sst1mpipe-dl2-dl3` on every DL2 file with the IRFs of `DATA_IRF_DIRECTORY` (cs1: `tel1`, cs2: `tel2`, stereo: `strict_stereo`, closest zenith angle), index files of gammapy per analysis in `dl3/<cs1, cs2, stereo>/` |
