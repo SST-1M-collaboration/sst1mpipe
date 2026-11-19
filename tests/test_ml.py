@@ -338,21 +338,26 @@ def test_plot_irfs(models, dl1_files, tmp_path):
     plot_irfs(["--irf", f"a={irf}", "--irf", f"b={irf}", "-o", str(tmp_path / "comparison")])
     assert {"energy_migration_a", "energy_migration_b", "sensitivity"} <= {
         path.stem for path in (tmp_path / "comparison").glob("*.png")}
-    # with the performance of the paper
-    plot_irfs(["--irf", f"stereo={irf}", "--dl2", f"stereo={dl2}", "--reference", "--reference-zenith", "30",
-               "-o", str(tmp_path / "reference")])
-    assert len(list((tmp_path / "reference").glob("*.png"))) == len(names)
+    # with the performance of the paper (IRF directories of the same format, some quantities only)
+    plot_irfs(["--irf", f"stereo={irf}", "--reference", "paper 30=paper:strict_stereo/ze30",
+               "--reference", "paper 20=paper:strict_stereo/ze20", "-o", str(tmp_path / "reference")])
+    assert {path.stem for path in (tmp_path / "reference").glob("*.png")} == names - {"gammaness", "roc"}
+    # the paper alone: its quantities only
+    plot_irfs(["--reference", "tel1=paper:tel1/ze30", "--reference", "tel2=paper:tel2/ze20", "-o", str(tmp_path / "paper")])
+    assert {path.stem for path in (tmp_path / "paper").glob("*.png")} == {
+        "effective_area", "energy_bias", "energy_resolution", "angular_resolution", "sensitivity", "sensitivity_crab"}
 
 
-def test_reference():
-    """Performance of the SST-1M Crab paper: all the quantities of its figures, sensible values"""
-    from sst1mpipe.ml.irf_plots import read_reference
+def test_crab_paper_reference():
+    """Performance of the SST-1M Crab paper in IRF directories: sensible values"""
+    import astropy.units as u
 
-    reference = read_reference(zeniths=[30])
-    assert set(reference["quantity"]) == {"sensitivity", "energy_resolution", "energy_bias", "angular_resolution", "roc"}
-    stereo = reference[(reference["quantity"] == "sensitivity") & (reference["series"] == "stereo, 30 deg")]
+    from sst1mpipe.ml.irf_plots import REFERENCE_DIRECTORY, read_irf_directory
+
+    stereo = read_irf_directory(REFERENCE_DIRECTORY / "strict_stereo" / "ze30")
+    assert set(stereo) == {"energy", "angular", "sensitivity"}
     # best sensitivity of the stereo: ~2e-12 TeV cm-2 s-1 at ~10 TeV (Fig. 11)
-    assert 1.5e-12 < np.min(stereo["value"]) < 2.5e-12
-    aeff = read_reference()
-    aeff = aeff[aeff["quantity"] == "effective_area"]
-    assert set(aeff["stage"]) == {"analysis level"} and len(set(aeff["series"])) == 3
+    sensitivity = stereo["sensitivity"]["ENERGY_FLUX_SENSITIVITY"].to_value(u.TeV / u.cm**2 / u.s)
+    assert 1.5e-12 < np.nanmin(sensitivity) < 2.5e-12
+    aeff = read_irf_directory(REFERENCE_DIRECTORY / "tel2" / "ze20")["aeff"]["EFFAREA"].to_value(u.m**2)
+    assert 5e5 < np.nanmax(aeff) < 1e6

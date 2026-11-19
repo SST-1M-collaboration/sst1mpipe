@@ -1,12 +1,19 @@
 """
 Performance of the SST-1M Crab paper (Alispach et al. 2025, A&A 699, A255, arXiv:2506.01733), extracted
-from the vector figures (SVG) of its HTML version into a table for sst1mpipe-plot-irfs (--reference):
-sst1mpipe/resources/reference/sst1m_crab_paper_2025.ecsv.
+from the vector figures (SVG) of its HTML version into IRF directories of the format of the pipeline
+(``scripts/camk/mc_irf.bash``: ``irf_point_like.fits.gz``, ``benchmarks_point_like.fits.gz``), for
+``sst1mpipe-plot-irfs --reference``: sst1mpipe/resources/reference/crab_paper_2025/<mode>/ze<zenith>/
 
-    for f in diff_sensitivity energy_res energy_bias angular_res effective_area roc; do
+- tel1 (SST-1M-1 mono), strict_stereo (paper: stereo, events of both telescopes): ze30, ze50,
+  benchmarks (energy bias and resolution, 68 % angular resolution, sensitivity)
+- tel1, tel2, strict_stereo: ze20, effective area (analysis level)
+
+The quantities the paper does not show (energy dispersion, background, cuts, ...) are not in the files.
+
+    for f in diff_sensitivity energy_res energy_bias angular_res effective_area; do
         curl -sL https://arxiv.org/html/2506.01733v2/$f.svg -o svg/$f.svg
     done
-    python extract_crab_paper_irfs.py svg/ sst1mpipe/resources/reference/sst1m_crab_paper_2025.ecsv
+    python extract_crab_paper_irfs.py svg/ sst1mpipe/resources/reference/crab_paper_2025
 
 The axes are calibrated with the positions of the major ticks of each figure and their values (read on
 the figures). Binned figures: one horizontal segment per energy bin, the zenith angle from the style
@@ -16,11 +23,12 @@ import re
 import sys
 from pathlib import Path
 
+import astropy.units as u
 import numpy as np
-from astropy.table import Table
+from astropy.io import fits
 
-SERIES_COLORS = {"#0000ff": "SST-1M-1 mono", "#ffa500": "stereo"}
-AEFF_COLORS = {"#0000ff": "SST-1M-1 mono", "#ffa500": "SST-1M-2 mono", "#4daf4a": "stereo"}
+SERIES_COLORS = {"#0000ff": "tel1", "#ffa500": "strict_stereo"}
+AEFF_COLORS = {"#0000ff": "tel1", "#ffa500": "tel2", "#4daf4a": "strict_stereo"}
 AEFF_STAGES = {None: "triggered", "7.4,3.2": "survived cleaning", "12.8,3.2,2,3.2": "quality cuts",
                "2,3.3": "analysis level"}
 
@@ -31,15 +39,14 @@ AXES = {
     "energy_bias": ([0.1, 1, 10, 100], True, list(np.arange(-0.3, 0.35, 0.1)), False),
     "angular_res": ([0.1, 1, 10, 100], True, list(np.arange(0, 0.65, 0.1)), False),
     "effective_area": ([1, 10, 100], True, [1e2, 1e3, 1e4, 1e5, 1e6], True),
-    "roc": (list(np.arange(0, 1.05, 0.2)), False, list(np.arange(0, 1.05, 0.2)), False),
 }
-#: binned figures: quantity, unit, x (energy)
-BINNED = {
-    "diff_sensitivity": ("sensitivity", "TeV cm-2 s-1", "reconstructed energy"),
-    "energy_res": ("energy_resolution", "", "true energy"),
-    "energy_bias": ("energy_bias", "", "true energy"),
-    "angular_res": ("angular_resolution", "deg", "true energy"),
-}
+#: binned figures: quantity
+BINNED = {"diff_sensitivity": "sensitivity", "energy_res": "resolution", "energy_bias": "bias",
+          "angular_res": "angular_resolution"}
+#: energy bins of the binned figures (5 per decade), of the effective area (10 per decade)
+ENERGY_BINS = np.logspace(-1, 3, 21)
+AEFF_BINS = np.logspace(-1, 3, 41)
+REFERENCE = "Alispach et al. 2025, A&A 699, A255, arXiv:2506.01733"
 
 
 def paths(svg):
@@ -128,50 +135,97 @@ def binned(svg, figure):
     return rows
 
 
-def curves(svg, figure, colors, styles, min_step=0.0):
+def curves(svg, figure, colors, styles):
     """Continuous curves (more than 5 points) of each color and line style"""
     to_x, to_y = axis_transforms(svg, figure)
     rows = []
     for color, dash, points in paths(svg):
         if color in colors and dash in styles and len(points) > 5:
-            last = None
-            for i, (x, y) in enumerate(points):
-                # points closer than min_step (path units) to the previous one dropped (ROC: ~1000s)
-                if last is None or i == len(points) - 1 or np.hypot(x - last[0], y - last[1]) >= min_step:
-                    rows.append((colors[color], styles[dash], to_x(x), to_y(y)))
-                    last = (x, y)
+            for x, y in points:
+                rows.append((colors[color], styles[dash], to_x(x), to_y(y)))
     return rows
 
 
+def _column(name, values, unit=None):
+    values = np.atleast_2d(values) if np.ndim(values) > 1 else np.asarray(values)[np.newaxis]
+    dim = "(" + ",".join(str(n) for n in values.shape[::-1]) + ")"
+    return fits.Column(name, format=f"{values.size}D", dim=dim, unit=unit, array=values[np.newaxis])
+
+
+def _hdu(name, bins, columns, comment=""):
+    """Binary table of one row, as the ones of ctapipe-compute-irf (point-like: one offset bin)"""
+    columns = [_column("ENERG_LO", bins[:-1], "TeV"), _column("ENERG_HI", bins[1:], "TeV"),
+               _column("THETA_LO", [0.0], "deg"), _column("THETA_HI", [1.0], "deg"), *columns]
+    hdu = fits.BinTableHDU.from_columns(columns, name=name)
+    hdu.header["REFERENC"] = REFERENCE
+    if comment:
+        hdu.header["COMMENT"] = comment
+    return hdu
+
+
+def _per_bin(rows, bins):
+    """Values of the bins of the figure in the bins ``bins`` (NaN without value)"""
+    values = np.full(len(bins) - 1, np.nan)
+    for low, high, value in rows:
+        index = np.argmin(np.abs(np.log10(bins[:-1]) - np.log10(low)))
+        if np.isclose(np.log10(bins[index]), np.log10(low), atol=0.02) and np.isclose(
+                np.log10(bins[index + 1]), np.log10(high), atol=0.02):
+            values[index] = value
+    return values
+
+
+def _crab(energy):
+    """E2 dN/dE of the Crab Nebula (HEGRA, ctapipe CRAB_HEGRA) in TeV cm-2 s-1"""
+    return 2.83e-11 * energy ** (2 - 2.62)
+
+
 def main(svg_directory, output):
-    svg_directory = Path(svg_directory)
-    table = Table(names=["quantity", "series", "regime", "zenith", "stage", "x_low", "x_high", "value"],
-                  dtype=[str, str, str, int, str, float, float, float])
-    for figure, (quantity, _, _) in BINNED.items():
-        for regime, zenith, stage, low, high, value in binned((svg_directory / f"{figure}.svg").read_text(), figure):
-            table.add_row((quantity, f"{regime}, {zenith} deg", regime, zenith, stage, low, high, value))
+    svg_directory, output = Path(svg_directory), Path(output)
+    values = {}  # (mode, zenith): {quantity: rows}
+    for figure, quantity in BINNED.items():
+        for mode, zenith, _, low, high, value in binned((svg_directory / f"{figure}.svg").read_text(), figure):
+            values.setdefault((mode, zenith), {}).setdefault(quantity, []).append((low, high, value))
+    curves_aeff = {}
     svg = (svg_directory / "effective_area.svg").read_text()
-    for regime, stage, x, value in curves(svg, "effective_area", AEFF_COLORS, AEFF_STAGES):
-        table.add_row(("effective_area", f"{regime}, 20 deg, {stage}", regime, 20, stage, x, x, value))
-    svg = (svg_directory / "roc.svg").read_text()
-    for regime, zenith, x, value in curves(svg, "roc", SERIES_COLORS, {None: 30, "1.5,2.475": 50}, min_step=1.5):
-        table.add_row(("roc", f"{regime}, {zenith} deg", regime, zenith, "", x, x, value))
-    table.meta = {
-        "reference": "Alispach et al. 2025, A&A 699, A255, arXiv:2506.01733 (SST-1M Crab Nebula)",
-        "extraction": "vector figures of the HTML version (scripts/reference/extract_crab_paper_irfs.py)",
-        "units": {"sensitivity": "TeV cm-2 s-1 (E2 dN/dE, 50 h, 5 sigma)", "energy_resolution": "(dE/E)_68",
-                  "energy_bias": "median(E_reco / E_true - 1)", "angular_resolution": "deg",
-                  "effective_area": "m2", "roc": "x: false positive rate, value: true positive rate"},
-        "x": {"sensitivity": "reconstructed energy (TeV)", "energy_resolution": "true energy (TeV)",
-              "energy_bias": "true energy (TeV)", "angular_resolution": "true energy (TeV)",
-              "effective_area": "true energy (TeV)", "roc": "false positive rate"},
-        "figures": {"sensitivity": 11, "energy_resolution": 9, "energy_bias": 9, "angular_resolution": 10,
-                    "effective_area": 8, "roc": 7},
-    }
-    table.write(output, format="ascii.ecsv", overwrite=True)
-    for quantity in np.unique(table["quantity"]):
-        selected = table[table["quantity"] == quantity]
-        print(quantity, {s: int(np.sum(selected["series"] == s)) for s in np.unique(selected["series"])})
+    for mode, stage, x, value in curves(svg, "effective_area", AEFF_COLORS, AEFF_STAGES):
+        if stage == "analysis level":
+            curves_aeff.setdefault(mode, []).append((x, value))
+
+    def write(directory, name, hdus):
+        directory.mkdir(parents=True, exist_ok=True)
+        fits.HDUList([fits.PrimaryHDU(), *hdus]).writeto(directory / name, overwrite=True)
+        print(directory / name, [hdu.name for hdu in hdus])
+
+    bins = ENERGY_BINS
+    for (mode, zenith), quantities in sorted(values.items()):
+        energy = np.sqrt(bins[:-1] * bins[1:])
+        bias, resolution = _per_bin(quantities["bias"], bins), _per_bin(quantities["resolution"], bins)
+        angular = _per_bin(quantities["angular_resolution"], bins)
+        sensitivity = _per_bin(quantities["sensitivity"], bins)  # E2 dN/dE, TeV cm-2 s-1
+        energy_flux = (sensitivity * u.Unit("TeV cm-2 s-1")).to_value("erg s-1 cm-2")
+        flux = (sensitivity / energy**2 * u.Unit("TeV-1 cm-2 s-1")).to_value("erg-1 s-1 cm-2")
+        write(output / mode / f"ze{zenith}", "benchmarks_point_like.fits.gz", [
+            _hdu("ENERGY BIAS RESOLUTION", bins, [_column("BIAS", bias[np.newaxis]),
+                                                  _column("RESOLUTION", resolution[np.newaxis])],
+                 "true energy; RESOLUTION: (dE/E)_68 of the paper, BIAS: median(E_reco/E_true - 1)"),
+            _hdu("ANGULAR RESOLUTION", bins, [_column("ANGULAR_RESOLUTION_68", angular[np.newaxis], "deg")],
+                 "true energy"),
+            _hdu("SENSITIVITY", bins, [_column("RELATIVE_SENSITIVITY", (sensitivity / _crab(energy))[np.newaxis]),
+                                       _column("FLUX_SENSITIVITY", flux[np.newaxis], "erg-1 s-1 cm-2"),
+                                       _column("ENERGY_FLUX_SENSITIVITY", energy_flux[np.newaxis], "erg s-1 cm-2")],
+                 "reconstructed energy; 50 h, 5 sigma; RELATIVE_SENSITIVITY: to the Crab of HEGRA"),
+        ])
+    for mode, points in sorted(curves_aeff.items()):
+        x, value = np.array(points).T
+        order = np.argsort(x)
+        centers = np.sqrt(AEFF_BINS[:-1] * AEFF_BINS[1:])
+        inside = (centers >= x.min()) & (centers <= x.max())
+        aeff = np.full(len(centers), np.nan)
+        aeff[inside] = 10 ** np.interp(np.log10(centers[inside]), np.log10(x[order]), np.log10(value[order]))
+        write(output / mode / "ze20", "irf_point_like.fits.gz", [
+            _hdu("EFFECTIVE AREA", AEFF_BINS, [_column("EFFAREA", aeff[np.newaxis], "m2")],
+                 "analysis level (gammaness and theta cuts)"),
+        ])
 
 
 if __name__ == "__main__":
