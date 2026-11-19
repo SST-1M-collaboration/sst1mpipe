@@ -444,3 +444,14 @@ def test_dl2_dl3(models, irfs, observation_monitoring, tmp_path, with_monitoring
     target = read_table(dl2, "/configuration/observation/observation_block")["target"][0]
     assert store.obs_table["OBJECT"][0] == target
     assert 0 < store.obs_table["ZEN_PNT"].quantity[0] < 90 * u.deg
+
+def test_cut_without_n_events():
+    """the cuts of the optimization of the sensitivity have no n_events: all the bins drawn"""
+    from astropy.table import QTable
+
+    from sst1mpipe.performance.irf_plots import _cut
+
+    table = QTable({"low": [1, 2] * u.TeV, "high": [2, 4] * u.TeV, "cut": [0.2, 0.1] * u.deg})
+    np.testing.assert_allclose(_cut(table)[2], [0.2, 0.1])
+    table["n_events"] = [5, 20]
+    assert np.isnan(_cut(table)[2][0]) and _cut(table)[2][1] == 0.1
