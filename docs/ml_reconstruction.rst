@@ -60,33 +60,36 @@ After the training, the plots of the models are made in ``--plot-dir`` (by defau
 ``<model name>_plots`` next to the model, e.g. ``models/nsb100/energy_regressor_plots``),
 with ctaplot:
 
-- ``<model name>_feature_importance.png``: feature importances of the model of each telescope type
-  (the norm regressor and the sign classifier of the disp);
-- ``<model name>_performance.png``: performance from the cross validation of ctapipe
+- one figure per quantity and per telescope, ``<model name>_tel<id>_<quantity>.png``: feature
+  importances, and the performance from the cross validation of ctapipe
   (``CrossValidator.n_cross_validations``, 5 by default; written in ``<model name>_cv.h5`` in the
-  plot directory if ``--cv-output`` is not given), one row per telescope. The stereo performance is
-  the one of the DL2 (benchmarks of ``ctapipe-compute-irf``).
+  plot directory if ``--cv-output`` is not given): energy resolution, bias and migration; gammaness
+  and ROC curves; disp norm migration, resolution, bias and sign accuracy;
+- the same axis limits for all the figures (``sst1mpipe.ml.plots.LIMITS``: relative errors within
+  0.5), bias and resolution as the benchmarks of ctapipe (median and half of the 16-84 % interval of
+  the relative error, energy bins with at least 10 events).
 
-Plots of the models trained on the three test simtel files (``tests``, a few hundred events: the
-statistics are low):
+The stereo performance is the one of the DL2 (benchmarks of ``ctapipe-compute-irf``).
 
-.. image:: _static/ml/energy_regressor_feature_importance.png
-   :width: 100%
+Some plots of the models trained on the three test simtel files (``tests``, a few hundred events:
+the statistics are low), telescope 1:
 
-.. image:: _static/ml/energy_regressor_performance.png
-   :width: 100%
-
-.. image:: _static/ml/particle_classifier_feature_importance.png
-   :width: 100%
-
-.. image:: _static/ml/particle_classifier_performance.png
-   :width: 100%
-
-.. image:: _static/ml/disp_reconstructor_feature_importance.png
-   :width: 100%
-
-.. image:: _static/ml/disp_reconstructor_performance.png
-   :width: 100%
+.. image:: _static/ml/energy_regressor_tel1_feature_importance.png
+   :width: 49%
+.. image:: _static/ml/energy_regressor_tel1_resolution.png
+   :width: 49%
+.. image:: _static/ml/energy_regressor_tel1_bias.png
+   :width: 49%
+.. image:: _static/ml/energy_regressor_tel1_migration.png
+   :width: 49%
+.. image:: _static/ml/particle_classifier_tel1_gammaness.png
+   :width: 49%
+.. image:: _static/ml/particle_classifier_tel1_roc.png
+   :width: 49%
+.. image:: _static/ml/disp_reconstructor_tel1_disp_resolution.png
+   :width: 49%
+.. image:: _static/ml/disp_reconstructor_tel1_disp_sign.png
+   :width: 49%
 
 Zenith angle and NSB
 --------------------

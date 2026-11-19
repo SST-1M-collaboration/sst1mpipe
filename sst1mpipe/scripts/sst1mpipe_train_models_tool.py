@@ -37,7 +37,7 @@ def setup_plots(tool):
 
 def cross_validation_per_telescope(cross_validator, subarray):
     """
-    Predictions of the cross validation of ctapipe, ``{"tel <id>": table}``.
+    Predictions of the cross validation of ctapipe, ``{"tel<id>": table}``.
 
     ctapipe writes them per telescope type name (``/cv_predictions/<name>``): the SST-1M telescopes
     are two types of the same name (``SST_1M_DigiCam``), the folds of the second type follow the ones
@@ -54,19 +54,18 @@ def cross_validation_per_telescope(cross_validator, subarray):
         folds = np.asarray(table["cv_fold"], dtype=np.int64)  # uint8 in the file
         starts = np.concatenate([[0], np.flatnonzero(np.diff(folds) < 0) + 1, [len(table)]])
         for tel_type, start, stop in zip(types, starts[:-1], starts[1:], strict=True):
-            tel_ids = ", ".join(map(str, subarray.get_tel_ids_for_type(tel_type)))
-            tables[f"tel {tel_ids}"] = table[start:stop]
+            tel_ids = "_".join(map(str, subarray.get_tel_ids_for_type(tel_type)))
+            tables[f"tel{tel_ids}"] = table[start:stop]
     return tables
 
 
 def plot_feature_importances(tool, model, subarray, title):
     """Feature importances of the model of each telescope (type)"""
     models = {
-        f"tel {', '.join(map(str, subarray.get_tel_ids_for_type(tel_type)))}": tel_model
+        f"tel{'_'.join(map(str, subarray.get_tel_ids_for_type(tel_type)))}": tel_model
         for tel_type, tel_model in model._models.items()
     }
-    stem = PathlibPath(tool.output_path).stem
-    return plots.plot_feature_importances(models, model.features, tool.plot_dir / f"{stem}_feature_importance.png",
+    return plots.plot_feature_importances(models, model.features, tool.plot_dir, PathlibPath(tool.output_path).stem,
                                           title=title)
 
 
@@ -83,11 +82,11 @@ class TrainEnergyRegressor(CtapipeTrainEnergyRegressor):
 
     def finish(self):
         subarray = self.loader.subarray
-        self.plots = [plot_feature_importances(self, self.regressor, subarray, "Energy regressor: feature importances")]
+        self.plots = plot_feature_importances(self, self.regressor, subarray, "Energy regressor: feature importances")
         cv = cross_validation_per_telescope(self.cross_validate, subarray)
         if cv:
-            path = self.plot_dir / f"{PathlibPath(self.output_path).stem}_performance.png"
-            self.plots.append(plots.plot_energy_performance(cv, self.regressor.prefix, path))
+            self.plots += plots.plot_energy_performance(
+                cv, self.regressor.prefix, self.plot_dir, PathlibPath(self.output_path).stem)
         super().finish()
 
 
@@ -104,12 +103,12 @@ class TrainParticleClassifier(CtapipeTrainParticleClassifier):
 
     def finish(self):
         subarray = self.signal_loader.subarray
-        self.plots = [plot_feature_importances(self, self.classifier, subarray,
-                                               "Particle classifier: feature importances")]
+        self.plots = plot_feature_importances(self, self.classifier, subarray,
+                                              "Particle classifier: feature importances")
         cv = cross_validation_per_telescope(self.cross_validate, subarray)
         if cv:
-            path = self.plot_dir / f"{PathlibPath(self.output_path).stem}_performance.png"
-            self.plots.append(plots.plot_classifier_performance(cv, self.classifier.prefix, path))
+            self.plots += plots.plot_classifier_performance(
+                cv, self.classifier.prefix, self.plot_dir, PathlibPath(self.output_path).stem)
         super().finish()
 
 
@@ -126,11 +125,11 @@ class TrainDispReconstructor(CtapipeTrainDispReconstructor):
 
     def finish(self):
         subarray = self.loader.subarray
-        self.plots = [plot_feature_importances(self, self.models, subarray, "Disp reconstructor: feature importances")]
+        self.plots = plot_feature_importances(self, self.models, subarray, "Disp reconstructor: feature importances")
         cv = cross_validation_per_telescope(self.cross_validate, subarray)
         if cv:
-            path = self.plot_dir / f"{PathlibPath(self.output_path).stem}_performance.png"
-            self.plots.append(plots.plot_disp_performance(cv, self.models.prefix, path))
+            self.plots += plots.plot_disp_performance(
+                cv, self.models.prefix, self.plot_dir, PathlibPath(self.output_path).stem)
         super().finish()
 
 
