@@ -94,17 +94,6 @@ def get_target(file, force_pointing=False):
 
 
 
-def get_nsb_levels_rates(config):
-
-    nsb_levels={}
-    nsb_rates={}
-    telescopes=list(config['mean_charge_to_nsb_rate'].keys())
-    for tel in telescopes:
-        nsb_levels[tel] = sorted([x['mean_charge_bin_low'] for x in config['mean_charge_to_nsb_rate'][tel]])
-        nsb_rates[tel] = {x['mean_charge_bin_low']: x['nsb_rate'] for x in config['mean_charge_to_nsb_rate'][tel]}
-    return nsb_levels, nsb_rates
-
-
 def get_trigger_time_ns(data):
     """
     Trigger times of the DL1 table (trigger_time column, see
@@ -437,79 +426,6 @@ def get_avg_pointing(dl1):
     return tel_ze, tel_az
 
 
-def get_closest_rf_model(
-        dl1, models_dir=None, nsb_level=None,
-        tel=None, config=None):
-    """
-    RF models are trained per bin in zenith angle,
-    azimuth and NSB level. They are expected to be
-    stored in subdirectories with the following
-    naming format: \'zeXX_azXX_nsbXX\'. This provides
-    the path to the closest RF models (in [NSB,ze,az]
-    space).
-
-    Parameters
-    ----------
-    dl1: pandas.DataFrame or astropy.table.Table
-    models_dir: str
-        Path to stored trained RFs, or path to general
-        production directory where subdirectories with
-        models in the following naming format are
-        expected: \'zeXX_azXX_nsbXX\''
-    nsb_level: float
-        Average NSB level, usualy stored in meanQ
-        column of the DL1 table
-    tel: string
-    config: dict
-
-    Returns
-    -------
-    string
-
-    """
-
-    dir_content = os.listdir(models_dir)
-    if len([i for i in dir_content if '.sav' in i]) == 0:
-        tel_ze, tel_az = get_avg_pointing(dl1)
-        models_tab = []
-        for dir_ze_az in dir_content:
-            try:
-                model_coords = dir_ze_az.split('_')
-                models_tab.append(
-                    [model_coords[0].split('ze')[1],
-                    model_coords[1].split('az')[1],
-                    model_coords[2].split('nsb')[1],
-                    dir_ze_az
-                    ])
-            except Exception:
-                logging.warning('%s does not follow the naming convention for RF model subdirectories, skipping..', os.path.join(models_dir, dir_ze_az))
-        models_tab = np.array(models_tab)
-        logging.info('%d RF nodes found in %s.',len(models_tab), models_dir)
-        if len(models_tab) == 0:
-            logging.error('Finding of the closest RFs failed. Subdirectories with RFs probably does not follow required naming format: \'zeXX_azXX_nsbXX\'')
-
-        # Find closest zenith and NSB
-        # TODO: closest node in general using azimuth
-        # Factor of 666 below is an arbitrary "high" number to force NSB level - we reconstruct for known NSB bins so exact match is expected
-        if (config is not None) and (nsb_level is not None) and (tel is not None):
-            nsb_levels, nsb_rates = get_nsb_levels_rates(config)
-            for meanQ_low in reversed(nsb_levels[tel]):
-                if nsb_level >= meanQ_low:
-                    break
-            logging.info('Average charge from pedestal events in the file is %f.', nsb_level)
-            idx_closest = np.argmin(abs(models_tab[:, 0].astype(np.float64) - tel_ze) + 666*abs(models_tab[:, 2].astype(np.float64) - nsb_rates[tel][meanQ_low]))
-        # If meanQ is not provided we do not care about the NSB bin
-        else:
-            #nsb_rate_default=100
-            idx_closest = np.argmin(abs(models_tab[:, 0].astype(np.float64) - tel_ze)) # + 666*abs(models_tab[:, 2].astype(np.float64) - nsb_rate_default))
-
-        closest_model_dir = os.path.join(models_dir, models_tab[idx_closest, 3])
-        logging.info('Closest RF node found: %s', closest_model_dir)
-        return closest_model_dir
-    logging.info('There are RFs found directly in the directory provided: %s These will be used for the reconstruction without any further selection.', models_dir)
-    return models_dir
-
-
 def check_same_shower_fraction(dl2, energy_bins):
 
     logging.info('SANITY CHECK: In each bin in reconstructed energy a fraction of reused triggered events is shown.')
@@ -666,65 +582,6 @@ def join_in_order(table, other, keys=("obs_id", "event_id"), join_type="inner"):
     joined.sort("_row")
     joined.remove_column("_row")
     return joined
-
-
-def energy_min_cut(file, config=None):
-
-    mc = read_table(file, "/configuration/simulation/run")
-    particle_type = get_primary_type(file)
-
-    if particle_type == 0:
-        min_energy = config["analysis"]["gamma_min_simulated_energy_tev"]
-    elif particle_type == 101:
-        min_energy = config["analysis"]["proton_min_simulated_energy_tev"]
-    else:
-        min_energy = config["analysis"]["proton_min_simulated_energy_tev"]
-
-    telescopes = get_telescopes(file)
-
-    for tel in telescopes:
-
-        params = read_table(file, "/dl1/event/telescope/parameters/" + tel)
-        try:
-            images_tab = True
-            images = read_table(file, "/dl1/event/telescope/images/" + tel)
-        except tables.exceptions.NoSuchNodeError:
-            images_tab = False
-
-        if (min_energy > mc['energy_range_min']).any():
-            logging.info('Cutting out all events with true energies below %f TeV, which is above the minimum simulated energy %f TeV.', min_energy, mc['energy_range_min'][0])
-            logging.warning("Note that beyond this point the mc table with number of all thrown events and the histograms are no longer correct. These will be corrected for automaticaly in performance evaluation.")
-
-            mask = params['true_energy'] >= min_energy
-            params['min_true_energy_cut'] = min_energy
-            masked_params = params[mask]
-            if images_tab:
-                masked_images = images[mask]
-
-            logging.info("Telescope %s: %d events removed.", tel, len(params)-len(masked_params))
-        else:
-            masked_params = params.copy()
-            masked_params['min_true_energy_cut'] = mc['energy_range_min'][0]
-            if images_tab:
-                masked_images = images.copy()
-
-        # Only combination of both overwrite and append works like expected, i.e. overwrite only telescope parameters and the rest
-        # of the DL1 file remains the same
-        # NOTE: Unfortunately, we cannot store units with serialize_meta, because these are stored somehow weirdly as a new table and ctapipe merge tool
-        # then cannot merge the files and raise error...
-        masked_params.write(file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
-        if images_tab:
-            masked_images.write(file, path='/dl1/event/telescope/images/'+tel, overwrite=True, append=True) #, serialize_meta=True)
-
-
-def remove_stereo(features):
-    if "HillasReconstructor_tel_impact_distance" in features:
-        features.remove("HillasReconstructor_tel_impact_distance")
-    if "HillasReconstructor_h_max" in features:
-        features.remove("HillasReconstructor_h_max")
-    #if "swgo_reco_tilted_impact" in features:
-    #    features.remove("swgo_reco_tilted_impact")
-    return features
 
 
 def check_output_dl1(file):
@@ -1044,40 +901,6 @@ def stereo_var_cuts(data, config=None):
     # I changed the config param to lower case, let's see what happens in the next versions
     data_selected = data[mask] #.copy()
     return data_selected
-
-
-def get_finite(data, config=None, stereo=False):
-
-    mask = np.ones(len(data), dtype=bool)
-
-    N_selected = len(data[mask])
-    features = set(config["energy_regression_features"] +
-            config["particle_classification_features"] +
-            config["disp_regression_features"] +
-            config["disp_classification_features"]
-            )
-
-    if not stereo:
-        logging.info('Checking if feature values are finite excluding stereo params')
-        features = remove_stereo(features)
-    else:
-        logging.info('Checking if feature values are finite INCLUDING STEREO PARAMS')
-
-    for key in features:
-        try:
-            mask &= np.isfinite(data[key])
-        except Exception:
-            logging.warning(f'{key} column not in data.')
-
-    N_finite = len(data[mask])
-
-    if N_selected > 0:
-        if (N_finite/N_selected < 0.9) & (~stereo):
-            logging.warning("There is more than 10% infinite values in features!")
-    else:
-        logging.warning("There is zero finite values in the file!")
-
-    return data[mask]
 
 
 def get_telescopes(input_file, data_level="dl1"):

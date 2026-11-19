@@ -79,6 +79,20 @@ def test_scaled_intensity(observation_dl1):
     np.testing.assert_allclose(data["log_hillas_intensity"], np.log10(2 * intensity))
 
 
+def test_event_selection(observation_dl1):
+    """the event selection of the data configuration (telescope frame parameters)"""
+    config = load_config(DATA_CONFIG_FILE, ismc=False)
+    data = load_dl1_sst1m(str(observation_dl1), tel=TEL, config=config, quality_cuts=True)
+    parameters = read_table(observation_dl1, f"/dl1/event/telescope/parameters/{TEL}")
+    low, high = config["event_selection"]["hillas_intensity"]
+    leakage_low, leakage_high = config["event_selection"]["leakage_intensity_width_2"]
+    selected = ((parameters["hillas_intensity"] >= low) & (parameters["hillas_intensity"] <= high)
+                & (parameters["leakage_intensity_width_2"] >= leakage_low)
+                & (parameters["leakage_intensity_width_2"] <= leakage_high))
+    assert 0 < len(data) == np.count_nonzero(selected)
+    assert np.all(np.asarray(data["hillas_intensity"]) >= low)
+
+
 def test_simulation_parameters(simulation_dl1):
     tel = "tel_001"
     data = load_dl1_sst1m(str(simulation_dl1), tel=tel)
