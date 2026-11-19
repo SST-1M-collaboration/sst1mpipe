@@ -128,7 +128,7 @@ def events_hdu(events, obs_id, location, pointing, start, stop, meta):
         header[f"DATE-{key}"] = (date, "UTC date")
         header[f"TIME-{key}"] = (clock, "UTC time")
     header["ONTIME"] = (livetime, "[s] Total good time")
-    # TODO: dead time of the cameras
+    # TODO: dead time of the cameras, GTI of the observation (issue #252)
     header["DEADC"] = (1.0, "Dead time correction factor (no dead time)")
     header["LIVETIME"] = (livetime, "[s] ONTIME * DEADC")
     header["RA_PNT"] = (pointing.ra.to_value(u.deg), "[deg] Pointing right ascension")

@@ -243,7 +243,8 @@ closest to the mean pointing of each observation is used):
   then ``create_hdu_indexes``)
 
 The models, the cuts and the IRFs must be the same (the same mode: ``tel1`` / ``tel2`` for the mono
-analysis of each telescope, ``stereo``). The dead time is not corrected yet (``DEADC = 1``).
+analysis of each telescope, ``stereo``). The dead time is not corrected yet (``DEADC = 1``), and the GTI
+of an observation is from its first to its last event (issue #252).
 
 
 .. _higher_level:
