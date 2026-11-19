@@ -22,4 +22,8 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL2
 | `data_dl1_stereo.bash` | `ctapipe-merge` of the night of each telescope, `sst1mpipe-stereo` |
 | `data_dl1_dl2.bash` | `sst1mpipe-apply-models` on every DL1 file (cs1, cs2, stereo) |
 
+`paper/mc_irf_paper.bash`: IRFs and sensitivity with the cuts of the SST-1M Crab paper
+(arXiv:2506.01733: 60 % gamma efficiency, 80 % theta containment, stereo only, protons weighted to
+protons + helium), in `irf_paper/ze<zenith>/`, from the DL2 of `submit_mc.bash`.
+
 TODO: DL3 of the data.
