@@ -338,3 +338,21 @@ def test_plot_irfs(models, dl1_files, tmp_path):
     plot_irfs(["--irf", f"a={irf}", "--irf", f"b={irf}", "-o", str(tmp_path / "comparison")])
     assert {"energy_migration_a", "energy_migration_b", "sensitivity"} <= {
         path.stem for path in (tmp_path / "comparison").glob("*.png")}
+    # with the performance of the paper
+    plot_irfs(["--irf", f"stereo={irf}", "--dl2", f"stereo={dl2}", "--reference", "--reference-zenith", "30",
+               "-o", str(tmp_path / "reference")])
+    assert len(list((tmp_path / "reference").glob("*.png"))) == len(names)
+
+
+def test_reference():
+    """Performance of the SST-1M Crab paper: all the quantities of its figures, sensible values"""
+    from sst1mpipe.ml.irf_plots import read_reference
+
+    reference = read_reference(zeniths=[30])
+    assert set(reference["quantity"]) == {"sensitivity", "energy_resolution", "energy_bias", "angular_resolution", "roc"}
+    stereo = reference[(reference["quantity"] == "sensitivity") & (reference["series"] == "stereo, 30 deg")]
+    # best sensitivity of the stereo: ~2e-12 TeV cm-2 s-1 at ~10 TeV (Fig. 11)
+    assert 1.5e-12 < np.min(stereo["value"]) < 2.5e-12
+    aeff = read_reference()
+    aeff = aeff[aeff["quantity"] == "effective_area"]
+    assert set(aeff["stage"]) == {"analysis level"} and len(set(aeff["series"])) == 3

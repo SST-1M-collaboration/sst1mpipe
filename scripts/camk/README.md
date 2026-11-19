@@ -33,3 +33,10 @@ MC_START=irf IRF_CUTS=paper bash scripts/camk/submit_mc.bash
 ```
 
 TODO: DL3 of the data.
+
+Comparison with the SST-1M Crab paper (performance extracted from its figures,
+`sst1mpipe/resources/reference/sst1m_crab_paper_2025.ecsv`, see `scripts/reference/`):
+
+```bash
+sst1mpipe-plot-irfs --irf stereo=$MC_DIRECTORY/irf/paper/strict_stereo/ze20 --reference --reference-zenith 30 -o plots_paper
+```
