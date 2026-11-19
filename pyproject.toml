@@ -102,7 +102,8 @@ sst1mpipe = [
   "resources/calibration/window/*",
   "resources/calibration/dark_runs/*",
   "resources/instrument/*",
-  "resources/reference/crab_paper_2025/*/*/*",
+  "resources/reference/*/*",
+  "resources/reference/*/*/*/*",
 ]
 
 [tool.setuptools.exclude-package-data]
@@ -111,8 +112,6 @@ sst1mpipe = ["resources/test_data/**"]
 [project.scripts]
 sst1mpipe_data_get_photon_list = "sst1mpipe.scripts.sst1mpipe_data_get_photon_list:main"
 sst1mpipe_data_dl2_dl3 = "sst1mpipe.scripts.sst1mpipe_data_dl2_dl3:main"
-sst1mpipe_mc_performance = "sst1mpipe.scripts.sst1mpipe_mc_performance:main"
-sst1mpipe_mc_make_irfs = "sst1mpipe.scripts.sst1mpipe_mc_make_irfs:main"
 sst1mpipe_merge_hdf5 = "sst1mpipe.scripts.sst1mpipe_merge_hdf5:main"
 sst1mpipe_pointing_check = "sst1mpipe.scripts.sst1mpipe_pointing_check:main"
 rate_scans_extraction = "sst1mpipe.scripts.rate_scans_extraction:main"

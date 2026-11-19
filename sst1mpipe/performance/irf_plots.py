@@ -3,8 +3,14 @@ Plots of the IRFs and benchmarks of ``ctapipe-compute-irf`` (point-like), and of
 separation of the DL2: one plot per figure, with the axis limits of `IRF_LIMITS` for all the figures.
 Each function takes ``inputs`` {label: data} and draws one series per label: one label for the plots
 of one mode (e.g. ``tel1``), several to compare them. ``references``: other IRF directories of the same
-format drawn as lines, e.g. the performance of the SST-1M Crab paper (arXiv:2506.01733) in
-`REFERENCE_DIRECTORY` (``<mode>/ze<zenith>``: only the quantities of the paper).
+format drawn as lines, e.g. the published performance in `REFERENCE_DIRECTORY` (only the quantities
+published, see `write_reference_directory`):
+
+- ``crab_paper_2025/<mode>/ze<zenith>``: SST-1M Crab paper (arXiv:2506.01733), tel1 and strict_stereo
+  at ze30, ze50 (energy bias and resolution, angular resolution, sensitivity), tel1, tel2 and
+  strict_stereo at ze20 (effective area)
+- ``lhaaso_1yr``, ``hawc_1yr``, ``veritas_50h``, ``hess_50h``, ``astri_50h``: sensitivity of other
+  instruments
 """
 from pathlib import Path
 
@@ -14,14 +20,15 @@ import numpy as np
 from astropy.io import fits
 from astropy.table import QTable
 
-from .plots import COLORS, LIMITS, MUTED, figure, save
+from pyirf.spectral import CRAB_HEGRA
 
-__all__ = ["IRF_LIMITS", "REFERENCE_DIRECTORY", "read_irf_directory", "plot_irfs", "plot_gamma_hadron_separation"]
+from sst1mpipe.ml.plots import COLORS, LIMITS, MUTED, figure, save
 
-#: performance of the SST-1M Crab paper (Alispach et al. 2025, arXiv:2506.01733) extracted from its
-#: figures (scripts/reference/extract_crab_paper_irfs.py), in IRF directories <mode>/ze<zenith>:
-#: tel1, strict_stereo (ze30, ze50: benchmarks), tel1, tel2, strict_stereo (ze20: effective area)
-REFERENCE_DIRECTORY = Path(__file__).parents[1] / "resources" / "reference" / "crab_paper_2025"
+__all__ = ["IRF_LIMITS", "REFERENCE_DIRECTORY", "read_irf_directory", "write_reference_directory", "plot_irfs",
+           "plot_gamma_hadron_separation"]
+
+#: published performance in IRF directories (scripts/reference)
+REFERENCE_DIRECTORY = Path(__file__).parents[1] / "resources" / "reference"
 
 #: axis limits of the IRF figures, in addition to the ones of the models (`sst1mpipe.ml.plots.LIMITS`)
 IRF_LIMITS = {
@@ -38,8 +45,8 @@ IRF_LIMITS = {
 
 def read_irf_directory(directory):
     """
-    The point-like IRFs, benchmarks and cuts of a directory of ``mc_irf.bash``
-    (``irf_point_like.fits.gz``, ``benchmarks_point_like.fits.gz``, ``cuts.fits``): the quantities
+    The point-like IRFs, benchmarks and cuts of ``ctapipe-compute-irf`` and
+    ``ctapipe-optimize-event-selection`` in a directory (``irf_point_like.fits.gz``, ``benchmarks_point_like.fits.gz``, ``cuts.fits``): the quantities
     of the files and HDUs found (e.g. a directory of `REFERENCE_DIRECTORY`: only some of them)
     """
     directory = Path(directory)
@@ -72,6 +79,79 @@ def _reference(ax, low, high, values, color, label):
     ax.plot(x, y, color=color, lw=1.5, ls="--", label=label)
 
 
+def _column(name, values, unit=None):
+    """Column of one row of the HDUs of ctapipe-compute-irf: values (n_energy) or (offset, n_energy)"""
+    values = np.atleast_2d(values) if np.ndim(values) > 1 else np.asarray(values, dtype=float)
+    dim = "(" + ",".join(str(n) for n in values.shape[::-1]) + ")"
+    return fits.Column(name, format=f"{values.size}D", dim=dim, unit=unit, array=values[np.newaxis])
+
+
+def _hdu(name, bins, columns, reference, comment):
+    columns = [_column("ENERG_LO", bins[:-1], "TeV"), _column("ENERG_HI", bins[1:], "TeV"),
+               _column("THETA_LO", [0.0], "deg"), _column("THETA_HI", [1.0], "deg"), *columns]
+    hdu = fits.BinTableHDU.from_columns(columns, name=name)
+    hdu.header["REFERENC"] = reference
+    if comment:
+        hdu.header["COMMENT"] = comment
+    return hdu
+
+
+def write_reference_directory(directory, reference, true_energy_bins=None, reco_energy_bins=None,
+                              effective_area=None, energy_bias=None, energy_resolution=None,
+                              angular_resolution=None, sensitivity=None, aeff_energy_bins=None, comments=None):
+    """
+    Published performance in an IRF directory of the format of ``ctapipe-compute-irf`` (point-like),
+    with the quantities given only (NaN: bins without value), for `plot_irfs` (``references``)
+
+    Parameters
+    ----------
+    directory: path
+    reference: str, publication (header keyword REFERENC)
+    true_energy_bins, reco_energy_bins, aeff_energy_bins: energy bins (TeV) of the benchmarks per true
+        energy (bias, resolutions), per reconstructed energy (sensitivity), of the effective area
+    effective_area: m2 per ``aeff_energy_bins`` bin
+    energy_bias, energy_resolution, angular_resolution (deg): per ``true_energy_bins`` bin
+    sensitivity: E² dN/dE (TeV cm-2 s-1) per ``reco_energy_bins`` bin (relative: to the Crab of HEGRA)
+    comments: {quantity: comment} (definitions of the publication)
+    """
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    comments = comments or {}
+
+    def row(values):
+        return np.asarray(values, dtype=float)[np.newaxis]
+
+    if effective_area is not None:
+        hdus = [_hdu("EFFECTIVE AREA", np.asarray(aeff_energy_bins), [_column("EFFAREA", row(effective_area), "m2")],
+                     reference, comments.get("effective_area", ""))]
+        fits.HDUList([fits.PrimaryHDU(), *hdus]).writeto(directory / "irf_point_like.fits.gz", overwrite=True)
+    hdus = []
+    if energy_bias is not None or energy_resolution is not None:
+        n = len(true_energy_bins) - 1
+        bias = np.full(n, np.nan) if energy_bias is None else energy_bias
+        resolution = np.full(n, np.nan) if energy_resolution is None else energy_resolution
+        hdus.append(_hdu("ENERGY BIAS RESOLUTION", np.asarray(true_energy_bins),
+                         [_column("BIAS", row(bias)), _column("RESOLUTION", row(resolution))], reference,
+                         comments.get("energy", "true energy")))
+    if angular_resolution is not None:
+        hdus.append(_hdu("ANGULAR RESOLUTION", np.asarray(true_energy_bins),
+                         [_column("ANGULAR_RESOLUTION_68", row(angular_resolution), "deg")], reference,
+                         comments.get("angular_resolution", "true energy")))
+    if sensitivity is not None:
+        bins = np.asarray(reco_energy_bins)
+        energy = np.sqrt(bins[:-1] * bins[1:])
+        sensitivity = np.asarray(sensitivity, dtype=float)
+        energy_flux = (sensitivity * u.Unit("TeV cm-2 s-1")).to_value("erg s-1 cm-2")
+        flux = (sensitivity / energy**2 * u.Unit("TeV-1 cm-2 s-1")).to_value("erg-1 s-1 cm-2")
+        hdus.append(_hdu("SENSITIVITY", bins, [
+            _column("RELATIVE_SENSITIVITY", row(sensitivity / _crab(energy))),
+            _column("FLUX_SENSITIVITY", row(flux), "erg-1 s-1 cm-2"),
+            _column("ENERGY_FLUX_SENSITIVITY", row(energy_flux), "erg s-1 cm-2"),
+        ], reference, comments.get("sensitivity", "reconstructed energy")))
+    if hdus:
+        fits.HDUList([fits.PrimaryHDU(), *hdus]).writeto(directory / "benchmarks_point_like.fits.gz", overwrite=True)
+
+
 def _cut(table, min_events=10):
     """Cut per reconstructed energy bin, NaN for the bins with the fill value (too few events)"""
     values = np.asarray(u.Quantity(table["cut"]).value, dtype=float)
@@ -92,8 +172,9 @@ def _series(ax, low, high, values, color, label):
 
 
 def _crab(energy):
-    """E² dN/dE of the Crab Nebula (HEGRA, Aharonian et al. 2004) in TeV cm-2 s-1"""
-    return (energy**2 * 2.83e-11 * energy**-2.62)
+    """E² dN/dE of the Crab Nebula (HEGRA, Aharonian et al. 2004, as the relative sensitivity of ctapipe) in TeV cm-2 s-1"""
+    energy = u.Quantity(energy, u.TeV)
+    return (energy**2 * CRAB_HEGRA(energy)).to_value(u.TeV / u.cm**2 / u.s)
 
 
 def plot_irfs(inputs, directory, title="", references=None):

@@ -2,6 +2,7 @@ import logging
 import math
 
 import astropy.units as u
+import ctaplot
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.coordinates import AltAz, Angle, SkyCoord, SkyOffsetFrame
@@ -10,7 +11,6 @@ from ctapipe.coordinates import CameraFrame
 from gammapy.data import DataStore
 from gammapy.stats import WStatCountsStatistic
 
-from sst1mpipe.performance import get_theta
 
 
 def add_reco_ra_dec(data, horizon_frame=None):
@@ -238,6 +238,40 @@ def add_wobble_flag(data, horizon_frame=None, wobbles=None):
         mask = pointing_coords.separation(wobble) < 0.1 * u.deg
         data['wobble'][mask] = wobble.info.name
     return data
+
+
+def get_theta(dl2, zero_alt=None, zero_az=None):
+    """
+    Calculates theta^2 for ON region
+
+    Parameters
+    ----------
+    dl2: astropy.table.Table
+    zero_alt: astropy.table.column.Column
+        Source altitude (column of floats in deg)
+    zero_az: astropy.table.column.Column
+        Source azimuth (column of floats in deg)
+
+    Returns
+    -------
+    dl2: astropy.table.Table
+
+    """
+
+    # NOTE: Be carefull with the units! - must be revisited for proper unit conversion!
+    if ~(zero_alt > np.pi).any():
+        raise Exception("ERROR: true_alt, true_az are probably not in degrees! Check your DL2 file.")
+    if ~(dl2['reco_alt'] > np.pi).any():
+        raise Exception("ERROR: reco_alt, reco_az are probably not in degrees! Check your DL2 file.")
+
+    dl2['theta'] = ctaplot.ana.angular_separation_altaz(
+        dl2['reco_alt'] * np.pi/180. * u.rad,
+        dl2['reco_az'] * np.pi/180. * u.rad,
+        zero_alt * np.pi/180. * u.rad,
+        zero_az * np.pi/180. * u.rad
+        )
+
+    return dl2
 
 
 def get_theta_off_stereo(data, n_off=1, on_region=None, wobbles=None):

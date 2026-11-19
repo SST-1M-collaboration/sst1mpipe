@@ -34,12 +34,11 @@ MC_START=irf IRF_CUTS=paper bash scripts/camk/submit_mc.bash
 
 TODO: DL3 of the data.
 
-Comparison with the SST-1M Crab paper: its performance extracted from its figures (`scripts/reference/`)
-is in IRF directories of the same format, `sst1mpipe/resources/reference/crab_paper_2025/<mode>/ze<z>`
-(tel1, strict_stereo at ze30, ze50: energy bias and resolution, angular resolution, sensitivity; tel1,
-tel2, strict_stereo at ze20: effective area), drawn as lines with `--reference <label>=paper:<mode>/ze<z>`:
+Comparison with the published performance (`ref:`: IRF directories of `sst1mpipe/resources/reference`,
+e.g. the SST-1M Crab paper, `crab_paper_2025/<mode>/ze<z>`, see `sst1mpipe-plot-irfs --help`):
 
 ```bash
 sst1mpipe-plot-irfs --irf strict_stereo=$MC_DIRECTORY/irf/paper/strict_stereo/ze20 \
-    --reference "paper 30°=paper:strict_stereo/ze30" --reference "paper 20°=paper:strict_stereo/ze20" -o plots_paper
+    --reference "paper 30°=ref:crab_paper_2025/strict_stereo/ze30" \
+    --reference "paper 20°=ref:crab_paper_2025/strict_stereo/ze20" -o plots_paper
 ```
