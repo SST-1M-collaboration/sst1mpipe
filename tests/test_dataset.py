@@ -1,5 +1,8 @@
 """Datasets: list of the runs of an analysis, read in Python and in bash"""
+import logging
 import subprocess
+
+from astropy.io import fits
 
 from conftest import DARK_FILE, OBSERVATION_RUNS, TRANSITION_FILES
 from sst1mpipe.io.dataset import dataset_paths, find_runs, read_dataset
@@ -58,3 +61,24 @@ def test_make_dataset(tmp_path, capsys):
     # all the runs without target
     make_dataset(["--root", str(root), "-o", str(output), "--overwrite", "20260119", "20260120", "20260121"])
     assert len(read_dataset(output)) == 4
+
+
+def test_old_and_broken_raw_files(tmp_path, caplog):
+    """TARGET in a table of another name (old raw files), unreadable file skipped, verbose log"""
+    from sst1mpipe.io.dataset import make_dataset as make
+
+    root = raw_data_root(tmp_path)
+    night = root / "cs1" / "data" / "raw" / "2026" / "01" / "20"
+    old = fits.HDUList([fits.PrimaryHDU(), fits.BinTableHDU(name="DataStream"),
+                        fits.BinTableHDU(name="OldEvents", header=fits.Header({"TARGET": "Crab_W2_83.63_22.01"}))])
+    old.writeto(night / "SST1M1_20260120_0001.fits.fz")
+    (night / "SST1M1_20260120_0002.fits.fz").write_bytes(b"not a fits file")
+
+    with caplog.at_level(logging.INFO, logger="sst1mpipe.io.dataset"):
+        dataset = make(root, ["20260120"], target="crab")
+    assert dataset["obs_id"].tolist() == [2026012010001]
+    messages = caplog.text
+    assert "SST1M1_20260120_0001.fits.fz: target Crab, obs_id 2026012010001: in the dataset" in messages
+    assert "SST1M1_20260120_1179.fits.fz: target MRK421" in messages
+    assert "SST1M1_20260120_0002.fits.fz: not readable" in messages
+    assert "night 20260120: 1 runs in the dataset" in messages

@@ -11,6 +11,7 @@ Read in bash:
     grep -v '^#' crab_paper_2025.ecsv | tail -n +2 | while read obs_id tel_id file; do echo "${ROOT}/${file}"; done
 """
 import argparse
+import logging
 from pathlib import Path
 
 from sst1mpipe.io.dataset import make_dataset, write_dataset
@@ -28,7 +29,9 @@ def main(args=None):
     parser.add_argument("--description", default="", help="description of the dataset")
     parser.add_argument("-o", "--output", required=True, type=Path, help="dataset file (.ecsv)")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("-q", "--quiet", action="store_true", help="only the warnings and the summary")
     options = parser.parse_args(args)
+    logging.basicConfig(level=logging.WARNING if options.quiet else logging.INFO, format="%(message)s")
 
     name = options.name or options.output.stem
     table = make_dataset(options.root, options.nights, target=options.target, telescopes=options.telescopes,

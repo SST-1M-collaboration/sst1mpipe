@@ -23,6 +23,7 @@ In bash::
     grep -v '^#' crab_paper_2025.ecsv | tail -n +2 | while read obs_id tel_id file; do echo "${ROOT}/${file}"; done
 """
 import datetime
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -36,7 +37,22 @@ from sst1mpipe.io.sst1m_event_source import (
     tel_id_from_file_name,
 )
 
-__all__ = ["dataset_paths", "find_runs", "make_dataset", "read_dataset", "write_dataset"]
+__all__ = ["dataset_paths", "find_runs", "make_dataset", "raw_file_target", "read_dataset", "write_dataset"]
+
+log = logging.getLogger(__name__)
+
+
+def raw_file_target(path):
+    """
+    Target of a raw file (TARGET field, without the wobble), from the first HDU whose header has it:
+    the ``Events`` table, whose name and position depend on the version of the files. None without
+    TARGET field
+    """
+    with fits.open(path) as hdul:
+        for hdu in hdul:
+            if "TARGET" in hdu.header:
+                return parse_target_field(hdu.header["TARGET"])[0]
+    return None
 
 
 def find_runs(root, night, telescopes=(1, 2)):
@@ -68,16 +84,28 @@ def make_dataset(root, nights, target=None, telescopes=(1, 2), name="", descript
     root = Path(root).absolute()
     rows = []
     for night in nights:
-        for path in find_runs(root, night, telescopes):
+        paths = find_runs(root, night, telescopes)
+        if not paths:
+            night = str(night)
+            log.warning("night %s: no raw files in %s", night, ", ".join(
+                str(root / f"cs{t}" / "data" / "raw" / night[:4] / night[4:6] / night[6:8]) for t in telescopes))
+        for path in paths:
             date_run, tel_id = parse_file_name(path), tel_id_from_file_name(path)
             if date_run is None or tel_id is None:
+                log.warning("%s: not a raw file name SST1M<n>_<date>_<run>, skipped", path)
                 continue
-            if target is not None:
-                run_target = parse_target_field(fits.getheader(path, "Events").get("TARGET"))[0]
-                if (run_target or "").lower() != target.lower():
-                    continue
+            try:
+                run_target = raw_file_target(path)
+            except Exception as error:  # noqa: BLE001 (broken file)
+                log.warning("%s: not readable (%s: %s), skipped", path, type(error).__name__, error)
+                continue
+            if target is not None and (run_target or "").lower() != target.lower():
+                log.info("%s: target %s", path, run_target)
+                continue
             _, obs_id = observation_ids(date_run[0], tel_id, date_run[1])
+            log.info("%s: target %s, obs_id %d: in the dataset", path, run_target, obs_id)
             rows.append((obs_id, tel_id, str(path.relative_to(root))))
+        log.info("night %s: %d runs in the dataset", night, sum(1 for row in rows if str(row[0]).startswith(str(night))))
     table = Table(rows=rows or None, names=["obs_id", "tel_id", "file"], dtype=[np.int64, np.int16, str])
     table.sort("obs_id")
     table.meta.update({
