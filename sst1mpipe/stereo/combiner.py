@@ -53,6 +53,7 @@ from ctapipe.core import Component
 from ctapipe.core.traits import AstroQuantity, Int
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer
+from sst1mpipe.io.sst1m_event_source import stereo_obs_id
 from sst1mpipe.utils.utils import _round_ns
 
 __all__ = [
@@ -297,7 +298,8 @@ class StereoEventCombiner(Component):
 
     def combine_index(self, stereo, events):
         """
-        Index of the stereo event (``stereo.index``): obs_id and event_id of the event of the reference telescope.
+        Index of the stereo event (``stereo.index``): event_id of the event of the reference telescope, obs_id
+        of its run with the telescope id 00 (``YYYYMMDD00<run>``, see `sst1mpipe.io.sst1m_event_source.stereo_obs_id`).
 
         All the ``combine_<part>`` methods have the same parameters, and fill their part of
         ``stereo`` in place.
@@ -310,7 +312,7 @@ class StereoEventCombiner(Component):
             Coincident events by telescope id, with the event of the reference telescope.
         """
         reference = events[self.reference_tel_id].index
-        stereo.index.obs_id = reference.obs_id
+        stereo.index.obs_id = stereo_obs_id(reference.obs_id)
         stereo.index.event_id = reference.event_id
 
     def combine_trigger(self, stereo, events):

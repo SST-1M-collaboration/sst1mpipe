@@ -22,7 +22,6 @@ from astropy.coordinates import (
     get_body,
     get_sun,
 )
-from astropy.io import fits
 from astropy.table import join
 from astropy.time import Time
 from astroquery.simbad import Simbad
@@ -66,31 +65,27 @@ def get_target(file, force_pointing=False):
     """
 
     # imported here: sst1mpipe.io imports this module
-    from sst1mpipe.io.sst1m_event_source import parse_target_field
+    from sst1mpipe.io.sst1m_event_source import parse_target_field, read_events_header
 
-    with fits.open(file) as hdul:
-
-        try:
-            header = hdul["Events"].header
-            # Delimiter should be hopefuly either ',' or '_'
-            # The string in the TARGET field is expected in the form: target[]wobble[]ra[]dec,
-            # but targetwobble[]ra[]dec, and also target_wobble[]ra[]dec should work as well
-            pointing_string = header['TARGET']
-            logging.info('TARGET field: ' + pointing_string)
-            targets_to_skip = ['transition', 'Transition', 'TRANSITION', 'Dark', 'DARK', 'dark']
-            if pointing_string in targets_to_skip and not force_pointing:
-                logging.info('Transition to the next wobble, or dark file, not on-source pointing direction, FILE SKIPPED.')
-                hdul.close()
-                exit()
-            target, wobble, ra, dec = parse_target_field(pointing_string)
-            if wobble is None:
-                logging.warning('Wrong format of coordinates in the fits header, unknown delimiter')
-                return None, None, None, None
-            if ra is None:
-                logging.warning('Wrong format of coordinates in the fits header, cannot read RA, DEC')
-        except KeyError:
-            logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
-            target, ra, dec, wobble = None, None, None, None
+    try:
+        # Delimiter should be hopefuly either ',' or '_'
+        # The string in the TARGET field is expected in the form: target[]wobble[]ra[]dec,
+        # but targetwobble[]ra[]dec, and also target_wobble[]ra[]dec should work as well
+        pointing_string = read_events_header(file)['TARGET']
+        logging.info('TARGET field: ' + pointing_string)
+        targets_to_skip = ['transition', 'Transition', 'TRANSITION', 'Dark', 'DARK', 'dark']
+        if pointing_string in targets_to_skip and not force_pointing:
+            logging.info('Transition to the next wobble, or dark file, not on-source pointing direction, FILE SKIPPED.')
+            exit()
+        target, wobble, ra, dec = parse_target_field(pointing_string)
+        if wobble is None:
+            logging.warning('Wrong format of coordinates in the fits header, unknown delimiter')
+            return None, None, None, None
+        if ra is None:
+            logging.warning('Wrong format of coordinates in the fits header, cannot read RA, DEC')
+    except KeyError:
+        logging.warning('TARGET field is not in the fits header! Cannot read pointing RA, DEC. Are you sure that this is a valid file with science data?')
+        target, ra, dec, wobble = None, None, None, None
     return target, ra, dec, wobble
 
 
@@ -1249,8 +1244,8 @@ def get_survived_ped_fraction(dl1_files, tel=None):
         times.append(events['local_time'][0])
         ped_fractions.append(ped_fraction)
         wobble.append(get_dl1_info(file)['wobble'][0])
-        # obs_id: date and run number, e.g. 202601201179
-        runs.append(int(str(events['obs_id'][0])[8:]))
+        # obs_id: YYYYMMDD, telescope and run number, e.g. 20260120211179 (run: the last four digits)
+        runs.append(int(events['obs_id'][0]) % 10_000)
         filenames.append(file)
 
     zenith_angles = np.array(zenith_angles)

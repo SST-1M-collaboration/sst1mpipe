@@ -362,7 +362,10 @@ def add_dl1_extra_parameters(events, input_file, tel):
     if "local_time" not in events.keys():
         events["local_time"] = events["trigger_time"].unix
     if "date" not in events.keys():
-        dates = {obs_id: int(str(obs_id)[:8]) for obs_id in np.unique(events["obs_id"])}
+        # obs_id: YYYYMMDD<tel_id:02d><run:04d> (sst1mpipe.io.sst1m_event_source.observation_ids)
+        from sst1mpipe.io.sst1m_event_source import obs_id_date
+
+        dates = {obs_id: obs_id_date(obs_id) for obs_id in np.unique(events["obs_id"])}
         events["date"] = np.array([dates[obs_id] for obs_id in events["obs_id"]], dtype=np.int64)
     if "meanQ" not in events.keys() and pedestal_images:
         events["meanQ"] = pedestal_mean_charge(input_file, tel, events["trigger_time"])

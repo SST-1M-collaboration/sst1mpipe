@@ -32,7 +32,7 @@ from protozfits import (
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer, StreamCameraConfigContainer
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
-from sst1mpipe.io.sst1m_event_source import fill_r0_event, parse_swapped_modules, pixel_order
+from sst1mpipe.io.sst1m_event_source import fill_r0_event, observation_ids, parse_swapped_modules, pixel_order
 from sst1mpipe.resources import SUBARRAY_FILE
 
 __all__ = ["ZMQEventSource", "DataStream"]
@@ -77,18 +77,25 @@ def is_zmq_endpoint(url):
     return True
 
 
-def run_header_obs_id(run_header):
+def run_header_ids(run_header):
     """
-    obs_id of a DigiCam run header (``DataModel.CameraRunHeader``): its ``run_id`` if set,
-    otherwise the date and the run number as for the files (``<YYYYMMDD><run:04d>``,
-    e.g. 202601210206) with the date of ``dateMJD``, or the run number without date.
+    ``(sb_id, obs_id)`` of a DigiCam run header (``DataModel.CameraRunHeader``): its ``run_id`` as
+    both if set, otherwise as for the files (`sst1mpipe.io.sst1m_event_source.observation_ids`):
+    ``sb_id = YYYYMMDD``, ``obs_id = YYYYMMDD<tel_id:02d><run:04d>`` with the date of ``dateMJD`` (e.g.
+    20260121, 20260121210206), or the run number as both without date.
     """
     if run_header.run_id:
-        return int(run_header.run_id)
+        return int(run_header.run_id), int(run_header.run_id)
     if run_header.dateMJD:
         date = Time(run_header.dateMJD, format="mjd", scale="utc").strftime("%Y%m%d")
-        return int(f"{date}{run_header.runNumber:04d}")
-    return int(run_header.runNumber)
+        tel_id = run_header.telescopeID or run_header.telescope_id
+        return observation_ids(date, tel_id, run_header.runNumber)
+    return int(run_header.runNumber), int(run_header.runNumber)
+
+
+def run_header_obs_id(run_header):
+    """obs_id of a DigiCam run header, see `run_header_ids`"""
+    return run_header_ids(run_header)[1]
 
 
 # message type of the stream -> protobuf message class and field(s) of the telescope id
@@ -406,12 +413,12 @@ class ZMQEventSource(EventSource):
         message.ParseFromString(payload)
         run_header = make_namedtuple(message)
         tel_id = run_header.telescopeID or run_header.telescope_id
-        obs_id = run_header_obs_id(run_header)
+        sb_id, obs_id = run_header_ids(run_header)
         self._run_headers[tel_id] = run_header
         self._run_obs_ids[tel_id] = obs_id
         # blocks of the run, unless given by a data stream
         if obs_id not in self._observation_blocks:
-            self._add_blocks(tel_id, sb_id=obs_id, obs_id=obs_id)
+            self._add_blocks(tel_id, sb_id=sb_id, obs_id=obs_id)
         self.log.info("Run header of telescope %d: run %d, obs_id %d", tel_id, run_header.runNumber, obs_id)
 
     def _add_blocks(self, tel_id, sb_id, obs_id):

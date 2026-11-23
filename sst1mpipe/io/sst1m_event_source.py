@@ -164,6 +164,36 @@ def parse_file_name(file_name):
     return match.groups() if match else None
 
 
+def observation_ids(date, tel_id, run):
+    """
+    ``(sb_id, obs_id)`` of a run (raw file) of a telescope:
+
+    - ``sb_id = YYYYMMDD``: one scheduling block per night, shared by the telescopes
+    - ``obs_id = YYYYMMDD<tel_id:02d><run:04d>``: one observation block per run and telescope, unique
+      over the nights and the telescopes; the stereo events have the telescope id 00 (`stereo_obs_id`)
+
+    e.g. ``observation_ids("20240110", 22, 12)`` -> ``(20240110, 20240110220012)``
+    """
+    date, tel_id, run = f"{int(date):08d}", int(tel_id), int(run)
+    if not 0 <= tel_id <= 99 or not 0 <= run <= 9999:
+        raise ValueError(f"telescope {tel_id} / run {run}: two digits for the telescope, four for the run")
+    return int(date), int(f"{date}{tel_id:02d}{run:04d}")
+
+
+def stereo_obs_id(obs_id):
+    """
+    obs_id of the stereo events of a run of a telescope (`observation_ids`): the telescope id replaced
+    by 00, ``YYYYMMDD00<run:04d>``, e.g. ``20240110210012`` -> ``20240110000012``
+    """
+    obs_id = int(obs_id)
+    return obs_id // 1_000_000 * 1_000_000 + obs_id % 10_000
+
+
+def obs_id_date(obs_id):
+    """Night ``YYYYMMDD`` of an obs_id of `observation_ids`"""
+    return int(obs_id) // 1_000_000
+
+
 def tel_id_from_file_name(file_name):
     """
     Telescope of a SST-1M raw data file name ``SST1M<n>_<date>_<run>.fits.fz``,
@@ -171,6 +201,25 @@ def tel_id_from_file_name(file_name):
     """
     match = re.match(r'SST1M(\d)_', os.path.basename(str(file_name)))
     return 20 + int(match.group(1)) if match else None
+
+
+def read_events_header(path):
+    """
+    Header of the ``Events`` table of a raw file (TARGET, DATE, DATEEND), or of the first HDU with a
+    TARGET field if the file has no ``Events`` table
+    """
+    with fits.open(path) as hdul:
+        if "Events" in hdul:
+            return hdul["Events"].header.copy()
+        for hdu in hdul:
+            if "TARGET" in hdu.header:
+                return hdu.header.copy()
+    raise KeyError(f"{path}: no Events table nor TARGET field")
+
+
+def read_target(path):
+    """Target of a raw file (TARGET field without the wobble, see `parse_target_field`), None if not given"""
+    return parse_target_field(read_events_header(path).get("TARGET"))[0]
 
 
 def file_start_and_duration(header):
@@ -494,7 +543,8 @@ class SST1MEventSource(EventSource):
 
     For each camera event, it fills:
 
-    - ``event.index``: ``obs_id`` from the date and run number of the file name, and ``event_id``,
+    - ``event.index``: ``obs_id`` from the date, telescope and run number of the file name (see
+      `observation_ids`), and ``event_id``,
       the SWAT array event id if the file has them (see `swat_event_ids_available`), the camera
       event number otherwise;
     - ``event.r0.tel[tel_id]`` (``SST1MR0CameraContainer``): the waveforms,
@@ -567,17 +617,17 @@ class SST1MEventSource(EventSource):
         # input file of the current provenance activity (zfits files have no reference metadata)
         Provenance().add_input_file(str(self.input_url), role="R0/Event", add_meta=False)
 
-        # obs_id from the date and run number of the file name
+        # sb_id (night) and obs_id (night, telescope and run) from the file name, see observation_ids
         date_run = parse_file_name(self.input_url)
-        self.run_number = int(date_run[1]) if date_run else 0
-        self.run_id = int(''.join(date_run)) if date_run else 0
         self.tel_id = tel_id_from_file(self.input_url) or 0
+        self.run_number = int(date_run[1]) if date_run else 0
+        self.sb_id, self.obs_id = observation_ids(date_run[0], self.tel_id, self.run_number) if date_run else (0, 0)
 
         # the telescope of the file only
         self._subarray = SUBARRAY_DESCRIPTION.select_subarray([self.tel_id], name=SUBARRAY_DESCRIPTION.name)
 
         # Target and pointing from the TARGET field of the file, unless the pointing is given by the user
-        header = fits.getheader(self.input_url, 'Events')
+        header = read_events_header(self.input_url)
         self._target, self._wobble, ra, dec = parse_target_field(header.get('TARGET'))
         file_pointing = None
         if (ra is not None) and (dec is not None):
@@ -627,21 +677,21 @@ class SST1MEventSource(EventSource):
             pointing_info["actual_duration"] = duration
 
         scheduling_block = SchedulingBlockContainer(
-            sb_id=np.uint64(self.run_id),
+            sb_id=np.uint64(self.sb_id),
             sb_type=scheduling_block_type(self._target),
             producer_id=producer_id,
             observing_mode=observing_mode(self._wobble),
             pointing_mode=pointing_mode,
         )
         observation_block = SST1MObservationBlockContainer(
-            obs_id=np.uint64(self.run_id),
-            sb_id=np.uint64(self.run_id),
+            obs_id=np.uint64(self.obs_id),
+            sb_id=np.uint64(self.sb_id),
             producer_id=producer_id,
             target=self._target or "",
             wobble=self._wobble or "NONE",
             **pointing_info
         )
-        return {self.run_id: scheduling_block}, {self.run_id: observation_block}
+        return {self.sb_id: scheduling_block}, {self.obs_id: observation_block}
 
     @property
     def subarray(self):
@@ -739,7 +789,7 @@ class SST1MEventSource(EventSource):
     def _generator(self):
         for count, array_event in enumerate(self.get_array_event(str(self.input_url))):
             array_event.count = count
-            array_event.index.obs_id = self.run_id
+            array_event.index.obs_id = self.obs_id
             yield array_event
 
     def get_array_event(self, input_path):

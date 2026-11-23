@@ -17,6 +17,7 @@ __all__ = [
     "WINDOW_DIR",
     "DARK_RUNS_DIR",
     "INSTRUMENT_DIR",
+    "DATASETS_DIR",
     "TEST_DATA_DIR",
     "DATA_CONFIG_FILE",
     "MC_CONFIG_FILES",
@@ -32,6 +33,8 @@ __all__ = [
 RESOURCES_DIR = files(__name__)
 
 CONFIG_DIR = RESOURCES_DIR / "config"
+# datasets of the analyses (sst1mpipe-make-dataset, sst1mpipe.io.dataset)
+DATASETS_DIR = RESOURCES_DIR / "datasets"
 CALIBRATION_DIR = RESOURCES_DIR / "calibration"
 WINDOW_DIR = CALIBRATION_DIR / "window"
 DARK_RUNS_DIR = CALIBRATION_DIR / "dark_runs"

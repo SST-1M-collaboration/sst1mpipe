@@ -102,6 +102,7 @@ sst1mpipe = [
   "resources/calibration/window/*",
   "resources/calibration/dark_runs/*",
   "resources/instrument/*",
+  "resources/datasets/*",
 ]
 
 [tool.setuptools.exclude-package-data]
@@ -129,6 +130,7 @@ sst1mpipe-trigger = "sst1mpipe.scripts.sst1mpipe_trigger_tool:main"
 sst1mpipe-monitoring = "sst1mpipe.scripts.sst1mpipe_monitoring_tool:main"
 sst1mpipe-stereo = "sst1mpipe.scripts.sst1mpipe_stereo_tool:main"
 sst1mpipe-plot-drive-pointing = "sst1mpipe.scripts.sst1mpipe_plot_drive_pointing_tool:main"
+sst1mpipe-make-dataset = "sst1mpipe.scripts.sst1mpipe_make_dataset_tool:main"
 
 # EventSource implementations found by ctapipe.io.EventSource
 [project.entry-points.ctapipe_io]

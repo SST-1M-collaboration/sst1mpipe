@@ -41,6 +41,29 @@ such as `gammapy <https://github.com/gammapy>`_, see :ref:`higher_level`.
     analysis, one should proceed with the steps described in :ref:`detailed_processing`.
 
 
+.. _datasets:
+
+Datasets
+--------
+
+The runs of an analysis are listed in a dataset, a text file (ECSV) with one line per run and
+telescope: ``obs_id`` (``YYYYMMDD<tel_id:02d><run:04d>``), ``tel_id`` and the raw file relative to the root
+of the data, with the computer and the root of the data in the header (``host``, ``root``). With the
+configurations used (e.g. in a zip), it archives an analysis and makes it reproducible.
+
+.. code-block:: console
+
+    sst1mpipe-make-dataset --host calculus --root /net --target Crab --name crab_paper_2025 \
+        -o crab_paper_2025.ecsv 20231017 20231108 20231218
+
+In Python, ``sst1mpipe.io.dataset.read_dataset`` and ``dataset_paths``; in bash:
+
+.. code-block:: console
+
+    ROOT=$(sed -n 's/^# - {root: \(.*\)}$/\1/p' crab_paper_2025.ecsv)
+    grep -v '^#' crab_paper_2025.ecsv | tail -n +2 | while read obs_id tel_id file; do echo "${ROOT}/${file}"; done
+
+
 .. _detailed_processing:
 
 Detailed data processing

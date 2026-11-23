@@ -41,7 +41,9 @@ MAX_ITERATIONS = 5
 
 DARK_TEL_ID = 22
 OTHER_TEL_ID = 21
-DARK_OBS_ID = 202601190007
+DARK_OBS_ID = 20260119220007
+# scheduling block of the dark run: the night
+DARK_SB_ID = 20260119
 DARK_FIRST_EVENT_ID = 28810122
 DARK_FIRST_CAMERA_EVENT_NUMBER = 117266
 DARK_SUM_WAVEFORM = [11926202, 11927313, 11927137, 11927213, 11927931]
@@ -131,7 +133,7 @@ def test_trigger_and_no_pointing_for_dark_run():
     assert not source.pointing_manual
     observation_block = source.observation_blocks[DARK_OBS_ID]
     assert np.isnan(observation_block.subarray_pointing_lon)
-    assert source.scheduling_blocks[DARK_OBS_ID].pointing_mode == PointingMode.UNKNOWN
+    assert source.scheduling_blocks[DARK_SB_ID].pointing_mode == PointingMode.UNKNOWN
     assert source.pedestal_event_type == EventType.DARK_PEDESTAL
 
     for i, event in enumerate(source):
@@ -181,7 +183,7 @@ def test_pointing_given_by_user():
     assert observation_block.subarray_pointing_lon == ra * u.deg
     assert observation_block.subarray_pointing_lat == dec * u.deg
     assert observation_block.subarray_pointing_frame == CoordinateFrameType.ICRS
-    assert source.scheduling_blocks[DARK_OBS_ID].pointing_mode == PointingMode.TRACK
+    assert source.scheduling_blocks[DARK_SB_ID].pointing_mode == PointingMode.TRACK
 
     # RA/Dec of the pointing of the events; their alt/az is given by the monitoring (sst1mpipe-monitoring)
     for event in source:
@@ -237,20 +239,37 @@ def test_file_start_and_duration():
     assert file_start_and_duration({"DATE": "2026-01-21T17:07:07"}) == (None, None)
 
 
+def test_observation_ids():
+    """sb_id: the night YYYYMMDD; obs_id: YYYYMMDD, telescope (two digits, 00 for stereo) and run (four digits)"""
+    from sst1mpipe.io.sst1m_event_source import observation_ids
+
+    from sst1mpipe.io.sst1m_event_source import obs_id_date, stereo_obs_id
+
+    assert observation_ids("20240110", 22, 12) == (20240110, 20240110220012)
+    assert observation_ids("20240110", 21, 12) != observation_ids("20240110", 22, 12)
+    assert observation_ids("20240110", 1, 9999) == (20240110, 20240110019999)
+    assert stereo_obs_id(20240110210012) == stereo_obs_id(20240110220012) == 20240110000012
+    assert obs_id_date(20240110220012) == obs_id_date(20240110000012) == 20240110
+    with pytest.raises(ValueError, match="four for the run"):
+        observation_ids("20240110", 21, 10000)
+    with pytest.raises(ValueError, match="two digits for the telescope"):
+        observation_ids("20240110", 100, 1)
+
+
 def test_blocks_of_dark_run():
 
     source = SST1MEventSource(input_url=DARK_FILE, max_events=1)
-    scheduling_block = source.scheduling_blocks[DARK_OBS_ID]
+    scheduling_block = source.scheduling_blocks[DARK_SB_ID]
     observation_block = source.observation_blocks[DARK_OBS_ID]
 
-    assert scheduling_block.sb_id == DARK_OBS_ID
+    assert scheduling_block.sb_id == DARK_SB_ID
     assert scheduling_block.sb_type == SchedulingBlockType.CALIBRATION
     assert scheduling_block.producer_id == "SST1M-22"
     assert scheduling_block.observing_mode == ObservingMode.UNKNOWN
     assert scheduling_block.pointing_mode == PointingMode.UNKNOWN
 
     assert observation_block.obs_id == DARK_OBS_ID
-    assert observation_block.sb_id == DARK_OBS_ID
+    assert observation_block.sb_id == DARK_SB_ID
     assert observation_block.producer_id == "SST1M-22"
     assert observation_block.target == "DARK"
     assert observation_block.wobble == "NONE"
@@ -273,7 +292,7 @@ def test_event_index():
 
     source = SST1MEventSource(input_url=DARK_FILE, max_events=MAX_ITERATIONS)
 
-    assert source.run_id == DARK_OBS_ID
+    assert source.obs_id == DARK_OBS_ID
     assert list(source.observation_blocks) == [DARK_OBS_ID]
     assert source.observation_blocks[DARK_OBS_ID].obs_id == DARK_OBS_ID
     for i, event in enumerate(source):
@@ -580,7 +599,7 @@ def test_warning_no_pointing_in_file(caplog):
 def test_warning_pointing_given_by_user_and_in_file(monkeypatch, caplog):
     """the pointing of the file and the one given by the user are reported, with their separation"""
     header = {"TARGET": "Crab_W1_83.63_22.01", "DATE": "2026-01-21T17:07:07", "DATEEND": "2026-01-21T17:07:19"}
-    monkeypatch.setattr(sst1m_event_source.fits, "getheader", lambda *args, **kwargs: header)
+    monkeypatch.setattr(sst1m_event_source, "read_events_header", lambda *args, **kwargs: header)
 
     with caplog.at_level(logging.WARNING):
         source = SST1MEventSource(input_url=DARK_FILE, max_events=1, pointing_ra=84.63, pointing_dec=22.01)
@@ -595,14 +614,14 @@ def test_warning_pointing_given_by_user_and_in_file(monkeypatch, caplog):
 def test_no_warning_pointing_in_file(monkeypatch, caplog):
 
     header = {"TARGET": "Crab_W1_83.63_22.01"}
-    monkeypatch.setattr(sst1m_event_source.fits, "getheader", lambda *args, **kwargs: header)
+    monkeypatch.setattr(sst1m_event_source, "read_events_header", lambda *args, **kwargs: header)
 
     with caplog.at_level(logging.WARNING):
         source = SST1MEventSource(input_url=DARK_FILE, max_events=1)
 
     assert source.pointing.ra.deg == pytest.approx(83.63)
-    assert source.scheduling_blocks[DARK_OBS_ID].sb_type == SchedulingBlockType.OBSERVATION
-    assert source.scheduling_blocks[DARK_OBS_ID].observing_mode == ObservingMode.WOBBLE
+    assert source.scheduling_blocks[DARK_SB_ID].sb_type == SchedulingBlockType.OBSERVATION
+    assert source.scheduling_blocks[DARK_SB_ID].observing_mode == ObservingMode.WOBBLE
     assert "pointing" not in caplog.text.lower()
 
 
@@ -673,8 +692,8 @@ def test_observation_run(input_file, tel_id, caplog):
         source = SST1MEventSource(input_url=input_file, max_events=20)
     assert "pointing" not in caplog.text.lower()
 
-    obs_id = source.run_id
-    scheduling_block = source.scheduling_blocks[obs_id]
+    obs_id = source.obs_id
+    scheduling_block = source.scheduling_blocks[source.sb_id]
     observation_block = source.observation_blocks[obs_id]
     assert (source.target, source.wobble) == ("MRK421", "W1")
     assert not source.pointing_manual
