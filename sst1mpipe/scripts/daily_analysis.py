@@ -1,12 +1,10 @@
 """
 Daily analysis of the data of a night on Calculus, per target: R0 -> DL1 (``sst1mpipe-monitoring``,
 ``sst1mpipe-process``) for each telescope, DL1 stereo (``sst1mpipe-stereo``), DL1 -> DL2
-(``sst1mpipe-apply-models``, models ``*.pkl`` of ``mono_model_dir`` / ``stereo_model_dir``: an NSB level),
-DL2 -> DL3 (``sst1mpipe-dl2-dl3``, ``run_dl3``: IRFs of ``irf_dirs`` {"cs1", "cs2", "stereo"}: directories of
-``ctapipe-compute-irf``, or with ``ze<zenith>`` subdirectories), with the index files of gammapy per target.
+(``sst1mpipe-apply-models``, models ``*.pkl`` of ``mono_model_dir`` / ``stereo_model_dir``: an NSB level).
 
-TODO: the DL1 distributions from the ctapipe DL2 (``sst1mpipe_extract_dl1_distributions`` reads the DL2 of
-the former sst1mpipe random forests).
+TODO: DL2 -> DL3 and the DL1 distributions from the ctapipe DL2 (``sst1mpipe_data_dl2_dl3`` and
+``sst1mpipe_extract_dl1_distributions`` read the DL2 of the former sst1mpipe random forests).
 
 Usage::
 
@@ -27,7 +25,6 @@ from pathlib import Path
 
 from astropy.io import fits
 
-from sst1mpipe.io.dl3 import write_index
 from sst1mpipe.resources import MONITORING_CONFIG_FILE
 
 DEFAULT_CONFIG_FILE = '/data/work/analysis/Daily_analysis/default_daily_ana_config.json'
@@ -69,12 +66,6 @@ def dl1_dl2(input_file, models_dir, out_dir):
     models = [arg for path in sorted(Path(models_dir).glob('*.pkl')) for arg in ('-r', path)]
     run(['sst1mpipe-apply-models', '-i', input_file, *models, '-o', output, '--overwrite',
          '--no-progress'])
-
-
-def dl2_dl3(input_file, irf_dir, out_dir):
-    """DL2 -> DL3 of a DL2 file (index files: once all the files are done)"""
-    run(['sst1mpipe-dl2-dl3', '-i', input_file, '--irf-directory', irf_dir, '-o', out_dir, '--overwrite',
-         '--no-index'])
 
 
 def pool_map(n_proc, function, files, **kwargs):
@@ -152,10 +143,6 @@ def run_daily_ana(daily_config):
     stereo = daily_config["stereo"]
     mono = {"cs1": daily_config["cs1"], "cs2": daily_config["cs2"]}
     run_dl1, run_dl2 = daily_config["run_dl1"], daily_config["run_dl2"]
-    run_dl3 = daily_config.get("run_dl3", False)
-    irf_dirs = daily_config.get("irf_dirs", {})
-    if run_dl3 and not irf_dirs:
-        raise ValueError("run_dl3: no irf_dirs in the configuration")
 
     if (year is None) or (month is None) or (day is None):
         yesterday = datetime.datetime.now() - datetime.timedelta(days=1)
@@ -170,8 +157,8 @@ def run_daily_ana(daily_config):
                   logging.StreamHandler(stream=sys.stdout)],
     )
     logging.info("Daily analysis (%s) START", date)
-    if any(daily_config.get(key) for key in ("run_dl3_eff", "run_data_qual", "run_data_qual_eff")):
-        logging.warning("DL1 distributions not available yet from the ctapipe DL2: skipped")
+    if any(daily_config.get(key) for key in ("run_dl3", "run_dl3_eff", "run_data_qual", "run_data_qual_eff")):
+        logging.warning("DL3 and DL1 distributions not available yet from the ctapipe DL2: skipped")
 
     files = {tel: refine_file_list(make_runlist_allfiles(itel, year, month, day, rootdir=daily_config["root_dir"]))
              for itel, tel in ((1, "cs1"), (2, "cs2"))}
@@ -194,7 +181,7 @@ def run_daily_ana(daily_config):
         dl2 = {**mono, "stereo": stereo}
         dirs = {}
         for tel in [tel for tel in ("cs1", "cs2") if mono[tel] or stereo] + (["stereo"] if stereo else []):
-            dirs[tel] = {level: datedir / target / tel / level for level in ("dl1", "dl2", "dl3")}
+            dirs[tel] = {level: datedir / target / tel / level for level in ("dl1", "dl2")}
             for path in dirs[tel].values():
                 path.mkdir(parents=True, exist_ok=True)
 
@@ -211,14 +198,6 @@ def run_daily_ana(daily_config):
                 pattern = '*.h5' if tel == "stereo" else '*.dl1.h5'  # not the monitoring files
                 pool_map(n_proc, dl1_dl2, glob.glob(str(dirs[tel]["dl1"] / pattern)),
                          models_dir=model_dirs[tel], out_dir=dirs[tel]["dl2"])
-
-        if run_dl3:
-            for tel in [tel for tel in dirs if dl2[tel] and irf_dirs.get(tel)]:
-                pool_map(n_proc, dl2_dl3, glob.glob(str(dirs[tel]["dl2"] / '*.h5')),
-                         irf_dir=irf_dirs[tel], out_dir=dirs[tel]["dl3"])
-                dl3_files = sorted(dirs[tel]["dl3"].glob('*.dl3.fits.gz'))
-                if dl3_files:
-                    write_index(dl3_files, dirs[tel]["dl3"])
 
     logging.info("Daily analysis (%s) ended", date)
 
