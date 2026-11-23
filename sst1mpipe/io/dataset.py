@@ -123,7 +123,16 @@ def write_dataset(table, path, overwrite=False):
 
 
 def read_dataset(path):
-    """Dataset of a file written by `write_dataset` (`make_dataset`): ``meta["root"]`` is the root of the data"""
+    """
+    Dataset of a file written by `write_dataset` (`make_dataset`), or of sst1mpipe by name
+    (``sst1mpipe/resources/datasets/<name>.ecsv``, e.g. ``read_dataset("crab_paper_2025")``):
+    ``meta["root"]`` is the root of the data
+    """
+    from sst1mpipe.resources import DATASETS_DIR
+
+    path = Path(path)
+    if not path.is_file() and (Path(DATASETS_DIR) / f"{path.name.removesuffix('.ecsv')}.ecsv").is_file():
+        path = Path(DATASETS_DIR) / f"{path.name.removesuffix('.ecsv')}.ecsv"
     return Table.read(path, format="ascii.ecsv")
 
 

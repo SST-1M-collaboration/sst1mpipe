@@ -82,3 +82,18 @@ def test_old_and_broken_raw_files(tmp_path, caplog):
     assert "SST1M1_20260120_1179.fits.fz: target MRK421" in messages
     assert "SST1M1_20260120_0002.fits.fz: not readable" in messages
     assert "night 20260120: 1 runs in the dataset" in messages
+
+
+def test_read_dataset_by_name(tmp_path, monkeypatch):
+    """the datasets of sst1mpipe (resources/datasets) are read by name"""
+    import sst1mpipe.resources
+    from sst1mpipe.io.dataset import make_dataset as make
+    from sst1mpipe.io.dataset import write_dataset
+
+    root = raw_data_root(tmp_path)
+    datasets = tmp_path / "datasets"
+    datasets.mkdir()
+    write_dataset(make(root, ["20260120"], target="mrk421", name="mrk421_test"), datasets / "mrk421_test.ecsv")
+    monkeypatch.setattr(sst1mpipe.resources, "DATASETS_DIR", datasets)
+    assert read_dataset("mrk421_test")["obs_id"].tolist() == [2026012011179, 2026012021102]
+    assert read_dataset("mrk421_test.ecsv").meta["name"] == "mrk421_test"

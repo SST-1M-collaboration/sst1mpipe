@@ -102,6 +102,7 @@ sst1mpipe = [
   "resources/calibration/window/*",
   "resources/calibration/dark_runs/*",
   "resources/instrument/*",
+  "resources/datasets/*",
 ]
 
 [tool.setuptools.exclude-package-data]
