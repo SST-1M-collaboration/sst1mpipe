@@ -37,28 +37,57 @@ submit() {
   fi
 }
 
+read -ra ZENITHS <<< "${MC_ZENITHS}"
+N_ZENITHS=${#ZENITHS[@]}
+
 R0_JOBS=()
 if run dl1; then
+  # lists of the simtel files of each particle and zenith angle
+  LISTS=()
   for ZENITH in ${MC_ZENITHS}; do
     for PARTICLE in gamma_diffuse gamma_point proton; do
       LIST="${MC_DIRECTORY}/lists/${PARTICLE}_ze${ZENITH}.txt"
       PATTERN=$(mc_pattern "${PARTICLE}" "${ZENITH}")
       find "$(dirname "${PATTERN}")" -maxdepth 1 -name "$(basename "${PATTERN}")" 2>/dev/null | sort > "${LIST}" || true
-      N=$(wc -l < "${LIST}")
-      if (( N == 0 )); then
-        echo "No ${PARTICLE} file at zenith ${ZENITH} deg: $(mc_pattern "${PARTICLE}" "${ZENITH}")" >&2
+      if [[ ! -s "${LIST}" ]]; then
+        echo "No ${PARTICLE} file at zenith ${ZENITH} deg: ${PATTERN}" >&2
         exit 1
       fi
-      N_TASKS=$(( (N + MC_FILES_PER_TASK - 1) / MC_FILES_PER_TASK ))
-      R0_JOBS+=("$(sbatch --parsable --array="0-$((N_TASKS - 1))" --export="ALL,PARTICLE=${PARTICLE},ZENITH=${ZENITH}" \
-        "${SCRIPTS}/mc_r0_dl1.bash")")
-      echo "${PARTICLE} zenith ${ZENITH} deg: ${N} files, ${N_TASKS} tasks, job ${R0_JOBS[-1]}"
+      LISTS+=("${PARTICLE}:${ZENITH}:${LIST}")
     done
+  done
+  # check, before submitting anything: the array tasks and the jobs of the next steps (merge, training,
+  # DL2, IRFs, comparison) with the jobs already in the queue within MC_MAX_SUBMIT
+  n_tasks() {  # array tasks of all the lists with $1 files per task
+    local total=0 entry n
+    for entry in "${LISTS[@]}"; do
+      n=$(wc -l < "${entry##*:}")
+      total=$(( total + (n + $1 - 1) / $1 ))
+    done
+    echo "${total}"
+  }
+  QUEUED=$(command -v squeue > /dev/null && squeue -u "${USER:-$(id -un)}" -h -r 2>/dev/null | wc -l || echo 0)
+  AVAILABLE=$(( MC_MAX_SUBMIT - QUEUED - 1 - 3 - 14 * N_ZENITHS ))
+  TOTAL=$(n_tasks "${MC_FILES_PER_TASK}")
+  if (( TOTAL > AVAILABLE )); then
+    MINIMUM=${MC_FILES_PER_TASK}
+    while (( AVAILABLE > 0 && $(n_tasks "${MINIMUM}") > AVAILABLE )); do MINIMUM=$(( MINIMUM + 1 )); done
+    echo "MC_FILES_PER_TASK=${MC_FILES_PER_TASK}: ${TOTAL} array tasks, ${AVAILABLE} jobs available (MC_MAX_SUBMIT" \
+      "${MC_MAX_SUBMIT}, ${QUEUED} jobs in the queue, $(( 4 + 14 * N_ZENITHS )) for the next steps)." \
+      "Nothing submitted: MC_FILES_PER_TASK=${MINIMUM} or more fits" >&2
+    exit 1
+  fi
+  echo "${MC_FILES_PER_TASK} files per task: ${TOTAL} array tasks (${QUEUED} jobs in the queue, limit ${MC_MAX_SUBMIT})"
+  for ENTRY in "${LISTS[@]}"; do
+    IFS=: read -r PARTICLE ZENITH LIST <<< "${ENTRY}"
+    N=$(wc -l < "${LIST}")
+    N_TASKS=$(( (N + MC_FILES_PER_TASK - 1) / MC_FILES_PER_TASK ))
+    R0_JOBS+=("$(sbatch --parsable --array="0-$((N_TASKS - 1))" --export="ALL,PARTICLE=${PARTICLE},ZENITH=${ZENITH}" \
+      "${SCRIPTS}/mc_r0_dl1.bash")")
+    echo "${PARTICLE} zenith ${ZENITH} deg: ${N} files, ${N_TASKS} tasks, job ${R0_JOBS[-1]}"
   done
 fi
 
-read -ra ZENITHS <<< "${MC_ZENITHS}"
-N_ZENITHS=${#ZENITHS[@]}
 DEPENDENCY=""
 # failed DL1 files are skipped by the merge (afterany)
 (( ${#R0_JOBS[@]} > 0 )) && DEPENDENCY="afterany:$(join_ids "${R0_JOBS[@]}")"
