@@ -5,15 +5,14 @@
 #######################
 # For each zenith angle of MC_ZENITHS and each mode, in irf/<MODELS_NAME>/<IRF_CUTS>/<mode>/ze<zenith>/:
 # - tel1, tel2: one telescope alone (DL2 dl2/<MODELS_NAME>/ze<zenith>/tel1, tel2)
-# - stereo: the events of the two telescopes, stereo or not (DL2 dl2/<MODELS_NAME>/ze<zenith>/stereo)
-# - strict_stereo: the stereo events only (both telescopes)
+# - stereo: the events with both telescopes (stereo models, DL2 dl2/<MODELS_NAME>/ze<zenith>/stereo)
 # 1. ctapipe-optimize-event-selection: gammaness and direction cuts (point gammas, protons);
 #    IRF_CUTS=optimized (best sensitivity) or paper (fixed: 60 % gammaness, 80 % theta)
 # 2. ctapipe-compute-irf: point-like IRFs (point gammas, direction cut), and full enclosure IRFs
 #    (diffuse gammas), with the benchmarks (sensitivity, resolutions)
 # 3. sst1mpipe-plot-irfs: one figure per quantity in plots/
 # Background: protons weighted to protons + helium (IRF_BACKGROUND, see run_irf_tool.py).
-# Task 4 i + j: zenith angle i, mode j.
+# Task 3 i + j: zenith angle i, mode j.
 
 #SBATCH --job-name=mc-irf
 #SBATCH --nodes=1
@@ -28,19 +27,13 @@
 source "${SST1MPIPE_ROOT:-${SLURM_SUBMIT_DIR:-.}}/scripts/camk/common.bash"
 
 read -ra ZENITHS <<< "${MC_ZENITHS}"
-MODES=(tel1 tel2 stereo strict_stereo)
+MODES=(tel1 tel2 stereo)
 TASK=${SLURM_ARRAY_TASK_ID:-0}
-ZENITH=${ZENITHS[TASK / 4]}
-MODE=${MODES[TASK % 4]}
+ZENITH=${ZENITHS[TASK / 3]}
+MODE=${MODES[TASK % 3]}
 
 CONFIGS=()
-case "${MODE}" in
-  tel1|tel2) DL2="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/${MODE}" ;;
-  stereo) DL2="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/stereo" ;;
-  strict_stereo)
-    DL2="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/stereo"
-    CONFIGS+=(--config "${CONFIG_DIRECTORY}/sst1mpipe_irf_strict_stereo.yaml") ;;
-esac
+DL2="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/${MODE}"
 case "${IRF_CUTS}" in
   optimized) CUT_CONFIGS=() ;;
   paper) CUT_CONFIGS=(--config "${CONFIG_DIRECTORY}/sst1mpipe_irf_paper_cuts.yaml") ;;

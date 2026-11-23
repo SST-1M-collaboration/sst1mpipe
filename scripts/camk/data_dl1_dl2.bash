@@ -3,7 +3,8 @@
 #############################
 #  DL1 -> DL2 of the data   #
 #############################
-# Every DL1 file (cs1, cs2, stereo) with the models of MODELS_DIRECTORY (sst1mpipe-apply-models),
+# Every DL1 file with the models of MODELS_DIRECTORY (sst1mpipe-apply-models): cs1, cs2 with the mono
+# models (MODELS_DIRECTORY/mono), stereo with the stereo models (MODELS_DIRECTORY/stereo),
 # N_PARALLEL files at a time: dl2/<cs1, cs2, stereo>/.
 
 #SBATCH --job-name=data-dl1-dl2
@@ -24,8 +25,9 @@ dl1_dl2() {
   local output="${1/\/dl1\//\/dl2\/}"
   output="$(dirname "${output}")/$(basename "${output//dl1/dl2}")"
   mkdir -p "$(dirname "${output}")"
-  local models
-  mapfile -t models < <(models_args "${MODELS_DIRECTORY}")
+  local models set=mono
+  [[ "$1" == */dl1/stereo/* ]] && set=stereo
+  mapfile -t models < <(models_args "${MODELS_DIRECTORY}/${set}")
   (( ${#models[@]} > 0 )) || return 1
   sst1mpipe-apply-models -i "$1" "${models[@]}" -o "${output}" --overwrite --no-progress
 }

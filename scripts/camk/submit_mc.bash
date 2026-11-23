@@ -68,24 +68,27 @@ if run merge; then
   echo "merge: job ${MERGE}"
 fi
 if run train; then
-  TRAIN=$(submit "${DEPENDENCY}" --array=0-2 "${SCRIPTS}/mc_train.bash")
+  # mono and stereo models: 2 x 3
+  TRAIN=$(submit "${DEPENDENCY}" --array=0-5 "${SCRIPTS}/mc_train.bash")
   DEPENDENCY="afterok:${TRAIN}"
   echo "training: job ${TRAIN}"
 fi
 if run dl2; then
   # starting from the DL2: the models must be there
-  if [[ "${MC_START}" == dl2 ]] && ! compgen -G "${MC_DIRECTORY}/models/${MODELS_NAME}/*.pkl" > /dev/null; then
-    echo "No models in ${MC_DIRECTORY}/models/${MODELS_NAME} (MODELS_NAME from MC_TRAIN_ZENITHS=\"${MC_TRAIN_ZENITHS}\")" >&2
-    exit 1
-  fi
+  for SET in mono stereo; do
+    if [[ "${MC_START}" == dl2 ]] && ! compgen -G "${MC_DIRECTORY}/models/${MODELS_NAME}/${SET}/*.pkl" > /dev/null; then
+      echo "No models in ${MC_DIRECTORY}/models/${MODELS_NAME}/${SET} (MODELS_NAME from MC_TRAIN_ZENITHS=\"${MC_TRAIN_ZENITHS}\")" >&2
+      exit 1
+    fi
+  done
   # 3 versions (stereo, tel1, tel2) x 3 files per zenith angle
   DL2=$(submit "${DEPENDENCY}" --array="0-$((9 * N_ZENITHS - 1))" --cpus-per-task="${MC_DL2_CPUS}" \
     --mem-per-cpu="${MC_DL2_MEM_PER_CPU}" "${SCRIPTS}/mc_dl1_dl2.bash")
   DEPENDENCY="afterok:${DL2}"
   echo "DL2: job ${DL2}"
 fi
-# 4 modes (tel1, tel2, stereo, strict_stereo) per zenith angle
-IRF=$(submit "${DEPENDENCY}" --array="0-$((4 * N_ZENITHS - 1))" "${SCRIPTS}/mc_irf.bash")
-# figures with the four modes (afterany: the modes that succeeded)
+# 3 modes (tel1, tel2, stereo) per zenith angle
+IRF=$(submit "${DEPENDENCY}" --array="0-$((3 * N_ZENITHS - 1))" "${SCRIPTS}/mc_irf.bash")
+# figures with the three modes (afterany: the modes that succeeded)
 COMPARISON=$(submit "afterany:${IRF}" --array="0-$((N_ZENITHS - 1))" "${SCRIPTS}/mc_irf_comparison.bash")
 echo "IRFs (${IRF_CUTS} cuts): job ${IRF}, comparison ${COMPARISON}, outputs in ${MC_DIRECTORY}"

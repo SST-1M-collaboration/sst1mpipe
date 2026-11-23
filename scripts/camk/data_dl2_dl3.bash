@@ -4,7 +4,7 @@
 #  DL2 -> DL3 of the data   #
 #############################
 # Every DL2 file of dl2/<cs1, cs2, stereo>/ with the cuts and IRFs of DATA_IRF_DIRECTORY/<mode> of its
-# analysis (DATA_IRF_MODES: cs1 -> tel1, cs2 -> tel2, stereo -> strict_stereo), zenith angle closest to
+# analysis (DATA_IRF_MODES: cs1 -> tel1, cs2 -> tel2, stereo -> stereo), zenith angle closest to
 # each observation (ze<zenith>), N_PARALLEL files at a time (sst1mpipe-dl2-dl3): dl3/<cs1, cs2, stereo>/,
 # then the index files of gammapy of each directory.
 
