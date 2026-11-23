@@ -49,7 +49,7 @@ def test_make_dataset(tmp_path):
                   "20260119", "20260120", "20260121"])
 
     dataset = read_dataset(output)
-    assert dataset["obs_id"].tolist() == [2026012011179, 2026012021102]
+    assert dataset["obs_id"].tolist() == [260120211179, 260120221102]
     assert dataset["tel_id"].tolist() == [21, 22]
     assert dataset.meta["root"] == str(root) and dataset.meta["target"] == "mrk421"
     assert dataset.meta["host"] == "calculus"
@@ -84,9 +84,9 @@ def test_old_and_broken_raw_files(tmp_path, caplog):
 
     with caplog.at_level(logging.INFO, logger="sst1mpipe.io.dataset"):
         dataset = make(root, ["20260120"], target="crab")
-    assert dataset["obs_id"].tolist() == [2026012010001]
+    assert dataset["obs_id"].tolist() == [260120210001]
     messages = caplog.text
-    assert "SST1M1_20260120_0001.fits.fz: target Crab, obs_id 2026012010001: in the dataset" in messages
+    assert "SST1M1_20260120_0001.fits.fz: target Crab, obs_id 260120210001: in the dataset" in messages
     assert "SST1M1_20260120_1179.fits.fz: target MRK421" in messages
     assert "SST1M1_20260120_0002.fits.fz: not readable" in messages
     assert "night 20260120: 1 runs in the dataset" in messages
@@ -103,7 +103,7 @@ def test_read_dataset_by_name(tmp_path, monkeypatch):
     datasets.mkdir()
     write_dataset(make(root, ["20260120"], target="mrk421", name="mrk421_test"), datasets / "mrk421_test.ecsv")
     monkeypatch.setattr(sst1mpipe.resources, "DATASETS_DIR", datasets)
-    assert read_dataset("mrk421_test")["obs_id"].tolist() == [2026012011179, 2026012021102]
+    assert read_dataset("mrk421_test")["obs_id"].tolist() == [260120211179, 260120221102]
     assert read_dataset("mrk421_test.ecsv").meta["name"] == "mrk421_test"
 
 

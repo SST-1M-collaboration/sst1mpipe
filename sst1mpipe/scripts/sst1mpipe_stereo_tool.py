@@ -32,6 +32,7 @@ Usage::
     sst1mpipe-stereo --input SST1M1_20260120_1179.dl1.h5 --input SST1M2_20260120_1102.dl1.h5 \\
         --output SST1M_20260120_1179.stereo.dl1.h5 [--combiner SWATEventIdCombiner] [--keep-mono]
 """
+import copy
 from collections import Counter
 
 import numpy as np
@@ -44,6 +45,7 @@ from tqdm import tqdm
 
 from sst1mpipe.io import append_monitoring_tables
 from sst1mpipe.io.containers import to_sst1m_event
+from sst1mpipe.io.sst1m_event_source import stereo_obs_id
 from sst1mpipe.stereo import StereoEventCombiner
 from sst1mpipe.utils import get_trigger_time_ns, merge_subarrays
 
@@ -102,7 +104,8 @@ class CombinedRuns:
     subarray : ctapipe.instrument.SubarrayDescription
         Subarray of all the telescopes.
     observation_blocks : dict
-        Observation blocks of the sources by obs_id (the first one if several sources have it).
+        Observation blocks of the sources by obs_id (the first one if several sources have it), and
+        of the stereo events: those of the ``stereo_sources`` with the obs_id of `stereo_obs_id`.
     scheduling_blocks : dict
         Scheduling blocks of the sources by sb_id (the first one if several sources have it).
     obs_ids : list of int
@@ -115,13 +118,20 @@ class CombinedRuns:
         No atmosphere profile (no simulations).
     """
 
-    def __init__(self, sources, subarray):
+    def __init__(self, sources, subarray, stereo_sources=()):
         self.subarray = subarray
         self.is_simulation = False
         self.observation_blocks, self.scheduling_blocks = {}, {}
         for source in sources:
             for obs_id, block in source.observation_blocks.items():
                 self.observation_blocks.setdefault(obs_id, block)
+        # the runs of the stereo events: those of the reference telescope, without telescope
+        for source in stereo_sources:
+            for obs_id, block in source.observation_blocks.items():
+                stereo_block = copy.deepcopy(block)
+                stereo_block.obs_id = np.uint64(stereo_obs_id(obs_id))
+                stereo_block.producer_id = "SST1M"
+                self.observation_blocks.setdefault(int(stereo_block.obs_id), stereo_block)
             for sb_id, block in source.scheduling_blocks.items():
                 self.scheduling_blocks.setdefault(sb_id, block)
         self.obs_ids = sorted(self.observation_blocks)
@@ -333,7 +343,8 @@ class StereoTool(Tool):
         }
         all_sources = [source for sources in self.sources.values() for source in sources]
         subarray = merge_subarrays([subarrays[tel_id] for tel_id in sorted(subarrays)])
-        self.writer = DataWriter(event_source=CombinedRuns(all_sources, subarray), parent=self)
+        stereo_sources = self.sources[self.combiner.reference_tel_id]
+        self.writer = DataWriter(event_source=CombinedRuns(all_sources, subarray, stereo_sources), parent=self)
         # closed in finish(), or when the tool exits if it fails before
         self._writer_closed = False
         self._exit_stack.callback(self._close_writer)
@@ -373,8 +384,14 @@ class StereoTool(Tool):
         return events
 
     def _event_id(self, event):
-        """(obs_id, event_id) of an output event: those of the reference telescope for a stereo event"""
-        tel_id = self.combiner.reference_tel_id if len(event) > 1 else next(iter(event))
+        """
+        (obs_id, event_id) of an output event: for a stereo event, those of the reference telescope, the
+        obs_id without telescope (`stereo_obs_id`)
+        """
+        if len(event) > 1:
+            row = self.triggers[self.combiner.reference_tel_id][event[self.combiner.reference_tel_id]]
+            return stereo_obs_id(row["obs_id"]), int(row["event_id"])
+        tel_id = next(iter(event))
         row = self.triggers[tel_id][event[tel_id]]
         return int(row["obs_id"]), int(row["event_id"])
 

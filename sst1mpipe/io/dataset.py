@@ -15,7 +15,7 @@ of the data (``host``, ``root``)::
     # - {root: /net}
     # ...
     obs_id tel_id file
-    2024011010012 21 cs1/data/raw/2024/01/10/SST1M1_20240110_0012.fits.fz
+    240110210012 21 cs1/data/raw/2024/01/10/SST1M1_20240110_0012.fits.fz
 
 In bash::
 
@@ -68,6 +68,7 @@ def make_dataset(root, nights, target=None, telescopes=(1, 2), name="", descript
     root = Path(root).absolute()
     rows = []
     for night in nights:
+        n_before = len(rows)
         paths = find_runs(root, night, telescopes)
         if not paths:
             night = str(night)
@@ -89,7 +90,7 @@ def make_dataset(root, nights, target=None, telescopes=(1, 2), name="", descript
             _, obs_id = observation_ids(date_run[0], tel_id, date_run[1])
             log.info("%s: target %s, obs_id %d: in the dataset", path, run_target, obs_id)
             rows.append((obs_id, tel_id, str(path.relative_to(root))))
-        log.info("night %s: %d runs in the dataset", night, sum(1 for row in rows if str(row[0]).startswith(str(night))))
+        log.info("night %s: %d runs in the dataset", night, len(rows) - n_before)
     table = Table(rows=rows or None, names=["obs_id", "tel_id", "file"], dtype=[np.int64, np.int16, str])
     table.sort("obs_id")
     table.meta.update({

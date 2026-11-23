@@ -19,7 +19,9 @@ from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, TEST_DATA_DIR
 from sst1mpipe.scripts.sst1mpipe_stereo_tool import StereoTool
 from sst1mpipe.utils import get_trigger_time_ns
 
-OBS_IDS = {21: 2026012011179, 22: 2026012021102}
+OBS_IDS = {21: 260120211179, 22: 260120221102}
+# obs_id of the stereo events, by reference telescope: its run with the telescope id 00
+STEREO_OBS_IDS = {21: 260120001179, 22: 260120001102}
 # the monitoring file of tel 21 has the pointing of its first events only (observation_monitoring):
 # the pointing of its later events is NaN when the files are read
 NAN_POINTING_OUT_OF_RANGE = Config({"PointingInterpolator": {"bounds_error": False}})
@@ -66,7 +68,7 @@ def test_stereo_events(dl1_files, tmp_path, combiner_args):
     # the coincident events, with the ids of the reference telescope, SUBARRAY events
     trigger = read_table(output, "/dl1/event/subarray/trigger")
     assert trigger["event_id"].tolist() == sorted(COINCIDENT_EVENTS)
-    assert np.all(trigger["obs_id"] == OBS_IDS[21])
+    assert np.all(trigger["obs_id"] == STEREO_OBS_IDS[21])
     assert np.all(trigger["event_type"] == EventType.SUBARRAY.value)
     assert np.all(trigger["tels_with_trigger"])
 
@@ -91,7 +93,7 @@ def test_stereo_events(dl1_files, tmp_path, combiner_args):
 
     with HDF5EventSource(output, config=NAN_POINTING_OUT_OF_RANGE) as source:
         assert source.subarray.tel_ids.tolist() == [21, 22]
-        assert sorted(source.obs_ids) == sorted(OBS_IDS.values())
+        assert sorted(source.obs_ids) == sorted([*OBS_IDS.values(), STEREO_OBS_IDS[21]])
         events = list(source)
     assert [event.index.event_id for event in events] == sorted(COINCIDENT_EVENTS)
     for event in events:
@@ -126,7 +128,7 @@ def test_reference_telescope(dl1_files, tmp_path):
     run_stereo(dl1_files.values(), output, "--reference-tel=22", "--combiner=SWATEventIdCombiner")
     trigger = read_table(output, "/dl1/event/subarray/trigger")
     assert trigger["event_id"].tolist() == sorted(COINCIDENT_EVENTS)
-    assert np.all(trigger["obs_id"] == OBS_IDS[22])
+    assert np.all(trigger["obs_id"] == STEREO_OBS_IDS[22])
 
 
 def test_monitoring_copied(dl1_files, tmp_path):
@@ -230,8 +232,8 @@ def test_merged_runs_then_stereo(dl1_files, tmp_path):
     assert tool.counts["stereo"] == len(COINCIDENT_EVENTS)
     trigger = read_table(output, "/dl1/event/subarray/trigger")
     assert trigger["event_id"].tolist() == sorted(COINCIDENT_EVENTS)
-    assert np.all(trigger["obs_id"] == OBS_IDS[21])
+    assert np.all(trigger["obs_id"] == STEREO_OBS_IDS[21])
     # the observation blocks of both telescopes and runs, one scheduling block (the night)
     with HDF5EventSource(output, config=NAN_POINTING_OUT_OF_RANGE) as source:
-        assert sorted(source.obs_ids) == sorted([OBS_IDS[21], OBS_IDS[21] + 1, OBS_IDS[22]])
+        assert sorted(source.obs_ids) == sorted([OBS_IDS[21], OBS_IDS[21] + 1, OBS_IDS[22], STEREO_OBS_IDS[21], STEREO_OBS_IDS[21] + 1])
         assert list(source.scheduling_blocks) == [20260120]
