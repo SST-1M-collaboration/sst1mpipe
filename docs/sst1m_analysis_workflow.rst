@@ -8,29 +8,20 @@ SST-1M analysis workflow
 Automatic data processing
 -------------------------
 
-Raw data from both telescopes are processed automaticaly up to DL3 level 
-every morning after an observing night on **Calculus** with ``Daily analysis``
-pipeline:
+Raw data of both telescopes are processed up to DL3 with the SLURM scripts of
+``scripts/camk`` (see ``scripts/camk/README.md``), one night at a time:
 
-``/mnt/nfs22_auger/jurysek/sst1mpipe/sst1mpipe/scripts/daily_analysis.py``
+.. code-block:: console
 
-Products of automatic processing (all data levels up to DL3) can be found in:
+    DATE=20260120 bash scripts/camk/submit_data.bash
 
-``/data/work/analysis/Daily_analysis/daily_data/``
+The simulations (training of the models, DL2 and IRFs) are processed in the same way with
+``scripts/camk/submit_mc.bash``. Paths and settings are in ``scripts/camk/sst1mpipe.env``; each
+data level directory contains the configuration and log files of each processed run, so the
+processing and the version of ``sst1mpipe`` can be checked. The DL3 files are written per telescope
+(``cs1``, ``cs2``) and for the coincident events (``stereo``), with the index files of gammapy.
 
-Those are sorted by date, source observed, and the telescope used (``cs1``, ``cs2`` and ``stereo`` for coincident events).
-All data level directories also contain configuration file and log file for each processed run, so 
-user can easily check if the processing went OK and which version of ``sst1mpipe`` was used. Random Forest models used in authomatic analysis 
-can be found in
-
-``/data/work/analysis/MC/prod_january_2023/``
-
-for both mono and stereo regimes of observation, together with expected performances and sensitivity curves. IRFs used for DL3
-production can be found in
-
-``/data/work/analysis/IRFs/``
-
-DL3 products of the automatic processing can be further analyzed using standard tools 
+DL3 products can be further analyzed using standard tools 
 such as `gammapy <https://github.com/gammapy>`_, see :ref:`higher_level`.
 
 .. note::
