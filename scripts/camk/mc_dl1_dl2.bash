@@ -4,7 +4,7 @@
 #  DL1 -> DL2 of simulations   #
 ################################
 # Test files (point gammas, diffuse gammas, protons) of each zenith angle of MC_ZENITHS, with the
-# models of ${MC_DIRECTORY}/models, in three versions: dl2/ze<zenith>/<version>/
+# models of models/<MODELS_NAME>, in three versions: dl2/<MODELS_NAME>/ze<zenith>/<version>/
 # - stereo: both telescopes (stereo combination, and the events of one telescope)
 # - tel1, tel2: one telescope alone (its mono reconstruction)
 # Task 9 i + 3 j + k: zenith angle i, version j, file k.
@@ -29,8 +29,8 @@ TASK=${SLURM_ARRAY_TASK_ID:-0}
 ZENITH=${ZENITHS[TASK / 9]}
 VERSION=${VERSIONS[TASK % 9 / 3]}
 NAME=${NAMES[TASK % 3]}
-OUTPUT="${MC_DIRECTORY}/dl2/ze${ZENITH}/${VERSION}/${NAME}.dl2.h5"
+OUTPUT="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/${VERSION}/${NAME}.dl2.h5"
 mkdir -p "$(dirname "${OUTPUT}")"
-mapfile -t MODELS < <(models_args "${MC_DIRECTORY}/models")
+mapfile -t MODELS < <(models_args "${MC_DIRECTORY}/models/${MODELS_NAME}")
 sst1mpipe-apply-models -i "${MC_DIRECTORY}/merged/ze${ZENITH}/${NAME}.dl1.h5" "${MODELS[@]}" -o "${OUTPUT}" \
   --ApplyModels.telescopes="${TELESCOPES[${VERSION}]}" --overwrite --no-progress

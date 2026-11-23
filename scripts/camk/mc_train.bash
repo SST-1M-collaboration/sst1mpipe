@@ -3,8 +3,9 @@
 #####################################
 #  Training of the models (ctapipe) #
 #####################################
-# Task 0: energy regressor, 1: particle classifier, 2: disp reconstructor, in ${MC_DIRECTORY}/models,
-# with their plots (<model>_plots): the models of the NSB level, trained on all its zenith angles
+# Task 0: energy regressor, 1: particle classifier, 2: disp reconstructor, in models/<MODELS_NAME>/,
+# with their plots (<model>_plots): the models of the NSB level, trained on the zenith angles
+# MC_TRAIN_ZENITHS (training files: train_directory)
 # (feature cos_zenith).
 
 #SBATCH --job-name=mc-train
@@ -20,8 +21,8 @@
 
 source "${SST1MPIPE_ROOT:-${SLURM_SUBMIT_DIR:-.}}/scripts/camk/common.bash"
 
-MERGED="${MC_DIRECTORY}/merged"
-MODELS="${MC_DIRECTORY}/models"
+MERGED="$(train_directory)"
+MODELS="${MC_DIRECTORY}/models/${MODELS_NAME}"
 mkdir -p "${MODELS}"
 
 MODEL_NAMES=(energy_regressor particle_classifier disp_reconstructor)

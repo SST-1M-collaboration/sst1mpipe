@@ -36,6 +36,18 @@ models_args() {
   done
 }
 
+# directory of the training files of the models MODELS_NAME: merged/ze<zenith> for one zenith angle,
+# merged/train_<MODELS_NAME> for several (mc_merge.bash)
+train_directory() {
+  local zeniths
+  read -ra zeniths <<< "${MC_TRAIN_ZENITHS}"
+  if (( ${#zeniths[@]} == 1 )); then
+    echo "${MC_DIRECTORY}/merged/ze${zeniths[0]}"
+  else
+    echo "${MC_DIRECTORY}/merged/train_${MODELS_NAME}"
+  fi
+}
+
 # simtel files of a particle (MC_GAMMA_DIFFUSE, MC_GAMMA_POINT, MC_PROTON) at a zenith angle
 mc_pattern() {
   local -A patterns=([gamma_diffuse]="${MC_GAMMA_DIFFUSE}" [gamma_point]="${MC_GAMMA_POINT}" [proton]="${MC_PROTON}")

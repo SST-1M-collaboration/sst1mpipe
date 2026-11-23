@@ -4,7 +4,7 @@
 #  Comparison of the IRFs of the four modes   #
 ##############################################
 # For each zenith angle of MC_ZENITHS (task of the job array), the figures of sst1mpipe-plot-irfs with
-# one series per mode (tel1, tel2, stereo, strict_stereo), in irf/<IRF_CUTS>/comparison/ze<zenith>/.
+# one series per mode (tel1, tel2, stereo, strict_stereo), in irf/<MODELS_NAME>/<IRF_CUTS>/comparison/ze<zenith>/.
 
 #SBATCH --job-name=mc-irf-comparison
 #SBATCH --nodes=1
@@ -20,8 +20,8 @@ source "${SST1MPIPE_ROOT:-${SLURM_SUBMIT_DIR:-.}}/scripts/camk/common.bash"
 
 read -ra ZENITHS <<< "${MC_ZENITHS}"
 ZENITH=${ZENITHS[${SLURM_ARRAY_TASK_ID:-0}]}
-IRFS="${MC_DIRECTORY}/irf/${IRF_CUTS}"
-DL2="${MC_DIRECTORY}/dl2/ze${ZENITH}"
+IRFS="${MC_DIRECTORY}/irf/${MODELS_NAME}/${IRF_CUTS}"
+DL2="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}"
 sst1mpipe-plot-irfs \
   --irf "tel1=${IRFS}/tel1/ze${ZENITH}" --irf "tel2=${IRFS}/tel2/ze${ZENITH}" \
   --irf "stereo=${IRFS}/stereo/ze${ZENITH}" --irf "strict_stereo=${IRFS}/strict_stereo/ze${ZENITH}" \

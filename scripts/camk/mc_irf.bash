@@ -3,9 +3,9 @@
 #######################
 #  IRFs (ctapipe)     #
 #######################
-# For each zenith angle of MC_ZENITHS and each mode, in irf/<IRF_CUTS>/<mode>/ze<zenith>/:
-# - tel1, tel2: one telescope alone (DL2 dl2/ze<zenith>/tel1, tel2)
-# - stereo: the events of the two telescopes, stereo or not (DL2 dl2/ze<zenith>/stereo)
+# For each zenith angle of MC_ZENITHS and each mode, in irf/<MODELS_NAME>/<IRF_CUTS>/<mode>/ze<zenith>/:
+# - tel1, tel2: one telescope alone (DL2 dl2/<MODELS_NAME>/ze<zenith>/tel1, tel2)
+# - stereo: the events of the two telescopes, stereo or not (DL2 dl2/<MODELS_NAME>/ze<zenith>/stereo)
 # - strict_stereo: the stereo events only (both telescopes)
 # 1. ctapipe-optimize-event-selection: gammaness and direction cuts (point gammas, protons);
 #    IRF_CUTS=optimized (best sensitivity) or paper (fixed: 60 % gammaness, 80 % theta)
@@ -35,10 +35,10 @@ MODE=${MODES[TASK % 4]}
 
 CONFIGS=()
 case "${MODE}" in
-  tel1|tel2) DL2="${MC_DIRECTORY}/dl2/ze${ZENITH}/${MODE}" ;;
-  stereo) DL2="${MC_DIRECTORY}/dl2/ze${ZENITH}/stereo" ;;
+  tel1|tel2) DL2="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/${MODE}" ;;
+  stereo) DL2="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/stereo" ;;
   strict_stereo)
-    DL2="${MC_DIRECTORY}/dl2/ze${ZENITH}/stereo"
+    DL2="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/stereo"
     CONFIGS+=(--config "${CONFIG_DIRECTORY}/sst1mpipe_irf_strict_stereo.yaml") ;;
 esac
 case "${IRF_CUTS}" in
@@ -46,7 +46,7 @@ case "${IRF_CUTS}" in
   paper) CUT_CONFIGS=(--config "${CONFIG_DIRECTORY}/sst1mpipe_irf_paper_cuts.yaml") ;;
   *) echo "IRF_CUTS: optimized or paper, not ${IRF_CUTS}" >&2; exit 1 ;;
 esac
-IRF="${MC_DIRECTORY}/irf/${IRF_CUTS}/${MODE}/ze${ZENITH}"
+IRF="${MC_DIRECTORY}/irf/${MODELS_NAME}/${IRF_CUTS}/${MODE}/ze${ZENITH}"
 TOOL="${SST1MPIPE_ROOT}/scripts/camk/run_irf_tool.py"
 export IRF_BACKGROUND
 mkdir -p "${IRF}"
