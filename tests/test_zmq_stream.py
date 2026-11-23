@@ -515,7 +515,7 @@ def camera_run_header(tel_id, run_number, date_mjd=0, run_id=0):
 
 
 @pytest.mark.parametrize("run_number, date_mjd, run_id, expected", [
-    (206, 61061, 0, 202601210206),  # MJD 61061: 2026-01-21
+    (206, 61061, 0, 2026012110206),  # MJD 61061: 2026-01-21
     (206, 0, 0, 206),
     (206, 61061, 123456, 123456),
 ])
@@ -536,11 +536,11 @@ def test_camera_event_stream_run_header():
 
     events = list(source)
     # as for the zfits file SST1M1_20260121_0206
-    assert {event.index.obs_id for event in events} == {202601210206}
+    assert {event.index.obs_id for event in events} == {2026012110206}
     assert source.run_headers[ZFITS_TEL_ID].runNumber == 206
-    assert list(source.observation_blocks) == [202601210206]
-    assert source.scheduling_blocks[202601210206].sb_type == SchedulingBlockType.OBSERVATION
-    assert source.scheduling_blocks[202601210206].producer_id == "SST1M-21"
+    assert list(source.observation_blocks) == [2026012110206]
+    assert source.scheduling_blocks[20260121].sb_type == SchedulingBlockType.OBSERVATION
+    assert source.scheduling_blocks[20260121].producer_id == "SST1M-21"
     source.close()
 
 
@@ -556,5 +556,5 @@ def test_data_stream_obs_id_before_run_header():
 
     events = list(source)
     assert {event.index.obs_id for event in events} == {OBS_ID}
-    assert set(source.observation_blocks) == {202601210206, OBS_ID}
+    assert set(source.observation_blocks) == {2026012110206, OBS_ID}
     source.close()

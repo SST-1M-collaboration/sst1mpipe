@@ -19,7 +19,7 @@ from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, TEST_DATA_DIR
 from sst1mpipe.scripts.sst1mpipe_stereo_tool import StereoTool
 from sst1mpipe.utils import get_trigger_time_ns
 
-OBS_IDS = {21: 202601201179, 22: 202601201102}
+OBS_IDS = {21: 2026012011179, 22: 2026012021102}
 # the monitoring file of tel 21 has the pointing of its first events only (observation_monitoring):
 # the pointing of its later events is NaN when the files are read
 NAN_POINTING_OUT_OF_RANGE = Config({"PointingInterpolator": {"bounds_error": False}})
@@ -196,3 +196,42 @@ def test_configuration_errors(dl1_files, tmp_path):
     shutil.copy(dl1_files[22], copy)
     with pytest.raises(ToolConfigurationError, match="same obs_id and event_id"):
         run_stereo([*dl1_files.values(), copy], tmp_path / "duplicated.dl1.h5", "--keep-mono")
+
+
+def test_merged_runs_then_stereo(dl1_files, tmp_path):
+    """
+    The DL1 files of several runs of a telescope of the same night are merged (ctapipe-merge, as the
+    camk scripts), then combined with the other telescope: obs_id per run and telescope, sb_id the night
+    """
+    from ctapipe.tools.merge import MergeTool
+
+    # a second run of tel 21 of the same night (copy of the raw file with another run number), its
+    # first events only: no coincident events
+    raw = tmp_path / OBSERVATION_RUNS[21]["path"].name.replace("_1179", "_1180")
+    raw.symlink_to(OBSERVATION_RUNS[21]["path"])
+    second_run = tmp_path / "tel_21_run_1180.dl1.h5"
+    run_process(raw, second_run, "--max-events=100")
+    # the first run processed as the second one (without monitoring data: same tables)
+    first_run = tmp_path / "tel_21_run_1179.dl1.h5"
+    run_process(OBSERVATION_RUNS[21]["path"], first_run, f"--max-events={EVENTS_TEL_1.stop}")
+
+    merged = tmp_path / "tel_21_night.dl1.h5"
+    run_tool(MergeTool(), argv=[str(first_run), str(second_run), f"--output={merged}"],
+             raises=True)
+    observation_blocks = read_table(merged, "/configuration/observation/observation_block")
+    assert sorted(observation_blocks["obs_id"]) == [OBS_IDS[21], OBS_IDS[21] + 1]
+    assert set(observation_blocks["sb_id"]) == {20260120}
+    with HDF5EventSource(merged, config=NAN_POINTING_OUT_OF_RANGE) as source:
+        assert sorted(source.obs_ids) == [OBS_IDS[21], OBS_IDS[21] + 1]
+        assert list(source.scheduling_blocks) == [20260120]
+
+    output = tmp_path / "stereo.dl1.h5"
+    tool = run_stereo([merged, dl1_files[22]], output)
+    assert tool.counts["stereo"] == len(COINCIDENT_EVENTS)
+    trigger = read_table(output, "/dl1/event/subarray/trigger")
+    assert trigger["event_id"].tolist() == sorted(COINCIDENT_EVENTS)
+    assert np.all(trigger["obs_id"] == OBS_IDS[21])
+    # the observation blocks of both telescopes and runs, one scheduling block (the night)
+    with HDF5EventSource(output, config=NAN_POINTING_OUT_OF_RANGE) as source:
+        assert sorted(source.obs_ids) == sorted([OBS_IDS[21], OBS_IDS[21] + 1, OBS_IDS[22]])
+        assert list(source.scheduling_blocks) == [20260120]

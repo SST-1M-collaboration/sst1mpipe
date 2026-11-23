@@ -90,7 +90,7 @@ def read_dark_run_events(file_list, max_events=None):
     n_events = 0
     for path in file_list:
         source = SST1MEventSource(input_url=path)
-        sb_type = source.scheduling_blocks[source.run_id].sb_type
+        sb_type = source.scheduling_blocks[source.sb_id].sb_type
         if sb_type != SchedulingBlockType.CALIBRATION:
             print(f"Warning : {path} is not a dark run (target {source.target!r},"
                   f" scheduling block {sb_type.name}), file skipped")

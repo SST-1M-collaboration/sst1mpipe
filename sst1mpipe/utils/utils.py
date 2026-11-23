@@ -1249,8 +1249,8 @@ def get_survived_ped_fraction(dl1_files, tel=None):
         times.append(events['local_time'][0])
         ped_fractions.append(ped_fraction)
         wobble.append(get_dl1_info(file)['wobble'][0])
-        # obs_id: date and run number, e.g. 202601201179
-        runs.append(int(str(events['obs_id'][0])[8:]))
+        # obs_id: date, telescope and run number, e.g. 2026012011179 (run: the last four digits)
+        runs.append(int(events['obs_id'][0]) % 10_000)
         filenames.append(file)
 
     zenith_angles = np.array(zenith_angles)

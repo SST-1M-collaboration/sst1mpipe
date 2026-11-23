@@ -24,13 +24,13 @@ N_TRIGGER_PATCHES = 432
 # and pedestal events (internal trigger), with SWAT array event ids
 FILES = {
     21: dict(
-        path=TRANSITION_FILES[21], obs_id=202601210206,
+        path=TRANSITION_FILES[21], obs_id=2026012110206,
         n_showers=84, n_pedestals=46, first_event_id=33759138, last_event_id=33759393,
         start="2026-01-21T18:49:45.441", stop="2026-01-21T18:49:45.894",
         date="2026-01-21T18:49:10", date_end="2026-01-21T18:49:10",
     ),
     22: dict(
-        path=TRANSITION_FILES[22], obs_id=202601210585,
+        path=TRANSITION_FILES[22], obs_id=2026012120585,
         n_showers=179, n_pedestals=67, first_event_id=43710705, last_event_id=43711231,
         start="2026-01-21T23:26:37.633", stop="2026-01-21T23:26:38.303",
         date="2026-01-21T23:26:02", date_end="2026-01-21T23:26:03",
@@ -178,18 +178,19 @@ def test_blocks_of_transition_run(zfits_file):
     """runs during the transition between two wobbles: scheduling block of UNKNOWN type"""
     obs_id = zfits_file["obs_id"]
     with SST1MEventSource(zfits_file["path"], max_events=1) as source:
-        scheduling_block = source.scheduling_blocks[obs_id]
+        scheduling_block = source.scheduling_blocks[obs_id // 100_000]
         observation_block = source.observation_blocks[obs_id]
 
     producer_id = f"SST1M-{zfits_file['tel_id']}"
-    assert scheduling_block.sb_id == obs_id
+    # sb_id: the night, obs_id: night, telescope and run
+    assert scheduling_block.sb_id == obs_id // 100_000 == 20260121
     assert scheduling_block.sb_type == SchedulingBlockType.UNKNOWN
     assert scheduling_block.producer_id == producer_id
     assert scheduling_block.observing_mode == ObservingMode.UNKNOWN
     assert scheduling_block.pointing_mode == PointingMode.UNKNOWN
 
     assert observation_block.obs_id == obs_id
-    assert observation_block.sb_id == obs_id
+    assert observation_block.sb_id == 20260121
     assert observation_block.producer_id == producer_id
     assert observation_block.target == "Transition"
     assert observation_block.wobble == "NONE"
@@ -205,7 +206,7 @@ def test_pointing_given_by_the_user():
     path = TRANSITION_FILES[21]
     with SST1MEventSource(path, max_events=1, pointing_ra=83.63, pointing_dec=22.01) as source:
         assert source.pointing_manual
-        scheduling_block = source.scheduling_blocks[FILES[21]["obs_id"]]
+        scheduling_block = source.scheduling_blocks[source.sb_id]
         observation_block = source.observation_blocks[FILES[21]["obs_id"]]
 
     assert scheduling_block.pointing_mode == PointingMode.TRACK
@@ -226,7 +227,7 @@ def test_blocks_written_in_the_output(zfits_file, tmp_path):
 
     scheduling_blocks = read_table(output, "/configuration/observation/scheduling_block")
     observation_blocks = read_table(output, "/configuration/observation/observation_block")
-    assert list(scheduling_blocks["sb_id"]) == [zfits_file["obs_id"]]
+    assert list(scheduling_blocks["sb_id"]) == [20260121]
     assert list(scheduling_blocks["sb_type"]) == [SchedulingBlockType.UNKNOWN.value]
     assert list(observation_blocks["obs_id"]) == [zfits_file["obs_id"]]
     assert list(observation_blocks["target"]) == ["Transition"]
@@ -273,7 +274,7 @@ def test_dark_run_events(capsys):
     events = list(read_dark_run_events([TRANSITION_FILES[21], DARK_FILE], max_events=20))
 
     assert len(events) == 20
-    assert {event.index.obs_id for event in events} == {202601190007}
+    assert {event.index.obs_id for event in events} == {2026011920007}
     assert {event.trigger.event_type for event in events} == {EventType.DARK_PEDESTAL}
     assert "is not a dark run" in capsys.readouterr().out
 

@@ -193,6 +193,17 @@ file (``attach_monitoring_file``). The DL1 file is then self-contained: e.g. ``l
 from it. The wobble of the run is added to the name of the output file (``_W1``,
 ``--ProcessorTool.wobble_in_output_name``).
 
+The events of a raw file ``SST1M<n>_<date>_<run>.fits.fz`` have the ids of its observation and
+scheduling blocks (``/configuration/observation``), from the name of the file:
+
+* ``obs_id = <date><n><run:04d>``: one observation block per run and telescope, unique over the nights
+  and the telescopes, e.g. ``SST1M2_20240110_0012.fits.fz``: ``2024011020012``. The runs of a night
+  can be merged (``ctapipe-merge``) before the stereo combination; a stereo event has the ``obs_id``
+  of the event of the reference telescope.
+* ``sb_id = <date>``: one scheduling block per night (``20240110``), shared by the telescopes. Its
+  type (observation, calibration, transition) and observing mode are those of the run: in a file
+  of several runs, those of one of them.
+
 Other settings of the processing:
 
 * ``--ProcessorTool.allowed_sb_types``: the runs processed, by type of scheduling block
