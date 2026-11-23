@@ -8,6 +8,7 @@
 # - stereo: both telescopes (stereo combination, and the events of one telescope)
 # - tel1, tel2: one telescope alone (its mono reconstruction)
 # Task 9 i + 3 j + k: zenith angle i, version j, file k.
+# The random forests use the CPUs of the task (--n-jobs): MC_DL2_CPUS (submit_mc.bash, default 16).
 
 #SBATCH --job-name=mc-dl1-dl2
 #SBATCH --nodes=1
@@ -15,7 +16,8 @@
 #SBATCH --time=0-08:00:00
 #SBATCH --qos=long
 #SBATCH --partition=pctacamk
-#SBATCH --mem-per-cpu=8GB
+#SBATCH --cpus-per-task=16
+#SBATCH --mem-per-cpu=3G
 #SBATCH --output=/home/%u/logs/%x-%A_%a.out
 #SBATCH --error=/home/%u/logs/%x-%A_%a.err
 
@@ -33,4 +35,4 @@ OUTPUT="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/${VERSION}/${NAME}.dl2.h5
 mkdir -p "$(dirname "${OUTPUT}")"
 mapfile -t MODELS < <(models_args "${MC_DIRECTORY}/models/${MODELS_NAME}")
 sst1mpipe-apply-models -i "${MC_DIRECTORY}/merged/ze${ZENITH}/${NAME}.dl1.h5" "${MODELS[@]}" -o "${OUTPUT}" \
-  --ApplyModels.telescopes="${TELESCOPES[${VERSION}]}" --overwrite --no-progress
+  --ApplyModels.telescopes="${TELESCOPES[${VERSION}]}" --n-jobs "${SLURM_CPUS_PER_TASK:-1}" --overwrite --no-progress

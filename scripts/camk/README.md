@@ -13,7 +13,7 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL3
 | `mc_r0_dl1.bash` | `sst1mpipe-process`, `MC_FILES_PER_TASK` simtel files per array task, per particle and zenith angle (`MC_ZENITHS`) |
 | `mc_merge.bash` | `ctapipe-merge`: training (`MC_TRAIN_FRACTION`) and test files of each zenith angle in `merged/ze<z>/`; with several training zenith angles (`MC_TRAIN_ZENITHS`), their training files in `merged/train_<MODELS_NAME>/` |
 | `mc_train.bash` | `sst1mpipe-train-*`: energy, particle classifier, disp in `models/<MODELS_NAME>/` (the NSB level, feature `cos_zenith`), with plots |
-| `mc_dl1_dl2.bash` | `sst1mpipe-apply-models` on the test files of each zenith angle: `dl2/<MODELS_NAME>/ze<z>/stereo` (both telescopes), `tel1`, `tel2` (one telescope alone) |
+| `mc_dl1_dl2.bash` | `sst1mpipe-apply-models` on the test files of each zenith angle: `dl2/<MODELS_NAME>/ze<z>/stereo` (both telescopes), `tel1`, `tel2` (one telescope alone); the random forests use the `MC_DL2_CPUS` CPUs of each task (default 16, `--n-jobs`) |
 | `mc_irf.bash` | `ctapipe-optimize-event-selection`, `ctapipe-compute-irf`: point-like and full enclosure IRFs per zenith angle and mode (`tel1`, `tel2`, `stereo`, `strict_stereo`), in `irf/<MODELS_NAME>/<IRF_CUTS>/<mode>/ze<z>/`, with their figures (`plots/`, `sst1mpipe-plot-irfs`) |
 | `mc_irf_comparison.bash` | figures of the four modes together, in `irf/<MODELS_NAME>/<IRF_CUTS>/comparison/ze<z>/` |
 

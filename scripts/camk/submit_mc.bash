@@ -74,7 +74,8 @@ if run train; then
 fi
 if run dl2; then
   # 3 versions (stereo, tel1, tel2) x 3 files per zenith angle
-  DL2=$(submit "${DEPENDENCY}" --array="0-$((9 * N_ZENITHS - 1))" "${SCRIPTS}/mc_dl1_dl2.bash")
+  DL2=$(submit "${DEPENDENCY}" --array="0-$((9 * N_ZENITHS - 1))" --cpus-per-task="${MC_DL2_CPUS}" \
+    --mem-per-cpu="${MC_DL2_MEM_PER_CPU}" "${SCRIPTS}/mc_dl1_dl2.bash")
   DEPENDENCY="afterok:${DL2}"
   echo "DL2: job ${DL2}"
 fi
