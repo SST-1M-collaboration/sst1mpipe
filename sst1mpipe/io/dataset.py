@@ -15,7 +15,7 @@ of the data (``host``, ``root``)::
     # - {root: /net}
     # ...
     obs_id tel_id file
-    240110210012 21 cs1/data/raw/2024/01/10/SST1M1_20240110_0012.fits.fz
+    20240110210012 21 cs1/data/raw/2024/01/10/SST1M1_20240110_0012.fits.fz
 
 In bash::
 

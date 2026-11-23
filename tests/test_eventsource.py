@@ -41,7 +41,7 @@ MAX_ITERATIONS = 5
 
 DARK_TEL_ID = 22
 OTHER_TEL_ID = 21
-DARK_OBS_ID = 260119220007
+DARK_OBS_ID = 20260119220007
 # scheduling block of the dark run: the night
 DARK_SB_ID = 20260119
 DARK_FIRST_EVENT_ID = 28810122
@@ -240,16 +240,16 @@ def test_file_start_and_duration():
 
 
 def test_observation_ids():
-    """sb_id: the night YYYYMMDD; obs_id: YYMMDD, telescope (two digits, 00 for stereo) and run (four digits)"""
+    """sb_id: the night YYYYMMDD; obs_id: YYYYMMDD, telescope (two digits, 00 for stereo) and run (four digits)"""
     from sst1mpipe.io.sst1m_event_source import observation_ids
 
     from sst1mpipe.io.sst1m_event_source import obs_id_date, stereo_obs_id
 
-    assert observation_ids("20240110", 22, 12) == (20240110, 240110220012)
+    assert observation_ids("20240110", 22, 12) == (20240110, 20240110220012)
     assert observation_ids("20240110", 21, 12) != observation_ids("20240110", 22, 12)
-    assert observation_ids("20240110", 1, 9999) == (20240110, 240110019999)
-    assert stereo_obs_id(240110210012) == stereo_obs_id(240110220012) == 240110000012
-    assert obs_id_date(240110220012) == obs_id_date(240110000012) == 20240110
+    assert observation_ids("20240110", 1, 9999) == (20240110, 20240110019999)
+    assert stereo_obs_id(20240110210012) == stereo_obs_id(20240110220012) == 20240110000012
+    assert obs_id_date(20240110220012) == obs_id_date(20240110000012) == 20240110
     with pytest.raises(ValueError, match="four for the run"):
         observation_ids("20240110", 21, 10000)
     with pytest.raises(ValueError, match="two digits for the telescope"):

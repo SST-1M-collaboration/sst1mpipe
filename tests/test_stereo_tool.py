@@ -19,9 +19,9 @@ from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, TEST_DATA_DIR
 from sst1mpipe.scripts.sst1mpipe_stereo_tool import StereoTool
 from sst1mpipe.utils import get_trigger_time_ns
 
-OBS_IDS = {21: 260120211179, 22: 260120221102}
+OBS_IDS = {21: 20260120211179, 22: 20260120221102}
 # obs_id of the stereo events, by reference telescope: its run with the telescope id 00
-STEREO_OBS_IDS = {21: 260120001179, 22: 260120001102}
+STEREO_OBS_IDS = {21: 20260120001179, 22: 20260120001102}
 # the monitoring file of tel 21 has the pointing of its first events only (observation_monitoring):
 # the pointing of its later events is NaN when the files are read
 NAN_POINTING_OUT_OF_RANGE = Config({"PointingInterpolator": {"bounds_error": False}})

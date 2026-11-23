@@ -299,7 +299,7 @@ class StereoEventCombiner(Component):
     def combine_index(self, stereo, events):
         """
         Index of the stereo event (``stereo.index``): event_id of the event of the reference telescope, obs_id
-        of its run with the telescope id 00 (``YYMMDD00<run>``, see `sst1mpipe.io.sst1m_event_source.stereo_obs_id`).
+        of its run with the telescope id 00 (``YYYYMMDD00<run>``, see `sst1mpipe.io.sst1m_event_source.stereo_obs_id`).
 
         All the ``combine_<part>`` methods have the same parameters, and fill their part of
         ``stereo`` in place.

@@ -47,7 +47,7 @@ Datasets
 --------
 
 The runs of an analysis are listed in a dataset, a text file (ECSV) with one line per run and
-telescope: ``obs_id`` (``YYMMDD<tel_id:02d><run:04d>``), ``tel_id`` and the raw file relative to the root
+telescope: ``obs_id`` (``YYYYMMDD<tel_id:02d><run:04d>``), ``tel_id`` and the raw file relative to the root
 of the data, with the computer and the root of the data in the header (``host``, ``root``). With the
 configurations used (e.g. in a zip), it archives an analysis and makes it reproducible.
 

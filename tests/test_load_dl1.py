@@ -54,7 +54,7 @@ def test_observation_parameters(observation_dl1):
     )
     assert np.all(data["equivalent_focal_length"] == SubarrayDescription.from_hdf(observation_dl1).tel[TEL_ID].optics.equivalent_focal_length.to_value(u.m))
 
-    # unix time of the triggers, date of the run (obs_id 260120211179)
+    # unix time of the triggers, date of the run (obs_id 20260120211179)
     trigger_time = read_trigger_time(observation_dl1, TEL)
     np.testing.assert_array_equal(data["local_time"], trigger_time["trigger_time"].unix)
     assert set(data["date"]) == {20260120}

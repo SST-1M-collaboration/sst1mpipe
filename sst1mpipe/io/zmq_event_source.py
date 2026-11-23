@@ -81,8 +81,8 @@ def run_header_ids(run_header):
     """
     ``(sb_id, obs_id)`` of a DigiCam run header (``DataModel.CameraRunHeader``): its ``run_id`` as
     both if set, otherwise as for the files (`sst1mpipe.io.sst1m_event_source.observation_ids`):
-    ``sb_id = YYYYMMDD``, ``obs_id = YYMMDD<tel_id:02d><run:04d>`` with the date of ``dateMJD`` (e.g.
-    20260121, 260121210206), or the run number as both without date.
+    ``sb_id = YYYYMMDD``, ``obs_id = YYYYMMDD<tel_id:02d><run:04d>`` with the date of ``dateMJD`` (e.g.
+    20260121, 20260121210206), or the run number as both without date.
     """
     if run_header.run_id:
         return int(run_header.run_id), int(run_header.run_id)

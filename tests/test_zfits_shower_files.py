@@ -24,13 +24,13 @@ N_TRIGGER_PATCHES = 432
 # and pedestal events (internal trigger), with SWAT array event ids
 FILES = {
     21: dict(
-        path=TRANSITION_FILES[21], obs_id=260121210206,
+        path=TRANSITION_FILES[21], obs_id=20260121210206,
         n_showers=84, n_pedestals=46, first_event_id=33759138, last_event_id=33759393,
         start="2026-01-21T18:49:45.441", stop="2026-01-21T18:49:45.894",
         date="2026-01-21T18:49:10", date_end="2026-01-21T18:49:10",
     ),
     22: dict(
-        path=TRANSITION_FILES[22], obs_id=260121220585,
+        path=TRANSITION_FILES[22], obs_id=20260121220585,
         n_showers=179, n_pedestals=67, first_event_id=43710705, last_event_id=43711231,
         start="2026-01-21T23:26:37.633", stop="2026-01-21T23:26:38.303",
         date="2026-01-21T23:26:02", date_end="2026-01-21T23:26:03",
@@ -178,12 +178,12 @@ def test_blocks_of_transition_run(zfits_file):
     """runs during the transition between two wobbles: scheduling block of UNKNOWN type"""
     obs_id = zfits_file["obs_id"]
     with SST1MEventSource(zfits_file["path"], max_events=1) as source:
-        scheduling_block = source.scheduling_blocks[20_000_000 + obs_id // 1_000_000]
+        scheduling_block = source.scheduling_blocks[obs_id // 1_000_000]
         observation_block = source.observation_blocks[obs_id]
 
     producer_id = f"SST1M-{zfits_file['tel_id']}"
     # sb_id: the night, obs_id: night, telescope and run
-    assert scheduling_block.sb_id == 20_000_000 + obs_id // 1_000_000 == 20260121
+    assert scheduling_block.sb_id == obs_id // 1_000_000 == 20260121
     assert scheduling_block.sb_type == SchedulingBlockType.UNKNOWN
     assert scheduling_block.producer_id == producer_id
     assert scheduling_block.observing_mode == ObservingMode.UNKNOWN
@@ -274,7 +274,7 @@ def test_dark_run_events(capsys):
     events = list(read_dark_run_events([TRANSITION_FILES[21], DARK_FILE], max_events=20))
 
     assert len(events) == 20
-    assert {event.index.obs_id for event in events} == {260119220007}
+    assert {event.index.obs_id for event in events} == {20260119220007}
     assert {event.trigger.event_type for event in events} == {EventType.DARK_PEDESTAL}
     assert "is not a dark run" in capsys.readouterr().out
 

@@ -1244,7 +1244,7 @@ def get_survived_ped_fraction(dl1_files, tel=None):
         times.append(events['local_time'][0])
         ped_fractions.append(ped_fraction)
         wobble.append(get_dl1_info(file)['wobble'][0])
-        # obs_id: YYMMDD, telescope and run number, e.g. 260120211179 (run: the last four digits)
+        # obs_id: YYYYMMDD, telescope and run number, e.g. 20260120211179 (run: the last four digits)
         runs.append(int(events['obs_id'][0]) % 10_000)
         filenames.append(file)
 

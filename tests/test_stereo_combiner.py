@@ -236,8 +236,8 @@ def mono_event(tel_id, time, obs_id, event_id, intensity):
 def events():
     time = Time("2026-01-20T22:00:00", scale="tai")
     return {
-        21: mono_event(21, time + 32 * u.ns, 260120211179, 25085157, 766.5),
-        22: mono_event(22, time, 260120221102, 25085157, 900.5),
+        21: mono_event(21, time + 32 * u.ns, 20260120211179, 25085157, 766.5),
+        22: mono_event(22, time, 20260120221102, 25085157, 900.5),
     }
 
 
@@ -246,7 +246,7 @@ def test_combine(events):
     assert isinstance(stereo, SST1MArrayEventContainer)
     # ids of the reference telescope, time of the earliest telescope, SUBARRAY event
     # obs_id of the run of the reference telescope, with the telescope id 00
-    assert (stereo.index.obs_id, stereo.index.event_id) == (260120001179, 25085157)
+    assert (stereo.index.obs_id, stereo.index.event_id) == (20260120001179, 25085157)
     assert stereo.trigger.time == events[22].trigger.time
     assert stereo.trigger.event_type == EventType.SUBARRAY
     assert stereo.trigger.tels_with_trigger.tolist() == [21, 22]
@@ -291,7 +291,7 @@ def test_combination_overridden_in_child_class(events):
             stereo.index = events[min(events)].index
 
     stereo = LowestTelescopeIds(reference_tel_id=22).combine(events)
-    assert stereo.index.obs_id == 260120211179
+    assert stereo.index.obs_id == 20260120211179
     assert stereo.trigger.tels_with_trigger.tolist() == [21, 22]
 
 

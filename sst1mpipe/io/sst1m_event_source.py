@@ -169,29 +169,29 @@ def observation_ids(date, tel_id, run):
     ``(sb_id, obs_id)`` of a run (raw file) of a telescope:
 
     - ``sb_id = YYYYMMDD``: one scheduling block per night, shared by the telescopes
-    - ``obs_id = YYMMDD<tel_id:02d><run:04d>``: one observation block per run and telescope, unique over
-      the nights and the telescopes; the stereo events have the telescope id 00 (`stereo_obs_id`)
+    - ``obs_id = YYYYMMDD<tel_id:02d><run:04d>``: one observation block per run and telescope, unique
+      over the nights and the telescopes; the stereo events have the telescope id 00 (`stereo_obs_id`)
 
-    e.g. ``observation_ids("20240110", 22, 12)`` -> ``(20240110, 240110220012)``
+    e.g. ``observation_ids("20240110", 22, 12)`` -> ``(20240110, 20240110220012)``
     """
     date, tel_id, run = f"{int(date):08d}", int(tel_id), int(run)
     if not 0 <= tel_id <= 99 or not 0 <= run <= 9999:
         raise ValueError(f"telescope {tel_id} / run {run}: two digits for the telescope, four for the run")
-    return int(date), int(f"{date[2:]}{tel_id:02d}{run:04d}")
+    return int(date), int(f"{date}{tel_id:02d}{run:04d}")
 
 
 def stereo_obs_id(obs_id):
     """
     obs_id of the stereo events of a run of a telescope (`observation_ids`): the telescope id replaced
-    by 00, ``YYMMDD00<run:04d>``, e.g. ``240110210012`` -> ``240110000012``
+    by 00, ``YYYYMMDD00<run:04d>``, e.g. ``20240110210012`` -> ``20240110000012``
     """
     obs_id = int(obs_id)
     return obs_id // 1_000_000 * 1_000_000 + obs_id % 10_000
 
 
 def obs_id_date(obs_id):
-    """Night ``YYYYMMDD`` of an obs_id of `observation_ids` (years 2000-2099)"""
-    return 20_000_000 + int(obs_id) // 1_000_000
+    """Night ``YYYYMMDD`` of an obs_id of `observation_ids`"""
+    return int(obs_id) // 1_000_000
 
 
 def tel_id_from_file_name(file_name):
