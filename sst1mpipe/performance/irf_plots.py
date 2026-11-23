@@ -289,11 +289,13 @@ def plot_irfs(inputs, directory, title="", references=None):
 
 def plot_gamma_hadron_separation(inputs, directory, prefix="RandomForestClassifier", title=""):
     """
-    Gammaness of the gammas and protons, and ROC curve, one series per input: ``inputs``
+    Gammaness of the gammas and protons, and ROC curve (gamma: the positive class; true positive rate:
+    gammas classified as gammas, false positive rate: protons classified as gammas) with its area
+    (AUC), one series per input: ``inputs``
     {label: (gamma DL2 file, proton DL2 file)}
     """
     from ctapipe.io import read_table
-    from sklearn.metrics import roc_curve
+    from sklearn.metrics import roc_auc_score, roc_curve
 
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -320,12 +322,15 @@ def plot_gamma_hadron_separation(inputs, directory, prefix="RandomForestClassifi
 
     fig, ax = figure()
     for (label, (gammas, protons)), color in zip(gammaness.items(), COLORS, strict=False):
+        # gamma: the positive class
         truth = np.concatenate([np.ones(len(gammas)), np.zeros(len(protons))])
-        false_positive, true_positive, _ = roc_curve(truth, np.concatenate([gammas, protons]))
-        ax.plot(false_positive, true_positive, color=color, label=label)
+        scores = np.concatenate([gammas, protons])
+        false_positive, true_positive, _ = roc_curve(truth, scores)
+        ax.plot(false_positive, true_positive, color=color, label=f"{label} (AUC {roc_auc_score(truth, scores):.3f})")
     ax.plot([0, 1], [0, 1], color=MUTED, lw=1, ls="--")
-    ax.set(xlim=IRF_LIMITS["fraction"], ylim=IRF_LIMITS["fraction"], xlabel="proton efficiency",
-           ylabel="gamma efficiency")
+    ax.set(xlim=IRF_LIMITS["fraction"], ylim=IRF_LIMITS["fraction"],
+           xlabel="false positive rate (protons classified as gammas)",
+           ylabel="true positive rate (gammas classified as gammas)")
     ax.legend(frameon=False, fontsize=8)
     paths.append(save(fig, directory / "roc.png", f"ROC curve{suffix}"))
     return paths
