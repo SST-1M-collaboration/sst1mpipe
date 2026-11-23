@@ -17,6 +17,7 @@ from ctapipe.containers import (
 from ctapipe.core import run_tool
 from ctapipe.io import read_table
 from ctapipe.reco.preprocessing import telescope_to_horizontal
+from ctapipe.reco import Reconstructor
 from ctapipe.reco.reconstructor import ReconstructionProperty
 from ctapipe.reco.stereo_combination import StereoCombiner, StereoMeanCombiner
 
@@ -28,7 +29,13 @@ from sst1mpipe.scripts.sst1mpipe_train_models_tool import (
     TrainEnergyRegressor,
     TrainParticleClassifier,
 )
-from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, TEST_DATA_DIR, TRAIN_CONFIG_FILES
+from sst1mpipe.resources import (
+    DATA_CONFIG_FILE,
+    MC_CONFIG_FILES,
+    STEREO_TRAIN_CONFIG_FILES,
+    TEST_DATA_DIR,
+    TRAIN_CONFIG_FILES,
+)
 
 SIMTEL_DIR = TEST_DATA_DIR / "simtel"
 GAMMA_DIFFUSE = SIMTEL_DIR / "gamma_200_800E3GeV_20_20deg_ATM52_102168.corsika.gz.NSBmed4.simtel.gz"
@@ -299,3 +306,35 @@ def test_apply_models_one_telescope(models, dl1_files, tmp_path):
                                events["RandomForestRegressor_tel_energy"][valid], rtol=1e-6)
     assert np.all(np.asarray(stereo["RandomForestRegressor_telescopes"])[:, 1] == 0)
 
+
+
+def test_stereo_models(dl1_files, tmp_path):
+    """
+    stereo models: the stereo parameters of the HillasReconstructor (impact distance, h_max) as features,
+    trained on the events reconstructed by both telescopes; predictions only for these events
+    """
+    directory = tmp_path / "stereo"
+    directory.mkdir()
+    for name, tool, inputs in (
+        ("energy_regressor", TrainEnergyRegressor(), ["-i", dl1_files["gamma"]]),
+        ("particle_classifier", TrainParticleClassifier(),
+         ["--signal", dl1_files["gamma"], "--background", dl1_files["proton"]]),
+        ("disp_reconstructor", TrainDispReconstructor(), ["-i", dl1_files["gamma"]]),
+    ):
+        argv = [*map(str, inputs), "-o", str(directory / f"{name}.pkl"),
+                f"--config={STEREO_TRAIN_CONFIG_FILES[name]}", "--CrossValidator.n_cross_validations=2"]
+        assert run_tool(tool, argv=argv, raises=True) == 0
+        model = Reconstructor.read(directory / f"{name}.pkl")
+        assert {"HillasReconstructor_tel_impact_distance", "HillasReconstructor_h_max"} <= set(model.features)
+
+    output = tmp_path / "gamma_point.dl2.h5"
+    reconstructors = [arg for path in sorted(directory.glob("*.pkl")) for arg in ("-r", str(path))]
+    argv = ["-i", str(dl1_files["gamma_point"]), *reconstructors, "-o", str(output), "--no-progress"]
+    assert run_tool(ApplyModels(), argv=argv, raises=True) == 0
+    energy = read_table(output, "/dl2/event/subarray/energy/RandomForestRegressor")
+    geometry = read_table(output, "/dl2/event/subarray/geometry/HillasReconstructor")
+    events = join(energy, geometry, keys=["obs_id", "event_id"])
+    valid = np.asarray(events["RandomForestRegressor_is_valid"], dtype=bool)
+    assert np.any(valid)
+    # only the events with the stereo parameters
+    assert np.all(np.isfinite(events["HillasReconstructor_h_max"][valid]))

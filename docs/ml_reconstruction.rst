@@ -55,9 +55,18 @@ DL2):
 
 ctapipe trains one model per telescope type: the two SST-1M telescopes are two types in the subarray
 (same name ``SST_1M_DigiCam``), so one model per telescope.
-The models are stereo models if the stereo features are in the configuration
-(``HillasReconstructor_tel_impact_distance``, ``HillasReconstructor_h_max``, commented out in the
-configurations).
+Two sets of models, as in the SST-1M Crab paper:
+
+- **mono models** (``sst1mpipe_train_<model>.yaml``): the image parameters only, for the analysis of
+  one telescope;
+- **stereo models** (``sst1mpipe_train_<model>_stereo.yaml``, ``sst1mpipe.resources.STEREO_TRAIN_CONFIG_FILES``):
+  in addition the stereo parameters of the HillasReconstructor, ``HillasReconstructor_tel_impact_distance``
+  (impact distance of the telescope) and ``HillasReconstructor_h_max`` (height of the shower maximum),
+  for the energy, the gammaness, and the disp norm and sign. They are trained on the events reconstructed
+  by both telescopes (quality criterion ``stereo``) and give predictions for these events only. Still one
+  model per telescope, whose predictions are combined (intensity weighted mean of the energy and the
+  gammaness, MARS direction). The simulations have the stereo parameters (the HillasReconstructor runs in
+  ``sst1mpipe-process``), the stereo data those of ``sst1mpipe-stereo``.
 
 After the training, the plots of the models are made in ``--plot-dir`` (by default
 ``<model name>_plots`` next to the model, e.g. ``models/nsb100/energy_regressor_plots``),
