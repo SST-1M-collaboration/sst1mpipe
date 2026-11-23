@@ -4,9 +4,9 @@ from the vector figures (SVG) of its HTML version into IRF directories of the fo
 (``ctapipe-compute-irf``: ``irf_point_like.fits.gz``, ``benchmarks_point_like.fits.gz``), for
 ``sst1mpipe-plot-irfs --reference``: sst1mpipe/resources/reference/crab_paper_2025/<mode>/ze<zenith>/
 
-- tel1 (SST-1M-1 mono), strict_stereo (paper: stereo, events of both telescopes): ze30, ze50,
+- tel1 (SST-1M-1 mono), stereo (events of both telescopes): ze30, ze50,
   benchmarks (energy bias and resolution, 68 % angular resolution, sensitivity)
-- tel1, tel2, strict_stereo: ze20, effective area (analysis level)
+- tel1, tel2, stereo: ze20, effective area (analysis level)
 
 The quantities the paper does not show (energy dispersion, background, cuts, ...) are not in the files.
 
@@ -27,8 +27,8 @@ import numpy as np
 
 from sst1mpipe.performance.irf_plots import write_reference_directory
 
-SERIES_COLORS = {"#0000ff": "tel1", "#ffa500": "strict_stereo"}
-AEFF_COLORS = {"#0000ff": "tel1", "#ffa500": "tel2", "#4daf4a": "strict_stereo"}
+SERIES_COLORS = {"#0000ff": "tel1", "#ffa500": "stereo"}
+AEFF_COLORS = {"#0000ff": "tel1", "#ffa500": "tel2", "#4daf4a": "stereo"}
 AEFF_STAGES = {None: "triggered", "7.4,3.2": "survived cleaning", "12.8,3.2,2,3.2": "quality cuts",
                "2,3.3": "analysis level"}
 

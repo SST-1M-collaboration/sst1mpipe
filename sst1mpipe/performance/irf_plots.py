@@ -6,9 +6,9 @@ of one mode (e.g. ``tel1``), several to compare them. ``references``: other IRF 
 format drawn as lines, e.g. the published performance in `REFERENCE_DIRECTORY` (only the quantities
 published, see `write_reference_directory`):
 
-- ``crab_paper_2025/<mode>/ze<zenith>``: SST-1M Crab paper (arXiv:2506.01733), tel1 and strict_stereo
+- ``crab_paper_2025/<mode>/ze<zenith>``: SST-1M Crab paper (arXiv:2506.01733), tel1 and stereo
   at ze30, ze50 (energy bias and resolution, angular resolution, sensitivity), tel1, tel2 and
-  strict_stereo at ze20 (effective area)
+  stereo at ze20 (effective area)
 - ``lhaaso_1yr``, ``hawc_1yr``, ``veritas_50h``, ``hess_50h``, ``astri_50h``: sensitivity of other
   instruments
 """

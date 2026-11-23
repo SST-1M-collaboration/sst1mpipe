@@ -16,7 +16,12 @@ telescopes are combined into stereo events by ``sst1mpipe-stereo``, a `ctapipe.c
     SST1M2_20260120_merged.dl1.h5 ─┘
 
 The coincident events are matched and combined by a `~sst1mpipe.stereo.StereoEventCombiner`. The
-stereo reconstruction (stereo DL2) is a later step.
+geometry of the showers of the combined events is then reconstructed by the ctapipe ``ShowerProcessor``
+(HillasReconstructor, settings of the ``ShowerProcessor`` section of the configuration) and written
+(DL2: direction, core, ``h_max``, impact distance of each telescope): the stereo parameters of the
+stereo models (:doc:`ml_reconstruction`). The array pointing of an event is the mean pointing of its
+telescopes; an event without the pointing of a telescope (out of the time range of its monitoring data)
+has an invalid reconstruction.
 
 
 Usage

@@ -196,3 +196,26 @@ def test_configuration_errors(dl1_files, tmp_path):
     shutil.copy(dl1_files[22], copy)
     with pytest.raises(ToolConfigurationError, match="same obs_id and event_id"):
         run_stereo([*dl1_files.values(), copy], tmp_path / "duplicated.dl1.h5", "--keep-mono")
+
+
+def test_stereo_geometry(dl1_files, tmp_path):
+    """
+    the geometry of the stereo events is reconstructed (HillasReconstructor) and written: with the
+    pointing of the telescopes (here extrapolated out of the monitoring data), invalid without it
+    """
+    output = tmp_path / "stereo.dl1.h5"
+    run_stereo(dl1_files.values(), output, "--PointingInterpolator.extrapolate=True")
+    geometry = read_table(output, "/dl2/event/subarray/geometry/HillasReconstructor")
+    assert geometry["event_id"].tolist() == sorted(COINCIDENT_EVENTS)
+    valid = np.asarray(geometry["HillasReconstructor_is_valid"], dtype=bool)
+    assert np.any(valid)
+    assert np.all(np.isfinite(geometry["HillasReconstructor_h_max"][valid]))
+    for tel_id in (21, 22):
+        impact = read_table(output, f"/dl2/event/telescope/impact/HillasReconstructor/tel_{tel_id:03d}")
+        assert np.all(np.isfinite(impact["HillasReconstructor_tel_impact_distance"][valid]))
+
+    # without pointing (out of the time range of the monitoring data): invalid
+    output = tmp_path / "stereo_no_pointing.dl1.h5"
+    run_stereo(dl1_files.values(), output)
+    geometry = read_table(output, "/dl2/event/subarray/geometry/HillasReconstructor")
+    assert not np.any(geometry["HillasReconstructor_is_valid"])

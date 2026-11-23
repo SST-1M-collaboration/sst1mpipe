@@ -10,15 +10,9 @@
 
     "run_dl1": true,
     "run_dl2": true,
-    "run_dl3": true,
 
     "root_dir" : "/net",
     "ana_dir": "/data2/work/tavernier/daily_ana/data_test/",
     "mono_model_dir":"/data/work/analysis/MC/prod_oct_2024_84/models_mono/",
-    "stereo_model_dir":"/data/work/analysis/MC/prod_oct_2024_84/models_stereo/",
-    "irf_dirs": {
-        "cs1": "/data/work/analysis/MC/prod_oct_2024_84/irf/optimized/tel1",
-        "cs2": "/data/work/analysis/MC/prod_oct_2024_84/irf/optimized/tel2",
-        "stereo": "/data/work/analysis/MC/prod_oct_2024_84/irf/optimized/stereo"
-    }
+    "stereo_model_dir":"/data/work/analysis/MC/prod_oct_2024_84/models_stereo/"
 }
