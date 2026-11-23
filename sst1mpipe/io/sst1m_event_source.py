@@ -190,6 +190,25 @@ def tel_id_from_file_name(file_name):
     return 20 + int(match.group(1)) if match else None
 
 
+def read_events_header(path):
+    """
+    Header of the ``Events`` table of a raw file (TARGET, DATE, DATEEND), or of the first HDU with a
+    TARGET field if the file has no ``Events`` table
+    """
+    with fits.open(path) as hdul:
+        if "Events" in hdul:
+            return hdul["Events"].header.copy()
+        for hdu in hdul:
+            if "TARGET" in hdu.header:
+                return hdu.header.copy()
+    raise KeyError(f"{path}: no Events table nor TARGET field")
+
+
+def read_target(path):
+    """Target of a raw file (TARGET field without the wobble, see `parse_target_field`), None if not given"""
+    return parse_target_field(read_events_header(path).get("TARGET"))[0]
+
+
 def file_start_and_duration(header):
     """
     Start time and duration of a raw data file, from the DATE and DATEEND fields
@@ -595,7 +614,7 @@ class SST1MEventSource(EventSource):
         self._subarray = SUBARRAY_DESCRIPTION.select_subarray([self.tel_id], name=SUBARRAY_DESCRIPTION.name)
 
         # Target and pointing from the TARGET field of the file, unless the pointing is given by the user
-        header = fits.getheader(self.input_url, 'Events')
+        header = read_events_header(self.input_url)
         self._target, self._wobble, ra, dec = parse_target_field(header.get('TARGET'))
         file_pointing = None
         if (ra is not None) and (dec is not None):

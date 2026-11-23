@@ -2,11 +2,20 @@
 import logging
 import subprocess
 
+import pytest
 from astropy.io import fits
+from ctapipe.core import ToolConfigurationError, run_tool
 
 from conftest import DARK_FILE, OBSERVATION_RUNS, TRANSITION_FILES
 from sst1mpipe.io.dataset import dataset_paths, find_runs, read_dataset
-from sst1mpipe.scripts.sst1mpipe_make_dataset import main as make_dataset
+from sst1mpipe.scripts.sst1mpipe_make_dataset_tool import MakeDataset
+
+
+def make_dataset(argv):
+    """sst1mpipe-make-dataset"""
+    tool = MakeDataset()
+    run_tool(tool, argv=argv, raises=True)
+    return tool
 
 
 def raw_data_root(tmp_path):
@@ -31,14 +40,13 @@ def test_find_runs(tmp_path):
     assert find_runs(root, 20250101) == []
 
 
-def test_make_dataset(tmp_path, capsys):
+def test_make_dataset(tmp_path):
     """the runs of a target (not the transitions and dark runs), readable in Python and bash"""
     root = raw_data_root(tmp_path)
     output = tmp_path / "mrk421.ecsv"
     make_dataset(["--host", "calculus", "--root", str(root), "--target", "mrk421", "-o", str(output),
                   "--description", "test",
                   "20260119", "20260120", "20260121"])
-    assert "2 runs" in capsys.readouterr().out
 
     dataset = read_dataset(output)
     assert dataset["obs_id"].tolist() == [2026012011179, 2026012021102]
@@ -97,3 +105,14 @@ def test_read_dataset_by_name(tmp_path, monkeypatch):
     monkeypatch.setattr(sst1mpipe.resources, "DATASETS_DIR", datasets)
     assert read_dataset("mrk421_test")["obs_id"].tolist() == [2026012011179, 2026012021102]
     assert read_dataset("mrk421_test.ecsv").meta["name"] == "mrk421_test"
+
+
+def test_make_dataset_configuration_errors(tmp_path):
+    root = raw_data_root(tmp_path)
+    with pytest.raises(ToolConfigurationError, match="required"):
+        make_dataset(["--root", str(root), "-o", str(tmp_path / "a.ecsv")])
+    with pytest.raises(ToolConfigurationError, match="YYYYMMDD"):
+        make_dataset(["--root", str(root), "-o", str(tmp_path / "a.ecsv"), "2026-01-20"])
+    (tmp_path / "exists.ecsv").write_text("")
+    with pytest.raises(ToolConfigurationError, match="--overwrite"):
+        make_dataset(["--root", str(root), "-o", str(tmp_path / "exists.ecsv"), "20260120"])

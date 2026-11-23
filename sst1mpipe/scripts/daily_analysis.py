@@ -12,7 +12,9 @@ from pathlib import Path
 import astropy.units as u
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy.io import fits
+
+from sst1mpipe.io.dataset import find_runs
+from sst1mpipe.io.sst1m_event_source import read_target
 
 '''
 this run the analysis pipeline up to stereo dl2 on Calculus.
@@ -153,63 +155,28 @@ def extract_dl1_distributions(arg):
         os.system(cmd)
 
 
-def make_runlist_allfiles(itel,year,month,day,rootdir='/net/'):
-        """
-        make a list of raw data file path
+def make_runlist_allfiles(itel, year, month, day, rootdir='/net/'):
+    """
+    Raw data files of a night of a telescope (1 or 2), see `sst1mpipe.io.dataset.find_runs`:
+    ``<rootdir>/cs<itel>/data/raw/YYYY/MM/DD/`` and its subdirectories
+    """
+    return [str(path) for path in find_runs(rootdir, f"{year:04d}{month:02d}{day:02d}", telescopes=[itel])]
 
-        Parameters
-        ----------
-        itel : int
-            telescope number (1 or 2)
-        year  : int
-
-        month : int
-
-        day   : int
-
-        Returns
-        -------
-        list of raw data file paths
-        """
-        basedir = rootdir+f'/cs{itel}/data/raw/'
-        filerad = f'SST1M{itel}'
-        filedir = os.path.join(basedir,
-                                       str(year),
-                                       f"{month:02d}",
-                                       f"{day:02d}",
-                                       filerad
-                                       )
-        return glob.glob(filedir+"/"+filerad+"*.fits.fz")
 
 def refine_file_list(file_list):
     """
-       sort list of raw data fits based on there TARGET field in header
-
-        Parameters
-        ----------
-        file_list : list
-            list of raw data file paths
-
-        Returns
-        -------
-        dict of raw data file paths
+    Raw data files by target (TARGET field of their header, see
+    `sst1mpipe.io.sst1m_event_source.read_target`): UNKNOWN if not readable
     """
-
-    list_dict = dict()
-    list_dict['DARK']       = []
-    list_dict['Transition'] = []
-    list_dict['UNKNOWN']    = []
+    list_dict = {'DARK': [], 'Transition': [], 'UNKNOWN': []}
     for fitsfile in file_list:
-        f = fits.open(fitsfile)
         try:
-            target=f[2].header['TARGET'].split(',')[0].split('_')[0].replace(" ", "")
+            target = (read_target(fitsfile) or 'UNKNOWN').replace(" ", "")
         except Exception:
-            target='UNKNOWN'
-        if target not in list_dict.keys():
-            list_dict[target]    = []
-        list_dict[target].append(fitsfile)
-        f.close()
+            target = 'UNKNOWN'
+        list_dict.setdefault(target, []).append(fitsfile)
     return list_dict
+
 
 def run_daily_ana(daily_config):
     """

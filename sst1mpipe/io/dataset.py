@@ -27,32 +27,13 @@ import logging
 from pathlib import Path
 
 import numpy as np
-from astropy.io import fits
 from astropy.table import Table
 
-from sst1mpipe.io.sst1m_event_source import (
-    observation_ids,
-    parse_file_name,
-    parse_target_field,
-    tel_id_from_file_name,
-)
+from sst1mpipe.io.sst1m_event_source import observation_ids, parse_file_name, read_target, tel_id_from_file_name
 
-__all__ = ["dataset_paths", "find_runs", "make_dataset", "raw_file_target", "read_dataset", "write_dataset"]
+__all__ = ["dataset_paths", "find_runs", "make_dataset", "read_dataset", "write_dataset"]
 
-log = logging.getLogger(__name__)
-
-
-def raw_file_target(path):
-    """
-    Target of a raw file (TARGET field, without the wobble), from the first HDU whose header has it:
-    the ``Events`` table, whose name and position depend on the version of the files. None without
-    TARGET field
-    """
-    with fits.open(path) as hdul:
-        for hdu in hdul:
-            if "TARGET" in hdu.header:
-                return parse_target_field(hdu.header["TARGET"])[0]
-    return None
+logger = logging.getLogger(__name__)
 
 
 def find_runs(root, night, telescopes=(1, 2)):
@@ -68,7 +49,7 @@ def find_runs(root, night, telescopes=(1, 2)):
     return files
 
 
-def make_dataset(root, nights, target=None, telescopes=(1, 2), name="", description="", host=""):
+def make_dataset(root, nights, target=None, telescopes=(1, 2), name="", description="", host="", log=None):
     """
     Dataset of the runs of the nights of ``root`` whose target (TARGET field of the raw file, without
     the wobble, compared in lower case) is ``target`` (all the runs if None)
@@ -78,9 +59,12 @@ def make_dataset(root, nights, target=None, telescopes=(1, 2), name="", descript
     astropy.table.Table: ``obs_id``, ``tel_id``, ``file`` (relative to ``root``), sorted by obs_id;
     ``meta``: name, description, host (computer of the data, e.g. calculus), root, target, nights,
     creation date and sst1mpipe version
+
+    ``log``: logger of the files read (the logger of this module by default)
     """
     import sst1mpipe
 
+    log = log or logger
     root = Path(root).absolute()
     rows = []
     for night in nights:
@@ -95,7 +79,7 @@ def make_dataset(root, nights, target=None, telescopes=(1, 2), name="", descript
                 log.warning("%s: not a raw file name SST1M<n>_<date>_<run>, skipped", path)
                 continue
             try:
-                run_target = raw_file_target(path)
+                run_target = read_target(path)
             except Exception as error:  # noqa: BLE001 (broken file)
                 log.warning("%s: not readable (%s: %s), skipped", path, type(error).__name__, error)
                 continue

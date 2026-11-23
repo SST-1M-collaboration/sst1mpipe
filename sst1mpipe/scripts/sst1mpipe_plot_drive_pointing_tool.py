@@ -9,7 +9,6 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy.coordinates import SkyCoord, UnitSphericalRepresentation, concatenate
-from astropy.io import fits
 from astropy.time import Time
 from astropy.visualization.wcsaxes.frame import EllipticalFrame
 from astropy.wcs import WCS
@@ -21,7 +20,7 @@ from matplotlib.ticker import FuncFormatter
 
 from sst1mpipe.instrument.pointing_model import PointingModel
 from sst1mpipe.io.drive import drive_radec, read_drive_logs
-from sst1mpipe.io.sst1m_event_source import parse_target_field
+from sst1mpipe.io.sst1m_event_source import parse_target_field, read_events_header
 from sst1mpipe.resources import SUBARRAY_FILE
 
 logger = logging.getLogger(__name__)
@@ -115,8 +114,7 @@ def read_targets(files):
     """Name, start time and pointing of the TARGET field of zfits runs (runs without pointing are skipped)"""
     targets = []
     for file in files:
-        with fits.open(file) as hdul:
-            header = hdul["Events"].header
+        header = read_events_header(file)
         target, wobble, ra, dec = parse_target_field(header.get("TARGET"))
         if ra is None:
             logger.warning("No pointing in the TARGET field (%r) of %s", header.get("TARGET"), file)

@@ -593,7 +593,7 @@ def test_warning_no_pointing_in_file(caplog):
 def test_warning_pointing_given_by_user_and_in_file(monkeypatch, caplog):
     """the pointing of the file and the one given by the user are reported, with their separation"""
     header = {"TARGET": "Crab_W1_83.63_22.01", "DATE": "2026-01-21T17:07:07", "DATEEND": "2026-01-21T17:07:19"}
-    monkeypatch.setattr(sst1m_event_source.fits, "getheader", lambda *args, **kwargs: header)
+    monkeypatch.setattr(sst1m_event_source, "read_events_header", lambda *args, **kwargs: header)
 
     with caplog.at_level(logging.WARNING):
         source = SST1MEventSource(input_url=DARK_FILE, max_events=1, pointing_ra=84.63, pointing_dec=22.01)
@@ -608,7 +608,7 @@ def test_warning_pointing_given_by_user_and_in_file(monkeypatch, caplog):
 def test_no_warning_pointing_in_file(monkeypatch, caplog):
 
     header = {"TARGET": "Crab_W1_83.63_22.01"}
-    monkeypatch.setattr(sst1m_event_source.fits, "getheader", lambda *args, **kwargs: header)
+    monkeypatch.setattr(sst1m_event_source, "read_events_header", lambda *args, **kwargs: header)
 
     with caplog.at_level(logging.WARNING):
         source = SST1MEventSource(input_url=DARK_FILE, max_events=1)
