@@ -189,8 +189,8 @@ diffuse gammas for the full enclosure IRFs, diffuse protons):
 1. ``ctapipe-optimize-event-selection``: gammaness and direction (theta) cuts per reconstructed energy
    bin (``sst1mpipe_optimize_cuts.yaml``: the cuts of the best sensitivity; with
    ``sst1mpipe_irf_paper_cuts.yaml``: the fixed efficiencies of the SST-1M Crab paper, 60 % of the
-   gammas for the gammaness cut, 80 % for the theta cut; with ``sst1mpipe_irf_strict_stereo.yaml``:
-   events with both telescopes only), written to ``cuts.fits``
+   gammas for the gammaness cut, 80 % for the theta cut), written to ``cuts.fits``. The stereo
+   analysis has the events with both telescopes only: the stereo models predict only for them
 2. ``ctapipe-compute-irf`` (``sst1mpipe_compute_irf.yaml``): the IRFs with these cuts (effective area,
    energy dispersion, PSF or ``RAD_MAX``, background) in the GADF format of gammapy, and the
    benchmarks (energy bias and resolution, angular resolution, sensitivity in 50 h).
@@ -274,13 +274,13 @@ published performance is in ``sst1mpipe/resources/reference`` (``ref:<directory>
 scripts of ``scripts/reference``), with the quantities published only:
 
 - ``crab_paper_2025/<mode>/ze<zenith>``: the SST-1M Crab paper (arXiv:2506.01733), ``tel1`` and
-  ``strict_stereo`` (paper: stereo) at ``ze30``, ``ze50`` (energy bias and resolution, angular
-  resolution, sensitivity), ``tel1``, ``tel2``, ``strict_stereo`` at ``ze20`` (effective area)
+  ``stereo`` at ``ze30``, ``ze50`` (energy bias and resolution, angular
+  resolution, sensitivity), ``tel1``, ``tel2``, ``stereo`` at ``ze20`` (effective area)
 - sensitivity of other instruments: ``lhaaso_1yr``, ``hawc_1yr``, ``veritas_50h``, ``hess_50h``,
   ``astri_50h``
 
 .. code-block:: console
 
-    sst1mpipe-plot-irfs --irf strict_stereo=irf/strict_stereo \
-        --reference "paper, 30 deg=ref:crab_paper_2025/strict_stereo/ze30" \
+    sst1mpipe-plot-irfs --irf stereo=irf/stereo \
+        --reference "paper, 30 deg=ref:crab_paper_2025/stereo/ze30" \
         --reference "ASTRI Mini-Array=ref:astri_50h" -o plots_paper

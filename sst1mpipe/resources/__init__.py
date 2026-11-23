@@ -23,6 +23,7 @@ __all__ = [
     "RTA_CONFIG_FILE",
     "MONITORING_CONFIG_FILE",
     "TRAIN_CONFIG_FILES",
+    "STEREO_TRAIN_CONFIG_FILES",
     "PDE_CORRECTION_FACTORS_FILE",
     "SUBARRAY_FILE",
     "PIXEL_MAPPING_FILE",
@@ -46,6 +47,11 @@ MONITORING_CONFIG_FILE = CONFIG_DIR / "sst1mpipe_monitoring_config.json"
 # configurations of the training tools (sst1mpipe-train-*): the models of sst1mpipe_mc_config_low_nsb.json
 TRAIN_CONFIG_FILES = {
     model: CONFIG_DIR / f"sst1mpipe_train_{model}.yaml"
+    for model in ("energy_regressor", "particle_classifier", "disp_reconstructor")
+}
+# stereo models: with the stereo parameters of the HillasReconstructor (impact distance, h_max)
+STEREO_TRAIN_CONFIG_FILES = {
+    model: CONFIG_DIR / f"sst1mpipe_train_{model}_stereo.yaml"
     for model in ("energy_regressor", "particle_classifier", "disp_reconstructor")
 }
 # TPointPointingModel of the SST-1M drives (AzElCorrCoefTel<n>.conf), periods from noon to noon UTC: tel 21 from

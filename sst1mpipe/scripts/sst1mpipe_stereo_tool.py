@@ -21,8 +21,12 @@ time of their telescopes. The other events (mono events) are written as they are
 ``--keep-mono``, otherwise not. The events are written in time order, with the ctapipe DataWriter
 (which data levels are written: ``DataWriter.write_dl1_images``, ``write_dl1_parameters``, ...).
 
-The stereo reconstruction (e.g. the geometry of the showers with the ctapipe ShowerProcessor) is
-not done: the stereo DL2 of the events is empty. The output file has the subarray of all the
+The geometry of the showers of the events is then reconstructed by the ctapipe ShowerProcessor
+(HillasReconstructor, settings of the ``ShowerProcessor`` section of the configuration), with the
+array pointing of each event as the mean pointing of its telescopes, and written (DL2:
+``HillasReconstructor`` direction, core, ``h_max``, impact distance of each telescope): the stereo
+features of the stereo models (``sst1mpipe_train_*_stereo.yaml``). The mono events have an invalid
+reconstruction. The output file has the subarray of all the
 telescopes, the observation and scheduling blocks of the input files, and their monitoring data
 (pointing, statistics of the pedestal events) with ``--StereoTool.copy_monitoring`` (default). The
 summary of the processing of the input files (/dl1/info) is not copied.
@@ -34,12 +38,14 @@ Usage::
 """
 from collections import Counter
 
+import astropy.units as u
 import numpy as np
 from astropy.table import vstack
 from ctapipe.core import Tool, ToolConfigurationError
 from ctapipe.core.traits import Bool, ComponentName, List, Path, classes_with_traits, flag
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import DataWriter, HDF5EventSource, read_table
+from ctapipe.reco import ShowerProcessor
 from tqdm import tqdm
 
 from sst1mpipe.io import append_monitoring_tables
@@ -185,6 +191,22 @@ class TelescopeEventReader:
         return self._cache.pop(key)
 
 
+def set_array_pointing(event):
+    """
+    Array pointing of an event (``event.monitoring.pointing``, needed by the HillasReconstructor):
+    the mean pointing of its telescopes (altitude, azimuth on the circle), NaN without pointing
+    """
+    pointings = [monitoring.pointing for monitoring in event.monitoring.tel.values()]
+    alt = u.Quantity([u.Quantity(p.altitude, u.rad) for p in pointings]).to_value(u.rad)
+    az = u.Quantity([u.Quantity(p.azimuth, u.rad) for p in pointings]).to_value(u.rad)
+    finite = np.isfinite(alt) & np.isfinite(az)
+    if not np.any(finite):
+        return
+    event.monitoring.pointing.array_altitude = u.Quantity(np.mean(alt[finite]), u.rad)
+    event.monitoring.pointing.array_azimuth = u.Quantity(
+        np.arctan2(np.mean(np.sin(az[finite])), np.mean(np.cos(az[finite]))) % (2 * np.pi), u.rad)
+
+
 class StereoTool(Tool):
     """
     Combination of the coincident events of the SST-1M telescopes into stereo events (``sst1mpipe-stereo``).
@@ -264,7 +286,7 @@ class StereoTool(Tool):
         **flag("progress", "StereoTool.progress_bar", "show a progress bar", "do not show a progress bar"),
         **flag("overwrite", "DataWriter.overwrite", "overwrite the output file", "do not overwrite the output file"),
     }
-    classes = [DataWriter] + classes_with_traits(StereoEventCombiner)
+    classes = [DataWriter] + classes_with_traits(StereoEventCombiner) + classes_with_traits(ShowerProcessor)
 
     def setup(self):
         """
@@ -333,6 +355,9 @@ class StereoTool(Tool):
         }
         all_sources = [source for sources in self.sources.values() for source in sources]
         subarray = merge_subarrays([subarrays[tel_id] for tel_id in sorted(subarrays)])
+        # the geometry of the showers (HillasReconstructor) is always reconstructed and written
+        self.config.DataWriter.write_dl2 = True
+        self.shower_processor = ShowerProcessor(subarray=subarray, parent=self)
         self.writer = DataWriter(event_source=CombinedRuns(all_sources, subarray), parent=self)
         # closed in finish(), or when the tool exits if it fails before
         self._writer_closed = False
@@ -411,7 +436,21 @@ class StereoTool(Tool):
             else:
                 event = to_sst1m_event(next(iter(telescope_events.values())))
             event.count = count
+            self.reconstruct_geometry(event)
             self.writer(event)
+
+    def reconstruct_geometry(self, event):
+        """
+        Geometry of the shower (ShowerProcessor), with the array pointing of `set_array_pointing`;
+        invalid if a telescope has no pointing (e.g. event out of the time range of its monitoring data)
+        """
+        set_array_pointing(event)
+        self.shower_processor(event)
+        pointings = [monitoring.pointing for monitoring in event.monitoring.tel.values()]
+        if not all(np.isfinite(u.Quantity(p.altitude).value) and np.isfinite(u.Quantity(p.azimuth).value)
+                   for p in pointings):
+            for geometry in event.dl2.stereo.geometry.values():
+                geometry.is_valid = False
 
     def finish(self):
         """Closing of the output file, copy of the monitoring data of the input files and summary in the log"""

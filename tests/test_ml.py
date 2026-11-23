@@ -17,6 +17,7 @@ from ctapipe.containers import (
 from ctapipe.core import run_tool
 from ctapipe.io import read_table
 from ctapipe.reco.preprocessing import telescope_to_horizontal
+from ctapipe.reco import Reconstructor
 from ctapipe.reco.reconstructor import ReconstructionProperty
 from ctapipe.reco.stereo_combination import StereoCombiner, StereoMeanCombiner
 
@@ -28,7 +29,13 @@ from sst1mpipe.scripts.sst1mpipe_train_models_tool import (
     TrainEnergyRegressor,
     TrainParticleClassifier,
 )
-from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, TEST_DATA_DIR, TRAIN_CONFIG_FILES
+from sst1mpipe.resources import (
+    DATA_CONFIG_FILE,
+    MC_CONFIG_FILES,
+    STEREO_TRAIN_CONFIG_FILES,
+    TEST_DATA_DIR,
+    TRAIN_CONFIG_FILES,
+)
 
 SIMTEL_DIR = TEST_DATA_DIR / "simtel"
 GAMMA_DIFFUSE = SIMTEL_DIR / "gamma_200_800E3GeV_20_20deg_ATM52_102168.corsika.gz.NSBmed4.simtel.gz"
@@ -340,8 +347,8 @@ def test_plot_irfs(models, dl1_files, tmp_path):
     assert {"energy_migration_a", "energy_migration_b", "sensitivity"} <= {
         path.stem for path in (tmp_path / "comparison").glob("*.png")}
     # with the performance of the paper (IRF directories of the same format, some quantities only)
-    plot_irfs(["--irf", f"stereo={irf}", "--reference", "paper 30=ref:crab_paper_2025/strict_stereo/ze30",
-               "--reference", "paper 20=ref:crab_paper_2025/strict_stereo/ze20", "-o", str(tmp_path / "reference")])
+    plot_irfs(["--irf", f"stereo={irf}", "--reference", "paper 30=ref:crab_paper_2025/stereo/ze30",
+               "--reference", "paper 20=ref:crab_paper_2025/stereo/ze20", "-o", str(tmp_path / "reference")])
     assert {path.stem for path in (tmp_path / "reference").glob("*.png")} == names - {"gammaness", "roc"}
     # the paper alone: its quantities only
     plot_irfs(["--reference", "tel1=ref:crab_paper_2025/tel1/ze30", "--reference", "tel2=ref:crab_paper_2025/tel2/ze20",
@@ -356,7 +363,7 @@ def test_crab_paper_reference():
 
     from sst1mpipe.performance.irf_plots import REFERENCE_DIRECTORY, read_irf_directory
 
-    stereo = read_irf_directory(REFERENCE_DIRECTORY / "crab_paper_2025" / "strict_stereo" / "ze30")
+    stereo = read_irf_directory(REFERENCE_DIRECTORY / "crab_paper_2025" / "stereo" / "ze30")
     assert set(stereo) == {"energy", "angular", "sensitivity"}
     # best sensitivity of the stereo: ~2e-12 TeV cm-2 s-1 at ~10 TeV (Fig. 11)
     sensitivity = stereo["sensitivity"]["ENERGY_FLUX_SENSITIVITY"].to_value(u.TeV / u.cm**2 / u.s)
@@ -388,3 +395,35 @@ def test_cut_without_n_events():
     np.testing.assert_allclose(_cut(table)[2], [0.2, 0.1])
     table["n_events"] = [5, 20]
     assert np.isnan(_cut(table)[2][0]) and _cut(table)[2][1] == 0.1
+
+
+def test_stereo_models(dl1_files, tmp_path):
+    """
+    stereo models: the stereo parameters of the HillasReconstructor (impact distance, h_max) as features,
+    trained on the events reconstructed by both telescopes; predictions only for these events
+    """
+    directory = tmp_path / "stereo"
+    directory.mkdir()
+    for name, tool, inputs in (
+        ("energy_regressor", TrainEnergyRegressor(), ["-i", dl1_files["gamma"]]),
+        ("particle_classifier", TrainParticleClassifier(),
+         ["--signal", dl1_files["gamma"], "--background", dl1_files["proton"]]),
+        ("disp_reconstructor", TrainDispReconstructor(), ["-i", dl1_files["gamma"]]),
+    ):
+        argv = [*map(str, inputs), "-o", str(directory / f"{name}.pkl"),
+                f"--config={STEREO_TRAIN_CONFIG_FILES[name]}", "--CrossValidator.n_cross_validations=2"]
+        assert run_tool(tool, argv=argv, raises=True) == 0
+        model = Reconstructor.read(directory / f"{name}.pkl")
+        assert {"HillasReconstructor_tel_impact_distance", "HillasReconstructor_h_max"} <= set(model.features)
+
+    output = tmp_path / "gamma_point.dl2.h5"
+    reconstructors = [arg for path in sorted(directory.glob("*.pkl")) for arg in ("-r", str(path))]
+    argv = ["-i", str(dl1_files["gamma_point"]), *reconstructors, "-o", str(output), "--no-progress"]
+    assert run_tool(ApplyModels(), argv=argv, raises=True) == 0
+    energy = read_table(output, "/dl2/event/subarray/energy/RandomForestRegressor")
+    geometry = read_table(output, "/dl2/event/subarray/geometry/HillasReconstructor")
+    events = join(energy, geometry, keys=["obs_id", "event_id"])
+    valid = np.asarray(events["RandomForestRegressor_is_valid"], dtype=bool)
+    assert np.any(valid)
+    # only the events with the stereo parameters
+    assert np.all(np.isfinite(events["HillasReconstructor_h_max"][valid]))
