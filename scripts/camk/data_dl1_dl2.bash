@@ -26,6 +26,7 @@ dl1_dl2() {
   mkdir -p "$(dirname "${output}")"
   local models
   mapfile -t models < <(models_args "${MODELS_DIRECTORY}")
+  (( ${#models[@]} > 0 )) || return 1
   sst1mpipe-apply-models -i "$1" "${models[@]}" -o "${output}" --overwrite --no-progress
 }
 export -f dl1_dl2 models_args

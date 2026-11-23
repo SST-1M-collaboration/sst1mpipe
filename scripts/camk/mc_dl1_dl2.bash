@@ -34,5 +34,6 @@ NAME=${NAMES[TASK % 3]}
 OUTPUT="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/${VERSION}/${NAME}.dl2.h5"
 mkdir -p "$(dirname "${OUTPUT}")"
 mapfile -t MODELS < <(models_args "${MC_DIRECTORY}/models/${MODELS_NAME}")
+(( ${#MODELS[@]} > 0 )) || exit 1
 sst1mpipe-apply-models -i "${MC_DIRECTORY}/merged/ze${ZENITH}/${NAME}.dl1.h5" "${MODELS[@]}" -o "${OUTPUT}" \
   --ApplyModels.telescopes="${TELESCOPES[${VERSION}]}" --n-jobs "${SLURM_CPUS_PER_TASK:-1}" --overwrite --no-progress

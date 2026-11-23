@@ -73,6 +73,11 @@ if run train; then
   echo "training: job ${TRAIN}"
 fi
 if run dl2; then
+  # starting from the DL2: the models must be there
+  if [[ "${MC_START}" == dl2 ]] && ! compgen -G "${MC_DIRECTORY}/models/${MODELS_NAME}/*.pkl" > /dev/null; then
+    echo "No models in ${MC_DIRECTORY}/models/${MODELS_NAME} (MODELS_NAME from MC_TRAIN_ZENITHS=\"${MC_TRAIN_ZENITHS}\")" >&2
+    exit 1
+  fi
   # 3 versions (stereo, tel1, tel2) x 3 files per zenith angle
   DL2=$(submit "${DEPENDENCY}" --array="0-$((9 * N_ZENITHS - 1))" --cpus-per-task="${MC_DL2_CPUS}" \
     --mem-per-cpu="${MC_DL2_MEM_PER_CPU}" "${SCRIPTS}/mc_dl1_dl2.bash")

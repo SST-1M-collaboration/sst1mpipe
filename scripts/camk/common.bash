@@ -28,10 +28,17 @@ join_ids() {
   echo "$*"
 }
 
-# -r <model> of the models (*.pkl) of a directory, for sst1mpipe-apply-models
+# -r <model> of the models (*.pkl) of a directory, for sst1mpipe-apply-models; error without models
 models_args() {
-  local model
+  local model models=()
   for model in "$1"/*.pkl; do
+    [[ -f "${model}" ]] && models+=("${model}")
+  done
+  if (( ${#models[@]} == 0 )); then
+    echo "No models (*.pkl) in $1: training (MC_START=train) or MODELS_NAME / MC_TRAIN_ZENITHS?" >&2
+    return 1
+  fi
+  for model in "${models[@]}"; do
     printf -- '-r\n%s\n' "${model}"
   done
 }
