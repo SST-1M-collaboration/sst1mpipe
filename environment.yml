@@ -9,8 +9,6 @@ dependencies:
   - ctapipe==0.32.0
   - eventio # optional dependency of ctapipe, used to read the simtel files
   - click
-  - gammapy>=2.1
-  - regions<0.12 # temporary: gammapy 2.1 imports a private function of regions removed in regions 0.12
   - h5py
   - jupyter
   - protozfits # used to read zfits files and protocolbuffer messages
@@ -46,3 +44,6 @@ dependencies:
   - pip:
       # not on conda-forge; sst1mpipe itself: pip install --no-deps -e . (the dependencies from conda)
       - sst1m-cts>=1.0 # sst1m_cts_core: camera configuration of DigiCam
+      # gammapy > 2.1 (pyproject.toml): only the release candidate 2.2rc1 exists, on PyPI only.
+      # TODO: once gammapy 2.2 is on conda-forge, move it to the conda dependencies as gammapy>2.1
+      - gammapy>=2.2rc1
