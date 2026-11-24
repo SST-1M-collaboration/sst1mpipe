@@ -5,6 +5,8 @@
 # ==============================================================================
 
 IrfTool:
+  # with the sst1mpipe tools: CRAB_HEGRA is the Crab of MAGIC (--crab MAGIC, default), IRFDOC_PROTON_SPECTRUM
+  # the protons + helium of DAMPE (--background p_he, default), see sst1mpipe.performance.irf_tools
   gamma_target_spectrum: CRAB_HEGRA
   proton_target_spectrum: IRFDOC_PROTON_SPECTRUM
   electron_target_spectrum: IRFDOC_ELECTRON_SPECTRUM

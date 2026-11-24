@@ -48,7 +48,7 @@
     "apply_peak_time_shift": [["type", "*", true]],
     "apply_waveform_time_shift": [["type", "*", false]],
     "LocalPeakWindowSum": {
-      "window_width": [["type", "*", 7]],
+      "window_width": [["type", "*", 8]],
       "window_shift": [["type", "*", 3]],
       "apply_integration_correction": [["type", "*", true]]
     }

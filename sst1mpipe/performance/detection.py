@@ -23,7 +23,7 @@ __all__ = ["DetectionRates", "detection_rates", "source_spectrum", "time_to_dete
 
 
 def source_spectrum(name):
-    """Spectrum of a source of `sst1mpipe.performance.spectra` (e.g. ``CRAB_HEGRA``)"""
+    """Spectrum of a source of `sst1mpipe.performance.spectra` (e.g. ``CRAB_MAGIC_JHEAP2015``)"""
     if name not in spectra.__all__ or "UNIT" in name:
         raise ValueError(f"Unknown source {name}: one of {[n for n in spectra.__all__ if 'UNIT' not in n]}")
     return getattr(spectra, name)

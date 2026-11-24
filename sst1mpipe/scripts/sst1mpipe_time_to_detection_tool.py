@@ -4,7 +4,7 @@
 the conditions of the sensitivity of ctapipe (at least 10 signal events, signal at least 5 % of the
 background), 5 OFF regions.
 
-    sst1mpipe-time-to-detection --irf irf/optimized/stereo/ze20 --source CRAB_HEGRA --source MRK421_VERITAS_LOW \\
+    sst1mpipe-time-to-detection --irf irf/optimized/stereo/ze20 --source CRAB_MAGIC_JHEAP2015 --source MRK421_VERITAS_LOW \\
         --energy-min 1 --energy-min 3 -o time_to_detection.png
 
 Sources: the spectra of `sst1mpipe.performance.spectra` (``--list-sources``). The minimum energies are
@@ -54,7 +54,7 @@ def main(args=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--irf", help="irf_point_like.fits.gz of ctapipe-compute-irf, or its directory")
     parser.add_argument("--source", action="append", default=[],
-                        help="spectrum of sst1mpipe.performance.spectra (repeatable, default CRAB_HEGRA)")
+                        help="spectrum of sst1mpipe.performance.spectra (repeatable, default CRAB_MAGIC_JHEAP2015, the Crab of the SST-1M Crab paper)")
     parser.add_argument("--energy-min", action="append", type=float, default=[],
                         help="minimum reconstructed energy in TeV (repeatable, default 0.3, 1, 3, 10)")
     parser.add_argument("--n-off", type=int, default=5, help="number of OFF regions")
@@ -68,7 +68,7 @@ def main(args=None):
     if options.irf is None:
         parser.error("--irf is required")
     irf = irf_file(options.irf)
-    sources = options.source or ["CRAB_HEGRA"]
+    sources = options.source or ["CRAB_MAGIC_JHEAP2015"]
     table = time_to_detection_table(irf, sources, options.energy_min or [0.3, 1, 3, 10], n_off=options.n_off)
     for name in ("signal_rate", "background_rate", "time", "energy_min"):
         table[name].info.format = ".3g"

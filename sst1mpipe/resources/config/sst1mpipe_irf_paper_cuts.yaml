@@ -1,12 +1,13 @@
-# Overlay of sst1mpipe_optimize_cuts.yaml: the fixed cuts of the SST-1M Crab paper (arXiv:2506.01733,
-# Sect. 5.3) instead of the optimized ones: 60 % of the gammas kept by the gammaness cut and 80 % by
-# the theta cut, in each energy bin
+# Overlay of sst1mpipe_optimize_cuts.yaml, with sst1mpipe-optimize-event-selection: the fixed cuts of the
+# SST-1M Crab paper (arXiv:2506.01733, Sec. 5.3) instead of the optimized ones: 60 % of the gammas kept
+# by the gammaness cut in each energy bin, and one theta cut for all the energies keeping 80 % of the
+# gammas (GlobalThetaPercentileCuts of sst1mpipe.performance.irf_tools)
 
 EventSelectionOptimizer:
-  optimization_algorithm: "PercentileCuts"
+  optimization_algorithm: "GlobalThetaPercentileCuts"
 
 GhPercentileCutCalculator:
   target_percentile: 60   # gamma efficiency of the gammaness cut
 
 ThetaPercentileCutCalculator:
-  target_percentile: 80   # containment of the theta cut
+  target_percentile: 80   # containment of the theta cut (all the energies)
