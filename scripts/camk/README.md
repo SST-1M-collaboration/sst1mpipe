@@ -17,7 +17,7 @@ The data of a night (R0 -> DL3) are processed by the scripts of `scripts/daily` 
 | `mc_train.bash` | `sst1mpipe-train-*`: energy, particle classifier, disp in `models/<MODELS_NAME>/mono/` (image parameters) and `models/<MODELS_NAME>/stereo/` (and the impact distance and `h_max` of the HillasReconstructor, events with both telescopes), with plots |
 | `mc_dl1_dl2.bash` | `sst1mpipe-apply-models` on the test files of each zenith angle: `dl2/<MODELS_NAME>/ze<z>/stereo` (stereo models, events with both telescopes), `tel1`, `tel2` (mono models, one telescope alone); the random forests use the `MC_DL2_CPUS` CPUs of each task (default 16, `--n-jobs`) |
 | `mc_irf.bash` | `sst1mpipe-optimize-event-selection`, `sst1mpipe-compute-irf` (ctapipe IRF tools with the Crab of MAGIC and protons + helium of the paper): point-like and full enclosure IRFs per zenith angle and mode (`tel1`, `tel2`, `stereo`), in `irf/<MODELS_NAME>/<IRF_CUTS>/<mode>/ze<z>/`, with their figures (`plots/`, `sst1mpipe-plot-irfs`) |
-| `mc_irf_comparison.bash` | figures of the three modes together, in `irf/<MODELS_NAME>/<IRF_CUTS>/comparison/ze<z>/` |
+| `mc_irf_comparison.bash` | figures of the three modes together, with the Crab paper as dashed lines, in `irf/<MODELS_NAME>/<IRF_CUTS>/comparison/ze<z>/` |
 
 `MODELS_NAME`: the zenith angles of the training, `ze20` or `ze20_30` (`MC_TRAIN_ZENITHS`, default
 `MC_ZENITHS`): the models, their DL2 and IRFs of different trainings do not overwrite each other. E.g.
