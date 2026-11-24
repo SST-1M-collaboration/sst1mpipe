@@ -56,8 +56,10 @@ def figure():
     return plt.subplots(figsize=(7, 5))
 
 
-def save(fig, path, title):
-    fig.axes[0].set_title(title)
+def save(fig, path, title=None):
+    """Save and close a figure, with a title if given"""
+    if title:
+        fig.axes[0].set_title(title)
     fig.tight_layout()
     fig.savefig(path, dpi=150)
     plt.close(fig)
