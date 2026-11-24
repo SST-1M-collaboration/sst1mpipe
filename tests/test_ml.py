@@ -308,12 +308,23 @@ def test_apply_models_one_telescope(models, dl1_files, tmp_path):
 
 
 
-def test_plot_irfs(models, dl1_files, tmp_path):
-    """IRFs of ctapipe (fixed cuts: few events) of the DL2 of the models, and their figures"""
-    from ctapipe.tools.compute_irf import IrfTool
-    from ctapipe.tools.optimize_event_selection import EventSelectionOptimizer
+@pytest.fixture
+def ctapipe_spectra():
+    """Spectra of the ctapipe IRF tools restored after the test (the sst1mpipe IRF tools change them)"""
+    from ctapipe.irf import spectra
+
+    saved = dict(spectra.SPECTRA)
+    yield spectra
+    spectra.SPECTRA.update(saved)
+
+
+def test_plot_irfs(models, dl1_files, tmp_path, ctapipe_spectra):
+    """IRFs (cuts of the Crab paper: few events) of the DL2 of the models with the sst1mpipe IRF tools, and their figures"""
+    from astropy.table import QTable
+    from pyirf.spectral import CRAB_MAGIC_JHEAP2015, DAMPE_P_He_SPECTRUM
 
     from sst1mpipe.resources import CONFIG_DIR
+    from sst1mpipe.scripts.sst1mpipe_irf_tools import SST1MEventSelectionOptimizer, SST1MIrfTool
     from sst1mpipe.scripts.sst1mpipe_plot_irfs_tool import main as plot_irfs
 
     directory, _ = models
@@ -330,12 +341,18 @@ def test_plot_irfs(models, dl1_files, tmp_path):
                f"--config={CONFIG_DIR / 'sst1mpipe_irf_paper_cuts.yaml'}"]
     argv = [*configs, "-g", str(dl2 / "gamma_point.dl2.h5"), "-p", str(dl2 / "proton_test.dl2.h5"),
             "-o", str(irf / "cuts.fits")]
-    assert run_tool(EventSelectionOptimizer(), argv=argv, raises=True) == 0
+    assert run_tool(SST1MEventSelectionOptimizer(), argv=argv, raises=True) == 0
+    # spectra of the paper: Crab of MAGIC, protons + helium
+    assert ctapipe_spectra.SPECTRA[ctapipe_spectra.Spectra.CRAB_HEGRA] is CRAB_MAGIC_JHEAP2015
+    assert ctapipe_spectra.SPECTRA[ctapipe_spectra.Spectra.IRFDOC_PROTON_SPECTRUM] is DAMPE_P_He_SPECTRUM
+    # one theta cut for all the energies (GlobalThetaPercentileCuts), gammaness cut per energy bin
+    rad_max = QTable.read(irf / "cuts.fits", hdu="RAD_MAX")["cut"]
+    assert len(rad_max) > 1 and np.all(rad_max == rad_max[0])
     argv = [f"--config={CONFIG_DIR / 'sst1mpipe_compute_irf.yaml'}", "--cuts", str(irf / "cuts.fits"),
             "--gamma-file", str(dl2 / "gamma_point.dl2.h5"), "--proton-file", str(dl2 / "proton_test.dl2.h5"),
             "--do-background", "--spatial-selection-applied", "--DefaultFoVOffsetBins.fov_offset_n_bins=1",
             "--output", str(irf / "irf_point_like.fits.gz"), "--benchmark-output", str(irf / "benchmarks_point_like.fits.gz")]
-    assert run_tool(IrfTool(), argv=argv, raises=True) == 0
+    assert run_tool(SST1MIrfTool(), argv=argv, raises=True) == 0
 
     plot_irfs(["--irf", f"stereo={irf}", "--dl2", f"stereo={dl2}", "-o", str(tmp_path / "plots")])
     names = {path.stem for path in (tmp_path / "plots").glob("*.png")}
