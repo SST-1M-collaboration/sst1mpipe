@@ -63,9 +63,17 @@ DEPENDENCY=""
 # failed DL1 files are skipped by the merge (afterany)
 (( ${#R0_JOBS[@]} > 0 )) && DEPENDENCY="afterany:$(join_ids "${R0_JOBS[@]}")"
 if run merge; then
-  MERGE=$(submit "${DEPENDENCY}" "${SCRIPTS}/mc_merge.bash")
+  # one task per merged file: 5 per zenith angle
+  MERGE=$(submit "${DEPENDENCY}" --array="0-$((5 * N_ZENITHS - 1))" "${SCRIPTS}/mc_merge.bash")
   DEPENDENCY="afterok:${MERGE}"
   echo "merge: job ${MERGE}"
+  # training files of several zenith angles: one task per particle
+  read -ra TRAIN_ZENITHS <<< "${MC_TRAIN_ZENITHS}"
+  if (( ${#TRAIN_ZENITHS[@]} > 1 )); then
+    MERGE_TRAIN=$(submit "${DEPENDENCY}" --array=0-1 "${SCRIPTS}/mc_merge_train.bash")
+    DEPENDENCY="afterok:${MERGE_TRAIN}"
+    echo "merge of the training files of ${MC_TRAIN_ZENITHS} deg: job ${MERGE_TRAIN}"
+  fi
 fi
 if run train; then
   # mono and stereo models: 2 x 3

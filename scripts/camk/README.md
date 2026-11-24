@@ -11,7 +11,8 @@ DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL3
 | Simulations | |
 |---|---|
 | `mc_r0_dl1.bash` | `sst1mpipe-process`, `MC_FILES_PER_TASK` simtel files per array task, per particle and zenith angle (`MC_ZENITHS`) |
-| `mc_merge.bash` | `ctapipe-merge`: training (`MC_TRAIN_FRACTION`) and test files of each zenith angle in `merged/ze<z>/`; with several training zenith angles (`MC_TRAIN_ZENITHS`), their training files in `merged/train_<MODELS_NAME>/` |
+| `mc_merge.bash` | `ctapipe-merge`, one array task per merged file (5 per zenith angle): training (`MC_TRAIN_FRACTION`) and test files of each zenith angle in `merged/ze<z>/` |
+| `mc_merge_train.bash` | with several training zenith angles (`MC_TRAIN_ZENITHS`): their training files in `merged/train_<MODELS_NAME>/`, one array task per particle |
 | `mc_train.bash` | `sst1mpipe-train-*`: energy, particle classifier, disp in `models/<MODELS_NAME>/mono/` (image parameters) and `models/<MODELS_NAME>/stereo/` (and the impact distance and `h_max` of the HillasReconstructor, events with both telescopes), with plots |
 | `mc_dl1_dl2.bash` | `sst1mpipe-apply-models` on the test files of each zenith angle: `dl2/<MODELS_NAME>/ze<z>/stereo` (stereo models, events with both telescopes), `tel1`, `tel2` (mono models, one telescope alone); the random forests use the `MC_DL2_CPUS` CPUs of each task (default 16, `--n-jobs`) |
 | `mc_irf.bash` | `ctapipe-optimize-event-selection`, `ctapipe-compute-irf`: point-like and full enclosure IRFs per zenith angle and mode (`tel1`, `tel2`, `stereo`), in `irf/<MODELS_NAME>/<IRF_CUTS>/<mode>/ze<z>/`, with their figures (`plots/`, `sst1mpipe-plot-irfs`) |
@@ -26,7 +27,7 @@ MC_ZENITHS="30" MC_TRAIN_ZENITHS="20 30" bash scripts/camk/submit_mc.bash
 ```
 
 and the DL2 and IRFs of ze20 with these models: `MC_START=dl2 MC_ZENITHS="20" MC_TRAIN_ZENITHS="20 30"`.
-The simulations of the zenith angles must have different CORSIKA runs (obs_id): `mc_merge.bash` stops otherwise.
+The simulations of the zenith angles must have different CORSIKA runs (obs_id): `mc_merge_train.bash` stops otherwise.
 
 | Data | |
 |---|---|
