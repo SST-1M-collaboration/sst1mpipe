@@ -31,7 +31,8 @@ dependencies = [
   "astroquery~=0.4.6",
   "click",
   "ctaplot~=0.6.2",
-  "gammapy~=1.3.0",
+  # gammapy 2.1 does not import with regions >= 0.12 (private function of regions removed): 2.2 or later
+  "gammapy>2.1",
   "h5py",
   "iminuit",
   "joblib",

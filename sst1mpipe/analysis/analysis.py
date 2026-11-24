@@ -449,9 +449,9 @@ def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_a
     if good_obsids is not None:
         obsid_mask = [obsid in list(good_obsids.astype(int)) for obsid in data_store.obs_table["OBS_ID"]]
         good_obs_list = data_store.obs_table[obsid_mask]['OBS_ID']
-        observations = data_store.get_observations(good_obs_list)
+        observations = data_store.get_observations(good_obs_list, required_irf="all-optional")
     else:
-        observations = data_store.get_observations()
+        observations = data_store.get_observations(required_irf="all-optional")
 
     for observation in observations:
 
@@ -469,9 +469,10 @@ def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_a
         norm_on = (separation > norm_range[0]) & (separation < norm_range[1])
         sum_norm_on += sum(norm_on)
 
-        # OFF counts
-        pos_angle = observation.pointing_radec.position_angle(target_coords)
-        sep_angle = observation.pointing_radec.separation(target_coords)
+        # OFF counts, around the pointing at the middle of the observation
+        pointing = observation.get_pointing_icrs(observation.tmid)
+        pos_angle = pointing.position_angle(target_coords)
+        sep_angle = pointing.separation(target_coords)
 
         # Calculate the OFF counts from the wobble positions (OFF regions) provided
         rotation_step = 360 / (n_off + 1)
@@ -481,7 +482,7 @@ def get_theta2_from_dl3(dl3_path, good_obsids=None, target_coords=None, theta2_a
 
         counts_all_off = []
         for _, rotation in enumerate(rotations_off, start=0):
-            position_off = observation.pointing_radec.directional_offset_by(rotation, sep_angle)
+            position_off = pointing.directional_offset_by(rotation, sep_angle)
             separation_off = position_off.separation(observation.events.radec)
             N_off += sum(separation_off < theta_cut)
             counts_off_wob, _ = np.histogram(separation_off ** 2, bins = theta2_axis.edges)
