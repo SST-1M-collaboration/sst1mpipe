@@ -28,7 +28,8 @@ MC_ZENITHS="30" MC_TRAIN_ZENITHS="20 30" bash scripts/camk/submit_mc.bash
 ```
 
 and the DL2 and IRFs of ze20 with these models: `MC_START=dl2 MC_ZENITHS="20" MC_TRAIN_ZENITHS="20 30"`.
-The simulations of the zenith angles must have different CORSIKA runs (obs_id): `mc_merge_train.bash` stops otherwise.
+The simulations of the zenith angles have the same CORSIKA runs (obs_id): in the training files of
+several zenith angles, the obs_ids of each zenith angle get the offset zenith × 10000000 (`offset_obs_ids.py`).
 
 IRFs: `IRF_CUTS=optimized` (best sensitivity) or `paper` (fixed cuts of arXiv:2506.01733: 60 % gamma
 efficiency, 80 % theta containment); background weighted to protons + helium (`IRF_BACKGROUND=p_he`,
