@@ -40,7 +40,8 @@ def main(args=None):
     parser.add_argument("--dl2", type=labelled, action="append", default=[],
                         help="<label>=<directory with gamma_point.dl2.h5 and proton_test.dl2.h5> (gammaness, ROC)")
     parser.add_argument("-o", "--output-dir", type=Path, required=True)
-    parser.add_argument("--title", default="", help="added to the titles of the figures")
+    parser.add_argument("--title", default="",
+                        help="title of the legends (the figures have no title), e.g. '30°, optimized cuts'")
     parser.add_argument("--reference", type=labelled, action="append", default=[],
                         help="<label>=<IRF directory>, drawn as lines; ref:<directory>: published performance, e.g. ref:crab_paper_2025/tel1/ze30")
     options = parser.parse_args(args)

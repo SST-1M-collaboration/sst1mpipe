@@ -33,6 +33,10 @@ REFERENCE_DIRECTORY = Path(__file__).parents[1] / "resources" / "reference"
 #: axis limits of the IRF figures, in addition to the ones of the models (`sst1mpipe.ml.plots.LIMITS`)
 IRF_LIMITS = {
     **LIMITS,
+    "energy": (0.1, 1e3),  # TeV, true and reconstructed energy
+    "bias": (-20, 20),  # %
+    "resolution": (0, 30),  # %
+    "migration": (0, 2),  # reconstructed / true energy
     "effective_area": (1e0, 1e7),  # m2
     "angular_resolution": (0, 0.5),  # deg
     "theta_cut": (0, 0.6),  # deg
@@ -70,6 +74,24 @@ def read_irf_directory(directory):
                     table = QTable.read(hdul[hdu], mask_invalid=False)
                     data[name] = table if filename == "cuts.fits" else table[0]
     return data
+
+
+#: axis labels of the IRF figures (matplotlib mathtext: the exponents do not depend on the glyphs of the font)
+E_TRUE = r"$E_\mathrm{true}$ (TeV)"
+E_RECO = r"$E_\mathrm{reco}$ (TeV)"
+LABELS = {
+    "effective_area": r"$A_\mathrm{eff}$ (m$^2$)",
+    "effective_area_protons": r"$A_\mathrm{eff}$, protons (m$^2$)",
+    "energy_bias": "energy bias (%)",
+    "energy_resolution": "energy resolution (%)",
+    "angular_resolution": r"$\theta_{68}$ (deg)",
+    "theta_cut": r"$\theta$ cut (deg)",
+    "gammaness_cut": "gammaness cut",
+    "background": r"background (s$^{-1}$ sr$^{-1}$ TeV$^{-1}$)",
+    "sensitivity_crab": "sensitivity (% Crab)",
+    "sensitivity": r"$E^2\,\mathrm{d}N/\mathrm{d}E$ (TeV cm$^{-2}$ s$^{-1}$)",
+    "migration": r"$E_\mathrm{reco}/E_\mathrm{true}$",
+}
 
 
 def _reference(ax, low, high, values, color, label):
@@ -185,26 +207,25 @@ def plot_irfs(inputs, directory, title="", references=None):
     """
     One figure per quantity in ``directory`` (``<quantity>.png``), one series per input:
     ``inputs`` {label: data of `read_irf_directory`}, ``references`` (same format) drawn as lines. The
-    quantities of none of the inputs are not drawn.
+    quantities of none of the inputs are not drawn. No figure titles: the labels of the series and
+    ``title`` (e.g. ``30°, optimized cuts``, as the title of the legend) say what is drawn.
     """
     references = references or {}
     colors = dict(zip([*inputs, *(f"reference {label}" for label in references)], COLORS * 2, strict=False))
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    suffix = f", {title}" if title else ""
     paths = []
-    labels = len(inputs) + len(references) > 1
 
     def legend(ax):
         if ax.get_legend_handles_labels()[0]:
-            ax.legend(frameon=False, fontsize=8)
+            ax.legend(frameon=False, fontsize=8, title=title or None, title_fontsize=8)
 
     def draw(ax, key, get):
         """Series of the inputs and references with ``key``: False if none"""
         drawn = False
         for label, data in inputs.items():
             if key in data:
-                _series(ax, *get(data), colors[label], label if labels else None)
+                _series(ax, *get(data), colors[label], label)
                 drawn = True
         for label, data in references.items():
             if key in data:
@@ -212,44 +233,42 @@ def plot_irfs(inputs, directory, title="", references=None):
                 drawn = True
         return drawn
 
-    def per_energy(name, ylabel, xlabel, ylim, get, key, log=False, zero_line=False, plot_title=None):
+    def per_energy(name, xlabel, ylim, get, key, log=False, zero_line=False):
         fig, ax = figure()
         if not draw(ax, key, get):
             plt.close(fig)
             return
         if zero_line:
             ax.axhline(0, color=MUTED, lw=1)
-        ax.set(xscale="log", xlim=IRF_LIMITS["energy"], ylim=ylim, xlabel=xlabel, ylabel=ylabel)
+        ax.set(xscale="log", xlim=IRF_LIMITS["energy"], ylim=ylim, xlabel=xlabel, ylabel=LABELS[name])
         if log:
             ax.set_yscale("log")
         legend(ax)
-        paths.append(save(fig, directory / f"{name}.png", (plot_title or ylabel.capitalize()) + suffix))
+        paths.append(save(fig, directory / f"{name}.png"))
 
-    true, reco = "true energy (TeV)", "reconstructed energy (TeV)"
-    per_energy("effective_area", "effective area (m²)", true, IRF_LIMITS["effective_area"],
-               lambda d: (*_edges(d["aeff"]), d["aeff"]["EFFAREA"].ravel().to_value(u.m**2)), "aeff", log=True,
-               plot_title="Effective area (gammas)")
-    per_energy("effective_area_protons", "effective area (m²)", true, IRF_LIMITS["effective_area"],
+    per_energy("effective_area", E_TRUE, IRF_LIMITS["effective_area"],
+               lambda d: (*_edges(d["aeff"]), d["aeff"]["EFFAREA"].ravel().to_value(u.m**2)), "aeff", log=True)
+    per_energy("effective_area_protons", E_TRUE, IRF_LIMITS["effective_area"],
                lambda d: (*_edges(d["aeff_protons"]), d["aeff_protons"]["EFFAREA"].ravel().to_value(u.m**2)),
-               "aeff_protons", log=True, plot_title="Effective area (protons)")
-    per_energy("energy_bias", "energy bias", true, IRF_LIMITS["bias"],
-               lambda d: (*_edges(d["energy"]), np.ravel(d["energy"]["BIAS"])), "energy", zero_line=True)
-    per_energy("energy_resolution", "energy resolution", true, IRF_LIMITS["resolution"],
-               lambda d: (*_edges(d["energy"]), np.ravel(d["energy"]["RESOLUTION"])), "energy")
-    per_energy("angular_resolution", "68 % containment radius (deg)", true, IRF_LIMITS["angular_resolution"],
+               "aeff_protons", log=True)
+    # bias and resolution in %
+    per_energy("energy_bias", E_TRUE, IRF_LIMITS["bias"],
+               lambda d: (*_edges(d["energy"]), 100 * np.ravel(d["energy"]["BIAS"])), "energy", zero_line=True)
+    per_energy("energy_resolution", E_TRUE, IRF_LIMITS["resolution"],
+               lambda d: (*_edges(d["energy"]), 100 * np.ravel(d["energy"]["RESOLUTION"])), "energy")
+    per_energy("angular_resolution", E_TRUE, IRF_LIMITS["angular_resolution"],
                lambda d: (*_edges(d["angular"]), d["angular"]["ANGULAR_RESOLUTION_68"].ravel().to_value(u.deg)),
-               "angular", plot_title="Angular resolution")
+               "angular")
     # cuts: bins with at least 10 events (the other ones have the fill value of ctapipe)
-    per_energy("theta_cut", "θ cut (deg)", reco, IRF_LIMITS["theta_cut"], lambda d: _cut(d["theta_cuts"]),
-               "theta_cuts", plot_title="Direction cut")
-    per_energy("gammaness_cut", "gammaness cut", reco, IRF_LIMITS["gammaness_cut"], lambda d: _cut(d["gh_cuts"]), "gh_cuts")
-    per_energy("background", "rate (s⁻¹ sr⁻¹ TeV⁻¹)", reco, IRF_LIMITS["background"],
+    per_energy("theta_cut", E_RECO, IRF_LIMITS["theta_cut"], lambda d: _cut(d["theta_cuts"]), "theta_cuts")
+    per_energy("gammaness_cut", E_RECO, IRF_LIMITS["gammaness_cut"], lambda d: _cut(d["gh_cuts"]), "gh_cuts")
+    per_energy("background", E_RECO, IRF_LIMITS["background"],
                lambda d: (*_edges(d["background"]),
                           d["background"]["BKG"].ravel().to_value(u.Unit("s-1 sr-1 TeV-1"))),
-               "background", log=True, plot_title="Background rate")
-    per_energy("sensitivity_crab", "flux sensitivity (% Crab)", reco, IRF_LIMITS["crab"],
+               "background", log=True)
+    per_energy("sensitivity_crab", E_RECO, IRF_LIMITS["crab"],
                lambda d: (*_edges(d["sensitivity"]), 100 * np.ravel(d["sensitivity"]["RELATIVE_SENSITIVITY"])),
-               "sensitivity", log=True, plot_title="Sensitivity, 50 h")
+               "sensitivity", log=True)
 
     # E² flux sensitivity, with the Crab Nebula
     fig, ax = figure()
@@ -260,10 +279,10 @@ def plot_irfs(inputs, directory, title="", references=None):
                     xytext=(0, 4), textcoords="offset points")
     if draw(ax, "sensitivity", lambda d: (*_edges(d["sensitivity"]), d["sensitivity"]["ENERGY_FLUX_SENSITIVITY"]
                                           .ravel().to_value(u.TeV / u.cm**2 / u.s))):
-        ax.set(xscale="log", yscale="log", xlim=IRF_LIMITS["energy"], ylim=IRF_LIMITS["sensitivity"], xlabel=reco,
-               ylabel="E² dN/dE (TeV cm⁻² s⁻¹)")
+        ax.set(xscale="log", yscale="log", xlim=IRF_LIMITS["energy"], ylim=IRF_LIMITS["sensitivity"], xlabel=E_RECO,
+               ylabel=LABELS["sensitivity"])
         legend(ax)
-        paths.append(save(fig, directory / "sensitivity.png", f"Flux sensitivity, 50 h{suffix}"))
+        paths.append(save(fig, directory / "sensitivity.png"))
     else:
         plt.close(fig)
 
@@ -279,11 +298,13 @@ def plot_irfs(inputs, directory, title="", references=None):
         fig, ax = figure()
         mesh = ax.pcolormesh(np.concatenate([low, high[-1:]]), migra, np.ma.masked_equal(matrix, 0), cmap="Blues")
         ax.axhline(1, color=MUTED, lw=1, ls="--")
-        ax.set(xscale="log", xlim=IRF_LIMITS["energy"], ylim=(migra[0], migra[-1]), xlabel=true,
-               ylabel="reconstructed / true energy")
+        ax.set(xscale="log", xlim=IRF_LIMITS["energy"], ylim=IRF_LIMITS["migration"], xlabel=E_TRUE,
+               ylabel=LABELS["migration"])
         fig.colorbar(mesh, ax=ax, label="probability density")
+        ax.text(0.03, 0.95, ", ".join(text for text in (label, title) if text), transform=ax.transAxes, fontsize=8,
+                va="top")
         name = "energy_migration" if len(inputs) == 1 else f"energy_migration_{label}"
-        paths.append(save(fig, directory / f"{name}.png", f"Energy migration, {label}{suffix}"))
+        paths.append(save(fig, directory / f"{name}.png"))
     return paths
 
 
@@ -299,7 +320,6 @@ def plot_gamma_hadron_separation(inputs, directory, prefix="RandomForestClassifi
 
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
-    suffix = f", {title}" if title else ""
     gammaness = {}
     for label, (gamma_file, proton_file) in inputs.items():
         values = []
@@ -316,9 +336,9 @@ def plot_gamma_hadron_separation(inputs, directory, prefix="RandomForestClassifi
         for values, name, color in ((gammas, "gammas", COLORS[0]), (protons, "protons", COLORS[1])):
             ax.hist(values, bins=bins, histtype="step", density=True, lw=2, color=color, label=name)
         ax.set(xlim=(0, 1), xlabel="gammaness", ylabel="probability density")
-        ax.legend(frameon=False)
+        ax.legend(frameon=False, fontsize=8, title=", ".join(text for text in (label, title) if text), title_fontsize=8)
         name = "gammaness" if len(inputs) == 1 else f"gammaness_{label}"
-        paths.append(save(fig, directory / f"{name}.png", f"Gammaness, {label}{suffix}"))
+        paths.append(save(fig, directory / f"{name}.png"))
 
     fig, ax = figure()
     for (label, (gammas, protons)), color in zip(gammaness.items(), COLORS, strict=False):
@@ -328,9 +348,8 @@ def plot_gamma_hadron_separation(inputs, directory, prefix="RandomForestClassifi
         false_positive, true_positive, _ = roc_curve(truth, scores)
         ax.plot(false_positive, true_positive, color=color, label=f"{label} (AUC {roc_auc_score(truth, scores):.3f})")
     ax.plot([0, 1], [0, 1], color=MUTED, lw=1, ls="--")
-    ax.set(xlim=IRF_LIMITS["fraction"], ylim=IRF_LIMITS["fraction"],
-           xlabel="false positive rate (protons classified as gammas)",
-           ylabel="true positive rate (gammas classified as gammas)")
-    ax.legend(frameon=False, fontsize=8)
-    paths.append(save(fig, directory / "roc.png", f"ROC curve{suffix}"))
+    ax.set(xlim=IRF_LIMITS["fraction"], ylim=IRF_LIMITS["fraction"], xlabel="false positive rate (protons)",
+           ylabel="true positive rate (gammas)")
+    ax.legend(frameon=False, fontsize=8, title=title or None, title_fontsize=8)
+    paths.append(save(fig, directory / "roc.png"))
     return paths
