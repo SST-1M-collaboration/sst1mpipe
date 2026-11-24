@@ -36,7 +36,7 @@
         "LocalPeakWindowSum": {
             "apply_integration_correction": true,
             "window_shift": 3,
-            "window_width": 7
+            "window_width": 8
         },
         "invalid_pixel_handler_type": "NeighborAverage"
     },

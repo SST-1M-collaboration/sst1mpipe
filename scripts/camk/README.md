@@ -16,7 +16,7 @@ The data of a night (R0 -> DL3) are processed by the scripts of `scripts/daily` 
 | `mc_merge_train.bash` | with several training zenith angles (`MC_TRAIN_ZENITHS`): their training files in `merged/train_<MODELS_NAME>/`, one array task per particle |
 | `mc_train.bash` | `sst1mpipe-train-*`: energy, particle classifier, disp in `models/<MODELS_NAME>/mono/` (image parameters) and `models/<MODELS_NAME>/stereo/` (and the impact distance and `h_max` of the HillasReconstructor, events with both telescopes), with plots |
 | `mc_dl1_dl2.bash` | `sst1mpipe-apply-models` on the test files of each zenith angle: `dl2/<MODELS_NAME>/ze<z>/stereo` (stereo models, events with both telescopes), `tel1`, `tel2` (mono models, one telescope alone); the random forests use the `MC_DL2_CPUS` CPUs of each task (default 16, `--n-jobs`) |
-| `mc_irf.bash` | `ctapipe-optimize-event-selection`, `ctapipe-compute-irf`: point-like and full enclosure IRFs per zenith angle and mode (`tel1`, `tel2`, `stereo`), in `irf/<MODELS_NAME>/<IRF_CUTS>/<mode>/ze<z>/`, with their figures (`plots/`, `sst1mpipe-plot-irfs`) |
+| `mc_irf.bash` | `sst1mpipe-optimize-event-selection`, `sst1mpipe-compute-irf` (ctapipe IRF tools with the Crab of MAGIC and protons + helium of the paper): point-like and full enclosure IRFs per zenith angle and mode (`tel1`, `tel2`, `stereo`), in `irf/<MODELS_NAME>/<IRF_CUTS>/<mode>/ze<z>/`, with their figures (`plots/`, `sst1mpipe-plot-irfs`) |
 | `mc_irf_comparison.bash` | figures of the three modes together, in `irf/<MODELS_NAME>/<IRF_CUTS>/comparison/ze<z>/` |
 
 `MODELS_NAME`: the zenith angles of the training, `ze20` or `ze20_30` (`MC_TRAIN_ZENITHS`, default
@@ -32,7 +32,7 @@ The simulations of the zenith angles have the same CORSIKA runs (obs_id): in the
 several zenith angles, the obs_ids of each zenith angle get the offset zenith × 10000000 (`offset_obs_ids.py`).
 
 IRFs: `IRF_CUTS=optimized` (best sensitivity) or `paper` (fixed cuts of arXiv:2506.01733: 60 % gamma
-efficiency, 80 % theta containment); background weighted to protons + helium (`IRF_BACKGROUND=p_he`,
+efficiency per energy bin, one theta cut of 80 % containment); background weighted to protons + helium (`IRF_BACKGROUND=p_he`,
 or `protons`). `MC_START=dl2` / `irf`: from the DL2 / IRFs of a previous submission, e.g.
 
 ```bash
