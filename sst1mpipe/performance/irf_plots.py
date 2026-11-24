@@ -206,12 +206,18 @@ def _crab(energy):
 def plot_irfs(inputs, directory, title="", references=None):
     """
     One figure per quantity in ``directory`` (``<quantity>.png``), one series per input:
-    ``inputs`` {label: data of `read_irf_directory`}, ``references`` (same format) drawn as lines. The
+    ``inputs`` {label: data of `read_irf_directory`}, ``references`` (same format) drawn as dashed lines,
+    with the color of the input named in their label (``paper stereo``: ``stereo``). The
     quantities of none of the inputs are not drawn. No figure titles: the labels of the series and
     ``title`` (e.g. ``30°, optimized cuts``, as the title of the legend) say what is drawn.
     """
     references = references or {}
-    colors = dict(zip([*inputs, *(f"reference {label}" for label in references)], COLORS * 2, strict=False))
+    colors = dict(zip(inputs, COLORS, strict=False))
+    # a reference named after an input (e.g. "paper stereo" for "stereo") has its color, the others the next ones
+    free = iter(COLORS[len(inputs):] + COLORS)
+    for label in references:
+        same = [name for name in inputs if name in label.split()]
+        colors[f"reference {label}"] = colors[same[0]] if same else next(free)
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     paths = []
