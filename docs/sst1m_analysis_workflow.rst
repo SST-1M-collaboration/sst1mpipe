@@ -8,18 +8,22 @@ SST-1M analysis workflow
 Automatic data processing
 -------------------------
 
-Raw data of both telescopes are processed up to DL3 with the SLURM scripts of
-``scripts/camk`` (see ``scripts/camk/README.md``), one night at a time:
+Raw data of both telescopes are processed up to DL3 every morning on **Calculus** by the scripts of
+``scripts/daily`` (see ``scripts/daily/README.md``), run by cron (``scripts/daily/crontab``) on the
+night before:
 
 .. code-block:: console
 
-    DATE=20260120 bash scripts/camk/submit_data.bash
+    DATE=20260120 bash scripts/daily/run_daily.bash
 
-The simulations (training of the models, DL2 and IRFs) are processed in the same way with
-``scripts/camk/submit_mc.bash``. Paths and settings are in ``scripts/camk/sst1mpipe.env``; each
-data level directory contains the configuration and log files of each processed run, so the
-processing and the version of ``sst1mpipe`` can be checked. The DL3 files are written per telescope
-(``cs1``, ``cs2``) and for the coincident events (``stereo``), with the index files of gammapy.
+The steps run on one machine, with all its cores. The same steps run with SLURM on camk with
+``scripts/daily/submit_data.bash``. The products are in ``/data/work/analysis/Daily_analysis/daily_data/<DATE>/``
+(``lists``, ``logs``, ``monitoring``, ``dl1``, ``dl2``, ``dl3``). Each data level has a directory per
+telescope (``cs1``, ``cs2``) and one for the coincident events (``stereo``). The logs of each step and
+raw file are in ``logs/``.
+
+The models and IRFs are those of the simulations, processed on camk with ``scripts/camk/submit_mc.bash``
+and copied to ``/data/work/analysis/MC/``. The settings are in ``scripts/daily/daily.env``.
 
 DL3 products can be further analyzed using standard tools 
 such as `gammapy <https://github.com/gammapy>`_, see :ref:`higher_level`.
