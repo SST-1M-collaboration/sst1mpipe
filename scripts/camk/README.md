@@ -4,9 +4,10 @@ Paths and settings: `sst1mpipe.env` (default simulations: `/work/se3/jurysek/sst
 submit scripts run on the login node and submit the jobs with their dependencies; logs in `~/logs`.
 
 ```bash
-bash scripts/camk/submit_mc.bash                  # simulations R0 -> IRFs
-DATE=20260120 bash scripts/camk/submit_data.bash  # data of a night R0 -> DL3
+bash scripts/camk/submit_mc.bash  # simulations R0 -> IRFs
 ```
+
+The data of a night (R0 -> DL3) are processed by the scripts of `scripts/daily` (camk or Calculus).
 
 | Simulations | |
 |---|---|
@@ -29,14 +30,6 @@ MC_ZENITHS="30" MC_TRAIN_ZENITHS="20 30" bash scripts/camk/submit_mc.bash
 and the DL2 and IRFs of ze20 with these models: `MC_START=dl2 MC_ZENITHS="20" MC_TRAIN_ZENITHS="20 30"`.
 The simulations of the zenith angles must have different CORSIKA runs (obs_id): `mc_merge_train.bash` stops otherwise.
 
-| Data | |
-|---|---|
-| `data_r0_dl1.bash` | `sst1mpipe-monitoring`, `sst1mpipe-process`, one raw file per array task, per telescope (raw files: `RAW_DIRECTORY`, default `/work/se1/sst1m_data/cs<tel>/data/raw/YYYY/MM/DD`) |
-| `data_dl1_stereo.bash` | `ctapipe-merge` of the night of each telescope, `sst1mpipe-stereo` |
-| `data_dl1_dl2.bash` | `sst1mpipe-apply-models` on every DL1 file: cs1, cs2 with the mono models, stereo with the stereo models |
-| `data_dl2_dl3.bash` | `sst1mpipe-dl2-dl3` on every DL2 file with the IRFs of `DATA_IRF_DIRECTORY` (cs1: `tel1`, cs2: `tel2`, stereo: `stereo`, closest zenith angle), index files of gammapy per analysis in `dl3/<cs1, cs2, stereo>/` |
-
-
 IRFs: `IRF_CUTS=optimized` (best sensitivity) or `paper` (fixed cuts of arXiv:2506.01733: 60 % gamma
 efficiency, 80 % theta containment); background weighted to protons + helium (`IRF_BACKGROUND=p_he`,
 or `protons`). `MC_START=dl2` / `irf`: from the DL2 / IRFs of a previous submission, e.g.
@@ -44,8 +37,6 @@ or `protons`). `MC_START=dl2` / `irf`: from the DL2 / IRFs of a previous submiss
 ```bash
 MC_START=irf IRF_CUTS=paper bash scripts/camk/submit_mc.bash
 ```
-
-DL3 (gammapy): `DataStore.from_dir("$DATA_DIRECTORY/dl3/stereo").get_observations(required_irf="point-like")`. TODO: dead time and GTI, issue #252.
 
 Comparison with the published performance (`ref:`: IRF directories of `sst1mpipe/resources/reference`,
 e.g. the SST-1M Crab paper, `crab_paper_2025/<mode>/ze<z>`, see `sst1mpipe-plot-irfs --help`):
