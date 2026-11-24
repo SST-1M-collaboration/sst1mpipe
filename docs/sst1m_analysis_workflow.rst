@@ -183,24 +183,31 @@ DL2 MC to IRFs
     :ref:`automatic_processing`. IRF production, however, is necessary in performance studies, or if one uses custom RFs to produce DL2, or applies
     custom selection cuts in DL2 to DL3 step.
 
-The IRFs are made with the tools of ctapipe from the DL2 of ``sst1mpipe-apply-models`` (point gammas,
-diffuse gammas for the full enclosure IRFs, diffuse protons):
+The IRFs are made with the tools of ctapipe, through their sst1mpipe versions, from the DL2 of
+``sst1mpipe-apply-models`` (point gammas, diffuse gammas for the full enclosure IRFs, diffuse protons).
+The sst1mpipe versions weight the events with the spectra of the SST-1M Crab paper (arXiv:2506.01733):
+the Crab Nebula of MAGIC (``--crab MAGIC``, default; ``HEGRA`` as ctapipe), and the protons weighted to
+protons + helium of DAMPE (``--background p_he``, default; ``protons`` as ctapipe). The relative
+sensitivity (% Crab) is relative to the Crab of MAGIC.
 
-1. ``ctapipe-optimize-event-selection``: gammaness and direction (theta) cuts per reconstructed energy
-   bin (``sst1mpipe_optimize_cuts.yaml``: the cuts of the best sensitivity; with
-   ``sst1mpipe_irf_paper_cuts.yaml``: the fixed efficiencies of the SST-1M Crab paper, 60 % of the
-   gammas for the gammaness cut, 80 % for the theta cut), written to ``cuts.fits``. The stereo
-   analysis has the events with both telescopes only: the stereo models predict only for them
-2. ``ctapipe-compute-irf`` (``sst1mpipe_compute_irf.yaml``): the IRFs with these cuts (effective area,
+1. ``sst1mpipe-optimize-event-selection``: gammaness and direction (theta) cuts, written to ``cuts.fits``:
+
+   - ``sst1mpipe_optimize_cuts.yaml``: the cuts of the best sensitivity per reconstructed energy bin;
+   - with ``sst1mpipe_irf_paper_cuts.yaml``: the cuts of the paper, a gammaness cut keeping 60 % of
+     the gammas in each energy bin and one theta cut for all the energies keeping 80 % of the gammas
+     (``GlobalThetaPercentileCuts``).
+
+   The stereo analysis has the events with both telescopes only: the stereo models predict only for them.
+2. ``sst1mpipe-compute-irf`` (``sst1mpipe_compute_irf.yaml``): the IRFs with these cuts (effective area,
    energy dispersion, PSF or ``RAD_MAX``, background) in the GADF format of gammapy, and the
    benchmarks (energy bias and resolution, angular resolution, sensitivity in 50 h).
    Point-like IRFs: ``--spatial-selection-applied --DefaultFoVOffsetBins.fov_offset_n_bins=1``.
 
 .. code-block:: console
 
-    ctapipe-optimize-event-selection --config sst1mpipe_optimize_cuts.yaml \
-        -g gamma_point.dl2.h5 -p proton_test.dl2.h5 -o cuts.fits
-    ctapipe-compute-irf --config sst1mpipe_compute_irf.yaml --cuts cuts.fits \
+    sst1mpipe-optimize-event-selection --config sst1mpipe_optimize_cuts.yaml \
+        --config sst1mpipe_irf_paper_cuts.yaml -g gamma_point.dl2.h5 -p proton_test.dl2.h5 -o cuts.fits
+    sst1mpipe-compute-irf --config sst1mpipe_compute_irf.yaml --cuts cuts.fits \
         --gamma-file gamma_point.dl2.h5 --proton-file proton_test.dl2.h5 --do-background \
         --spatial-selection-applied --DefaultFoVOffsetBins.fov_offset_n_bins=1 \
         --output irf_point_like.fits.gz --benchmark-output benchmarks_point_like.fits.gz

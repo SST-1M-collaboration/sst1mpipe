@@ -129,6 +129,8 @@ sst1mpipe-train-disp-reconstructor = "sst1mpipe.scripts.sst1mpipe_train_models_t
 sst1mpipe-apply-models = "sst1mpipe.scripts.sst1mpipe_apply_models_tool:main"
 sst1mpipe-plot-irfs = "sst1mpipe.scripts.sst1mpipe_plot_irfs_tool:main"
 sst1mpipe-dl2-dl3 = "sst1mpipe.scripts.sst1mpipe_dl2_dl3_tool:main"
+sst1mpipe-optimize-event-selection = "sst1mpipe.scripts.sst1mpipe_irf_tools:optimize_main"
+sst1mpipe-compute-irf = "sst1mpipe.scripts.sst1mpipe_irf_tools:compute_irf_main"
 
 # EventSource implementations found by ctapipe.io.EventSource
 [project.entry-points.ctapipe_io]
