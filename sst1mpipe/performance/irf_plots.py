@@ -20,7 +20,7 @@ import numpy as np
 from astropy.io import fits
 from astropy.table import QTable
 
-from pyirf.spectral import CRAB_HEGRA
+from pyirf.spectral import CRAB_MAGIC_JHEAP2015
 
 from sst1mpipe.ml.plots import COLORS, LIMITS, MUTED, figure, save
 
@@ -111,7 +111,7 @@ def write_reference_directory(directory, reference, true_energy_bins=None, reco_
         energy (bias, resolutions), per reconstructed energy (sensitivity), of the effective area
     effective_area: m2 per ``aeff_energy_bins`` bin
     energy_bias, energy_resolution, angular_resolution (deg): per ``true_energy_bins`` bin
-    sensitivity: E² dN/dE (TeV cm-2 s-1) per ``reco_energy_bins`` bin (relative: to the Crab of HEGRA)
+    sensitivity: E² dN/dE (TeV cm-2 s-1) per ``reco_energy_bins`` bin (relative: to the Crab of MAGIC, `_crab`)
     comments: {quantity: comment} (definitions of the publication)
     """
     directory = Path(directory)
@@ -176,9 +176,9 @@ def _series(ax, low, high, values, color, label):
 
 
 def _crab(energy):
-    """E² dN/dE of the Crab Nebula (HEGRA, Aharonian et al. 2004, as the relative sensitivity of ctapipe) in TeV cm-2 s-1"""
+    """E² dN/dE of the Crab Nebula (MAGIC, Aleksić et al. 2015, as the SST-1M Crab paper and the sst1mpipe IRF tools) in TeV cm-2 s-1"""
     energy = u.Quantity(energy, u.TeV)
-    return (energy**2 * CRAB_HEGRA(energy)).to_value(u.TeV / u.cm**2 / u.s)
+    return (energy**2 * CRAB_MAGIC_JHEAP2015(energy)).to_value(u.TeV / u.cm**2 / u.s)
 
 
 def plot_irfs(inputs, directory, title="", references=None):
