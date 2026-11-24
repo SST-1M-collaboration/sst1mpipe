@@ -44,7 +44,7 @@ models_args() {
 }
 
 # directory of the training files of the models MODELS_NAME: merged/ze<zenith> for one zenith angle,
-# merged/train_<MODELS_NAME> for several (mc_merge.bash)
+# merged/train_<MODELS_NAME> for several (mc_merge_train.bash)
 train_directory() {
   local zeniths
   read -ra zeniths <<< "${MC_TRAIN_ZENITHS}"
