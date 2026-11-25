@@ -15,7 +15,8 @@ sst1mpipe tool                           ctapipe tool                           
 ``sst1mpipe-train-particle-classifier``  ``ctapipe-train-particle-classifier``      plots: feature importances, gammaness, ROC curves
                                                                                     (all energies and per true energy)
 ``sst1mpipe-train-disp-reconstructor``   ``ctapipe-train-disp-reconstructor``       plots: feature importances, disp norm, sign accuracy
-``sst1mpipe-apply-models``               ``ctapipe-apply-models``                   pointing of the target if no telescope pointing
+``sst1mpipe-apply-models``               ``ctapipe-apply-models``                   pointing of the target if no telescope pointing,
+                                                                                    stereo combiner of the direction
 =======================================  =========================================  ===================================================
 
 Input: DL1 with the telescope frame parameters
@@ -62,8 +63,8 @@ Two sets of models, as in the SST-1M Crab paper:
   (impact distance of the telescope) and ``HillasReconstructor_h_max`` (height of the shower maximum),
   for the energy, the gammaness, and the disp norm and sign. They are trained on the events reconstructed
   by both telescopes (quality criterion ``stereo``) and give predictions for these events only. Still one
-  model per telescope, whose predictions are combined (intensity weighted mean of the energy, the
-  gammaness and the direction). The simulations have the stereo parameters (the HillasReconstructor runs in
+  model per telescope, whose predictions are combined (intensity weighted mean of the energy and the
+  gammaness, stereo direction of the paper: ``StereoDISPSignCombiner``). The simulations have the stereo parameters (the HillasReconstructor runs in
   ``sst1mpipe-process``), the stereo data those of ``sst1mpipe-stereo``.
 
 After the training, the plots of the models are made in ``--plot-dir`` (by default
@@ -128,6 +129,45 @@ data (interpolated at the time of each event). Without it (data processed withou
 data), the pointing of the target (RA/Dec of the run) transformed into alt/az at the time of each
 event is used, with a warning.
 
+Stereo direction of the SST-1M Crab paper
+-----------------------------------------
+
+The stereo disp models use ``StereoDISPSignCombiner`` (``sst1mpipe_train_disp_reconstructor_stereo.yaml``),
+the stereo direction of the SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.2, the approach of MAGIC, as
+``stereo_reconstruction`` of sst1mpipe < 0.9):
+
+.. code-block:: yaml
+
+    DispReconstructor:
+      stereo_combiner_cls: StereoDISPSignCombiner
+      StereoDISPSignCombiner:
+        weights: intensity
+        min_telescopes: 2
+
+- only the disp norm of each telescope is used, not its sign classifier: each telescope gives two
+  possible source positions, at its disp norm on either side of the image centroid along the major axis;
+- of the combinations of the signs of the telescopes (4 for two telescopes), the one whose positions are
+  the closest is chosen (``disp_sign_combination``: smallest angular distance, for more telescopes the
+  smallest sum of the distances of the pairs);
+- the direction is the weighted mean of these positions (``weights``, as ``StereoMeanCombiner``:
+  intensity, as the paper);
+- stereo events are the events with at least ``min_telescopes`` valid telescopes, i.e. passing the
+  quality cuts of the models (paper: both telescopes, intensity > 45 p.e., leakage2 < 0.7). The other
+  ones get an invalid direction, so they are not in the IRFs. ``min_telescopes: 1`` keeps the events
+  with one telescope, with the sign of its classifier.
+
+The energy and the gammaness are combined by the ``StereoMeanCombiner`` (intensity weighted mean). The
+combiner is a class of sst1mpipe (``sst1mpipe.ml``): the models using it are applied with the sst1mpipe
+tools (or any program importing ``sst1mpipe.ml``), not with ``ctapipe-apply-models``.
+
+The combiner is saved with the disp model at its training. ``sst1mpipe-apply-models`` can apply the
+same models with another combiner, e.g. to compare the stereo directions:
+
+.. code-block:: console
+
+    sst1mpipe-apply-models -i gamma_point.dl1.h5 -o gamma_point.dl2.h5 -r models/stereo/disp_reconstructor.pkl ... \
+        --ApplyModels.disp_stereo_combiner=StereoDISPSignCombiner --StereoDISPSignCombiner.min_telescopes=2
+
 Differences with the random forests of sst1mpipe
 ------------------------------------------------
 
@@ -135,13 +175,19 @@ Differences with the random forests of sst1mpipe
 same                                            random forests and their settings, features, event selection,
                                                 number of training events, gamma/proton fraction, one model per
                                                 telescope, intensity weighted stereo mean of the energy and
-                                                gammaness
+                                                gammaness, stereo direction (``StereoDISPSignCombiner``)
 different                                       energy trained on ln(E) (log10(E) in sst1mpipe), one feature list
                                                 for the disp norm and sign, DL2 columns and tables of ctapipe, one
-                                                file per model type (with its configuration), stereo direction:
-                                                intensity weighted mean (``StereoMeanCombiner``)
+                                                file per model type (with its configuration)
 not (yet) with the ctapipe reconstructors       ``disp_vector``, misdirection model and event classes, reconstructed
                                                 energy and disp as gammaness features (by hand: apply the energy and
                                                 disp models to a separate classifier training sample)
 new                                             cross validation, training by chunks (larger samples)
 ==============================================  =================================================================
+
+API
+---
+
+.. autoclass:: sst1mpipe.ml.StereoDISPSignCombiner
+
+.. autofunction:: sst1mpipe.ml.disp_sign_combination

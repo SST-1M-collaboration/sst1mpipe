@@ -207,3 +207,16 @@ def test_stereo_models(dl1_files, tmp_path):
     assert np.any(valid)
     # only the events with the stereo parameters
     assert np.all(np.isfinite(events["HillasReconstructor_h_max"][valid]))
+
+    # stereo direction of the Crab paper (StereoDISPSignCombiner of the stereo disp model): both telescopes
+    disp = read_table(output, "/dl2/event/subarray/geometry/disp")
+    n_telescopes = np.sum(np.asarray(disp["disp_telescopes"]), axis=1)
+    assert np.any(disp["disp_is_valid"])
+    assert np.all(n_telescopes[np.asarray(disp["disp_is_valid"], dtype=bool)] == 2)
+    # the same models with another combiner (apply time): also the events with one valid telescope
+    output_mean = tmp_path / "gamma_point_mean.dl2.h5"
+    argv = ["-i", str(dl1_files["gamma_point"]), *reconstructors, "-o", str(output_mean), "--no-progress",
+            "--ApplyModels.disp_stereo_combiner=StereoMeanCombiner"]
+    assert run_tool(ApplyModels(), argv=argv, raises=True) == 0
+    mean = read_table(output_mean, "/dl2/event/subarray/geometry/disp")
+    assert np.count_nonzero(mean["disp_is_valid"]) >= np.count_nonzero(disp["disp_is_valid"])
