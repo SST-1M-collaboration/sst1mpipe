@@ -18,8 +18,6 @@ sst1mpipe tool                           ctapipe tool                           
 ``sst1mpipe-apply-models``               ``ctapipe-apply-models``                   pointing of the target if no telescope pointing
 =======================================  =========================================  ===================================================
 
-The stereo direction of the MARS analysis (``StereoMARSCombiner``) is available in all of them.
-
 Input: DL1 with the telescope frame parameters
 ----------------------------------------------
 
@@ -64,8 +62,8 @@ Two sets of models, as in the SST-1M Crab paper:
   (impact distance of the telescope) and ``HillasReconstructor_h_max`` (height of the shower maximum),
   for the energy, the gammaness, and the disp norm and sign. They are trained on the events reconstructed
   by both telescopes (quality criterion ``stereo``) and give predictions for these events only. Still one
-  model per telescope, whose predictions are combined (intensity weighted mean of the energy and the
-  gammaness, MARS direction). The simulations have the stereo parameters (the HillasReconstructor runs in
+  model per telescope, whose predictions are combined (intensity weighted mean of the energy, the
+  gammaness and the direction). The simulations have the stereo parameters (the HillasReconstructor runs in
   ``sst1mpipe-process``), the stereo data those of ``sst1mpipe-stereo``.
 
 After the training, the plots of the models are made in ``--plot-dir`` (by default
@@ -130,30 +128,6 @@ data (interpolated at the time of each event). Without it (data processed withou
 data), the pointing of the target (RA/Dec of the run) transformed into alt/az at the time of each
 event is used, with a warning.
 
-Stereo direction of the MARS analysis
--------------------------------------
-
-``StereoMARSCombiner`` is selected in the configuration of the disp reconstructor (as in
-``sst1mpipe_train_disp_reconstructor.yaml``):
-
-.. code-block:: yaml
-
-    DispReconstructor:
-      stereo_combiner_cls: StereoMARSCombiner
-      StereoMARSCombiner:
-        weights: intensity
-
-Each telescope gives two possible source positions: at the reconstructed disp norm on either side
-of the image centroid along its major axis. For two telescopes, ``mars_disp_signs`` computes the
-crossing of the two major axes, and each telescope takes the sign whose position is the closest to
-this crossing. The directions of the telescopes recomputed with these signs are combined as by the
-``StereoMeanCombiner`` (weighted mean, ``weights``). Events with one telescope keep the disp sign
-predicted by the classifier; more than two telescopes are not implemented yet (TODO,
-``NotImplementedError``). The energy and the gammaness are combined as by the ``StereoMeanCombiner``.
-
-The combiner is a class of sst1mpipe (``sst1mpipe.ml``): the models using it are applied with the
-sst1mpipe tools (or any program importing ``sst1mpipe.ml``), not with ``ctapipe-apply-models``.
-
 Differences with the random forests of sst1mpipe
 ------------------------------------------------
 
@@ -161,10 +135,11 @@ Differences with the random forests of sst1mpipe
 same                                            random forests and their settings, features, event selection,
                                                 number of training events, gamma/proton fraction, one model per
                                                 telescope, intensity weighted stereo mean of the energy and
-                                                gammaness, MARS stereo direction
+                                                gammaness
 different                                       energy trained on ln(E) (log10(E) in sst1mpipe), one feature list
                                                 for the disp norm and sign, DL2 columns and tables of ctapipe, one
-                                                file per model type (with its configuration)
+                                                file per model type (with its configuration), stereo direction:
+                                                intensity weighted mean (``StereoMeanCombiner``)
 not (yet) with the ctapipe reconstructors       ``disp_vector``, misdirection model and event classes, reconstructed
                                                 energy and disp as gammaness features (by hand: apply the energy and
                                                 disp models to a separate classifier training sample)

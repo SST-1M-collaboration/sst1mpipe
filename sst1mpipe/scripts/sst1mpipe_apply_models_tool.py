@@ -1,6 +1,6 @@
 """
 ``sst1mpipe-apply-models``: ``ctapipe-apply-models`` (same options) for the SST-1M files. The output
-is the DL2 of ctapipe; the models can use the ``StereoMARSCombiner``.
+is the DL2 of ctapipe.
 
     sst1mpipe-apply-models -i run.dl1.h5 -o run.dl2.h5 \\
         -r models/nsb100/energy_regressor.pkl -r models/nsb100/particle_classifier.pkl \\
@@ -22,7 +22,7 @@ from ctapipe.core.traits import Int, IntTelescopeParameter, List
 from ctapipe.reco import Reconstructor
 from ctapipe.tools.apply_models import ApplyModels as CtapipeApplyModels
 
-import sst1mpipe.ml  # noqa: F401 (StereoMARSCombiner)
+import sst1mpipe.ml  # noqa: F401 (stereo combiners of sst1mpipe)
 
 #: Reconstructor.read of ctapipe (replaced during ApplyModels.setup)
 _read_reconstructor = Reconstructor.read

@@ -49,7 +49,7 @@ TrainDispReconstructor:
         - ["width", "hillas_width > 0"]
         - ["length", "hillas_length > 0"]
         - ["leakage", "leakage_intensity_width_2 < 0.7"]
-    # stereo direction of the MARS analysis (sst1mpipe.ml.StereoMARSCombiner)
-    stereo_combiner_cls: StereoMARSCombiner
-    StereoMARSCombiner:
+    # mono models: one telescope, the direction of its disp (the stereo combination does nothing)
+    stereo_combiner_cls: StereoMeanCombiner
+    StereoMeanCombiner:
       weights: intensity

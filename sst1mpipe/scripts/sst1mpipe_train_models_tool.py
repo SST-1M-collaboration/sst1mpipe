@@ -16,7 +16,7 @@ from ctapipe.tools.train_disp_reconstructor import TrainDispReconstructor as Cta
 from ctapipe.tools.train_energy_regressor import TrainEnergyRegressor as CtapipeTrainEnergyRegressor
 from ctapipe.tools.train_particle_classifier import TrainParticleClassifier as CtapipeTrainParticleClassifier
 
-from sst1mpipe.ml import plots  # also makes the StereoMARSCombiner available
+from sst1mpipe.ml import plots
 
 __all__ = ["TrainEnergyRegressor", "TrainParticleClassifier", "TrainDispReconstructor"]
 
