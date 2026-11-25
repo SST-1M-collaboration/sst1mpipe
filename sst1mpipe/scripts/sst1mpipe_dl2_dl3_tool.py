@@ -5,9 +5,9 @@ with the cuts and point-like IRFs of the ctapipe IRF tools (``ctapipe-optimize-e
 
     sst1mpipe-dl2-dl3 -i stereo/run.dl2.h5 --irf-directory irf/optimized/stereo -o dl3/
 
-One DL3 file per observation (``<output-dir>/SST1M_<obs_id>.dl3.fits.gz``, see
-`sst1mpipe.io.dl3`), then the index files of gammapy of all the DL3 files of the output directory
-(``hdu-index.fits.gz``, ``obs-index.fits.gz``):
+One DL3 file per observation (``<output-dir>/SST1M_<obs_id>.dl3.fits.gz``) in the Gamma Astro Data
+Formats (GADF, https://gamma-astro-data-formats.readthedocs.io, see `sst1mpipe.io.dl3`), then the index
+files of all the DL3 files of the output directory (``hdu-index.fits.gz``, ``obs-index.fits.gz``):
 
     from gammapy.data import DataStore
     observations = DataStore.from_dir("dl3/").get_observations(required_irf="point-like")
@@ -43,6 +43,23 @@ def _circular_mean(angles):
     return np.rad2deg(np.arctan2(np.mean(np.sin(radians)), np.mean(np.cos(radians)))) % 360
 
 
+def _target(observation):
+    """ICRS position of the target of the observation (observation block), None if not in ICRS"""
+    from ctapipe.containers import CoordinateFrameType
+
+    names = ("subarray_pointing_frame", "subarray_pointing_lon", "subarray_pointing_lat")
+    if not all(name in observation.colnames for name in names):
+        return None
+    try:
+        frame = CoordinateFrameType(int(observation["subarray_pointing_frame"][0]))
+    except (ValueError, TypeError):
+        return None
+    lon, lat = observation["subarray_pointing_lon"][0], observation["subarray_pointing_lat"][0]
+    if frame is not CoordinateFrameType.ICRS or not np.isfinite([float(lon), float(lat)]).all():
+        return None
+    return SkyCoord(ra=u.Quantity(lon, u.deg), dec=u.Quantity(lat, u.deg), frame="icrs")
+
+
 class DL2ToDL3(Tool):
     """DL3 of the data from the DL2 of ctapipe, with the cuts and IRFs of the ctapipe IRF tools"""
 
@@ -62,6 +79,7 @@ class DL2ToDL3(Tool):
     geometry_reconstructor = Unicode("disp", help="Prefix of the reconstructed direction").tag(config=True)
     energy_reconstructor = Unicode("RandomForestRegressor", help="Prefix of the reconstructed energy").tag(config=True)
     telescope = Unicode("SST-1M", help="TELESCOP of the DL3 files").tag(config=True)
+    origin = Unicode("SST-1M Collaboration", help="ORIGIN of the DL3 files (organisation)").tag(config=True)
     overwrite = Bool(False, help="Overwrite the DL3 files").tag(config=True)
     index = Bool(
         True, help="Write the index files of all the DL3 files of the output directory (not when run in parallel)",
@@ -140,15 +158,32 @@ class DL2ToDL3(Tool):
                 "alt": u.Quantity(selected[f"{geometry}_alt"], u.deg), "az": u.Quantity(selected[f"{geometry}_az"], u.deg),
                 "gammaness": selected[gammaness],
             }
+            if f"{geometry}_telescopes" in selected.colnames:
+                # telescopes of the reconstruction of the direction (MULTIP)
+                dl3_events["multiplicity"] = np.sum(np.asarray(selected[f"{geometry}_telescopes"]), axis=1)
             middle = start + (stop - start) / 2
             alt, az = np.nanmean(observation["pointing_alt"]), _circular_mean(observation["pointing_az"])
             pointing = SkyCoord(alt=alt * u.deg, az=az * u.deg, frame=AltAz(obstime=middle, location=location)).icrs
-            meta = {"TELESCOP": self.telescope, "INSTRUME": ",".join(str(t) for t in subarray.tel_ids),
-                    "N_TELS": len(subarray.tel_ids), "TELLIST": ",".join(str(t) for t in subarray.tel_ids),
-                    "ALT_PNT": (alt, "[deg] Mean pointing altitude"), "AZ_PNT": (az, "[deg] Mean pointing azimuth"),
-                    "CREATOR": self.name, "IRF": str(irf_directory)}
+            import sst1mpipe
+
+            tel_ids = [int(t) for t in subarray.tel_ids]
+            meta = {
+                "ORIGIN": (self.origin, "Organisation that created the file"),
+                "TELESCOP": (self.telescope, "Telescope"),
+                # SST-1M-1, SST-1M-2 (data telescopes 21, 22, simulated 1, 2) or SST-1M-1+2 (stereo)
+                "INSTRUME": ("SST-1M-" + "+".join(str(t % 20) for t in tel_ids), "Telescopes of the analysis"),
+                "N_TELS": (len(tel_ids), "Number of telescopes"),
+                "TELLIST": (",".join(str(t) for t in tel_ids), "Telescope ids"),
+                "ALT_PNT": (alt, "[deg] Mean pointing altitude"), "AZ_PNT": (az, "[deg] Mean pointing azimuth"),
+                "CREATOR": (f"{self.name} (sst1mpipe {sst1mpipe.__version__})", "Software that created the file"),
+                "IRF": str(irf_directory),  # IRFs and cuts (ctapipe-compute-irf); long path: no comment
+            }
             if "target" in observation.colnames and str(observation["target"][0]):
-                meta["OBJECT"] = str(observation["target"][0])
+                meta["OBJECT"] = (str(observation["target"][0]), "Target of the observation")
+            target = _target(observation)
+            if target is not None:
+                meta["RA_OBJ"] = (target.ra.to_value(u.deg), "[deg] Right ascension of the target")
+                meta["DEC_OBJ"] = (target.dec.to_value(u.deg), "[deg] Declination of the target")
             hdus = [
                 events_hdu(dl3_events, obs_id, location, pointing, start, stop, meta),
                 gti_hdu(start, stop),
