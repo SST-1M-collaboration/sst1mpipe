@@ -13,7 +13,7 @@
 # 3. sst1mpipe-plot-irfs: one figure per quantity in plots/
 # Spectra of the SST-1M Crab paper: Crab Nebula of MAGIC, protons weighted to protons + helium
 # (IRF_BACKGROUND=p_he, or protons; sst1mpipe.performance.irf_tools).
-# Task 3 i + j: zenith angle i, mode j.
+# Task n i + j: zenith angle i, mode j (n modes, IRF_MODES).
 
 #SBATCH --job-name=mc-irf
 #SBATCH --nodes=1
@@ -28,10 +28,12 @@
 source "${SST1MPIPE_ROOT:-${SLURM_SUBMIT_DIR:-.}}/scripts/camk/common.bash"
 
 read -ra ZENITHS <<< "${MC_ZENITHS}"
-MODES=(tel1 tel2 stereo)
+# IRF_MODES: the DL2 versions (default tel1 tel2 stereo, see mc_dl1_dl2.bash)
+read -ra MODES <<< "${IRF_MODES:-tel1 tel2 stereo}"
+N_MODES=${#MODES[@]}
 TASK=${SLURM_ARRAY_TASK_ID:-0}
-ZENITH=${ZENITHS[TASK / 3]}
-MODE=${MODES[TASK % 3]}
+ZENITH=${ZENITHS[TASK / N_MODES]}
+MODE=${MODES[TASK % N_MODES]}
 
 CONFIGS=()
 DL2="${MC_DIRECTORY}/dl2/${MODELS_NAME}/ze${ZENITH}/${MODE}"
