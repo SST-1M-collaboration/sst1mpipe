@@ -151,6 +151,9 @@ the stereo direction of the SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.2, the
   smallest sum of the distances of the pairs);
 - the direction is the weighted mean of these positions (``weights``, as ``StereoMeanCombiner``:
   intensity, as the paper);
+- ``sign_method: axes_crossing``: the former sst1mpipe method instead (each telescope takes the sign
+  whose position is the closest to the crossing of the major axes, ``axes_crossing_disp_signs``), for
+  comparison;
 - stereo events are the events with at least ``min_telescopes`` valid telescopes, i.e. passing the
   quality cuts of the models (paper: both telescopes, intensity > 45 p.e., leakage2 < 0.7). The other
   ones get an invalid direction, so they are not in the IRFs. ``min_telescopes: 1`` keeps the events
@@ -191,3 +194,5 @@ API
 .. autoclass:: sst1mpipe.ml.StereoDISPSignCombiner
 
 .. autofunction:: sst1mpipe.ml.disp_sign_combination
+
+.. autofunction:: sst1mpipe.ml.axes_crossing_disp_signs

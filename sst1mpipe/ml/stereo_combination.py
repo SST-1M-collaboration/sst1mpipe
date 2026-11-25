@@ -24,7 +24,7 @@ from ctapipe.reco.reconstructor import ReconstructionProperty
 from ctapipe.reco.stereo_combination import StereoMeanCombiner
 from ctapipe.reco.telescope_event_handling import get_subarray_index
 
-__all__ = ["StereoDISPSignCombiner", "StereoMARSCombiner", "disp_sign_combination", "axes_crossing_disp_signs"]
+__all__ = ["StereoDISPSignCombiner", "disp_sign_combination", "axes_crossing_disp_signs"]
 
 
 def _unit_vectors(alt, az):
@@ -76,8 +76,8 @@ def disp_sign_combination(alt_plus, az_plus, alt_minus, az_minus):
 
 def axes_crossing_disp_signs(hillas, disps):
     """
-    Signs of the disp of two telescopes by the crossing of the major axes (former ``StereoMARSCombiner``
-    of sst1mpipe, not the method of the SST-1M Crab paper): the crossing of the major axes of the two images is
+    Signs of the disp of two telescopes by the crossing of the major axes (the former stereo
+    combiner of sst1mpipe, not the method of the SST-1M Crab paper): the crossing of the major axes of the two images is
     computed, and each telescope takes the sign of its disp whose position (centroid +/- disp along
     the major axis) is the closest to this crossing.
 
@@ -171,7 +171,7 @@ class StereoDISPSignCombiner(StereoMeanCombiner):
         default_value="closest_positions",
         help=(
             "Choice of the disp signs: closest_positions (SST-1M Crab paper, MAGIC: the closest of the combinations"
-            " of the signs, disp_sign_combination), axes_crossing (former StereoMARSCombiner: each telescope takes"
+            " of the signs, disp_sign_combination), axes_crossing (former sst1mpipe combiner: each telescope takes"
             " the sign whose position is the closest to the crossing of the major axes, two telescopes only)"
         ),
     ).tag(config=True)
@@ -289,20 +289,3 @@ class StereoDISPSignCombiner(StereoMeanCombiner):
             geometry.ang_distance_uncert = np.nan * u.deg
             geometry.is_valid = False
 
-
-class StereoMARSCombiner(StereoDISPSignCombiner):
-    """
-    Deprecated: the former stereo combiner of sst1mpipe, kept to read the disp models trained with it.
-    The ``StereoDISPSignCombiner`` with the signs of the crossing of the major axes
-    (``sign_method="axes_crossing"``, `axes_crossing_disp_signs`) and the events with one telescope
-    (``min_telescopes=1``). Use the ``StereoDISPSignCombiner`` (stereo direction of the SST-1M Crab paper).
-    """
-
-    sign_method = CaselessStrEnum(
-        ["closest_positions", "axes_crossing"], default_value="axes_crossing",
-        help="Choice of the disp signs, see StereoDISPSignCombiner",
-    ).tag(config=True)
-
-    min_telescopes = Int(
-        default_value=1, min=1, help="Minimum number of valid telescopes, see StereoDISPSignCombiner",
-    ).tag(config=True)
