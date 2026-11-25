@@ -53,9 +53,33 @@ models_args() {
   done
 }
 
-# raw files of the night DATE of the telescope $1 (1 or 2), sorted
+# raw files of the night DATE of the telescope $1 (1 or 2), sorted: all the files of the night, or with
+# RAW_LIST (file with one raw file per line: absolute, or relative to ${RAW_DIRECTORY}/cs<tel>/, e.g.
+# data/raw/2023/10/12/SST1M1_20231012_0123.fits.fz) the ones of the list of this night and telescope
 raw_files() {
-  local directory="${RAW_DIRECTORY}/cs$1/data/raw/${DATE:0:4}/${DATE:4:2}/${DATE:6:2}"
+  local night="${DATE:0:4}/${DATE:4:2}/${DATE:6:2}"
+  if [[ -n "${RAW_LIST:-}" ]]; then
+    local line
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+      line="${line%%#*}"
+      line="${line//[[:space:]]/}"
+      [[ -z "${line}" ]] && continue
+      [[ "${line}" == /* ]] || line="${RAW_DIRECTORY}/cs$1/${line}"
+      [[ "$(basename "${line}")" == SST1M$1_*.fits.fz && "${line}" == */${night}/* ]] || continue
+      if [[ -f "${line}" ]]; then
+        echo "${line}"
+      else
+        echo "warning: ${line} (RAW_LIST) does not exist" >&2
+      fi
+    done < "${RAW_LIST}" | sort -u
+    return 0
+  fi
+  local directory="${RAW_DIRECTORY}/cs$1/data/raw/${night}"
   [[ -d "${directory}" ]] || return 0
   find "${directory}" -name "SST1M$1_*.fits.fz" | sort
+}
+
+# nights (YYYYMMDD) of the raw files of the list $1 (directories .../YYYY/MM/DD/), sorted
+list_nights() {
+  grep -oE '/[0-9]{4}/[0-9]{2}/[0-9]{2}/' "$1" | tr -d / | sort -u
 }

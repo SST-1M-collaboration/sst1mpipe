@@ -58,6 +58,19 @@ DATE=20260120 bash scripts/daily/submit_data.bash
 The same steps run as SLURM jobs: one array task per raw file for R0 -> DL1, then one job per step. The
 settings are in `camk.env` (the camk paths, then `daily.env`), and the logs in `~/logs`.
 
+- `DATA_STOP`: last step, `dl1` (monitoring and R0 -> DL1 only), `stereo`, `dl2` or `dl3` (default).
+- `RAW_LIST`: only the raw files of a list (one per line, absolute or relative to `RAW_DIRECTORY/cs<tel>/`,
+  e.g. `data/raw/2023/10/12/SST1M1_20231012_0123.fits.fz`; both telescopes in the same list), e.g. the
+  runs of a source. Without it, all the raw files of the night.
+
+Several nights, `submit_nights.bash`: the nights of `NIGHTS`, or of the files of `RAW_LIST` (directories
+`YYYY/MM/DD`), each with `submit_data.bash`:
+
+```bash
+RAW_LIST=crab_runs.txt DATA_STOP=dl1 bash scripts/daily/submit_nights.bash
+NIGHTS="20231012 20231013" DATA_STOP=dl1 bash scripts/daily/submit_nights.bash
+```
+
 ## Steps
 
 | Script | |
