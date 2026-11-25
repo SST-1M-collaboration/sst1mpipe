@@ -5,6 +5,6 @@ by the sst1mpipe tools (``sst1mpipe.scripts``): `StereoDISPSignCombiner` (stereo
 SST-1M Crab paper) and the plots of the trained models (`sst1mpipe.ml.plots`). Importing this package
 makes `StereoDISPSignCombiner` available to the ctapipe reconstructors.
 """
-from .stereo_combination import StereoDISPSignCombiner, StereoMARSCombiner, axes_crossing_disp_signs, disp_sign_combination
+from .stereo_combination import StereoDISPSignCombiner, axes_crossing_disp_signs, disp_sign_combination
 
-__all__ = ["StereoDISPSignCombiner", "StereoMARSCombiner", "disp_sign_combination", "axes_crossing_disp_signs"]
+__all__ = ["StereoDISPSignCombiner", "disp_sign_combination", "axes_crossing_disp_signs"]

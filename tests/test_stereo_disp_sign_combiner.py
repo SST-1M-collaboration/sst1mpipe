@@ -16,7 +16,7 @@ from ctapipe.reco.preprocessing import telescope_to_horizontal
 from ctapipe.reco.reconstructor import ReconstructionProperty
 from ctapipe.reco.stereo_combination import StereoCombiner, StereoMeanCombiner
 
-from sst1mpipe.ml import StereoDISPSignCombiner, StereoMARSCombiner, axes_crossing_disp_signs, disp_sign_combination
+from sst1mpipe.ml import StereoDISPSignCombiner, axes_crossing_disp_signs, disp_sign_combination
 
 GEOMETRY = ReconstructionProperty.GEOMETRY
 
@@ -186,10 +186,9 @@ def test_axes_crossing_disp_signs():
         axes_crossing_disp_signs([*hillas, hillas[0]], [0.9, 1.5, 0.3])
 
 
-def test_mars_combiner():
-    """former StereoMARSCombiner: signs of the axes crossing, events with one telescope kept"""
-    combiner = StereoMARSCombiner(prefix="disp", property=GEOMETRY)
-    assert combiner.sign_method == "axes_crossing" and combiner.min_telescopes == 1
+def test_axes_crossing_combiner():
+    """sign_method axes_crossing (former sst1mpipe combiner), min_telescopes 1: events with one telescope kept"""
+    combiner = StereoDISPSignCombiner(prefix="disp", property=GEOMETRY, sign_method="axes_crossing", min_telescopes=1)
     table = mono_table()
     stereo = combiner.predict_table(table)
     corrected = table.copy()
