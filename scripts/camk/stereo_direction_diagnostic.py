@@ -5,7 +5,7 @@ Reads a stereo DL2 file of point gammas (sst1mpipe-apply-models with the stereo 
 the 68 % containment of the angular distance to the true direction, per true energy bin (5 per decade,
 as the paper), for:
 
-  pipeline       the stereo direction of the pipeline (disp, StereoMARSCombiner) of all the valid events,
+  pipeline       the stereo direction of the DL2 (disp, combiner of the version) of all the valid events,
                  as in the IRFs: events with one valid telescope included
   1 telescope    the events of the pipeline with one valid telescope only (the other one failed the quality
                  cuts of the models: intensity > 45 p.e., leakage2 < 0.7)
