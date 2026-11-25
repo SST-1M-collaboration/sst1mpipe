@@ -317,8 +317,22 @@ def test_dl2_dl3(models, irfs, observation_monitoring, tmp_path, with_monitoring
     output = tmp_path / "dl3"
     argv = ["-i", str(dl2), "--irf-directory", str(irf_directories / "ze40"), "-o", str(output)]
     assert run_tool(DL2ToDL3(), argv=argv, raises=True) == 0
+    # GADF specification: the DL3 files and the index files
+    from astropy.io import fits
+
+    from sst1mpipe.io.dl3 import check_dl3_file, check_index
+
+    dl3_files = sorted(output.glob("*.dl3.fits.gz"))
+    assert len(dl3_files) == 1
+    assert check_dl3_file(dl3_files[0]) == []
+    assert check_index(output) == []
+    header = fits.getheader(dl3_files[0], "EVENTS")
+    assert header["INSTRUME"] == "SST-1M-1" and header["ORIGIN"] and header["CREATOR"].startswith("sst1mpipe-dl2-dl3")
+    assert header["TIMESYS"] == "TT" and header["DATE-OBS"] and header["RA_OBJ"] == pytest.approx(header["RA_PNT"], abs=2)
     store = DataStore.from_dir(output)
-    assert set(store.hdu_table["HDU_TYPE"]) == {"events", "gti", "pointing", "aeff", "edisp", "rad_max", "bkg"}
+    # the HDU types of GADF (the POINTING HDU is in the files, not in the index)
+    assert set(store.hdu_table["HDU_TYPE"]) == {"events", "gti", "aeff", "edisp", "rad_max", "bkg"}
+    assert {"OBS_ID", "OBS_MODE", "RA_PNT", "DEC_PNT", "TSTART", "TSTOP", "ZEN_PNT", "LIVETIME"} <= set(store.obs_table.colnames)
     observation = store.get_observations(required_irf="point-like")[0]
     events = observation.events.table
     valid = read_table(dl2, "/dl2/event/subarray/particle_type/RandomForestClassifier")["RandomForestClassifier_is_valid"]

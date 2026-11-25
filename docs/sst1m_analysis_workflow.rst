@@ -248,6 +248,33 @@ The models, the cuts and the IRFs must be the same (the same mode: ``tel1`` / ``
 analysis of each telescope, ``stereo``). The dead time is not corrected yet (``DEADC = 1``), and the GTI
 of an observation is from its first to its last event (issue #252).
 
+The files follow the `Gamma Astro Data Formats <https://gamma-astro-data-formats.readthedocs.io>`_
+(GADF, ``HDUCLASS = GADF``, ``HDUVERS = 0.3``), read by gammapy:
+
+- ``EVENTS``: the mandatory columns ``EVENT_ID``, ``TIME`` (float64 s since ``MJDREFI``/``MJDREFF``,
+  ``TIMESYS = TT``), ``RA``, ``DEC``, ``ENERGY``, and ``ALT``, ``AZ``, ``GAMMANESS``, ``MULTIP`` (telescopes
+  of the direction); the mandatory keywords (``OBS_ID``, ``TSTART``, ``TSTOP``, ``ONTIME``, ``LIVETIME``,
+  ``DEADC``, ``OBS_MODE = POINTING``, ``RA_PNT``, ``DEC_PNT``, ``EQUINOX``, ``RADECSYS``, ``ORIGIN``,
+  ``TELESCOP = SST-1M``, ``INSTRUME`` = ``SST-1M-1``, ``SST-1M-2`` or ``SST-1M-1+2``, ``CREATOR``), the
+  location of the array (``GEOLON``, ``GEOLAT``, ``ALTITUDE``) and ``OBJECT``, ``RA_OBJ``, ``DEC_OBJ``;
+- ``GTI`` (``START``, ``STOP``), ``POINTING`` (``TIME``, ``RA_PNT``, ``DEC_PNT``, ``ALT_PNT``, ``AZ_PNT``);
+- the point-like IRFs of ``ctapipe-compute-irf`` (``HDUCLAS3 = POINT-LIKE``: ``AEFF_2D``, ``EDISP_2D``,
+  ``RAD_MAX_2D``; ``BKG_2D``);
+- the index files: ``HDU_INDEX`` (the HDU types of GADF: ``events``, ``gti``, ``aeff``, ``edisp``,
+  ``rad_max``, ``bkg``; the ``POINTING`` HDU is not indexed), ``OBS_INDEX`` (``OBS_ID``, ``OBS_MODE``,
+  ``RA_PNT``, ``DEC_PNT``, ``TSTART``, ``TSTOP`` and ``ALT_PNT``, ``AZ_PNT``, ``ZEN_PNT``, ``ONTIME``,
+  ``LIVETIME``, ``DEADC``, dates, ``OBJECT``, ``TMID``, ``EVENT_COUNT``, ...).
+
+``sst1mpipe.io.dl3.check_dl3_file`` and ``check_index`` list what a DL3 file or the index files of a
+directory miss of the specification:
+
+.. code-block:: python
+
+    from sst1mpipe.io.dl3 import check_dl3_file, check_index
+
+    print(check_dl3_file("dl3/SST1M_20240110210012.dl3.fits.gz"))  # [] if it follows GADF
+    print(check_index("dl3/"))
+
 
 .. _higher_level:
 
