@@ -51,7 +51,9 @@ TrainDispReconstructor:
         - ["leakage", "leakage_intensity_width_2 < 0.7"]
         # stereo parameters of the HillasReconstructor (both telescopes)
         - ["stereo", "np.isfinite(HillasReconstructor_h_max) & np.isfinite(HillasReconstructor_tel_impact_distance)"]
-    # stereo direction of the MARS analysis (sst1mpipe.ml.StereoMARSCombiner)
-    stereo_combiner_cls: StereoMARSCombiner
-    StereoMARSCombiner:
+    # stereo direction of the SST-1M Crab paper (sst1mpipe.ml.StereoDISPSignCombiner): the closest of the
+    # combinations of the disp signs, intensity weighted mean; stereo events: both telescopes valid
+    stereo_combiner_cls: StereoDISPSignCombiner
+    StereoDISPSignCombiner:
       weights: intensity
+      min_telescopes: 2
