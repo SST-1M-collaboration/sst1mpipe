@@ -308,25 +308,23 @@ def test_apply_models_one_telescope(models, dl1_files, tmp_path):
 
 
 
-@pytest.fixture
-def ctapipe_spectra():
-    """Spectra of the ctapipe IRF tools restored after the test (the sst1mpipe IRF tools change them)"""
-    from ctapipe.irf import spectra
-
-    saved = dict(spectra.SPECTRA)
-    yield spectra
-    spectra.SPECTRA.update(saved)
-
-
-def test_plot_irfs(models, dl1_files, tmp_path, ctapipe_spectra):
-    """IRFs (cuts of the Crab paper: few events) of the DL2 of the models with the sst1mpipe IRF tools, and their figures"""
+@pytest.fixture(scope="module")
+def irfs(models, dl1_files, tmp_path_factory):
+    """
+    IRFs (cuts of the Crab paper: few events) of the DL2 of the models with the sst1mpipe IRF tools: (IRF
+    directory: cuts.fits, irf_point_like.fits.gz, benchmarks_point_like.fits.gz; DL2 directory). The spectra
+    of the ctapipe IRF tools (changed by the sst1mpipe tools) are restored after the tests.
+    """
     from astropy.table import QTable
+    from ctapipe.irf import spectra
     from pyirf.spectral import CRAB_MAGIC_JHEAP2015, DAMPE_P_He_SPECTRUM
 
     from sst1mpipe.resources import CONFIG_DIR
     from sst1mpipe.scripts.sst1mpipe_irf_tools import SST1MEventSelectionOptimizer, SST1MIrfTool
-    from sst1mpipe.scripts.sst1mpipe_plot_irfs_tool import main as plot_irfs
 
+    saved_spectra = dict(spectra.SPECTRA)
+
+    tmp_path = tmp_path_factory.mktemp("irfs")
     directory, _ = models
     reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
     dl2 = tmp_path / "dl2"
@@ -343,8 +341,8 @@ def test_plot_irfs(models, dl1_files, tmp_path, ctapipe_spectra):
             "-o", str(irf / "cuts.fits")]
     assert run_tool(SST1MEventSelectionOptimizer(), argv=argv, raises=True) == 0
     # spectra of the paper: Crab of MAGIC, protons + helium
-    assert ctapipe_spectra.SPECTRA[ctapipe_spectra.Spectra.CRAB_HEGRA] is CRAB_MAGIC_JHEAP2015
-    assert ctapipe_spectra.SPECTRA[ctapipe_spectra.Spectra.IRFDOC_PROTON_SPECTRUM] is DAMPE_P_He_SPECTRUM
+    assert spectra.SPECTRA[spectra.Spectra.CRAB_HEGRA] is CRAB_MAGIC_JHEAP2015
+    assert spectra.SPECTRA[spectra.Spectra.IRFDOC_PROTON_SPECTRUM] is DAMPE_P_He_SPECTRUM
     # one theta cut for all the energies (GlobalThetaPercentileCuts), gammaness cut per energy bin
     rad_max = QTable.read(irf / "cuts.fits", hdu="RAD_MAX")["cut"]
     assert len(rad_max) > 1 and np.all(rad_max == rad_max[0])
@@ -353,7 +351,15 @@ def test_plot_irfs(models, dl1_files, tmp_path, ctapipe_spectra):
             "--do-background", "--spatial-selection-applied", "--DefaultFoVOffsetBins.fov_offset_n_bins=1",
             "--output", str(irf / "irf_point_like.fits.gz"), "--benchmark-output", str(irf / "benchmarks_point_like.fits.gz")]
     assert run_tool(SST1MIrfTool(), argv=argv, raises=True) == 0
+    yield irf, dl2
+    spectra.SPECTRA.update(saved_spectra)
 
+
+def test_plot_irfs(irfs, tmp_path):
+    """Figures of the IRFs, with references"""
+    from sst1mpipe.scripts.sst1mpipe_plot_irfs_tool import main as plot_irfs
+
+    irf, dl2 = irfs
     plot_irfs(["--irf", f"stereo={irf}", "--dl2", f"stereo={dl2}", "-o", str(tmp_path / "plots")])
     names = {path.stem for path in (tmp_path / "plots").glob("*.png")}
     assert names == {"effective_area", "effective_area_protons", "energy_bias", "energy_resolution", "angular_resolution",
@@ -401,6 +407,76 @@ def test_instrument_sensitivities(name):
     sensitivity = data["sensitivity"]["ENERGY_FLUX_SENSITIVITY"].to_value(u.TeV / u.cm**2 / u.s)
     assert np.all((sensitivity > 1e-14) & (sensitivity < 1e-10))
 
+
+@pytest.mark.parametrize("with_monitoring", [True, False])
+def test_dl2_dl3(models, irfs, observation_monitoring, tmp_path, with_monitoring):
+    """
+    DL3 of an observation of telescope 21 (models and IRFs of telescope 1): read by gammapy with its
+    point-like IRFs; IRFs of the closest zenith angle; pointing of the target without monitoring data
+    """
+    import shutil
+
+    from astropy.coordinates import angular_separation
+    from ctapipe.irf import OptimizationResult
+    from gammapy.data import DataStore
+
+    from sst1mpipe.io.dl3 import select_irf_directory
+    from sst1mpipe.scripts.sst1mpipe_dl2_dl3_tool import DL2ToDL3
+
+    run = OBSERVATION_RUNS[21]
+    dl1 = tmp_path / "observation.dl1.h5"
+    monitoring = monitoring_source_args(observation_monitoring[21]) if with_monitoring else []
+    run_process(run["path"], dl1, f"--max-events={run['n_events']}", *monitoring, config=DATA_CONFIG_FILE)
+    directory, _ = models
+    dl2 = tmp_path / "observation.dl2.h5"
+    reconstructors = [arg for path in sorted((directory / "nsb100").glob("*.pkl")) for arg in ("-r", str(path))]
+    assert run_tool(ApplyModels(), argv=["-i", str(dl1), *reconstructors, "-o", str(dl2), "--no-progress"],
+                    raises=True) == 0
+
+    # IRFs at two zenith angles; the ze40 ones without gammaness cut (the test models are poor)
+    irf, _ = irfs
+    irf_directories = tmp_path / "irf"
+    shutil.copytree(irf, irf_directories / "ze20")
+    shutil.copytree(irf, irf_directories / "ze40")
+    cuts = OptimizationResult.read(irf / "cuts.fits")
+    cuts.gh_cuts["cut"] = 0.0
+    cuts.write(irf_directories / "ze40" / "cuts.fits", overwrite=True)
+    assert select_irf_directory(irf_directories, 30.5 * u.deg).name == "ze40"
+    assert select_irf_directory(irf_directories, 25 * u.deg).name == "ze20"
+    assert select_irf_directory(irf, 60 * u.deg) == irf
+
+    output = tmp_path / "dl3"
+    argv = ["-i", str(dl2), "--irf-directory", str(irf_directories / "ze40"), "-o", str(output)]
+    assert run_tool(DL2ToDL3(), argv=argv, raises=True) == 0
+    # GADF specification: the DL3 files and the index files
+    from astropy.io import fits
+
+    from sst1mpipe.io.dl3 import check_dl3_file, check_index
+
+    dl3_files = sorted(output.glob("*.dl3.fits.gz"))
+    assert len(dl3_files) == 1
+    assert check_dl3_file(dl3_files[0]) == []
+    assert check_index(output) == []
+    header = fits.getheader(dl3_files[0], "EVENTS")
+    assert header["INSTRUME"] == "SST-1M-1" and header["ORIGIN"] and header["CREATOR"].startswith("sst1mpipe-dl2-dl3")
+    assert header["TIMESYS"] == "TT" and header["DATE-OBS"] and header["RA_OBJ"] == pytest.approx(header["RA_PNT"], abs=2)
+    store = DataStore.from_dir(output)
+    # the HDU types of GADF (the POINTING HDU is in the files, not in the index)
+    assert set(store.hdu_table["HDU_TYPE"]) == {"events", "gti", "aeff", "edisp", "rad_max", "bkg"}
+    assert {"OBS_ID", "OBS_MODE", "RA_PNT", "DEC_PNT", "TSTART", "TSTOP", "ZEN_PNT", "LIVETIME"} <= set(store.obs_table.colnames)
+    observation = store.get_observations(required_irf="point-like")[0]
+    events = observation.events.table
+    valid = read_table(dl2, "/dl2/event/subarray/particle_type/RandomForestClassifier")["RandomForestClassifier_is_valid"]
+    assert 0 < len(events) <= np.count_nonzero(valid)
+    assert observation.obs_id == read_table(dl2, "/dl1/event/subarray/trigger")["obs_id"][0]
+    assert observation.rad_max is not None and observation.aeff is not None
+    # events around the pointing (wobble of the observation)
+    pointing = observation.pointing.fixed_icrs
+    separation = angular_separation(events["RA"].quantity, events["DEC"].quantity, pointing.ra, pointing.dec)
+    assert np.all(separation < 5 * u.deg)
+    target = read_table(dl2, "/configuration/observation/observation_block")["target"][0]
+    assert store.obs_table["OBJECT"][0] == target
+    assert 0 < store.obs_table["ZEN_PNT"].quantity[0] < 90 * u.deg
 
 def test_cut_without_n_events():
     """the cuts of the optimization of the sensitivity have no n_events: all the bins drawn"""

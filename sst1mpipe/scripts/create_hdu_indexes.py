@@ -1,79 +1,34 @@
 #!/usr/bin/env python
-
 """
-A script to create HDU index files for a user-defined selection of DL3 files.
-- Inputs are DL3 files to be indexed, together with IRF base directory.
-- Outputs are HDU index files
+Index files of gammapy (``hdu-index.fits.gz``, ``obs-index.fits.gz``) of a selection of DL3 files of
+``sst1mpipe-dl2-dl3`` (IRFs in the DL3 files), e.g. several nights of a source for a joint analysis:
 
-Usage:
-
-$> python create_hdu_indexes.py
---input-files '/tel1/DL3/20240110/*.fits /tel1/DL3/20240111/*.fits'
---irf-dir /IRFs/
---output-dir ./
-
+    create_hdu_indexes --input-files '/dl3/20240110/*.dl3.fits.gz /dl3/20240111/*.dl3.fits.gz' --output-dir ./crab
 """
-
 import argparse
 import glob
 
-import numpy as np
-from gammapy.data import DataStore
-
-from sst1mpipe.io import check_outdir
-from sst1mpipe.io.dl2_to_dl3 import create_hdu_index
+from sst1mpipe.io.dl3 import write_index
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Makes index files for all input DL3 files.")
-
-    # Required arguments
+def parse_args(args=None):
+    parser = argparse.ArgumentParser(description="Index files of gammapy of DL3 files")
     parser.add_argument(
-                        '--input-files', '-d',
-                        dest='dl3_files',
-                        required=True,
-                        help='Input DL3 fits files. You may use wild cards, or specify more directories separated with space, e.g. --input-files=\'/dir1/*/CRAB/*fits /dir2/*/CRAB/*fits\''
-                        )
-
-    parser.add_argument(
-                        '--irf-dir', '-i',
-                        dest='irf_dir',
-                        default=None,
-                        help='Directory with IRFs. This should be just the base directory, specific IRF file in ../data/ is found authomaticaly to all given observing blocks.',
-                        )
-
-    parser.add_argument(
-                        '--output-dir', '-o', type=str,
-                        dest='outdir',
-                        help='Path to store index files.',
-                        default='./'
-                        )
-
-    args = parser.parse_args()
-    return args
+        "--input-files", "-d", dest="dl3_files", required=True,
+        help="DL3 files: glob patterns separated by spaces, e.g. '/dir1/*/*.dl3.fits.gz /dir2/*.dl3.fits.gz'",
+    )
+    parser.add_argument("--output-dir", "-o", dest="outdir", default="./", help="Directory of the index files")
+    return parser.parse_args(args)
 
 
-def main():
-
-    args = parse_args()
-
-    dl3_files = args.dl3_files
-    irf_dir = args.irf_dir
-    outdir = args.outdir
-
-    check_outdir(outdir)
-
-    file_lists = dl3_files.split(' ')
-    dl3_file_list = []
-    for flist in file_lists:
-        dl3_file_list.append(np.array(glob.glob(flist)))
-    list_flattened = [item for row in dl3_file_list for item in row]
-
-    #print(list_flattened)
-    create_hdu_index(list_flattened, out_dir=outdir, irf_dir=irf_dir)
-
-    data_store = DataStore.from_dir(outdir)
+def main(args=None):
+    args = parse_args(args)
+    files = sorted({path for pattern in args.dl3_files.split() for path in glob.glob(pattern)})
+    if not files:
+        raise SystemExit(f"No DL3 files: {args.dl3_files}")
+    data_store = write_index(files, args.outdir)
     print(data_store.obs_table)
+
 
 if __name__ == "__main__":
     main()
