@@ -42,15 +42,17 @@ case "${VERSION}" in
   stereo_*)
     TELESCOPES="[]"
     case "${VERSION#stereo_}" in
-      # former StereoMARSCombiner: signs of the crossing of the major axes, events with one telescope kept
-      mars) COMBINER=(--StereoDISPSignCombiner.sign_method=axes_crossing --StereoDISPSignCombiner.min_telescopes=1) ;;
-      mars_2tel) COMBINER=(--StereoDISPSignCombiner.sign_method=axes_crossing --StereoDISPSignCombiner.min_telescopes=2) ;;
-      # SST-1M Crab paper: closest combination of the signs, both telescopes
-      paper_1tel) COMBINER=(--StereoDISPSignCombiner.sign_method=closest_positions --StereoDISPSignCombiner.min_telescopes=1) ;;
-      paper) COMBINER=(--StereoDISPSignCombiner.sign_method=closest_positions --StereoDISPSignCombiner.min_telescopes=2) ;;
+      # StereoDispSignCrossingCombiner (former StereoMARSCombiner): signs of the crossing of the major axes
+      mars) COMBINER=(StereoDispSignCrossingCombiner 1) ;;
+      mars_2tel) COMBINER=(StereoDispSignCrossingCombiner 2) ;;
+      # StereoDispSignClosestCombiner (SST-1M Crab paper): closest combination of the signs
+      paper_1tel) COMBINER=(StereoDispSignClosestCombiner 1) ;;
+      paper) COMBINER=(StereoDispSignClosestCombiner 2) ;;
       *) echo "Unknown version ${VERSION}: stereo_mars, stereo_mars_2tel, stereo_paper_1tel or stereo_paper" >&2; exit 1 ;;
     esac
-    COMBINER=(--ApplyModels.disp_stereo_combiner=StereoDISPSignCombiner --StereoDISPSignCombiner.weights=intensity "${COMBINER[@]}")
+    # minimum number of valid telescopes of the stereo events
+    COMBINER=(--ApplyModels.disp_stereo_combiner="${COMBINER[0]}" --"${COMBINER[0]}".weights=intensity
+              --"${COMBINER[0]}".min_telescopes="${COMBINER[1]}")
     ;;
   *) echo "Unknown version ${VERSION}" >&2; exit 1 ;;
 esac

@@ -5,18 +5,18 @@
 ##########################################################################
 # The stereo models of a previous submission (models/<MODELS_NAME>/stereo) applied to the test files with
 # four stereo combinations of the direction (sst1mpipe-apply-models --ApplyModels.disp_stereo_combiner):
-#   stereo_mars        former StereoMARSCombiner: signs of the crossing of the major axes, events with
-#                      at least one valid telescope (as the IRFs before)
+#   stereo_mars        StereoDispSignCrossingCombiner (former StereoMARSCombiner): signs of the crossing
+#                      of the major axes, events with at least one valid telescope (as the IRFs before)
 #   stereo_mars_2tel   the same, events with both telescopes valid
 #   stereo_paper_1tel  SST-1M Crab paper: closest combination of the signs, events with at least one telescope
-#   stereo_paper       SST-1M Crab paper: closest combination of the signs, both telescopes (StereoDISPSignCombiner)
+#   stereo_paper       SST-1M Crab paper: closest combination of the signs, both telescopes (StereoDispSignClosestCombiner)
 # then their IRFs (IRF_CUTS, default paper) and the comparison:
 #   irf/<MODELS_NAME>/<IRF_CUTS>/combiners/ze<zenith>/: figures of the four versions with the paper, and
 #   stereo_direction_<zenith>.txt/png: theta68 without cuts, per number of telescopes and sign method
 #
 #   MC_ZENITHS="30" MC_TRAIN_ZENITHS="30" bash scripts/camk/submit_stereo_combiners.bash
-# MC_START: train (default: the disp models, mono and stereo, are retrained first: models with the former
-# StereoMARSCombiner cannot be read any more), dl2 (models already retrained) or irf (DL2 of a previous
+# MC_START: train (default: the disp models, mono and stereo, are retrained first: the models trained
+# with the former StereoMARSCombiner cannot be read any more), dl2 (models already retrained) or irf (DL2 of a previous
 # submission). STEREO_VERSIONS: other versions (subset of the four).
 
 export SST1MPIPE_ROOT="${SST1MPIPE_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
