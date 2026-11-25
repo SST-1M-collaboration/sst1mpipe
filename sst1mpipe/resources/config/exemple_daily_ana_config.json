@@ -8,21 +8,11 @@
     "cs2"   : true,
     "stereo": true,
 
-    "run_dl1": false,
-    "run_dl2": false,
-    "run_dl3": false,
-    "run_data_qual": false,
-
-    "run_dl3_eff"        : true,
-    "run_data_qual_eff"  : true,
-    "eff_cut_dir_mono"   : "/data/work/analysis/MC/prod_oct_2024_84/v0.7.2/edep_cuts_eff05_mono_med4/",
-    "eff_cut_dir_stereo" : "/data/work/analysis/MC/prod_oct_2024_84/v0.7.2/edep_cuts_eff05_stereo_med4/",
+    "run_dl1": true,
+    "run_dl2": true,
 
     "root_dir" : "/net",
     "ana_dir": "/data2/work/tavernier/daily_ana/data_test/",
-    "irf_dir" : "/data/work/tavernier/nsb_mon/farm_dir2/IRFs/",
-    "mono_model_dir":"/data/work/analysis/MC/prod_oct_2024_84/v0.7.2/models_mono/",
-    "stereo_model_dir":"/data/work/analysis/MC/prod_oct_2024_84/v0.7.2/models_stereo/"
+    "mono_model_dir":"/data/work/analysis/MC/prod_oct_2024_84/models_mono/",
+    "stereo_model_dir":"/data/work/analysis/MC/prod_oct_2024_84/models_stereo/"
 }
-
-

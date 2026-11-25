@@ -128,6 +128,7 @@ sst1mpipe-plot-drive-pointing = "sst1mpipe.scripts.sst1mpipe_plot_drive_pointing
 sst1mpipe-train-energy-regressor = "sst1mpipe.scripts.sst1mpipe_train_models_tool:main_energy_regressor"
 sst1mpipe-train-particle-classifier = "sst1mpipe.scripts.sst1mpipe_train_models_tool:main_particle_classifier"
 sst1mpipe-train-disp-reconstructor = "sst1mpipe.scripts.sst1mpipe_train_models_tool:main_disp_reconstructor"
+sst1mpipe-apply-models = "sst1mpipe.scripts.sst1mpipe_apply_models_tool:main"
 
 # EventSource implementations found by ctapipe.io.EventSource
 [project.entry-points.ctapipe_io]

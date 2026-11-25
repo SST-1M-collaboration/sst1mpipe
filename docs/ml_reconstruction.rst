@@ -2,8 +2,8 @@ DL1 to DL2 with the ctapipe reconstructors
 ==========================================
 
 The energy, the gamma/hadron separation (gammaness) and the direction of the events can be
-reconstructed with the machine learning reconstructors of ctapipe (``ctapipe.reco``), trained by
-sst1mpipe tools built on the ctapipe tools. They have the options and configuration
+reconstructed with the machine learning reconstructors of ctapipe (``ctapipe.reco``), trained and
+applied by sst1mpipe tools built on the ctapipe tools. They have the options and configuration
 sections of the ctapipe tools, and write the DL2 of ctapipe (tables and column names, e.g.
 ``RandomForestRegressor_energy``, ``RandomForestClassifier_prediction``, ``disp_alt``):
 
@@ -15,6 +15,7 @@ sst1mpipe tool                           ctapipe tool                           
 ``sst1mpipe-train-particle-classifier``  ``ctapipe-train-particle-classifier``      plots: feature importances, gammaness, ROC curves
                                                                                     (all energies and per true energy)
 ``sst1mpipe-train-disp-reconstructor``   ``ctapipe-train-disp-reconstructor``       plots: feature importances, disp norm, sign accuracy
+``sst1mpipe-apply-models``               ``ctapipe-apply-models``                   pointing of the target if no telescope pointing
 =======================================  =========================================  ===================================================
 
 Input: DL1 with the telescope frame parameters
@@ -107,12 +108,25 @@ The models of an NSB level are trained on the training files of all its simulate
 merged, with the pointing of the telescope as feature (``cos_zenith``, from
 ``telescope_pointing_altitude``; not the azimuth, the reconstruction is not sensitive to it): the
 same models for all the pointings, in ``models/nsb<rate>/``. The NSB level is chosen with the
-models applied.
+models given to ``sst1mpipe-apply-models``.
 
 A random forest does not extrapolate: the events of a zenith angle between two simulated ones are
 reconstructed close to the closest simulated one, and outside the simulated zenith angles as the
 closest one (e.g. 40 deg as 30 deg with simulations at 10, 20, 30 deg). The simulated zenith
 angles must cover the observations.
+
+Application
+-----------
+
+.. code-block:: console
+
+    sst1mpipe-apply-models -i run.dl1.h5 -o run.dl2.h5 -r models/nsb100/energy_regressor.pkl \
+        -r models/nsb100/particle_classifier.pkl -r models/nsb100/disp_reconstructor.pkl
+
+The pointing of the telescopes is in the simulations, and in the data processed with the monitoring
+data (interpolated at the time of each event). Without it (data processed without monitoring
+data), the pointing of the target (RA/Dec of the run) transformed into alt/az at the time of each
+event is used, with a warning.
 
 Differences with the random forests of sst1mpipe
 ------------------------------------------------
