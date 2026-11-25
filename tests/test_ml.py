@@ -376,7 +376,7 @@ def test_stereo_models(dl1_files, tmp_path):
     # only the events with the stereo parameters
     assert np.all(np.isfinite(events["HillasReconstructor_h_max"][valid]))
 
-    # stereo direction of the Crab paper (StereoDISPSignCombiner of the stereo disp model): both telescopes
+    # stereo direction of the Crab paper (StereoDispSignClosestCombiner of the stereo disp model): both telescopes
     disp = read_table(output, "/dl2/event/subarray/geometry/disp")
     n_telescopes = np.sum(np.asarray(disp["disp_telescopes"]), axis=1)
     assert np.any(disp["disp_is_valid"])

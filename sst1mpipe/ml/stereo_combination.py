@@ -1,17 +1,26 @@
 """
-Stereo direction of the SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.2, the MAGIC approach, as
-sst1mpipe < 0.9) for the ctapipe disp reconstructor, selected in its configuration::
+Stereo direction of the ctapipe disp reconstructor from the disp norms of the telescopes and a choice
+of their disp signs (`StereoDispSignCombiner`):
+
+- `StereoDispSignClosestCombiner`: the SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.2, the MAGIC
+  approach, as sst1mpipe < 0.9), the closest combination of the signs;
+- `StereoDispSignCrossingCombiner`: the former ``StereoMARSCombiner`` of sst1mpipe, the signs closest
+  to the crossing of the major axes.
+
+Selected in the configuration of the disp reconstructor::
 
     DispReconstructor:
-      stereo_combiner_cls: StereoDISPSignCombiner
-      StereoDISPSignCombiner:
+      stereo_combiner_cls: StereoDispSignClosestCombiner
+      StereoDispSignClosestCombiner:
         weights: intensity
+        min_telescopes: 2
 
-or when the models are applied (``sst1mpipe-apply-models --ApplyModels.disp_stereo_combiner=StereoDISPSignCombiner``).
+or when the models are applied (``sst1mpipe-apply-models --ApplyModels.disp_stereo_combiner=<name>``).
 
 ctapipe finds the combiners among the imported subclasses of ``StereoCombiner``: ``sst1mpipe.ml`` must
 be imported, as by the sst1mpipe tools.
 """
+from abc import abstractmethod
 from itertools import product
 
 import astropy.units as u
@@ -24,7 +33,13 @@ from ctapipe.reco.reconstructor import ReconstructionProperty
 from ctapipe.reco.stereo_combination import StereoMeanCombiner
 from ctapipe.reco.telescope_event_handling import get_subarray_index
 
-__all__ = ["StereoDISPSignCombiner", "disp_sign_combination", "axes_crossing_disp_signs"]
+__all__ = [
+    "StereoDispSignCombiner",
+    "StereoDispSignClosestCombiner",
+    "StereoDispSignCrossingCombiner",
+    "disp_sign_combination",
+    "axes_crossing_disp_signs",
+]
 
 
 def _unit_vectors(alt, az):
@@ -76,8 +91,8 @@ def disp_sign_combination(alt_plus, az_plus, alt_minus, az_minus):
 
 def axes_crossing_disp_signs(hillas, disps):
     """
-    Signs of the disp of two telescopes by the crossing of the major axes (the former stereo
-    combiner of sst1mpipe, not the method of the SST-1M Crab paper): the crossing of the major axes of the two images is
+    Signs of the disp of two telescopes by the crossing of the major axes (`StereoDispSignCrossingCombiner`,
+    the former ``StereoMARSCombiner`` of sst1mpipe; not the method of the SST-1M Crab paper): the crossing of the major axes of the two images is
     computed, and each telescope takes the sign of its disp whose position (centroid +/- disp along
     the major axis) is the closest to this crossing.
 
@@ -143,18 +158,17 @@ def _positions(fov_lon, fov_lat, psi, disp_norm, pointing_alt, pointing_az):
     ]
 
 
-class StereoDISPSignCombiner(StereoMeanCombiner):
+class StereoDispSignCombiner(StereoMeanCombiner):
     """
-    Stereo direction of the SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.2; the MAGIC approach,
-    ``stereo_reconstruction`` of sst1mpipe < 0.9): only the disp norm of the telescopes is used (not
-    the sign classifier); of the combinations of the disp signs of the telescopes, the one whose
-    positions are the closest is chosen (`disp_sign_combination`), and the direction is the weighted
-    mean of these positions (as the ``StereoMeanCombiner``, ``weights``: intensity by default, as the
-    paper).
+    Base class of the stereo combiners of the direction which choose the disp signs of the telescopes
+    from their disp norms (not their sign classifier) for the events with at least two valid telescopes
+    (`_signs`): each telescope gives two possible source positions, at its disp norm on either side of
+    the image centroid along the major axis. The direction is the weighted mean of the positions of the
+    chosen signs (as the ``StereoMeanCombiner``, ``weights``: intensity by default, as the paper).
 
-    Stereo events are the events with at least ``min_telescopes`` valid telescopes (paper: both
-    telescopes pass the quality cuts of the models); the other ones get an invalid direction. With
-    ``min_telescopes`` 1, the events with one telescope keep the sign of the classifier.
+    Stereo events are the events with at least ``min_telescopes`` valid telescopes; the other ones get
+    an invalid direction. The events with one valid telescope (``min_telescopes`` 1) keep the sign of
+    the classifier.
 
     Needs the telescope frame Hillas parameters and the telescope pointing. Energy and particle type:
     as the ``StereoMeanCombiner``.
@@ -166,23 +180,32 @@ class StereoDISPSignCombiner(StereoMeanCombiner):
         help="Weights of the mean of the directions of the telescopes (see StereoMeanCombiner); paper: intensity",
     ).tag(config=True)
 
-    sign_method = CaselessStrEnum(
-        ["closest_positions", "axes_crossing"],
-        default_value="closest_positions",
-        help=(
-            "Choice of the disp signs: closest_positions (SST-1M Crab paper, MAGIC: the closest of the combinations"
-            " of the signs, disp_sign_combination), axes_crossing (former sst1mpipe combiner: each telescope takes"
-            " the sign whose position is the closest to the crossing of the major axes, two telescopes only)"
-        ),
-    ).tag(config=True)
-
     min_telescopes = Int(
         default_value=2, min=1,
         help=(
-            "Minimum number of valid telescopes of a stereo event (paper: 2, both telescopes pass the quality"
-            " cuts); the events with fewer telescopes get an invalid direction"
+            "Minimum number of valid telescopes of a stereo event (SST-1M Crab paper: 2, both telescopes pass"
+            " the quality cuts); the events with fewer telescopes get an invalid direction"
         ),
     ).tag(config=True)
+
+    @abstractmethod
+    def _signs(self, hillas, disps, plus, minus):
+        """
+        Disp signs (+1, -1) of the telescopes of events with the same number of valid telescopes n.
+
+        Parameters
+        ----------
+        hillas: dict
+            ``fov_lon``, ``fov_lat``, ``psi`` (Quantity, shape (n_events, n))
+        disps: Quantity, shape (n_events, n)
+            predicted (signed) disp
+        plus, minus: tuple of Quantity
+            (alt, az) of the positions with the signs +1 and -1, shape (n_events, n)
+
+        Returns
+        -------
+        numpy.ndarray, shape (n_events, n)
+        """
 
     def predict_table(self, mono_predictions: Table) -> Table:
         if self.property is not ReconstructionProperty.GEOMETRY:
@@ -213,32 +236,26 @@ class StereoDISPSignCombiner(StereoMeanCombiner):
             pointing = table["telescope_pointing_altitude"].quantity, table["telescope_pointing_azimuth"].quantity
         else:
             pointing = table["subarray_pointing_lat"].quantity, table["subarray_pointing_lon"].quantity
-        norm = np.abs(table[f"{prefix}_parameter"].quantity[rows])
-        (alt_p, az_p), (alt_m, az_m) = _positions(
-            table["hillas_fov_lon"].quantity[rows], table["hillas_fov_lat"].quantity[rows],
-            table["hillas_psi"].quantity[rows], norm, pointing[0][rows], pointing[1][rows],
-        )
+        hillas = {name: table[f"hillas_{name}"].quantity[rows] for name in ("fov_lon", "fov_lat", "psi")}
+        disp = table[f"{prefix}_parameter"].quantity[rows]
+        plus, minus = _positions(hillas["fov_lon"], hillas["fov_lat"], hillas["psi"], np.abs(disp),
+                                 pointing[0][rows], pointing[1][rows])
         signs = np.ones(len(rows), dtype=int)
+        # events grouped by their number of valid telescopes, the rows of an event together
         multiplicity = n_valid[index[rows]]
-        if self.sign_method == "axes_crossing":
-            disp = table[f"{prefix}_parameter"].quantity[rows]
-            for event in np.unique(index[rows]):
-                event_rows = np.flatnonzero(index[rows] == event)
-                hillas = [{name: table[f"hillas_{name}"].quantity[rows[i]] for name in ("fov_lon", "fov_lat", "psi")}
-                          for i in event_rows]
-                signs[event_rows] = axes_crossing_disp_signs(hillas, disp[event_rows])
-            multiplicity = multiplicity[:0]
-        # events grouped by their number of valid telescopes (combinations of the same size)
         for n_tel in np.unique(multiplicity):
             selected = np.flatnonzero(multiplicity == n_tel)
-            order = selected[np.argsort(index[rows][selected], kind="stable")]  # rows of an event together
-            shape = (-1, n_tel)
-            signs[order] = disp_sign_combination(
-                alt_p[order].reshape(shape), az_p[order].reshape(shape),
-                alt_m[order].reshape(shape), az_m[order].reshape(shape),
+            order = selected[np.argsort(index[rows][selected], kind="stable")]
+
+            def grouped(values, order=order, n_tel=n_tel):
+                return values[order].reshape(-1, n_tel)
+
+            signs[order] = self._signs(
+                {name: grouped(value) for name, value in hillas.items()}, grouped(disp),
+                (grouped(plus[0]), grouped(plus[1])), (grouped(minus[0]), grouped(minus[1])),
             ).ravel()
-        alt = np.where(signs > 0, alt_p.to_value(u.deg), alt_m.to_value(u.deg)) * u.deg
-        az = np.where(signs > 0, az_p.to_value(u.deg), az_m.to_value(u.deg)) * u.deg
+        alt = np.where(signs > 0, plus[0].to_value(u.deg), minus[0].to_value(u.deg)) * u.deg
+        az = np.where(signs > 0, plus[1].to_value(u.deg), minus[1].to_value(u.deg)) * u.deg
         table[f"{prefix}_alt"][rows] = alt.to_value(table[f"{prefix}_alt"].unit or u.deg)
         table[f"{prefix}_az"][rows] = az.to_value(table[f"{prefix}_az"].unit or u.deg)
         return table
@@ -254,25 +271,22 @@ class StereoDISPSignCombiner(StereoMeanCombiner):
             self._invalidate_too_few(event, len(tel_ids))
             return
 
-        positions = []
-        for tel_id in tel_ids:
-            h = event.dl1.tel[tel_id].parameters.hillas
-            pointing = event.monitoring.tel[tel_id].pointing
-            norm = abs(event.dl2.tel[tel_id].disp[self.prefix].parameter)
-            positions.append(_positions(h.fov_lon, h.fov_lat, h.psi, norm, pointing.altitude, pointing.azimuth))
-        if self.sign_method == "axes_crossing":
-            hillas = [event.dl1.tel[tel_id].parameters.hillas for tel_id in tel_ids]
-            signs = axes_crossing_disp_signs(
-                [dict(fov_lon=h.fov_lon, fov_lat=h.fov_lat, psi=h.psi) for h in hillas],
-                [event.dl2.tel[tel_id].disp[self.prefix].parameter for tel_id in tel_ids],
-            )
-        else:
-            (alt_p, az_p), (alt_m, az_m) = ([u.Quantity([p[s][k] for p in positions]) for k in (0, 1)] for s in (0, 1))
-            signs = disp_sign_combination(alt_p, az_p, alt_m, az_m)
+        parameters = [event.dl1.tel[tel_id].parameters.hillas for tel_id in tel_ids]
+        def row(values):
+            """quantities of the telescopes, shape (1, n_telescopes)"""
+            return u.Quantity(values).reshape(1, -1)
+
+        hillas = {name: row([getattr(h, name) for h in parameters]) for name in ("fov_lon", "fov_lat", "psi")}
+        disp = row([event.dl2.tel[tel_id].disp[self.prefix].parameter for tel_id in tel_ids])
+        pointing = [event.monitoring.tel[tel_id].pointing for tel_id in tel_ids]
+        plus, minus = _positions(hillas["fov_lon"], hillas["fov_lat"], hillas["psi"], np.abs(disp),
+                                 row([p.altitude for p in pointing]), row([p.azimuth for p in pointing]))
+        signs = self._signs(hillas, disp, plus, minus)[0]
         geometries = [event.dl2.tel[tel_id].geometry[self.prefix] for tel_id in tel_ids]
         predicted = [(geometry.alt, geometry.az) for geometry in geometries]
-        for geometry, position, sign in zip(geometries, positions, signs, strict=True):
-            geometry.alt, geometry.az = position[0 if sign > 0 else 1]
+        for i, (geometry, sign) in enumerate(zip(geometries, signs, strict=True)):
+            position = plus if sign > 0 else minus
+            geometry.alt, geometry.az = position[0][0, i], position[1][0, i]
         try:
             super()._combine_altaz(event)
         finally:
@@ -289,3 +303,37 @@ class StereoDISPSignCombiner(StereoMeanCombiner):
             geometry.ang_distance_uncert = np.nan * u.deg
             geometry.is_valid = False
 
+
+class StereoDispSignClosestCombiner(StereoDispSignCombiner):
+    """
+    Stereo direction of the SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.2; the MAGIC approach,
+    ``stereo_reconstruction`` of sst1mpipe < 0.9): of the combinations of the disp signs of the
+    telescopes, the one whose positions are the closest (`disp_sign_combination`); intensity weighted
+    mean; stereo events: both telescopes valid (``min_telescopes`` 2). See `StereoDispSignCombiner`.
+    """
+
+    def _signs(self, hillas, disps, plus, minus):
+        return disp_sign_combination(plus[0], plus[1], minus[0], minus[1])
+
+
+class StereoDispSignCrossingCombiner(StereoDispSignCombiner):
+    """
+    The former ``StereoMARSCombiner`` of sst1mpipe: each telescope takes the disp sign whose position is
+    the closest to the crossing of the major axes of the two telescopes (`axes_crossing_disp_signs`,
+    two telescopes only: ``NotImplementedError`` for more); intensity weighted mean. By default the
+    events with one valid telescope are kept with the sign of its classifier (``min_telescopes`` 1, as
+    the ``StereoMARSCombiner``). Not the method of the SST-1M Crab paper (`StereoDispSignClosestCombiner`).
+    """
+
+    min_telescopes = Int(
+        default_value=1, min=1,
+        help="Minimum number of valid telescopes of a stereo event, see StereoDispSignCombiner",
+    ).tag(config=True)
+
+    def _signs(self, hillas, disps, plus, minus):
+        return np.array([
+            axes_crossing_disp_signs(
+                [{name: hillas[name][event, i] for name in hillas} for i in range(disps.shape[1])], disps[event],
+            )
+            for event in range(disps.shape[0])
+        ])
