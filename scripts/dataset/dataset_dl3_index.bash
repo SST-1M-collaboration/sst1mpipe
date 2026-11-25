@@ -29,5 +29,6 @@ for MAPPING in ${DATA_IRF_MODES}; do
   fi
   mkdir -p "${DATASET_DIRECTORY}/dl3/${ANALYSIS}"
   create_hdu_indexes --input-files "${PATTERN}" --output-dir "${DATASET_DIRECTORY}/dl3/${ANALYSIS}"
+  check_gadf "${DATASET_DIRECTORY}/dl3/${ANALYSIS}" || true
   echo "${ANALYSIS}: $(compgen -G "${PATTERN}" | wc -l) DL3 files, index in ${DATASET_DIRECTORY}/dl3/${ANALYSIS}"
 done

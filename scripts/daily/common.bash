@@ -82,3 +82,21 @@ raw_files() {
 list_nights() {
   grep -oE '/[0-9]{4}/[0-9]{2}/[0-9]{2}/' "$1" | tr -d / | sort -u
 }
+
+# what the DL3 files and index files of a directory miss of the GADF specification (warnings in the log)
+check_gadf() {
+  python - "$1" <<'PYTHON'
+import sys
+from pathlib import Path
+
+from sst1mpipe.io.dl3 import check_dl3_file, check_index
+
+directory = Path(sys.argv[1])
+problems = check_index(directory)
+problems += [f"{path.name}: {problem}" for path in sorted(directory.glob("*.dl3.fits.gz"))
+             for problem in check_dl3_file(path)]
+for problem in problems:
+    print(f"warning: GADF: {directory}: {problem}", file=sys.stderr)
+print(f"{directory}: {'follows' if not problems else 'does not follow'} the GADF specification")
+PYTHON
+}
