@@ -1,4 +1,4 @@
-"""StereoDISPSignCombiner: stereo direction of the SST-1M Crab paper (closest combination of the disp signs)"""
+"""Stereo combiners of the direction from the disp norms: closest combination of the signs (paper), axes crossing"""
 from itertools import product
 
 import astropy.units as u
@@ -16,16 +16,25 @@ from ctapipe.reco.preprocessing import telescope_to_horizontal
 from ctapipe.reco.reconstructor import ReconstructionProperty
 from ctapipe.reco.stereo_combination import StereoCombiner, StereoMeanCombiner
 
-from sst1mpipe.ml import StereoDISPSignCombiner, axes_crossing_disp_signs, disp_sign_combination
+from sst1mpipe.ml import (
+    StereoDispSignClosestCombiner,
+    StereoDispSignCrossingCombiner,
+    axes_crossing_disp_signs,
+    disp_sign_combination,
+)
 
 GEOMETRY = ReconstructionProperty.GEOMETRY
 
 
 def test_combiner_is_available():
     """the combiner can be chosen by name in the configuration of the reconstructors"""
-    assert "StereoDISPSignCombiner" in StereoCombiner.non_abstract_subclasses()
-    combiner = StereoDISPSignCombiner(prefix="disp", property=GEOMETRY)
-    assert combiner.weights == "intensity" and combiner.min_telescopes == 2
+    names = StereoCombiner.non_abstract_subclasses()
+    assert {"StereoDispSignClosestCombiner", "StereoDispSignCrossingCombiner"} <= set(names)
+    assert "StereoDispSignCombiner" not in names  # base class
+    closest = StereoDispSignClosestCombiner(prefix="disp", property=GEOMETRY)
+    assert closest.weights == "intensity" and closest.min_telescopes == 2
+    crossing = StereoDispSignCrossingCombiner(prefix="disp", property=GEOMETRY)
+    assert crossing.weights == "intensity" and crossing.min_telescopes == 1  # as the former StereoMARSCombiner
 
 
 def test_disp_sign_combination():
@@ -96,7 +105,7 @@ def brute_force_signs(table, rows):
 def test_combiner_table(n_tel):
     """weighted mean of the closest positions; events with one telescope invalid (min_telescopes 2)"""
     table = mono_table(n_tel=n_tel)
-    stereo = StereoDISPSignCombiner(prefix="disp", property=GEOMETRY).predict_table(table)
+    stereo = StereoDispSignClosestCombiner(prefix="disp", property=GEOMETRY).predict_table(table)
 
     corrected = table.copy()
     n_valid = {}
@@ -125,7 +134,7 @@ def test_combiner_table(n_tel):
 def test_combiner_min_telescopes():
     """min_telescopes 1: the events with one telescope keep the direction of the classifier sign"""
     table = mono_table()
-    stereo = StereoDISPSignCombiner(prefix="disp", property=GEOMETRY, min_telescopes=1).predict_table(table)
+    stereo = StereoDispSignClosestCombiner(prefix="disp", property=GEOMETRY, min_telescopes=1).predict_table(table)
     mean = StereoMeanCombiner(prefix="disp", property=GEOMETRY, weights="intensity").predict_table(table)
     np.testing.assert_array_equal(stereo["disp_is_valid"], mean["disp_is_valid"])
     one = np.array([np.count_nonzero((table["event_id"] == e) & table["disp_tel_is_valid"]) == 1
@@ -136,9 +145,13 @@ def test_combiner_min_telescopes():
 
 def test_combiner_event():
     """the event loop version gives the direction of the table version"""
+    _check_event_loop(StereoDispSignClosestCombiner)
+
+
+def _check_event_loop(combiner_cls):
     table = mono_table(n_events=1)
     table["disp_tel_is_valid"] = True
-    combiner = StereoDISPSignCombiner(prefix="disp", property=GEOMETRY)
+    combiner = combiner_cls(prefix="disp", property=GEOMETRY, min_telescopes=2)
     expected = combiner.predict_table(table)[0]
 
     event = ArrayEventContainer()
@@ -186,9 +199,9 @@ def test_axes_crossing_disp_signs():
         axes_crossing_disp_signs([*hillas, hillas[0]], [0.9, 1.5, 0.3])
 
 
-def test_axes_crossing_combiner():
-    """sign_method axes_crossing (former sst1mpipe combiner), min_telescopes 1: events with one telescope kept"""
-    combiner = StereoDISPSignCombiner(prefix="disp", property=GEOMETRY, sign_method="axes_crossing", min_telescopes=1)
+def test_crossing_combiner():
+    """former StereoMARSCombiner: signs of the axes crossing, events with one telescope kept"""
+    combiner = StereoDispSignCrossingCombiner(prefix="disp", property=GEOMETRY)
     table = mono_table()
     stereo = combiner.predict_table(table)
     corrected = table.copy()
@@ -206,3 +219,16 @@ def test_axes_crossing_combiner():
     separation = angular_separation(stereo["disp_az"].quantity, stereo["disp_alt"].quantity,
                                     expected["disp_az"].quantity, expected["disp_alt"].quantity)[valid]
     assert np.all(separation < 1e-6 * u.deg)
+
+
+def test_crossing_combiner_more_than_two_telescopes():
+    table = mono_table(n_events=2, n_tel=3)
+    table["disp_tel_is_valid"] = True
+    with pytest.raises(NotImplementedError):
+        StereoDispSignCrossingCombiner(prefix="disp", property=GEOMETRY).predict_table(table)
+
+
+@pytest.mark.parametrize("combiner_cls", [StereoDispSignClosestCombiner, StereoDispSignCrossingCombiner])
+def test_combiners_event_loop(combiner_cls):
+    """the event loop gives the direction of the table version, for both combiners"""
+    _check_event_loop(combiner_cls)

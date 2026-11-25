@@ -3,8 +3,9 @@
 is the DL2 of ctapipe.
 
 The stereo combiner of the direction is the one of the disp model (chosen at the training), or
-``--ApplyModels.disp_stereo_combiner`` (e.g. ``StereoDISPSignCombiner``, the stereo direction of the
-SST-1M Crab paper, or ``StereoMeanCombiner``: the same models applied with another combiner).
+``--ApplyModels.disp_stereo_combiner``: the same models applied with another combiner, e.g.
+``StereoDispSignClosestCombiner`` (SST-1M Crab paper), ``StereoDispSignCrossingCombiner`` (crossing of the
+major axes) or ``StereoMeanCombiner``.
 
     sst1mpipe-apply-models -i run.dl1.h5 -o run.dl2.h5 \\
         -r models/nsb100/energy_regressor.pkl -r models/nsb100/particle_classifier.pkl \\
@@ -98,8 +99,8 @@ class ApplyModels(CtapipeApplyModels):
         allow_none=True,
         help=(
             "Stereo combiner of the direction of the disp models instead of the one chosen at their training"
-            " (e.g. StereoDISPSignCombiner, StereoMeanCombiner), configured by its own section"
-            " (e.g. --StereoDISPSignCombiner.min_telescopes=2)"
+            " (e.g. StereoDispSignClosestCombiner, StereoDispSignCrossingCombiner, StereoMeanCombiner), configured"
+            " by its own section (e.g. --StereoDispSignClosestCombiner.min_telescopes=2)"
         ),
     ).tag(config=True)
 

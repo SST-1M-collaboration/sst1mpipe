@@ -64,7 +64,7 @@ Two sets of models, as in the SST-1M Crab paper:
   for the energy, the gammaness, and the disp norm and sign. They are trained on the events reconstructed
   by both telescopes (quality criterion ``stereo``) and give predictions for these events only. Still one
   model per telescope, whose predictions are combined (intensity weighted mean of the energy and the
-  gammaness, stereo direction of the paper: ``StereoDISPSignCombiner``). The simulations have the stereo parameters (the HillasReconstructor runs in
+  gammaness, stereo direction of the paper: ``StereoDispSignClosestCombiner``). The simulations have the stereo parameters (the HillasReconstructor runs in
   ``sst1mpipe-process``), the stereo data those of ``sst1mpipe-stereo``.
 
 After the training, the plots of the models are made in ``--plot-dir`` (by default
@@ -129,39 +129,41 @@ data (interpolated at the time of each event). Without it (data processed withou
 data), the pointing of the target (RA/Dec of the run) transformed into alt/az at the time of each
 event is used, with a warning.
 
-Stereo direction of the SST-1M Crab paper
------------------------------------------
+Stereo direction
+----------------
 
-The stereo disp models use ``StereoDISPSignCombiner`` (``sst1mpipe_train_disp_reconstructor_stereo.yaml``),
-the stereo direction of the SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.2, the approach of MAGIC, as
-``stereo_reconstruction`` of sst1mpipe < 0.9):
+The stereo direction is computed from the disp norms of the telescopes (not their sign classifier) and
+a choice of their disp signs (``sst1mpipe.ml.StereoDispSignCombiner``): each telescope gives two
+possible source positions, at its disp norm on either side of the image centroid along the major axis.
+Two combiners choose the signs:
+
+- ``StereoDispSignClosestCombiner``: the SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.2, the approach of
+  MAGIC, ``stereo_reconstruction`` of sst1mpipe < 0.9): of the combinations of the signs (4 for two
+  telescopes), the one whose positions are the closest (``disp_sign_combination``: smallest angular
+  distance, for more telescopes the smallest sum of the distances of the pairs). Used by the stereo disp
+  models (``sst1mpipe_train_disp_reconstructor_stereo.yaml``);
+- ``StereoDispSignCrossingCombiner``: the former ``StereoMARSCombiner`` of sst1mpipe: each telescope takes
+  the sign whose position is the closest to the crossing of the major axes of the two telescopes
+  (``axes_crossing_disp_signs``, two telescopes only).
 
 .. code-block:: yaml
 
     DispReconstructor:
-      stereo_combiner_cls: StereoDISPSignCombiner
-      StereoDISPSignCombiner:
+      stereo_combiner_cls: StereoDispSignClosestCombiner
+      StereoDispSignClosestCombiner:
         weights: intensity
         min_telescopes: 2
 
-- only the disp norm of each telescope is used, not its sign classifier: each telescope gives two
-  possible source positions, at its disp norm on either side of the image centroid along the major axis;
-- of the combinations of the signs of the telescopes (4 for two telescopes), the one whose positions are
-  the closest is chosen (``disp_sign_combination``: smallest angular distance, for more telescopes the
-  smallest sum of the distances of the pairs);
-- the direction is the weighted mean of these positions (``weights``, as ``StereoMeanCombiner``:
-  intensity, as the paper);
-- ``sign_method: axes_crossing``: the former sst1mpipe method instead (each telescope takes the sign
-  whose position is the closest to the crossing of the major axes, ``axes_crossing_disp_signs``), for
-  comparison;
-- stereo events are the events with at least ``min_telescopes`` valid telescopes, i.e. passing the
-  quality cuts of the models (paper: both telescopes, intensity > 45 p.e., leakage2 < 0.7). The other
-  ones get an invalid direction, so they are not in the IRFs. ``min_telescopes: 1`` keeps the events
-  with one telescope, with the sign of its classifier.
+The direction is the weighted mean of the positions of the chosen signs (``weights``, as
+``StereoMeanCombiner``: intensity, as the paper). Stereo events are the events with at least
+``min_telescopes`` valid telescopes, i.e. passing the quality cuts of the models (paper: both telescopes,
+intensity > 45 p.e., leakage2 < 0.7): the other ones get an invalid direction, so they are not in the
+IRFs. With ``min_telescopes: 1`` (default of ``StereoDispSignCrossingCombiner``, as the former
+``StereoMARSCombiner``) the events with one telescope are kept, with the sign of its classifier.
 
 The energy and the gammaness are combined by the ``StereoMeanCombiner`` (intensity weighted mean). The
-combiner is a class of sst1mpipe (``sst1mpipe.ml``): the models using it are applied with the sst1mpipe
-tools (or any program importing ``sst1mpipe.ml``), not with ``ctapipe-apply-models``.
+combiners are classes of sst1mpipe (``sst1mpipe.ml``): the models using them are applied with the
+sst1mpipe tools (or any program importing ``sst1mpipe.ml``), not with ``ctapipe-apply-models``.
 
 The combiner is saved with the disp model at its training. ``sst1mpipe-apply-models`` can apply the
 same models with another combiner, e.g. to compare the stereo directions:
@@ -169,7 +171,7 @@ same models with another combiner, e.g. to compare the stereo directions:
 .. code-block:: console
 
     sst1mpipe-apply-models -i gamma_point.dl1.h5 -o gamma_point.dl2.h5 -r models/stereo/disp_reconstructor.pkl ... \
-        --ApplyModels.disp_stereo_combiner=StereoDISPSignCombiner --StereoDISPSignCombiner.min_telescopes=2
+        --ApplyModels.disp_stereo_combiner=StereoDispSignCrossingCombiner --StereoDispSignCrossingCombiner.min_telescopes=2
 
 Differences with the random forests of sst1mpipe
 ------------------------------------------------
@@ -178,7 +180,7 @@ Differences with the random forests of sst1mpipe
 same                                            random forests and their settings, features, event selection,
                                                 number of training events, gamma/proton fraction, one model per
                                                 telescope, intensity weighted stereo mean of the energy and
-                                                gammaness, stereo direction (``StereoDISPSignCombiner``)
+                                                gammaness, stereo direction (``StereoDispSignClosestCombiner``)
 different                                       energy trained on ln(E) (log10(E) in sst1mpipe), one feature list
                                                 for the disp norm and sign, DL2 columns and tables of ctapipe, one
                                                 file per model type (with its configuration)
@@ -191,7 +193,11 @@ new                                             cross validation, training by ch
 API
 ---
 
-.. autoclass:: sst1mpipe.ml.StereoDISPSignCombiner
+.. autoclass:: sst1mpipe.ml.StereoDispSignCombiner
+
+.. autoclass:: sst1mpipe.ml.StereoDispSignClosestCombiner
+
+.. autoclass:: sst1mpipe.ml.StereoDispSignCrossingCombiner
 
 .. autofunction:: sst1mpipe.ml.disp_sign_combination
 
