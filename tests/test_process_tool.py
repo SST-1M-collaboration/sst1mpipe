@@ -41,7 +41,7 @@ def test_process_r0_file(tmp_path, observation_monitoring, tel_id, flag_bad_cali
     # the pedestal events are not processed
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")
     assert len(parameters) == run["n_events"] - run["n_pedestals"]
-    intensity = parameters["camera_frame_hillas_intensity"]
+    intensity = parameters["hillas_intensity"]
     assert np.isfinite(intensity).sum() > 0
     assert np.all(intensity[np.isfinite(intensity)] > 0)
 
@@ -102,7 +102,7 @@ def test_process_without_monitoring_source(tmp_path, nsb_cleaner_pedestal_stds):
 
     parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")
     assert len(parameters) == run["n_events"] - run["n_pedestals"]
-    assert np.isfinite(parameters["camera_frame_hillas_intensity"]).sum() > 0
+    assert np.isfinite(parameters["hillas_intensity"]).sum() > 0
     info = get_dl1_info(output)
     assert info["n_pedestal"][0] == run["n_pedestals"]
     # no statistics of the pedestal events for the NSBImageCleaner: no raised picture threshold

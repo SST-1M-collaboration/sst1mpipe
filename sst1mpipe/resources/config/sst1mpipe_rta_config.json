@@ -53,7 +53,7 @@
       "LocalPeakWindowSum": {
           "apply_integration_correction": true,
           "window_shift": 3,
-          "window_width": 7
+          "window_width": 8
       },
       "data_volume_reducer_type": "NullDataVolumeReducer",
       "invalid_pixel_handler_type": "NeighborAverage"
@@ -61,7 +61,7 @@
 
   "ImageProcessor": {
     "image_cleaner_type": "NSBImageCleaner",
-    "use_telescope_frame": false,
+    "use_telescope_frame": true,
     "TailcutsImageCleaner": {
         "picture_threshold_pe": [
           ["type", "*", 1800]

@@ -499,9 +499,9 @@ def test_process_camera_event_stream(tmp_path):
     # 84 Cherenkov events (the 46 pedestal events are not written)
     assert len(stream_parameters) == 84
     np.testing.assert_array_equal(stream_parameters["event_id"], file_parameters["event_id"])
-    for column in ["camera_frame_hillas_intensity", "camera_frame_hillas_x", "camera_frame_hillas_width"]:
+    for column in ["hillas_intensity", "hillas_fov_lon", "hillas_width"]:
         np.testing.assert_array_equal(stream_parameters[column], file_parameters[column])
-    assert np.isfinite(stream_parameters["camera_frame_hillas_intensity"]).sum() > 0
+    assert np.isfinite(stream_parameters["hillas_intensity"]).sum() > 0
 
 
 # ---------------------------------------------------------------------------
