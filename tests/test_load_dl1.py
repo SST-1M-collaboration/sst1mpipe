@@ -46,11 +46,11 @@ def test_observation_parameters(observation_dl1):
     parameters = read_table(observation_dl1, f"/dl1/event/telescope/parameters/{TEL}")
     np.testing.assert_array_equal(data["event_id"], parameters["event_id"])
 
-    intensity = np.asarray(parameters["camera_frame_hillas_intensity"])
-    np.testing.assert_allclose(data["log_camera_frame_hillas_intensity"], np.log10(intensity))
+    intensity = np.asarray(parameters["hillas_intensity"])
+    np.testing.assert_allclose(data["log_hillas_intensity"], np.log10(intensity))
     np.testing.assert_allclose(
-        data["camera_frame_hillas_wl"],
-        np.asarray(parameters["camera_frame_hillas_width"]) / np.asarray(parameters["camera_frame_hillas_length"]),
+        data["hillas_wl"],
+        np.asarray(parameters["hillas_width"]) / np.asarray(parameters["hillas_length"]),
     )
     assert np.all(data["equivalent_focal_length"] == SubarrayDescription.from_hdf(observation_dl1).tel[TEL_ID].optics.equivalent_focal_length.to_value(u.m))
 
@@ -67,7 +67,7 @@ def test_observation_parameters(observation_dl1):
 
     # the parameters are also in the pandas table
     df = load_dl1_sst1m(str(observation_dl1), tel=TEL, table="pandas")
-    assert {"log_camera_frame_hillas_intensity", "local_time", "date", "meanQ"} <= set(df.columns)
+    assert {"log_hillas_intensity", "local_time", "date", "meanQ"} <= set(df.columns)
 
 
 def test_scaled_intensity(observation_dl1):
@@ -75,8 +75,22 @@ def test_scaled_intensity(observation_dl1):
     config = deepcopy(load_config(DATA_CONFIG_FILE, ismc=False))
     config["NsbCalibrator"]["intensity_correction"][TEL] = 2.0
     data = load_dl1_sst1m(str(observation_dl1), tel=TEL, config=config, scale_intensities=True)
-    intensity = np.asarray(read_table(observation_dl1, f"/dl1/event/telescope/parameters/{TEL}")["camera_frame_hillas_intensity"])
-    np.testing.assert_allclose(data["log_camera_frame_hillas_intensity"], np.log10(2 * intensity))
+    intensity = np.asarray(read_table(observation_dl1, f"/dl1/event/telescope/parameters/{TEL}")["hillas_intensity"])
+    np.testing.assert_allclose(data["log_hillas_intensity"], np.log10(2 * intensity))
+
+
+def test_event_selection(observation_dl1):
+    """the event selection of the data configuration (telescope frame parameters)"""
+    config = load_config(DATA_CONFIG_FILE, ismc=False)
+    data = load_dl1_sst1m(str(observation_dl1), tel=TEL, config=config, quality_cuts=True)
+    parameters = read_table(observation_dl1, f"/dl1/event/telescope/parameters/{TEL}")
+    low, high = config["event_selection"]["hillas_intensity"]
+    leakage_low, leakage_high = config["event_selection"]["leakage_intensity_width_2"]
+    selected = ((parameters["hillas_intensity"] >= low) & (parameters["hillas_intensity"] <= high)
+                & (parameters["leakage_intensity_width_2"] >= leakage_low)
+                & (parameters["leakage_intensity_width_2"] <= leakage_high))
+    assert 0 < len(data) == np.count_nonzero(selected)
+    assert np.all(np.asarray(data["hillas_intensity"]) >= low)
 
 
 def test_simulation_parameters(simulation_dl1):
@@ -94,17 +108,8 @@ def test_simulation_parameters(simulation_dl1):
     np.testing.assert_allclose(data["true_energy"], [true_energy[e] for e in data["event_id"]])
     np.testing.assert_allclose(data["log_true_energy"], np.log10(np.asarray(data["true_energy"])))
 
-    # DISP (lstchain definition): vector from the center of gravity of the image to the true
-    # position in the camera, its norm is its projection on the major axis
-    image = np.isfinite(np.asarray(data["camera_frame_hillas_intensity"]))
-    assert image.sum() > 50
-    dx = np.asarray(data["true_camera_x"]) - np.asarray(data["camera_frame_hillas_x"])
-    dy = np.asarray(data["true_camera_y"]) - np.asarray(data["camera_frame_hillas_y"])
-    psi = np.deg2rad(np.asarray(data["camera_frame_hillas_psi"]))
-    np.testing.assert_allclose(np.asarray(data["disp_dx"])[image], dx[image])
-    np.testing.assert_allclose(np.asarray(data["disp_norm"])[image], np.abs(dx * np.cos(psi) + dy * np.sin(psi))[image])
-    assert set(np.asarray(data["disp_sign"])[image]) <= {-1, 1}
-    assert np.all(np.abs(np.asarray(data["miss"])[image]) < np.asarray(data["disp_norm"])[image] + 1e-9)
+    # telescope frame DL1: no camera frame DISP (former random forests)
+    assert "disp_norm" not in data.keys()
     # true impact distance: distance between the telescope and the core of the shower
     position = SubarrayDescription.from_hdf(simulation_dl1).positions[1]
     np.testing.assert_allclose(

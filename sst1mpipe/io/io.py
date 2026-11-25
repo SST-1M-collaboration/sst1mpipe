@@ -23,7 +23,7 @@ from pyirf.cuts import evaluate_binned_cut
 from traitlets.config import Config
 
 import sst1mpipe
-from sst1mpipe.io.containers import DL1_info, DL2_info
+from sst1mpipe.io.containers import DL1_info
 from sst1mpipe.monitoring import last_chunk_index
 from sst1mpipe.resources import DATA_CONFIG_FILE, MC_CONFIG_FILES, PDE_CORRECTION_FACTORS_FILE
 from sst1mpipe.utils.utils import (
@@ -36,9 +36,9 @@ from sst1mpipe.utils.utils import (
     add_timing_features,
     add_true_impact,
     event_selection,
-    get_finite,
     get_tel_id,
     get_telescopes,
+    hillas_prefix,
     join_in_order,
     read_subarray,
     telescope_location,
@@ -116,33 +116,6 @@ def check_outdir(outdir):
             logging.info("Ah, the directory appeared in the meantime... \
                 May happpen if you run more scripts in parallel terminals. \
                 Should not be an issue.")
-
-
-def write_dl2(
-        dl2_table, output_file=None, telescope=None,
-        config=None, mode='w'):
-    """
-    Helper function to write DL2 file
-
-    Parameters
-    ----------
-    dl2_table: pandas.DataFrame
-    output_file: string
-    telescope: string
-    config: dict
-    mode: string
-
-    Returns
-    -------
-
-    """
-
-    write_dl2_table(
-        dl2_table, output_file=output_file,
-        table_path='/dl2/event/telescope/parameters',
-        table_name=telescope, config=config,
-        mode=mode
-        )
 
 
 def write_photon_list(
@@ -246,7 +219,6 @@ def write_extra_parameters(
         merged_table.write(file, path='/dl1/event/telescope/parameters/'+tel, overwrite=True, append=True) #, serialize_meta=True)
 
 
-
 def read_trigger_time(input_file, tel):
     """
     Reads the trigger times of the telescope from the DL1 file
@@ -310,7 +282,7 @@ def add_dl1_extra_parameters(events, input_file, tel):
     DL1 file, when they are not already in the table (DL1 files of the former sst1mpipe_r0_dl1,
     which wrote them in the file):
 
-    - ``log_camera_frame_hillas_intensity`` and ``camera_frame_hillas_wl``, always computed
+    - ``log_hillas_intensity`` and ``hillas_wl`` (``camera_frame_`` prefix in the camera frame), always computed
       (from the intensity scaled by load_dl1_sst1m)
     - ``equivalent_focal_length`` (m), from the subarray of the file
     - observed data: ``local_time`` (unix time of the trigger, s), ``date`` (date of the run:
@@ -318,7 +290,7 @@ def add_dl1_extra_parameters(events, input_file, tel):
       images of the chunk of pedestal events at the time of the event, in p.e., if the monitoring
       data are in the file)
     - simulations: the true parameters of the shower (/simulation/event/subarray/shower),
-      ``log_true_energy``, ``true_camera_x``/``true_camera_y``, the DISP parameters, ``miss``
+      ``log_true_energy``, ``true_camera_x``/``true_camera_y``, the DISP parameters, ``miss`` (camera frame)
       and ``true_tel_impact_distance``
 
     Parameters
@@ -351,7 +323,8 @@ def add_dl1_extra_parameters(events, input_file, tel):
             events = join_in_order(events, read_table(input_file, SIMULATION_SHOWER_TABLE))
         if "log_true_energy" not in events.keys():
             events = add_log_true_energy(events)
-        if "disp_norm" not in events.keys():
+        if "disp_norm" not in events.keys() and hillas_prefix(events):
+            # true disp and miss of the camera frame parameters (DL1 in the camera frame)
             # the camera coordinates do not depend on the location and time of the frame
             events = add_disp(events, AltAz(location=subarray.reference_location))
             events = add_miss(events)
@@ -385,7 +358,7 @@ def pedestal_mean_charge(input_file, tel, times):
 
 def load_dl1_sst1m(
         input_file, tel=None, config=None,
-        table='astropy', check_finite=False,
+        table='astropy',
         stereo=False, quality_cuts=False, scale_intensities=False):
     """
     Reads DL1 table from the input HDF file.
@@ -400,9 +373,6 @@ def load_dl1_sst1m(
     table: string
         Type of the output table: \'astropy\'
         or \'pandas\'
-    check_finite: bool
-        If True finite check of RF features is
-        performed.
     stereo: bool
         If True, extra columns with geometricaly reconstructed
         stereo quantities are added to the output table
@@ -426,7 +396,8 @@ def load_dl1_sst1m(
     if scale_intensities:
         I_corr = float(config["NsbCalibrator"]["intensity_correction"][tel])
         logging.info('Intensity correction of %f applied on %s data.', I_corr, tel)
-        events['camera_frame_hillas_intensity'] = events['camera_frame_hillas_intensity'] * I_corr
+        intensity = f'{hillas_prefix(events)}hillas_intensity'
+        events[intensity] = events[intensity] * I_corr
 
     # trigger time with ns precision, for the matching of the stereo events
     trigger_time = read_trigger_time(input_file, tel)
@@ -470,10 +441,6 @@ def load_dl1_sst1m(
     if quality_cuts & (config is not None):
         logging.info('Performing event selection.')
         events = event_selection(events, config=config)
-
-    if check_finite & (config is not None):
-        logging.info('Performing finite check.')
-        events = get_finite(events, config=config, stereo=stereo)
 
 
     if stereo:
@@ -867,59 +834,6 @@ def load_extra_table(input_file, key=None, remove_column=None):
     return table_pd
 
 
-def write_dl2_table(
-        dl2, output_file=None, table_path=None,
-        table_name=None, config=None, mode='a'):
-    """
-    Opens the HDF file and writes DL2 table
-
-    Parameters
-    ----------
-    dl2: pandas.DataFrame
-    output_file: string
-    table_path: string
-    table_name: string
-    config: dict
-    mode: string
-
-    Returns
-    -------
-
-    """
-
-    for key in dl2.keys():
-
-        if dl2[key].dtypes is object:
-            logging.info('Removing key: %s, with content: %s', key, str(dl2[key].iloc[0]))
-            logging.info('Because object saving is not supported in table')
-            del dl2[key]
-            continue
-
-        # converting datatime columns in UNIX time in [ns]
-        if dl2[key].dtypes == np.dtype('datetime64[ns]'):
-            dl2[key] = dl2[key].astype('int')
-
-    logging.info('Writing DL2 in %s', output_file)
-
-    with tables.open_file(output_file, mode=mode) as f:
-
-        full_node_path = f"{table_path}/{table_name}"
-        if full_node_path in f:
-            logging.info("Removing existing node %s", full_node_path)
-            f.remove_node(table_path, name=table_name, recursive=True)
-
-        logging.info("Creating new node %s", full_node_path)
-        t = f.create_table(
-            table_path,
-            table_name,
-            dl2.to_records(index=False),
-            createparents=True,
-        )
-
-        if config:
-            t.attrs["config"] = config
-
-
 def write_pl_table(
         pl_table, output_file=None, table_path=None,
         table_name=None, config=None, mode='a'):
@@ -1053,36 +967,6 @@ def load_drive_data(file):
     merge_data['date'] = [datetime.fromtimestamp(float(k/1000)) for k in merge_data['TIMESTAMP']]
     hdul.close()
     return merge_data
-
-
-def write_dl2_info(dl2_file, rfs_used=None):
-    """
-    Stores info tab with RF used and sst1mpipe
-    version in the DL2 file. These are necesary
-    for DL3 production.
-
-    Parameters
-    ----------
-    dl2_file: string
-    rfs_used: string
-
-    Returns
-    -------
-
-    """
-
-    with tables.open_file(dl2_file, mode='a') as file:
-
-        table = file.create_table(
-            '/dl2',
-            'info',
-            DL2_info,
-            "DL2 production info"
-        )
-        info = table.row
-        info['sst1mpipe_version'] = sst1mpipe.__version__
-        info['RF_used'] = rfs_used
-        info.append()
 
 
 def write_dl1_info(dl1_file, info):

@@ -1,5 +1,4 @@
 {
-    "allowed_tels": null,
 
     "analysis": {
       "global_theta_cut": 0.2,
@@ -20,20 +19,15 @@
       "nbins_fov_offset_bg": 17,
       "source_offset_max_deg": 1,
       "nbins_source_offset": 501,
-      "gamma_min_simulated_energy_tev": 0.2,
-      "proton_min_simulated_energy_tev": 0.4,
       "true_energy_scaling_factor": 1.0,
-      "n_training_events": 7E5,
-      "gamma_to_proton_training_ratio": 1.0,
-      "stereo_reco_weights": "camera_frame_hillas_intensity",
       "observation_time_h": 50,
       "off_regions": 5
     },
 
     "event_selection": {
-        "camera_frame_hillas_intensity": [0, 1000000],
-        "camera_frame_hillas_width": [0, 100],
-        "camera_frame_hillas_length": [0, 100],
+        "hillas_intensity": [0, 1000000],
+        "hillas_width": [0, 100],
+        "hillas_length": [0, 100],
         "leakage_intensity_width_2": [0, 1]
     },
 
@@ -42,7 +36,7 @@
         "LocalPeakWindowSum": {
             "apply_integration_correction": true,
             "window_shift": 3,
-            "window_width": 7
+            "window_width": 8
         },
         "invalid_pixel_handler_type": "NeighborAverage"
     },
@@ -87,7 +81,7 @@
 
     "ImageProcessor": {
       "image_cleaner_type": "NSBImageCleaner",
-      "use_telescope_frame": false,
+      "use_telescope_frame": true,
       "TailcutsImageCleaner": {
           "picture_threshold_pe": [
             ["id", 1, 8],
@@ -140,130 +134,6 @@
           ]
         }
       }
-    },
-
-    "random_forest_regressor_args": {
-        "max_depth": 30,
-        "min_samples_leaf": 10,
-        "n_jobs": -1,
-        "n_estimators": 150,
-        "bootstrap": true,
-        "criterion": "squared_error",
-        "max_leaf_nodes": null,
-        "min_impurity_decrease": 0.0,
-        "min_samples_split": 10,
-        "min_weight_fraction_leaf": 0.0,
-        "oob_score": false,
-        "random_state": 42,
-        "verbose": 0,
-        "warm_start": false
-      },
-
-      "random_forest_classifier_args": {
-        "max_depth": 30,
-        "min_samples_leaf": 10,
-        "n_jobs": -1,
-        "n_estimators": 100,
-        "criterion": "gini",
-        "min_samples_split": 10,
-        "min_weight_fraction_leaf": 0.0,
-        "max_leaf_nodes": null,
-        "min_impurity_decrease": 0.0,
-        "bootstrap": true,
-        "oob_score": false,
-        "random_state": 42,
-        "verbose": 0,
-        "warm_start": false,
-        "class_weight": null
-      },
-
-    "energy_regression_features": [
-        "log_camera_frame_hillas_intensity",
-        "camera_frame_hillas_width",
-        "camera_frame_hillas_length",
-        "camera_frame_hillas_wl",
-        "camera_frame_hillas_skewness",
-        "camera_frame_hillas_kurtosis",
-        "camera_frame_timing_slope",
-        "leakage_intensity_width_2",
-        "camera_frame_hillas_x",
-        "camera_frame_hillas_y",
-        "HillasReconstructor_tel_impact_distance",
-        "HillasReconstructor_h_max"
-     ],
-     
-    "particle_classification_features": [
-        "log_camera_frame_hillas_intensity",
-        "camera_frame_hillas_width",
-        "camera_frame_hillas_length",
-        "camera_frame_hillas_wl",
-        "camera_frame_hillas_skewness",
-        "camera_frame_hillas_kurtosis",
-        "camera_frame_timing_slope",
-        "leakage_intensity_width_2",
-        "camera_frame_hillas_x",
-        "camera_frame_hillas_y",
-        "HillasReconstructor_tel_impact_distance",
-        "HillasReconstructor_h_max"
-      ],
-
-    "disp_method": "disp_norm_sign",
-
-    "disp_regression_features": [
-        "log_camera_frame_hillas_intensity",
-        "camera_frame_hillas_width",
-        "camera_frame_hillas_length",
-        "camera_frame_hillas_wl",
-        "camera_frame_hillas_skewness",
-        "camera_frame_hillas_kurtosis",
-        "camera_frame_timing_slope",
-        "leakage_intensity_width_2",
-        "HillasReconstructor_tel_impact_distance",
-        "HillasReconstructor_h_max"
-      ],
-
-      "disp_classification_features": [
-        "log_camera_frame_hillas_intensity",
-        "camera_frame_hillas_width",
-        "camera_frame_hillas_length",
-        "camera_frame_hillas_wl",
-        "camera_frame_hillas_skewness",
-        "camera_frame_hillas_kurtosis",
-        "camera_frame_timing_slope",
-        "leakage_intensity_width_2"
-      ],
-
-      "misdirection_regression_features_mono": [
-        "log_camera_frame_hillas_intensity",
-        "camera_frame_hillas_width",
-        "camera_frame_hillas_length",
-        "camera_frame_hillas_wl",
-        "camera_frame_hillas_skewness",
-        "camera_frame_hillas_kurtosis",
-        "camera_frame_timing_slope",
-        "leakage_intensity_width_2"
-      ],
-
-      "misdirection_regression_features_stereo": [
-        "log_camera_frame_hillas_intensity_tel1",
-        "camera_frame_hillas_width_tel1",
-        "camera_frame_hillas_length_tel1",
-        "camera_frame_hillas_wl_tel1",
-        "camera_frame_hillas_skewness_tel1",
-        "camera_frame_hillas_kurtosis_tel1",
-        "camera_frame_timing_slope_tel1",
-        "leakage_intensity_width_2_tel1",
-        "HillasReconstructor_tel_impact_distance_tel1",
-        "log_camera_frame_hillas_intensity_tel2",
-        "camera_frame_hillas_width_tel2",
-        "camera_frame_hillas_length_tel2",
-        "camera_frame_hillas_wl_tel2",
-        "camera_frame_hillas_skewness_tel2",
-        "camera_frame_hillas_kurtosis_tel2",
-        "camera_frame_timing_slope_tel2",
-        "leakage_intensity_width_2_tel2",
-        "HillasReconstructor_tel_impact_distance_tel2",
-        "HillasReconstructor_h_max"
-]
+    }
 
 }

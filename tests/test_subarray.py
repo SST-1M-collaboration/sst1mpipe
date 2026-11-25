@@ -113,10 +113,3 @@ def test_merge_subarrays():
     moved = SubarrayDescription(name="moved", tel_positions={22: [10.0, 0.0, 0.0] * u.m},
                                 tel_descriptions={22: SUBARRAY.tel[22]}, reference_location=SUBARRAY.reference_location)
     assert distance(merge_subarrays([moved, SUBARRAY]).tel_earth_locations[22], SUBARRAY.tel_earth_locations[22]) > 1 * u.m
-
-
-@pytest.mark.parametrize("function", ["apply_models", "stereo_reconstruction"])
-def test_subarray_is_required(function):
-    reco = pytest.importorskip("sst1mpipe.reco.reco")  # needs pyirf, compatible with the installed astropy
-    with pytest.raises(ValueError, match="subarray is required"):
-        getattr(reco, function)(pd.DataFrame())

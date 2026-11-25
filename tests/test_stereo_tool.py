@@ -87,7 +87,7 @@ def test_stereo_events(dl1_files, tmp_path, combiner_args):
         parameters = read_table(output, f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")
         mono = read_table(dl1_files[tel_id], f"/dl1/event/telescope/parameters/tel_{tel_id:03d}")
         mono = mono[np.isin(mono["event_id"], list(COINCIDENT_EVENTS))]
-        np.testing.assert_array_equal(parameters["camera_frame_hillas_intensity"], mono["camera_frame_hillas_intensity"])
+        np.testing.assert_array_equal(parameters["hillas_intensity"], mono["hillas_intensity"])
 
     with HDF5EventSource(output, config=NAN_POINTING_OUT_OF_RANGE) as source:
         assert source.subarray.tel_ids.tolist() == [21, 22]
