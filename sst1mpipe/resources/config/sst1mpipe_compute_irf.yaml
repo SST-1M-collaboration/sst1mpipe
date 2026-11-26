@@ -39,12 +39,12 @@ DL2EventPreprocessor:
 
 DefaultRecoEnergyBins:
   reco_energy_min: 0.1 TeV
-  reco_energy_max: 300 TeV
+  reco_energy_max: 1000 TeV
   reco_energy_n_bins_per_decade: 5
 
 DefaultTrueEnergyBins:
   true_energy_min: 0.1 TeV
-  true_energy_max: 300 TeV
+  true_energy_max: 1000 TeV
   true_energy_n_bins_per_decade: 10
 
 DefaultFoVOffsetBins:
@@ -54,7 +54,7 @@ DefaultFoVOffsetBins:
 
 EnergyDispersion2dMaker:
   # true_energy_min: 0.1 TeV
-  # true_energy_max: 300 TeV
+  # true_energy_max: 1000 TeV
   # true_energy_n_bins_per_decade: 10
   energy_migration_min: 0.2
   energy_migration_max: 5
@@ -65,7 +65,7 @@ EnergyDispersion2dMaker:
 
 PSF3DMaker:
   # true_energy_min: 0.1 TeV
-  # true_energy_max: 300 TeV
+  # true_energy_max: 1000 TeV
   # true_energy_n_bins_per_decade: 10
   source_offset_min: 0.0 deg
   source_offset_max: 1.0 deg
@@ -76,7 +76,7 @@ PSF3DMaker:
 
 # EffectiveArea2dMaker:
 #   true_energy_min: 0.1 TeV
-#   true_energy_max: 300 TeV
+#   true_energy_max: 1000 TeV
 #   true_energy_n_bins_per_decade: 10
 #   fov_offset_min: 0 deg
 #   fov_offset_max: 5 deg
@@ -84,7 +84,7 @@ PSF3DMaker:
 
 # BackgroundRate2dMaker:
 #   reco_energy_min: 0.1 TeV
-#   reco_energy_max: 300 TeV
+#   reco_energy_max: 1000 TeV
 #   reco_energy_n_bins_per_decade: 5
 #   fov_offset_min: 0 deg
 #   fov_offset_max: 5 deg
@@ -94,10 +94,10 @@ AngularResolution2dMaker:
   use_reco_energy: False
   quantiles: [0.25, 0.5, 0.68, 0.95]
   # reco_energy_min: 0.1 TeV
-  # reco_energy_max: 300 TeV
+  # reco_energy_max: 1000 TeV
   # reco_energy_n_bins_per_decade: 5
   # true_energy_min: 0.1 TeV
-  # true_energy_max: 300 TeV
+  # true_energy_max: 1000 TeV
   # true_energy_n_bins_per_decade: 10
   # fov_offset_min: 0 deg
   # fov_offset_max: 5 deg
@@ -105,7 +105,7 @@ AngularResolution2dMaker:
 
 # EnergyBiasResolution2dMaker:
 #   true_energy_min: 0.1 TeV
-#   true_energy_max: 300 TeV
+#   true_energy_max: 1000 TeV
 #   true_energy_n_bins_per_decade: 10
 #   fov_offset_min: 0 deg
 #   fov_offset_max: 5 deg
@@ -114,7 +114,7 @@ AngularResolution2dMaker:
 Sensitivity2dMaker:
   alpha: 0.2
   # reco_energy_min: 0.1 TeV
-  # reco_energy_max: 300 TeV
+  # reco_energy_max: 1000 TeV
   # reco_energy_n_bins_per_decade: 5
   # background of the sensitivity: the gamma-like protons within 1.2 deg of the camera center (the on-axis
   # point source), as sst1mpipe < 0.9 (theta_cut_p) and the SST-1M Crab paper, scaled to the size of the ON
