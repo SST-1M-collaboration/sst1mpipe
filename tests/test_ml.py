@@ -231,6 +231,12 @@ def irfs(models, dl1_files, tmp_path_factory):
             "--do-background", "--spatial-selection-applied", "--DefaultFoVOffsetBins.fov_offset_n_bins=1",
             "--output", str(irf / "irf_point_like.fits.gz"), "--benchmark-output", str(irf / "benchmarks_point_like.fits.gz")]
     assert run_tool(SST1MIrfTool(), argv=argv, raises=True) == 0
+    # background of the sensitivity within 1.2 deg (Sensitivity2dMaker), the IRFs within 5 deg (DefaultFoVOffsetBins)
+    sensitivity = QTable.read(irf / "benchmarks_point_like.fits.gz", hdu="SENSITIVITY")
+    assert u.Quantity(sensitivity["THETA_LO"]).ravel()[0] == 0 * u.deg
+    assert u.Quantity(sensitivity["THETA_HI"]).ravel()[-1] == 1.2 * u.deg
+    background = QTable.read(irf / "irf_point_like.fits.gz", hdu="BACKGROUND")
+    assert u.Quantity(background["THETA_HI"]).ravel()[-1] == 5 * u.deg
     yield irf, dl2
     spectra.SPECTRA.update(saved_spectra)
 

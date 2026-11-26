@@ -200,6 +200,10 @@ sensitivity (% Crab) is relative to the Crab of MAGIC.
    energy dispersion, PSF or ``RAD_MAX``, background) in the GADF format of gammapy, and the
    benchmarks (energy bias and resolution, angular resolution, sensitivity in 50 h).
    Point-like IRFs: ``--spatial-selection-applied --DefaultFoVOffsetBins.fov_offset_n_bins=1``.
+   The background of the sensitivity is the density of the gamma-like protons within 1.2 deg of the camera
+   center, where the on-axis point source is (``Sensitivity2dMaker.fov_offset_max``, as sst1mpipe < 0.9 and
+   the SST-1M Crab paper), scaled to the size of the ON region; the IRFs keep the offset bins of
+   ``DefaultFoVOffsetBins`` (0-5 deg).
 
 .. code-block:: console
 
