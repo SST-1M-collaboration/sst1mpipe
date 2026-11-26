@@ -183,35 +183,55 @@ DL2 MC to IRFs
     :ref:`automatic_processing`. IRF production, however, is necessary in performance studies, or if one uses custom RFs to produce DL2, or applies
     custom selection cuts in DL2 to DL3 step.
 
-To make IRFs from MC DL2 files, one can run ``sst1mpipe_mc_make_irfs`` script, which currently produces only full enclosure IRFs, so it has to be provided with 
-diffuse protons and diffuse gammas. The script applies event selection cuts defined in the config file (``event_selection``), including cut on gammaness. 
-The gammaness cut can be either global (one number independent on energy) or energy dependent (gammaness distribution naturaly depends on energy, so using optimised 
-energy dependent gammaness cut results in performance improvement). Global gammaness cut can be set in the config file (``global_gammaness_cut`` field), while energy dependent
-cuts, must be provided as ``HDF5`` table, where the cuts for individual energy bins are stored, using parameter 
-``--gammaness-cut-dir``. These tables can be generated with ``sst1mpipe_mc_performance`` (see :ref:`performance`). Pre-calculated energy dependent gammaness 
-cuts are stored on Calculus for mono/stereo and different zenith angles:
+The IRFs are made with the tools of ctapipe, through their sst1mpipe versions, from the DL2 of
+``sst1mpipe-apply-models`` (point gammas, diffuse gammas for the full enclosure IRFs, diffuse protons).
+The sst1mpipe versions weight the events with the spectra of the SST-1M Crab paper (arXiv:2506.01733):
+the Crab Nebula of MAGIC (``--crab MAGIC``, default; ``HEGRA`` as ctapipe), and the protons weighted to
+protons + helium of DAMPE (``--background p_he``, default; ``protons`` as ctapipe). The relative
+sensitivity (% Crab) is relative to the Crab of MAGIC.
 
-``/data/work/analysis/MC/prod_january_2023/$SST1MPIPE_VER/performance/*_performance_*``
+1. ``sst1mpipe-optimize-event-selection``: gammaness and direction (theta) cuts, written to ``cuts.fits``:
 
-Again, one should make sure that the event selection applied to produce the cuts is the same as for IRFs. The IRF maker creates 
-some directory structure inside the ``--output-dir``, automaticaly recognizing proper bin in zenith, azimuth, NSB level and gammaness cut applied. 
-This directory structure should remain untouched for :ref:`dl2_dl3` to work properly.
+   - ``sst1mpipe_optimize_cuts.yaml``: the cuts of the best sensitivity per reconstructed energy bin;
+   - with ``sst1mpipe_irf_paper_cuts.yaml``: the cuts of the paper, a gammaness cut keeping 60 % of
+     the gammas in each energy bin and one theta cut for all the energies keeping 80 % of the gammas
+     (``GlobalThetaPercentileCuts``).
 
-Output IRF files are fully compatible with gammapy and may be read and explored with the use of gammapy funkcionalities:
+   The stereo analysis has the events with both telescopes only: the stereo models predict only for them.
+2. ``sst1mpipe-compute-irf`` (``sst1mpipe_compute_irf.yaml``): the IRFs with these cuts (effective area,
+   energy dispersion, PSF or ``RAD_MAX``, background) in the GADF format of gammapy, and the
+   benchmarks (energy bias and resolution, angular resolution, sensitivity in 50 h).
+   Point-like IRFs: ``--spatial-selection-applied --DefaultFoVOffsetBins.fov_offset_n_bins=1``.
+   The background of the sensitivity is the density of the gamma-like protons between
+   ``Sensitivity2dMaker.fov_offset_min`` and ``Sensitivity2dMaker.fov_offset_max`` from the camera center,
+   around the on-axis point source (as sst1mpipe < 0.9 and the SST-1M Crab paper), scaled to the size of the
+   ON region; the IRFs keep the offset bins of ``DefaultFoVOffsetBins``. The sensitivity of an energy bin is
+   computed only with at least ``MinimumStatisticsSensitivity2dMaker.min_simulated_signal`` simulated gammas
+   and ``MinimumStatisticsSensitivity2dMaker.min_simulated_background`` simulated protons left after the cuts:
+
+   .. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_compute_irf.yaml
+      :language: yaml
+      :start-at: Sensitivity2dMaker:
 
 .. code-block:: console
 
-    from gammapy.irf import (
-        EffectiveAreaTable2D,
-        PSF3D,
-        EnergyDispersion2D
-        Background2D
-    )
-    irf_filename = 'SST1M_tel_021_Zen30deg_gcut0.75_irfs.fits'
-    aeff = EffectiveAreaTable2D.read(irf_filename, hdu="EFFECTIVE AREA")
-    edisp = EnergyDispersion2D.read(irf_filename, hdu="ENERGY DISPERSION")
-    psf = PSF3D.read(irf_filename, hdu='POINT SPREAD FUNCTION')
-    bg_2d = Background2D.read(irf_filename, hdu='BACKGROUND')
+    sst1mpipe-optimize-event-selection --config sst1mpipe_optimize_cuts.yaml \
+        --config sst1mpipe_irf_paper_cuts.yaml -g gamma_point.dl2.h5 -p proton_test.dl2.h5 -o cuts.fits
+    sst1mpipe-compute-irf --config sst1mpipe_compute_irf.yaml --cuts cuts.fits \
+        --gamma-file gamma_point.dl2.h5 --proton-file proton_test.dl2.h5 --do-background \
+        --spatial-selection-applied --DefaultFoVOffsetBins.fov_offset_n_bins=1 \
+        --output irf_point_like.fits.gz --benchmark-output benchmarks_point_like.fits.gz
+
+The IRF files are compatible with gammapy:
+
+.. code-block:: python
+
+    from gammapy.irf import EffectiveAreaTable2D, EnergyDispersion2D
+
+    aeff = EffectiveAreaTable2D.read("irf_point_like.fits.gz", hdu="EFFECTIVE AREA")
+    edisp = EnergyDispersion2D.read("irf_point_like.fits.gz", hdu="ENERGY DISPERSION")
+
+The figures of the IRFs and of the benchmarks are made by ``sst1mpipe-plot-irfs``, see :ref:`performance`.
 
 
 .. _dl2_dl3:
@@ -225,6 +245,12 @@ files into per-wobble DL3 ``fits`` files containing only photon lists. It also f
 per-night index files needed for further analysis in gammapy. The script applies event selection cuts defined in the config file (``event_selection``), 
 including cut on gammaness, so **one should make sure that these are the same as used on MC to produce IRFs**. Energy dependent gammaness cuts can be used as well, following 
 the same rules described in :ref:`dl2_irfs`.
+
+.. warning::
+
+    ``sst1mpipe_data_dl2_dl3`` (and ``sst1mpipe_data_get_photon_list``) read the DL2 of the former
+    random forests of sst1mpipe, not the DL2 of ctapipe written by ``sst1mpipe-apply-models``: the
+    DL3 of the ctapipe DL2 is not implemented yet.
 
 
 .. _higher_level:
@@ -244,7 +270,34 @@ HDU index files indexing all DL3s to be used in the final analysis.
 
 .. _performance:
 
-RF performance and sensitivity
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Performance and sensitivity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-TBD
+The performance is in the IRFs and benchmarks of ``ctapipe-compute-irf`` (see :ref:`dl2_irfs`), and
+the performance of the models in the figures of the training tools, see :doc:`ml_reconstruction`.
+``sst1mpipe-plot-irfs`` makes one figure per quantity (effective area, energy bias and resolution,
+energy migration, angular resolution, cuts, background rate, sensitivity in 50 h, and with the DL2
+the gammaness distributions and the ROC curve), with the same axis limits for all the figures.
+Each ``--irf <label>=<directory>`` (``irf_point_like.fits.gz``, ``benchmarks_point_like.fits.gz``,
+``cuts.fits``) is a series, e.g. to compare the mono analysis of each telescope and the stereo:
+
+.. code-block:: console
+
+    sst1mpipe-plot-irfs --irf tel1=irf/tel1 --irf tel2=irf/tel2 --irf stereo=irf/stereo \
+        --dl2 stereo=dl2/stereo -o plots
+
+``--reference <label>=<directory>`` draws IRF directories of the same format as lines: the
+published performance is in ``sst1mpipe/resources/reference`` (``ref:<directory>``, made by the
+scripts of ``scripts/reference``), with the quantities published only:
+
+- ``crab_paper_2025/<mode>/ze<zenith>``: the SST-1M Crab paper (arXiv:2506.01733), ``tel1`` and
+  ``stereo`` at ``ze30``, ``ze50`` (energy bias and resolution, angular
+  resolution, sensitivity), ``tel1``, ``tel2``, ``stereo`` at ``ze20`` (effective area)
+- sensitivity of other instruments: ``lhaaso_1yr``, ``hawc_1yr``, ``veritas_50h``, ``hess_50h``,
+  ``astri_50h``
+
+.. code-block:: console
+
+    sst1mpipe-plot-irfs --irf stereo=irf/stereo \
+        --reference "paper, 30 deg=ref:crab_paper_2025/stereo/ze30" \
+        --reference "ASTRI Mini-Array=ref:astri_50h" -o plots_paper
