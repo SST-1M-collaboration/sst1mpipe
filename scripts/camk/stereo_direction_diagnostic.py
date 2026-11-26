@@ -31,7 +31,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.table import join, vstack
+from astropy.table import join
 from ctapipe.io import read_table
 from ctapipe.reco.preprocessing import telescope_to_horizontal
 
@@ -130,7 +130,7 @@ if len(tels) == 2:
     pipeline_choice = np.argmin(np.nan_to_num(np.stack([separation(*direction(np.full(len(events), i)), events["disp_alt"], events["disp_az"])
                                                         for i in range(4)]), nan=1e9), axis=0)
     predicted_choice = np.array([combos.index(x + y) if isinstance(x, str) and isinstance(y, str) and (x + y) in combos else 0
-                                 for x, y in zip(events[f"predicted_{a}"], events[f"predicted_{b}"])])
+                                 for x, y in zip(events[f"predicted_{a}"], events[f"predicted_{b}"], strict=True)])
 theta["Hillas"] = separation(events["HillasReconstructor_alt"], events["HillasReconstructor_az"], true_alt, true_az)
 masks["Hillas"] = two & np.asarray(events["HillasReconstructor_is_valid"], dtype=bool)
 
