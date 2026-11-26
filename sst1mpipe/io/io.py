@@ -3,10 +3,12 @@ import json
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 
 import astropy.units as u
 import numpy as np
 import tables
+import yaml
 from astropy.coordinates import AltAz
 from astropy.io import fits
 from astropy.table import Table, join, vstack
@@ -44,8 +46,7 @@ from sst1mpipe.utils.utils import (
 
 def load_config(cfg_file, ismc=False):
     """
-    Reads sst1mpipe config file which must
-    be stored as json file.
+    Reads a sst1mpipe config file, in YAML (``.yaml``, ``.yml``) or JSON (``.json``).
 
     Parameters
     ----------
@@ -62,10 +63,13 @@ def load_config(cfg_file, ismc=False):
         logging.info('No config file specified, loading default config.')
         cfg_file = MC_CONFIG_FILES["low"] if ismc else DATA_CONFIG_FILE
 
-    with open(cfg_file) as json_file:
-        config = json.load(json_file)
+    with open(cfg_file) as f:
+        if Path(cfg_file).suffix.lower() == ".json":
+            config = json.load(f)
+        else:
+            config = yaml.safe_load(f)
 
-    return Config(config)
+    return Config(config or {})
 
 
 def load_source_catalog(catalog_file):
@@ -158,7 +162,8 @@ def write_extra_parameters(
 
         else:
 
-            params["equivalent_focal_length"] = float(config['telescope_equivalent_focal_length'][tel])
+            tel_id = int(tel.removeprefix('tel_'))
+            params["equivalent_focal_length"] = read_subarray(file).tel[tel_id].optics.equivalent_focal_length.to_value(u.m)
 
             # Adding date
             merged_table = params.copy()
@@ -347,7 +352,7 @@ def load_dl1_sst1m(
         file is applied.
     scale_intensities: bool
         If True a global scale on Hillas Intensity of each shower
-        is applied from config["NsbCalibrator"]["intensity_correction"]
+        is applied from config["NsbCalibrator"]["intensity_correction"] (1 if not given)
     Returns
     -------
     data: pandas.DataFrame or astropy.table.Table
@@ -360,7 +365,7 @@ def load_dl1_sst1m(
     events = read_table(input_file, "/dl1/event/telescope/parameters/" + tel)
 
     if scale_intensities:
-        I_corr = float(config["NsbCalibrator"]["intensity_correction"][tel])
+        I_corr = float(config.get("NsbCalibrator", {}).get("intensity_correction", {}).get(tel, 1.0))
         logging.info('Intensity correction of %f applied on %s data.', I_corr, tel)
         intensity = f'{hillas_prefix(events)}hillas_intensity'
         events[intensity] = events[intensity] * I_corr
@@ -457,7 +462,7 @@ def load_dl2_sst1m(
         Cut on minimum reconstructed energy [TeV]
     scale_reco_energy: bool
         If True a global scale on reconstructed energy of each shower
-        is applied from config["analysis"]["reco_energy_scaling_factor"]
+        is applied from config["analysis"]["reco_energy_scaling_factor"] (1 if not given)
 
     Returns
     -------
@@ -479,8 +484,9 @@ def load_dl2_sst1m(
 
 
     if scale_reco_energy:
-        logging.warning('Reconstructed energy scaled by %f', float(config["analysis"]["reco_energy_scaling_factor"]))
-        events['reco_energy'] *= float(config["analysis"]["reco_energy_scaling_factor"])
+        factor = float(config.get("analysis", {}).get("reco_energy_scaling_factor", 1.0))
+        logging.warning('Reconstructed energy scaled by %f', factor)
+        events['reco_energy'] *= factor
 
     if energy_min > 0:
         events = events[events['reco_energy'] >= energy_min]

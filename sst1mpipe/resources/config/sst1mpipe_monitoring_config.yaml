@@ -1,0 +1,126 @@
+# sst1mpipe-monitoring: pointing, statistics of the pedestal events, camera calibration coefficients of a run:
+#   sst1mpipe-monitoring -i SST1M1_20260120_1179.fits.fz -o run.monitoring.h5 --config sst1mpipe_monitoring_config.yaml
+# The calibration settings must be those of sst1mpipe_data_config.yaml and sst1mpipe_rta_config.yaml.
+#
+# Every configurable value of the components used is written (explicit, no reliance on the
+# defaults); the input and output files are given on the command line.
+
+MonitoringTool:  # Monitoring data of a SST-1M run (raw data): pointing of the telescopes and statistics of the ADC samples an...
+  overwrite: false  # Overwrite the output file if it exists
+  progress_bar: true  # Show a progress bar during the event loop
+  pointing_update_interval: 1.0  # Time between two rows of the pointing table of a telescope (s)
+
+EventSource:  # Parent class for EventSources
+  max_events: null  # Maximum number of events that will be read from the file
+  allowed_tels: null  # list of allowed tel_ids, others will be ignored
+
+SST1MEventSource:  # Event source of the SST-1M raw data (R0) files
+  pointing_ra: null  # Pointing right ascension in deg
+  pointing_dec: null  # Pointing declination in deg
+  focal_length_choice: EQUIVALENT  # Which focal length to use for the camera frame transformations
+  swapped_modules:  # Wrongly connected modules: the pixels of the two modules are swapped for the events of the telescope in the...
+    - {tel_id: 22, start: '2023-09-01T00:00:00', stop: '2024-07-18T00:00:00', modules: [59, 88]}
+    - {tel_id: 21, start: '2025-12-17T12:00:00', stop: '2026-01-15T12:00:00', modules: [8, 9]}
+
+R0R1Calibrator:  # R0 -> R1 calibration of the SST-1M telescopes: the corrections which do not need the pedestal events, so th...
+  calibration_file: [[type, '*', null]]  # HDF5 file with the calibration parameters (dc_to_pe, calib_flag) from the dark runs
+  window_transmittance_file: [[type, '*', null]]  # File with the transmittance correction factor of the camera window of each pixel (pixel_id, correction_fact...
+  pde_drop_factor: [[type, '*', null]]  # The charges are divided by this factor (factor of the camera calibration coefficients) to correct the simul...
+  flag_bad_calibration_pixels: [[type, '*', true]]  # Flag the pixels with bad calibration parameters (calib_flag != 1), whose charge is interpolated
+  bad_pixels: [[type, '*', []], [id, 21, []], [id, 22, []]]  # Ids of the pixels always flagged (e.g. broken pixels), whose charge is interpolated, for the observed and s...
+  saturation_threshold: [[type, '*', 3000]]  # ADC (pedestal subtracted) above which the maximum of a saturated pulse is
+  saturation_width_level: [[type, '*', 2500]]  # ADC (pedestal subtracted) level used to compute the width of the saturated pulses
+  saturation_width_threshold: [[type, '*', 5]]  # Minimum number of samples above saturation_width_level of a saturated pulse
+  calibrate_r0: [[type, '*', true], [id, 1, false], [id, 2, false]]  # Calibrate the R0 waveforms of the telescope (raw data)
+
+CameraCoefficientsCalculator:  # Camera calibration coefficients of each chunk of the statistics of the ADC samples of the pedestal events (...
+  voltage_drop_correction: [[type, '*', global]]  # Correction of the voltage drop due to the NSB: 'global' uses the median of the pedestal variance of the cam...
+  flag_dead_pixels: [[type, '*', true]]  # Flag the dead pixels, whose charge is interpolated: the pixels without statistics of the ADC samples of the...
+
+ImageSaturationCorrector:  # Correction of the charges and peak times of the saturated pixels, applied after the image extraction (`~cta...
+  integration_level: [[type, '*', 0.2]]  # Fraction of the maximum defining the integration window of the saturated pulses
+  peak_time_level: [[type, '*', 2500]]  # ADC (pedestal subtracted): the peak time of a saturated pulse is the middle of its R0 samples above this level
+
+CameraCalibrator:  # Calibrator to handle the full camera calibration chain, in order to fill the DL1 data level in the event co...
+  data_volume_reducer_type: NullDataVolumeReducer  # The name of a DataVolumeReducer subclass
+  image_extractor_type: [[type, '*', LocalPeakWindowSum]]  # Name of the ImageExtractor subclass to be used
+  invalid_pixel_handler_type: NeighborAverage  # Name of the InvalidPixelHandler to use
+  apply_peak_time_shift: [[type, '*', true]]  # Apply peak time shift corrections
+  apply_waveform_time_shift: [[type, '*', false]]  # Apply waveform time shift corrections
+
+LocalPeakWindowSum:  # Extractor which sums in a window about the peak in each pixel's waveform
+  window_width: [[type, '*', 8]]  # Define the width of the integration window
+  window_shift: [[type, '*', 3]]  # Define the shift of the integration windowfrom the peak_index (peak_index - shift)
+  apply_integration_correction: [[type, '*', true]]  # Apply the integration window correction
+
+WaveformStatisticsCalculator:  # Statistics of the ADC samples of the pedestal events (R0), see `PedestalWaveformAggregator`
+  stats_aggregator_type: [[type, '*', PedestalWaveformAggregator]]  # Name of the StatisticsAggregator subclass to be used
+  faulty_pixels_fraction: 0.1  # Minimum fraction of faulty camera pixels to identify regions of trouble
+  outlier_detector_list:  # List of dicts containing the name of the OutlierDetector subclass to be used, the aggregated statistic valu...
+    - {apply_to: std, name: MedianOutlierDetector, config: {median_range_factors: [-0.5, 10.0]}}
+
+PedestalWaveformAggregator:  # Statistics of the ADC samples of the pedestal events, from the mean and the std of the samples of each pixe...
+  chunking_type: SizeChunking  # The chunking strategy to use for dividing data into chunks
+  # rolling chunks of the last 100 pedestal events, updated at each pedestal event (nested: only for this
+  # aggregator, the images have their own chunks)
+  SizeChunking:  # chunks of a number of pedestal events
+    chunk_size: 100  # Number of rows per chunk
+    chunk_shift: 1  # Number of rows to shift between consecutive chunks
+    last_chunk_policy: overlap  # 'overlap': the last chunk ends at the last event and overlaps the previous one
+    allow_undersized_tables: true  # If True, a table smaller than a chunk gives a single chunk
+  TimeChunking:  # chunks of a time interval (used with chunking_type: TimeChunking)
+    chunk_duration: 1 s  # Duration of each time chunk
+    chunk_shift: 0.1 s  # Time shift between consecutive chunks
+    last_chunk_policy: overlap  # 'overlap': the last chunk ends at the last event and overlaps the previous one
+    allow_undersized_tables: true  # If True, a table smaller than a chunk gives a single chunk
+
+ImageStatisticsCalculator:  # Statistics of the calibrated images (p.e.) of the pedestal events (DL1)
+  stats_aggregator_type: [[type, '*', PlainAggregator]]  # Name of the BaseAggregator subclass to be used
+  faulty_pixels_fraction: 0.1  # Minimum fraction of faulty camera pixels to identify regions of trouble
+  outlier_detector_list: []  # List of dicts containing the name of the OutlierDetector subclass to be used, the aggregated statistic valu...
+
+PlainAggregator:  # Compute aggregated statistic values from a chunk of event-wise data using numpy functions
+  chunking_type: SizeChunking  # The chunking strategy to use for dividing data into chunks
+  # chunks of 1000 pedestal images (a single chunk for most runs)
+  SizeChunking:  # chunks of a number of pedestal events
+    chunk_size: 1000  # Number of rows per chunk
+    chunk_shift: 1  # Number of rows to shift between consecutive chunks
+    last_chunk_policy: overlap  # 'overlap': the last chunk ends at the last event and overlaps the previous one
+    allow_undersized_tables: true  # If True, a table smaller than a chunk gives a single chunk
+  TimeChunking:  # chunks of a time interval (used with chunking_type: TimeChunking)
+    chunk_duration: 10 s  # Duration of each time chunk
+    chunk_shift: 1 s  # Time shift between consecutive chunks
+    last_chunk_policy: overlap  # 'overlap': the last chunk ends at the last event and overlaps the previous one
+    allow_undersized_tables: true  # If True, a table smaller than a chunk gives a single chunk
+
+SigmaClippingAggregator:  # Compute aggregated statistic values from a chunk of event-wise data using astropy's sigma clipping functions
+  max_sigma: 4  # Maximal value for the sigma clipping outlier removal
+  iterations: 5  # Number of iterations for the sigma clipping outlier removal
+  chunking_type: SizeChunking  # The chunking strategy to use for dividing data into chunks
+  SizeChunking:  # chunks of a number of pedestal events
+    chunk_size: 1000  # Number of rows per chunk
+    chunk_shift: 1  # Number of rows to shift between consecutive chunks
+    last_chunk_policy: overlap  # 'overlap': the last chunk ends at the last event and overlaps the previous one
+    allow_undersized_tables: true  # If True, a table smaller than a chunk gives a single chunk
+  TimeChunking:  # chunks of a time interval (used with chunking_type: TimeChunking)
+    chunk_duration: 10 s  # Duration of each time chunk
+    chunk_shift: 1 s  # Time shift between consecutive chunks
+    last_chunk_policy: overlap  # 'overlap': the last chunk ends at the last event and overlaps the previous one
+    allow_undersized_tables: true  # If True, a table smaller than a chunk gives a single chunk
+
+SiPMVoltageDropModel:  # Voltage drop of the SiPMs of the SST-1M cameras under NSB light, from the variance of the ADC samples of th...
+  baseline_shift_spline:  # B-spline of the baseline shift (ADC) vs. the variance of the ADC samples of the pedestal events (ADC²): dic...
+    - [type, '*', null]
+    - [id, 21, {knots: [0.0, 0.0, 0.0, 46.96969697, 60.90909091, 67.57575758, 74.24242424, 74.24242424, 74.24242424], coefficients: [-0.4367913, 9.08788226, 39.66927065, 54.18389959, 69.24518367, 104.29418015, 0.0, 0.0, 0.0], degree: 2}]
+    - [id, 22, {knots: [0.0, 0.0, 93.74735497, 126.46232902, 181.54405469, 256.80398702, 266.62290877, 292.98812266, 294.71402901, 295.67072519, 298.04051867, 339.91032956, 339.91032956], coefficients: [-1.74764142, 48.41280122, 68.36843193, 104.62272377, 168.14318275, 179.34289593, 212.07400565, 214.10474285, 215.17017626, 217.7828114, 268.19128994, 0.0, 0.0], degree: 1}]
+  gain_drop_slope: [[type, '*', null], [id, 21, -0.00487], [id, 22, -0.00118]]  # Relative drop of the gain per ADC of baseline shift (arXiv:1910.00348, fig. 11.1)
+  pde_drop_slope: [[type, '*', null], [id, 21, -0.00317], [id, 22, -0.000663]]  # Relative drop of the PDE per ADC of baseline shift (arXiv:1910.00348, fig. 11.1)
+  photon_detection_efficiency: [[type, '*', 0.35]]  # PDE of the SiPMs without voltage drop, for the NSB photon rate (approximate)
+  pulse_integral: [[type, '*', null], [id, 21, 21.0], [id, 22, 23.5]]  # Integral of the pulse of one p.e. without voltage drop (ADC x samples)
+
+NullDataVolumeReducer: {}  # Perform no data volume reduction
+
+NeighborAverage: {}
+
+MedianOutlierDetector:  # Detect outliers based on the deviation from the camera median
+  median_range_factors: [-0.5, 10.0]  # Defines the range of acceptable values (lower, upper) as fractional deviations from the mean

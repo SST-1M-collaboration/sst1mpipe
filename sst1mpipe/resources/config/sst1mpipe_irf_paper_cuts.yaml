@@ -3,11 +3,24 @@
 # by the gammaness cut in each energy bin, and one theta cut for all the energies keeping 80 % of the
 # gammas (GlobalThetaPercentileCuts of sst1mpipe.performance.irf_tools)
 
-EventSelectionOptimizer:
-  optimization_algorithm: "GlobalThetaPercentileCuts"
+EventSelectionOptimizer:  # Tool to create optimized cuts for IRF generation
+  optimization_algorithm: GlobalThetaPercentileCuts  # The cut optimization algorithm to be used
+  chunk_size: 100000  # How many subarray events to load at once when preselecting events
+  electron_target_spectrum: IRFDOC_ELECTRON_SPECTRUM  # Name of the spectrum used for weights of electron events
+  gamma_target_spectrum: CRAB_HEGRA  # Name of the spectrum used for weights of gamma events
+  obs_time: 50 h  # Observation time in the form ``<value> <unit>``
+  overwrite: false
+  proton_target_spectrum: IRFDOC_PROTON_SPECTRUM  # Name of the spectrum used for weights of proton events
 
-GhPercentileCutCalculator:
-  target_percentile: 60   # gamma efficiency of the gammaness cut
+GhPercentileCutCalculator:  # Computes a percentile cut on gammaness
+  target_percentile: 60  # gamma efficiency of the gammaness cut
+  min_counts: 10  # Minimum number of events in a bin to attempt to find a cut value
+  smoothing: null  # When given, the width (in units of bins) of gaussian smoothing applied
 
-ThetaPercentileCutCalculator:
-  target_percentile: 80   # containment of the theta cut (all the energies)
+ThetaPercentileCutCalculator:  # Computes a percentile cut on theta
+  target_percentile: 80  # containment of the theta cut (all the energies)
+  min_counts: 10  # Minimum number of events in a bin to attempt to find a cut value
+  smoothing: null  # When given, the width (in units of bins) of gaussian smoothing applied
+  theta_fill_value: 0.5 deg  # Angular cut value used for bins with too few events
+  theta_max_angle: 0.5 deg  # Largest angular cut value allowed (None means no cut)
+  theta_min_angle: null  # Smallest angular cut value allowed (None means no cut)

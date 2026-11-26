@@ -45,13 +45,13 @@ The configuration files of ``sst1mpipe`` are in ``sst1mpipe/resources/config``:
 
    * - File
      - Used by
-   * - ``sst1mpipe_monitoring_config.json``
+   * - ``sst1mpipe_monitoring_config.yaml``
      - ``sst1mpipe-monitoring``
-   * - ``sst1mpipe_data_config.json``
+   * - ``sst1mpipe_data_config.yaml``
      - ``sst1mpipe-process`` for the real data, and the analysis steps after DL1
-   * - ``sst1mpipe_mc_config_low_nsb.json``, ``sst1mpipe_mc_config_high_nsb.json``
+   * - ``sst1mpipe_mc_config_low_nsb.yaml``, ``sst1mpipe_mc_config_high_nsb.yaml``
      - ``sst1mpipe-process`` for the simulations at low and high NSB, and the analysis steps after DL1
-   * - ``sst1mpipe_rta_config.json``
+   * - ``sst1mpipe_rta_config.yaml``
      - ``sst1mpipe-process`` for the ZMQ streams of the real-time analysis
 
 Each section of a file configures a component (a ctapipe class) by its name. The settings of a
@@ -59,34 +59,31 @@ telescope component can be given per telescope, as a list of rules: ``["type", "
 telescopes, ``["id", 21, value]`` for telescope 21. When several rules match a telescope, the last one
 wins. A plain value applies to all the telescopes.
 
-**Calibration** (``sst1mpipe_data_config.json``): ``null`` files are the default files of the telescope
+**Calibration** (``sst1mpipe_data_config.yaml``): ``null`` files are the default files of the telescope
 (``sst1mpipe/resources/calibration``: averaged calibration parameters of 2023-2024, and the window
 transmittance measured in the lab).
 
-.. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_data_config.json
-   :language: json
-   :start-at: "R0R1Calibrator": {
-   :end-before: "telescope_equivalent_focal_length"
-   :dedent: 4
+.. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_data_config.yaml
+   :language: yaml
+   :start-at: R0R1Calibrator:
+   :end-before: StereoEventCombiner:
 
-**Cleaning** (``sst1mpipe_data_config.json``): the ``NSBImageCleaner`` with the thresholds of each telescope.
+**Cleaning** (``sst1mpipe_data_config.yaml``): the ``NSBImageCleaner`` with the thresholds of each telescope.
 The picture threshold of a pixel is raised to ``pedestal_factor`` times the std of its pedestal images
 when this is above ``picture_threshold_pe``.
 
-.. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_data_config.json
-   :language: json
-   :start-at: "ImageProcessor": {
-   :end-before: "DataWriter"
-   :dedent: 4
+.. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_data_config.yaml
+   :language: yaml
+   :start-at: ImageProcessor:
+   :end-before: DataWriter:
 
-**Rolling chunks of the monitoring** (``sst1mpipe_monitoring_config.json``): statistics of the last 100
+**Rolling chunks of the monitoring** (``sst1mpipe_monitoring_config.yaml``): statistics of the last 100
 pedestal events, updated at each pedestal event (see :ref:`sst1mpipe_monitoring`).
 
-.. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
-   :language: json
-   :start-at: "WaveformStatisticsCalculator": {
-   :end-before: "ImageStatisticsCalculator"
-   :dedent: 2
+.. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_monitoring_config.yaml
+   :language: yaml
+   :start-at: WaveformStatisticsCalculator:
+   :end-before: ImageStatisticsCalculator:
 
 **Overriding some settings**: ``--config`` can be given several times; each file overrides the
 settings it gives, and a list (e.g. the rules of a telescope parameter) is replaced as a whole. E.g. the
@@ -107,21 +104,21 @@ calibration parameters of dark runs of the two telescopes, and chunks of 50 pede
 .. code-block:: bash
 
     sst1mpipe-monitoring --input SST1M1_20260120_1179.fits.fz --output SST1M1_20260120_1179.monitoring.h5 \
-        --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.json --config my_config.yaml
+        --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.yaml --config my_config.yaml
 
 The full configuration files:
 
 .. toggle::
 
-    .. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
-       :language: json
-       :caption: sst1mpipe_monitoring_config.json
+    .. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_monitoring_config.yaml
+       :language: yaml
+       :caption: sst1mpipe_monitoring_config.yaml
 
 .. toggle::
 
-    .. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_data_config.json
-       :language: json
-       :caption: sst1mpipe_data_config.json
+    .. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_data_config.yaml
+       :language: yaml
+       :caption: sst1mpipe_data_config.yaml
 
 
 .. _monitoring_step:
@@ -134,7 +131,7 @@ The full configuration files:
     sst1mpipe-monitoring \
         --input SST1M1_20260120_1179.fits.fz \
         --output SST1M1_20260120_1179.monitoring.h5 \
-        --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
+        --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.yaml
 
 The raw data file is read twice (the images of the pedestal events are calibrated as the events by
 ``sst1mpipe-process``, with the camera calibration coefficients of the first pass), and the monitoring file
@@ -155,7 +152,7 @@ in :ref:`sst1mpipe_monitoring`.
     sst1mpipe-process \
         --input SST1M1_20260120_1179.fits.fz \
         --output SST1M1_20260120_1179.dl1.h5 \
-        --config sst1mpipe/resources/config/sst1mpipe_data_config.json \
+        --config sst1mpipe/resources/config/sst1mpipe_data_config.yaml \
         --monitoring-source SST1MMonitoringSource \
         --SST1MMonitoringSource.input_files SST1M1_20260120_1179.monitoring.h5
 
@@ -211,10 +208,10 @@ events: no voltage drop correction, no dead pixels (only the ``bad_pixels`` and 
 calibration parameters, warning in the log), and the picture thresholds of the ``NSBImageCleaner`` are not raised. The
 output file has no pointing (the event source gives the RA/Dec of the run only), so it cannot be
 reconstructed in DL2 by ``sst1mpipe-apply-models``. This is used for the ZMQ streams of the real-time analysis
-(``sst1mpipe_rta_config.json``); a monitoring file can be given to the stream as well.
+(``sst1mpipe_rta_config.yaml``); a monitoring file can be given to the stream as well.
 
 **Simulations** (``.simtel.gz`` files) are processed without monitoring source, with the MC
-configuration files (``sst1mpipe_mc_config_low_nsb.json``, ``sst1mpipe_mc_config_high_nsb.json``). How
+configuration files (``sst1mpipe_mc_config_low_nsb.yaml``, ``sst1mpipe_mc_config_high_nsb.yaml``). How
 each telescope is calibrated is set in the configuration: for the simulated telescopes 1 and 2, the R1
 waveforms of the simulation are kept (``R0R1Calibrator.calibrate_r0`` false), the charges are corrected for
 the PDE drop by the ``factor`` of the coefficients (``R0R1Calibrator.pde_drop_factor``), and the saturated
@@ -224,7 +221,7 @@ pixels are not corrected (``ImageSaturationCorrector`` ``integration_level`` and
 .. code-block:: bash
 
     sst1mpipe-process --input gamma.simtel.gz --output gamma.dl1.h5 \
-        --config sst1mpipe/resources/config/sst1mpipe_mc_config_low_nsb.json
+        --config sst1mpipe/resources/config/sst1mpipe_mc_config_low_nsb.yaml
 
 **A night of data**: the monitoring and the processing of each run, e.g.
 
@@ -233,8 +230,8 @@ pixels are not corrected (``ImageSaturationCorrector`` ``integration_level`` and
     CONFIG=sst1mpipe/resources/config
     for raw in /data/raw/2026/01/20/SST1M1/SST1M1_20260120_*.fits.fz; do
         run=$(basename "$raw" .fits.fz)
-        sst1mpipe-monitoring -i "$raw" -o "$run.monitoring.h5" --config $CONFIG/sst1mpipe_monitoring_config.json
-        sst1mpipe-process -i "$raw" -o "$run.dl1.h5" --config $CONFIG/sst1mpipe_data_config.json \
+        sst1mpipe-monitoring -i "$raw" -o "$run.monitoring.h5" --config $CONFIG/sst1mpipe_monitoring_config.yaml
+        sst1mpipe-process -i "$raw" -o "$run.dl1.h5" --config $CONFIG/sst1mpipe_data_config.yaml \
             --monitoring-source SST1MMonitoringSource --SST1MMonitoringSource.input_files "$run.monitoring.h5"
     done
 

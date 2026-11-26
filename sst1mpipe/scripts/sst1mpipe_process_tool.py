@@ -65,28 +65,28 @@ class ProcessorTool(Tool):
     examples = """
     Simulations:
 
-    > sst1mpipe-process -i mysim.simtel.gz -o events.dl1.h5 --config sst1mpipe_mc_config_low_nsb.json
+    > sst1mpipe-process -i mysim.simtel.gz -o events.dl1.h5 --config sst1mpipe_mc_config_low_nsb.yaml
 
     Raw data of a run with its monitoring file (sst1mpipe-monitoring):
 
-    > sst1mpipe-process -i run.fits.fz -o run.dl1.h5 --config sst1mpipe_data_config.json
+    > sst1mpipe-process -i run.fits.fz -o run.dl1.h5 --config sst1mpipe_data_config.yaml
       --monitoring-source SST1MMonitoringSource --SST1MMonitoringSource.input_files=run.monitoring.h5
 
     ZMQ stream:
 
-    > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json
+    > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.yaml
 
     Publish the processed events to the viewer of the events (ZMQ, see
     `sst1mpipe.io.zmq_event_stream`; several processes can publish to the same viewer):
 
-    > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json
+    > sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.yaml
       --publish tcp://viewer-host:5561
 
     Without output file (no --output nor DataWriter.output_path), nothing is written to disk (no
     DL1 file, no provenance log): the events are only processed and published, e.g. for the
     real-time analysis:
 
-    > sst1mpipe-process -i tcp://localhost:24593 --config sst1mpipe_rta_config.json
+    > sst1mpipe-process -i tcp://localhost:24593 --config sst1mpipe_rta_config.yaml
       --publish tcp://viewer-host:5561
     """
 

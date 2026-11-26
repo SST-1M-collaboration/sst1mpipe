@@ -14,7 +14,7 @@ events of the run, see :ref:`data_processing`.
     sst1mpipe-monitoring \
         --input SST1M1_20260120_1179.fits.fz \
         --output SST1M1_20260120_1179.monitoring.h5 \
-        --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.json
+        --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.yaml
 
 Main options (``sst1mpipe-monitoring --help``, and ``--help-all`` for all the settings):
 
@@ -22,7 +22,7 @@ Main options (``sst1mpipe-monitoring --help``, and ``--help-all`` for all the se
 ``-i``, ``--input``            raw data file of the run (``EventSource.input_url``)
 ``-o``, ``--output``           monitoring file (HDF5), required
 ``--config``                   configuration file, by default
-                               ``sst1mpipe/resources/config/sst1mpipe_monitoring_config.json``
+                               ``sst1mpipe/resources/config/sst1mpipe_monitoring_config.yaml``
 ``-m``, ``--max-events``       number of events read (all the events of the run by default)
 ``-t``, ``--allowed-tels``     telescopes read (all by default)
 ``--overwrite``                overwrite the output file (an existing file is an error otherwise)
@@ -59,8 +59,8 @@ events by ``sst1mpipe-process``, with the statistics of the ADC samples:
    statistics of the ADC samples at their time) are not used (warning in the log), as they are skipped by ``sst1mpipe-process``.
 
 The calibration settings (``R0R1Calibrator``, ``CameraCalibrator``, ``ImageSaturationCorrector``) of
-``sst1mpipe_monitoring_config.json`` are those of ``sst1mpipe_data_config.json`` and
-``sst1mpipe_rta_config.json``: if they are changed for the processing, they must be changed for the
+``sst1mpipe_monitoring_config.yaml`` are those of ``sst1mpipe_data_config.yaml`` and
+``sst1mpipe_rta_config.yaml``: if they are changed for the processing, they must be changed for the
 monitoring too (checked by the tests). Reading the file twice takes about 25 % more time than once (43 s
 instead of 35 s for 11.5 s of data of a telescope).
 
@@ -162,7 +162,7 @@ Unlike the ``ctapipe-calculate-pixel-statistics`` tool, whose first pass ignores
 chunks are rolling, and the chunk of an event is the last one ended before it, not the last one started
 before it (which would contain the pedestal events after the event).
 
-The main settings, in ``sst1mpipe_monitoring_config.json``:
+The main settings, in ``sst1mpipe_monitoring_config.yaml``:
 
 * ``WaveformStatisticsCalculator.PedestalWaveformAggregator.SizeChunking`` and
   ``ImageStatisticsCalculator.PlainAggregator.SizeChunking``: ``chunk_size`` the number of pedestal

@@ -1,0 +1,44 @@
+# sst1mpipe-trigger: trigger emulators on the simulations:
+#   sst1mpipe-trigger -i gamma.simtel.gz -o trigger.h5 --config sst1mpipe_trigger_emulator_mc.yaml
+#
+# Every configurable value of the components used is written (explicit, no reliance on the
+# defaults); the input and output files are given on the command line.
+
+TriggerTool:  # Emulate the SST-1M camera trigger (patch7 and TDSCAN) on R0 data, real or simulated, and write the trigger...
+  compare_camera: false  # Real data: compare the emulated patch7 output with the one recorded by the camera
+  max_events: null  # Maximum number of events to read
+  overwrite: false  # Overwrite the output file if it exists
+  progress_bar: false  # Show a progress bar during processing
+  save_outputs: false  # Also write the trigger outputs per patch and sample (432 x n_samples booleans per trigger)
+
+TriggerPatch7Emulator:  # patch7: sum of the 7 patches of each cluster (fewer at the camera edge)
+  threshold: 242  # patch7 fires when a 7-patch cluster sum is above this value (required)
+
+TriggerTDSCANEmulator:  # TDSCAN: 4-bit codes filtered in space (patch + neighbours) and time
+  threshold: 9.03125  # TDSCAN fires when a filtered score is above this value
+  score_quantizer_edges: [16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128]  # Strictly increasing edges: the code of a sample is the number of edges it reaches
+  eps_t: 2  # Temporal half-width, the kernel spans 2 * eps_t + 1 samples
+  ring_weights: [[0.5, -0.0078125], [-0.5, -0.03125], [-0.5, -0.125], [0.5, 0.0625], [0.5, 0.25]]  # Weights, one row per time tap, [centre, neighbours]
+  quantize_step: null  # Fixed-point formats of the HLS core (see sst1mpipe_trigger_emulator_data.yaml), null for floating point
+  overflow_mode: AP_SAT  # Fixed point only
+  quantization_mode: AP_TRN  # Fixed point only
+
+SimTelEventSource:  # Read events from a SimTelArray data file (in EventIO format)
+  allowed_tels: null  # list of allowed tel_ids, others will be ignored
+  atmosphere_profile_choice: AUTO  # Which type of atmosphere density profile to load from the file, in case more than one exists
+  back_seekable: false  # Require the event source to be backwards seekable
+  calib_scale: 1.0  # Factor to transform ADC counts into number of photoelectrons
+  calib_shift: 0.0  # Factor to shift the R1 photoelectron samples
+  focal_length_choice: EFFECTIVE  # If both nominal and effective focal lengths are available in the SimTelArray file, which one to use for the...
+  gain_selector_type: ThresholdGainSelector  # The name of a GainSelector subclass
+  max_events: null  # Maximum number of events that will be read from the file
+  obs_id_offset: null  # Override the obs_id by adding an offset to the run number
+  override_obs_id: null  # Use the given obs_id instead of the run number from sim_telarray
+  select_gain: null  # Whether to perform gain selection
+  skip_calibration_events: true  # Skip calibration events
+  skip_r1_calibration: false  # Skip the simtel category-A calibration
+
+ThresholdGainSelector:  # Select gain channel according to a maximum threshold value
+  threshold: 4000.0  # Threshold value in waveform sample units
+
+HDF5TableWriter: {}  # A very basic table writer that can take a container (or more than one) and write it to an HDF5 file

@@ -782,7 +782,7 @@ def event_selection(data, config=None):
 
     """
 
-    events_selection = config["event_selection"]
+    events_selection = config.get("event_selection", {})  # no selection if not given
 
     mask = np.ones(len(data), dtype=bool)
 
@@ -826,30 +826,31 @@ def stereo_var_cuts(data, config=None):
     pandas.DataFrame
 
     """
+    analysis = config.get('analysis', {})  # no cut if not given
     mask_disp = np.ones(len(data), dtype=bool)
     mask_gammaness = np.ones(len(data), dtype=bool)
     mask_energy = np.ones(len(data), dtype=bool)
 
-    if ('stereo_delta_disp_cut_deg' in config['analysis']) and ('min_distance' in data.columns):
-        if config['analysis']['stereo_delta_disp_cut_deg'] is not None:
-            mask_disp = data['min_distance']*180/np.pi < config['analysis']['stereo_delta_disp_cut_deg']
-            logging.info('{} deg cut on min disp distance applied.'.format(config['analysis']['stereo_delta_disp_cut_deg']))
+    if ('stereo_delta_disp_cut_deg' in analysis) and ('min_distance' in data.columns):
+        if analysis['stereo_delta_disp_cut_deg'] is not None:
+            mask_disp = data['min_distance']*180/np.pi < analysis['stereo_delta_disp_cut_deg']
+            logging.info('{} deg cut on min disp distance applied.'.format(analysis['stereo_delta_disp_cut_deg']))
             logging.info(f'N of events of stereo after delta disp cut: {sum(mask_disp)} ')
     else:
         logging.info('No cut on min disp distance applied.')
 
-    if ('stereo_relative_std_reco_energy_cut' in config['analysis']) and ('var_reco_energy' in data.columns):
-        if config['analysis']['stereo_relative_std_reco_energy_cut'] is not None:
-            mask_energy = np.sqrt(data['var_reco_energy'])/data['reco_energy'] < config['analysis']['stereo_relative_std_reco_energy_cut']
-            logging.info('{} cut on max relative std of reco energy applied.'.format(config['analysis']['stereo_relative_std_reco_energy_cut']))
+    if ('stereo_relative_std_reco_energy_cut' in analysis) and ('var_reco_energy' in data.columns):
+        if analysis['stereo_relative_std_reco_energy_cut'] is not None:
+            mask_energy = np.sqrt(data['var_reco_energy'])/data['reco_energy'] < analysis['stereo_relative_std_reco_energy_cut']
+            logging.info('{} cut on max relative std of reco energy applied.'.format(analysis['stereo_relative_std_reco_energy_cut']))
             logging.info(f'N of events of stereo after relative std reco energy cut: {sum(mask_energy)} ')
     else:
         logging.info('No cut on max relative std reco energy applied.')
 
-    if ('stereo_std_gammaness_cut' in config['analysis']) and ('var_gammaness' in data.columns):
-        if config['analysis']['stereo_std_gammaness_cut'] is not None:
-            mask_gammaness = np.sqrt(data['var_gammaness']) < config['analysis']['stereo_std_gammaness_cut']
-            logging.info('{} cut on max std of reco gammaness applied.'.format(config['analysis']['stereo_std_gammaness_cut']))
+    if ('stereo_std_gammaness_cut' in analysis) and ('var_gammaness' in data.columns):
+        if analysis['stereo_std_gammaness_cut'] is not None:
+            mask_gammaness = np.sqrt(data['var_gammaness']) < analysis['stereo_std_gammaness_cut']
+            logging.info('{} cut on max std of reco gammaness applied.'.format(analysis['stereo_std_gammaness_cut']))
             logging.info(f'N of events of stereo after std reco gammaness cut: {sum(mask_gammaness)} ')
     else:
         logging.info('No cut on max std reco gammaness applied.')

@@ -6,7 +6,7 @@ of the events (``sst1mpipe-viewer``), with ``--publish``:
 
 .. code-block:: console
 
-    sst1mpipe-process -i tcp://camera-server:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.json \
+    sst1mpipe-process -i tcp://camera-server:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.yaml \
         --publish tcp://viewer-host:5561
 
 Without output file (no ``-o``), nothing is written to disk: the events are only processed and

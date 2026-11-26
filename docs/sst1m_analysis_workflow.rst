@@ -66,20 +66,20 @@ Config files for MC, for the simulations at low and high NSB (they differ by the
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_low_nsb.json
-       :code: json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_low_nsb.yaml
+       :code: yaml
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_high_nsb.json
-       :code: json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_mc_config_high_nsb.yaml
+       :code: yaml
 
 Default config file for data:
 
 .. toggle:: 
 
-    .. include:: ../sst1mpipe/resources/config/sst1mpipe_data_config.json
-       :code: json
+    .. include:: ../sst1mpipe/resources/config/sst1mpipe_data_config.yaml
+       :code: yaml
 
 
 R0 to DL1
@@ -103,13 +103,13 @@ contain any Cherenkov photons), and parametrizes the shower images with Hillas e
   * ``window_transmittance_file`` - camera window transmittance correction factors of the pixels, measured in the lab (``null``: default file of the telescope, can be kept)
   * ``flag_bad_calibration_pixels`` - the pixels with bad calibration parameters are flagged as outliers and interpolated
   * ``bad_pixels`` - ids of pixels always flagged as outliers and interpolated (data and MC)
-  * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the charges are divided by this factor (``factor`` of the camera calibration coefficients), which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.json`` and ``sst1mpipe_mc_config_high_nsb.json`` have the factors of the low and high NSB simulations
+  * ``pde_drop_factor`` - correction of the PDE drop due to the NSB in the simulations: the charges are divided by this factor (``factor`` of the camera calibration coefficients), which must match the PDE file of the simulation (``mc_pde_correction_factors.json``). ``null`` (real telescopes 21 and 22) applies no correction. ``sst1mpipe_mc_config_low_nsb.yaml`` and ``sst1mpipe_mc_config_high_nsb.yaml`` have the factors of the low and high NSB simulations
 
   The corrections which need the pedestal events are the camera calibration coefficients computed by ``sst1mpipe-monitoring`` (``CameraCoefficientsCalculator`` of the monitoring config, see :ref:`sst1mpipe_monitoring`): ``voltage_drop_correction`` (``none``, ``global`` or ``pixelwise`` correction of the voltage drop due to the NSB: the charges are divided by the charge drop of the ``SiPMVoltageDropModel``, see :ref:`nsb_level`) and ``flag_dead_pixels`` (the pixels without statistics of the ADC samples of the pedestal events are flagged as outliers and interpolated).
 
-  The former ``telescope_calibration``, ``NsbCalibrator.*``, ``analysis.bad_pixels`` and ``window_transmittance`` settings are no longer read.
-
-* ``NsbCalibrator.intensity_correction`` - global scale of the Hillas intensity per telescope. It is not applied at this step, but by ``load_dl1_sst1m(scale_intensities=True)``; not yet by ``sst1mpipe-apply-models`` (TODO)
+  The former ``telescope_calibration``, ``NsbCalibrator``, ``analysis``, ``event_selection``,
+  ``telescope_equivalent_focal_length`` and ``window_transmittance`` settings are no longer in the configuration
+  files (sst1mpipe < 0.9). The equivalent focal length is the one of the subarray description.
 
 
 * ``CameraCalibrator`` - Pulse integration settings
@@ -210,6 +210,7 @@ sensitivity (% Crab) is relative to the Crab of MAGIC.
    .. literalinclude:: ../sst1mpipe/resources/config/sst1mpipe_compute_irf.yaml
       :language: yaml
       :start-at: Sensitivity2dMaker:
+      :end-before: BackgroundRate2dMaker:
 
 .. code-block:: console
 

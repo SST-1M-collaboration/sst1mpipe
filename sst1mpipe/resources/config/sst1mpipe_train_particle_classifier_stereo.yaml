@@ -2,46 +2,87 @@
 # mono models (sst1mpipe_train_particle_classifier.yaml) and the stereo parameters of the HillasReconstructor
 # (impact distance of the telescope, height of the shower maximum), trained on the events reconstructed
 # by both telescopes; applied to the stereo events (sst1mpipe-stereo reconstructs their geometry)
-TrainParticleClassifier:
-  random_seed: 42
-  ParticleClassifier:
-    model_cls: RandomForestClassifier
-    model_config:              # random_forest_classifier_args
-      n_estimators: 100
-      max_depth: 100          # SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.3)
-      min_samples_leaf: 10
-      min_samples_split: 10
-      bootstrap: true
-      criterion: gini
-      random_state: 42
-    positive_class: 0          # gammas (true_shower_primary_id 0): the prediction is the gammaness
-    features:                  # particle_classification_features (telescope frame names)
-      - log_hillas_intensity
-      - hillas_width
-      - hillas_length
-      - hillas_wl
-      - hillas_skewness
-      - hillas_kurtosis
-      - timing_slope
-      - leakage_intensity_width_2
-      - hillas_fov_lon
-      - hillas_fov_lat
-      - cos_zenith             # pointing of the telescope (models of all the zenith angles)
-      - HillasReconstructor_tel_impact_distance
-      - HillasReconstructor_h_max
-    FeatureGenerator:
-      features:
-        - ["log_hillas_intensity", "log10(hillas_intensity)"]
-        - ["hillas_wl", "hillas_width / hillas_length"]
-        - ["cos_zenith", "sin(telescope_pointing_altitude)"]
-    MLQualityQuery:
-      quality_criteria:
-        # cuts of the SST-1M Crab paper (arXiv:2506.01733): intensity > 45 p.e., leakage2 < 0.7
-        - ["intensity", "(hillas_intensity > 45) & (hillas_intensity < 1e6)"]
-        - ["width", "hillas_width > 0"]
-        - ["length", "hillas_length > 0"]
-        - ["leakage", "leakage_intensity_width_2 < 0.7"]
-        # stereo parameters of the HillasReconstructor (both telescopes)
-        - ["stereo", "np.isfinite(HillasReconstructor_h_max) & np.isfinite(HillasReconstructor_tel_impact_distance)"]
-    StereoMeanCombiner:
-      weights: intensity
+#
+# Every configurable value of the components used is written (explicit, no reliance on the
+# defaults); the input and output files are given on the command line.
+
+TrainParticleClassifier:  # ``ctapipe-train-particle-classifier`` with plots: feature importances, gammaness, ROC curves
+  random_seed: 42  # Random seed for sampling training events
+  chunk_size: 100000  # How many subarray events to load at once before training on n_events (or all available) events
+  n_events: [[type, '*', null]]  # Total number of events to be used for training
+  n_jobs: null  # Number of threads to use for the reconstruction
+  overwrite: false
+  signal_fraction: 0.5  # Fraction of signal events in all events to be used for training. ``signal_fraction`` = n_signal / (n_signal...
+
+Application: {}  # A singleton application with full configuration support
+
+ParticleClassifier:  # Predict dl2 particle classification
+  model_cls: RandomForestClassifier  # Which scikit-learn classification model to use
+  model_config:  # random_forest_classifier_args
+    n_estimators: 100
+    max_depth: 100  # SST-1M Crab paper (arXiv:2506.01733, Sec. 4.3.3)
+    min_samples_leaf: 10
+    min_samples_split: 10
+    bootstrap: true
+    criterion: gini
+    random_state: 42
+  positive_class: 0  # gammas (true_shower_primary_id 0): the prediction is the gammaness
+  features:  # particle_classification_features (telescope frame names)
+    - log_hillas_intensity
+    - hillas_width
+    - hillas_length
+    - hillas_wl
+    - hillas_skewness
+    - hillas_kurtosis
+    - timing_slope
+    - leakage_intensity_width_2
+    - hillas_fov_lon
+    - hillas_fov_lat
+    - cos_zenith  # pointing of the telescope (models of all the zenith angles)
+    - HillasReconstructor_tel_impact_distance
+    - HillasReconstructor_h_max
+  invalid_class: -1  # The label value to fill in case no prediction could be made
+  n_jobs: null  # Number of threads to use for the reconstruction if supported by the reconstructor
+  prefix: RandomForestClassifier  # Prefix for the output of this model
+  stereo_combiner_cls: StereoMeanCombiner  # Which stereo combination method to use
+
+FeatureGenerator:  # Generate features for astropy.table.Table
+  features:  # List of 2-Tuples of Strings: ('new_feature_name', 'expression to generate feature')
+    - [log_hillas_intensity, log10(hillas_intensity)]
+    - [hillas_wl, hillas_width / hillas_length]
+    - [cos_zenith, sin(telescope_pointing_altitude)]
+
+MLQualityQuery:  # Quality criteria for machine learning models with different defaults
+  quality_criteria:  # list of tuples of ('<description', 'expression string') to accept (select) a given data value
+    - [intensity, (hillas_intensity > 45) & (hillas_intensity < 1e6)]
+    - [width, hillas_width > 0]
+    - [length, hillas_length > 0]
+    - [leakage, leakage_intensity_width_2 < 0.7]
+    - [stereo, np.isfinite(HillasReconstructor_h_max) & np.isfinite(HillasReconstructor_tel_impact_distance)]
+
+StereoMeanCombiner:  # Calculate array-event prediction as (weighted) mean of telescope-wise predictions
+  weights: intensity  # What kind of weights to use
+  log_target: false  # If true, calculate exp(mean(log(values)))
+  prefix: RandomForestClassifier  # Prefix to be added to the output container / column names
+  property: PARTICLE_TYPE  # Which property is being combined
+
+TableLoader:  # Load telescope-event or subarray-event data from ctapipe HDF5 files
+  dl1_images: false  # load extracted images
+  dl1_muons: false  # load muon ring parameters
+  dl1_parameters: true  # load reconstructed image parameters
+  dl2: true  # load available dl2 stereo parameters
+  focal_length_choice: EFFECTIVE  # If both nominal and effective focal lengths are available, which one to use for the `~ctapipe.coordinates.C...
+  instrument: false  # join subarray instrument information to each event
+  observation_info: false  # join observation information to each event
+  pointing: true  # Load pointing information and interpolate / join to events
+  simulated: true  # load simulated shower information
+  true_images: false  # load simulated shower images
+  true_parameters: true  # load image parameters obtained from true images
+
+PointingInterpolator:  # Interpolator for pointing and pointing correction data
+  bounds_error: true  # If true, raises an exception when trying to extrapolate out of the given table
+  extrapolate: false  # If bounds_error is False, this flag will specify whether values outsidethe available values are filled with...
+
+CrossValidator:  # Class to train sklearn based reconstructors in a cross validation
+  n_cross_validations: 5  # Number of cross validation iterations
+  rng_seed: 1337  # Random seed for splitting the training data

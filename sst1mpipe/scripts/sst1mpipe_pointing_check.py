@@ -11,7 +11,6 @@ Usage:
 $> python sst1mpipe_pointing_check.py
 --input-file SST1M1_20240304_0012.fits.fz
 --output-dir ./
---config sst1mpipe_config.json
 --max-magnitude 8
 --pointing-ra 85.0
 --pointing-dec 25.0
@@ -33,14 +32,10 @@ from ctapipe.instrument import SubarrayDescription
 from ctapipe.visualization import CameraDisplay
 
 import sst1mpipe
-from sst1mpipe.io import (
-    load_config,
-)
 from sst1mpipe.io.containers import PEDESTAL_EVENT_TYPES
 from sst1mpipe.io.sst1m_event_source import SST1MEventSource
 from sst1mpipe.utils import (
     get_target,
-    get_tel_string,
     simbad_query,
 )
 from sst1mpipe.resources import SUBARRAY_FILE
@@ -55,11 +50,6 @@ def parse_args():
                         '--input-file', '-f', type=str,
                         dest='input_file',
                         help='Path to the simtelarray or data file',
-                        required=True
-                        )
-    parser.add_argument('--config', '-c', action='store', type=str,
-                        dest='config_file',
-                        help='Path to a configuration file.',
                         required=True
                         )
 
@@ -143,8 +133,6 @@ def main():
 
     result_table = simbad_query(ra=ra, dec=dec, max_mag=max_mag)
 
-    config = load_config(args.config_file)
-
     wobble_coords = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame='icrs')
 
     source = SST1MEventSource(input_url=input_file)
@@ -175,7 +163,6 @@ def main():
     std_samples = np.array(std_samples)
     time_all = np.array(time_all)
 
-    tel_string = get_tel_string(tel, mc=False)
     location = subarray.tel_earth_locations[tel]
 
     index_mid = int(std_samples.shape[0]/2)
@@ -186,7 +173,7 @@ def main():
     # Length of one file
     file_time = round((obstime[-1]-obstime[0]).to_value(u.s), 1)
 
-    focal = float(config['telescope_equivalent_focal_length'][tel_string]) * u.m
+    focal = subarray.tel[tel].optics.equivalent_focal_length
     camera_frame = CameraFrame(
         focal_length=focal,
         telescope_pointing=tel_pointing,
