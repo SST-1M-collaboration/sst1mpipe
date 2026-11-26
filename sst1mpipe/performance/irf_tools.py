@@ -23,11 +23,10 @@ import operator
 
 import astropy.units as u
 import numpy as np
-from ctapipe.irf import spectra
-from ctapipe.core.traits import AstroQuantity
 from astropy.io.fits import BinTableHDU
 from astropy.table import QTable
-from ctapipe.core.traits import Int
+from ctapipe.core.traits import AstroQuantity, Int
+from ctapipe.irf import spectra
 from ctapipe.irf.benchmarks import Sensitivity2dMaker
 from ctapipe.irf.optimize import PercentileCuts
 from pyirf.cuts import evaluate_binned_cut
