@@ -191,6 +191,9 @@ sensitivity (% Crab) is relative to the Crab of MAGIC.
    - with ``sst1mpipe_irf_paper_cuts.yaml``: the cuts of the paper, a gammaness cut keeping 60 % of
      the gammas in each energy bin and one theta cut for all the energies keeping 80 % of the gammas
      (``GlobalThetaPercentileCuts``).
+   - ``--EventSelectionOptimizer.optimization_algorithm=FixedThetaCuts``: the same gammaness cut and a
+     fixed theta cut for all the energies, ``--FixedThetaCuts.theta_cut`` (0.2 deg: the cut of the analysis
+     of the paper with sst1mpipe < 0.9).
 
    The stereo analysis has the events with both telescopes only: the stereo models predict only for them.
 2. ``sst1mpipe-compute-irf`` (``sst1mpipe_compute_irf.yaml``): the IRFs with these cuts (effective area,
