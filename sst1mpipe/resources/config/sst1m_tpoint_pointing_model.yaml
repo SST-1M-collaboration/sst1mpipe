@@ -1,0 +1,23 @@
+# Pointing models (TPOINT) of the drives of the SST-1M telescopes (AzElCorrCoefTel<n>.conf),
+# coefficients in arcsec (sst1mpipe.instrument.pointing_model.TPointPointingModel).
+
+TPointPointingModel:  # Pointing model of alt-az mounts with the terms of TPOINT [1]_ (names and units), corrections of the drive (...
+  ia: [[type, '*', 0.0], [id, 21, -8441.94], [id, 22, -2190.46]]  # IA: azimuth index (arcsec)
+  ie: [[type, '*', 0.0], [id, 21, -574.57], [id, 22, -59.57]]  # IE: elevation index (arcsec)
+  npae: [[type, '*', 0.0], [id, 21, -109.28], [id, 22, -175.39]]  # NPAE: non perpendicularity of the azimuth and elevation axes (arcsec)
+  ca: [[type, '*', 0.0], [id, 21, -139.23], [id, 22, 0.0]]  # CA: left-right collimation, non perpendicularity of the pointing direction and the elevation axis (arcsec)
+  an: [[type, '*', 0.0], [id, 21, 106.29], [id, 22, 141.19]]  # AN: north-south misalignment of the azimuth axis (arcsec)
+  aw: [[type, '*', 0.0], [id, 21, 196.91], [id, 22, -130.33]]  # AW: east-west misalignment of the azimuth axis (arcsec)
+  aces: [[type, '*', 0.0], [id, 21, -66.43], [id, 22, 55.86]]  # ACES: azimuth centring error, sin component (arcsec)
+  acec: [[type, '*', 0.0], [id, 21, 42.53], [id, 22, 0.0]]  # ACEC: azimuth centring error, cos component (arcsec)
+  eces: [[type, '*', 0.0], [id, 21, -308.15], [id, 22, 0.0]]  # ECES: elevation centring error, sin component (arcsec)
+  ecec: [[type, '*', 0.0], [id, 21, -234.15], [id, 22, -312.05]]  # ECEC: elevation centring error, cos component (arcsec)
+  periods:  # Coefficients (arcsec) of a telescope over a period of time, instead of those of the parameters: {"tel_id":...
+    - {tel_id: 21, start: '2023-04-20T12:00:00', stop: '2023-06-12T12:00:00', ia: -8441.94, ie: -574.57, npae: -109.28, ca: -139.23, an: 106.29, aw: 196.91, aces: -66.43, acec: 42.53, eces: -308.15, ecec: -234.15}
+    - {tel_id: 21, start: '2023-06-12T12:00:00', stop: '2023-06-24T12:00:00', ia: -8441.94, ie: -574.57, npae: -109.28, ca: -139.23, an: 106.29, aw: 196.91, aces: -66.43, acec: 42.53, eces: -308.15, ecec: -234.15}
+    - {tel_id: 21, start: '2023-06-24T12:00:00', stop: null, ia: -8441.94, ie: -574.57, npae: -109.28, ca: -139.23, an: 106.29, aw: 196.91, aces: -66.43, acec: 42.53, eces: -308.15, ecec: -234.15}
+    - {tel_id: 22, start: '2024-04-30T12:00:00', stop: '2026-03-14T12:00:00', ia: -2103.0, ie: -29.98, npae: -122.48, ca: 0.0, an: 127.82, aw: -121.88, aces: 43.3, acec: 0.0, eces: 0.0, ecec: -317.46}
+    - {tel_id: 22, start: '2026-03-17T12:00:00', stop: null, ia: -2190.46, ie: -59.57, npae: -175.39, ca: 0.0, an: 141.19, aw: -130.33, aces: 55.86, acec: 0.0, eces: 0.0, ecec: -312.05}
+  tf: [[type, '*', 0.0]]  # TF: tube flexure in cos(alt) (arcsec)
+  tolerance: 30.0  # Largest distance (arcsec) between the sky position and revert of the drive position found by apply
+  tx: [[type, '*', 0.0]]  # TX: tube flexure in 1 / tan(alt) (arcsec)

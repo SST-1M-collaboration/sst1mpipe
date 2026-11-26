@@ -11,7 +11,7 @@ from traitlets.config import Config
 
 from conftest import OBSERVATION_RUNS  # noqa: F401 (no IERS download, as for the other tests)
 from sst1mpipe.instrument.pointing_model import PointingModel, TPointPointingModel
-from sst1mpipe.io import read_drive_logs
+from sst1mpipe.io import load_config, read_drive_logs
 from sst1mpipe.resources import SST1M_POINTING_MODEL_CONFIG_FILE, SUBARRAY_FILE, TEST_DATA_DIR
 
 # arcsec, of the size of the corrections of the SST-1M drives
@@ -207,7 +207,7 @@ def test_sst1m_pointing_model(subarray, caplog, tel_id, ie):
     (tel 22: period from 20240430 to 20260313): pointing on the Mrk 421 wobble W1 (TARGET of the
     zfits runs) within 1 arcmin
     """
-    model = TPointPointingModel(subarray, config=Config(json.loads(SST1M_POINTING_MODEL_CONFIG_FILE.read_text())))
+    model = TPointPointingModel(subarray, config=load_config(SST1M_POINTING_MODEL_CONFIG_FILE))
     assert model.coefficients(tel_id, Time("2026-01-21T03:00:00"))["ie"] == ie
     drive = read_drive_logs(DRIVE_FILES[tel_id - 21], subarray=subarray)
     tracking = (
@@ -229,7 +229,7 @@ def test_sst1m_pointing_model(subarray, caplog, tel_id, ie):
 ])
 def test_sst1m_pointing_model_periods(subarray, caplog, tel_id, night, known):
     """Nights (from noon to noon UTC) with the coefficients of the SST-1M drives known"""
-    model = TPointPointingModel(subarray, config=Config(json.loads(SST1M_POINTING_MODEL_CONFIG_FILE.read_text())))
+    model = TPointPointingModel(subarray, config=load_config(SST1M_POINTING_MODEL_CONFIG_FILE))
     times = Time(f"{night}T12:00:00") + np.linspace(0, 23.99, 25) * u.hour
     model.coefficients(tel_id, times)
     assert ("outside of its periods" not in caplog.text) == known

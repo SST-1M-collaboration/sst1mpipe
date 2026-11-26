@@ -1,0 +1,161 @@
+# sst1mpipe-process of the ZMQ event stream of the camera server (real-time analysis):
+#   sst1mpipe-process -i tcp://localhost:24593 -o events.dl1.h5 --config sst1mpipe_rta_config.yaml
+#
+# Every configurable value of the components used is written (explicit, no reliance on the
+# defaults); the input and output files are given on the command line.
+
+ProcessorTool:  # Process data from lower-data levels up to DL1 including image extraction and optionally image parameterization
+  progress_bar: true  # show progress bar during processing
+  allowed_sb_types: [OBSERVATION]  # Scheduling block types of the runs whose events are processed, e.g. OBSERVATION, CALIBRATION (dark runs), E...
+  attach_monitoring: true  # Copy the monitoring data of the monitoring files of the monitoring sources into the output file (pointing,...
+  monitoring_source_list: []  # Monitoring sources filling the monitoring containers of the events before their calibration, e.g. SST1MMoni...
+  overwrite: false
+  wobble_in_output_name: true  # Add the wobble of the observation (e.g. W1, read from the input file) to the name of the output file, e.g....
+
+EventSource:  # Parent class for EventSources
+  input_url: tcp://localhost:13581  # Path to the input file containing events
+  allowed_tels: null  # list of allowed tel_ids, others will be ignored
+  max_events: 100000  # Maximum number of events that will be read from the file
+
+SST1MEventSource:  # Event source of the SST-1M raw data (R0) files
+  swapped_modules:  # Wrongly connected modules: the pixels of the two modules are swapped for the events of the telescope in the...
+    - {tel_id: 22, start: '2023-09-01T00:00:00', stop: '2024-07-18T00:00:00', modules: [59, 88]}
+    - {tel_id: 21, start: '2025-12-17T12:00:00', stop: '2026-01-15T12:00:00', modules: [8, 9]}
+  focal_length_choice: EQUIVALENT  # Which focal length to use for the camera frame transformations
+  pointing_dec: null  # Pointing declination in deg
+  pointing_ra: null  # Pointing right ascension in deg
+
+ZMQEventSource:  # Event source of the telescope events sent in a ZMQ stream, e.g. by the camera server for the real time anal...
+  swapped_modules:  # Wrongly connected modules of the DigiCam camera events, see SST1MEventSource.swapped_modules
+    - {tel_id: 22, start: '2023-09-01T00:00:00', stop: '2024-07-18T00:00:00', modules: [59, 88]}
+    - {tel_id: 21, start: '2025-12-17T12:00:00', stop: '2026-01-15T12:00:00', modules: [8, 9]}
+  pedestal_event_type: SKY_PEDESTAL  # Event type of the pedestal events of the stream, which is not sent in the stream: SKY_PEDESTAL, DARK_PEDEST...
+  scheduling_block_type: OBSERVATION  # Type of the scheduling blocks of the stream, which is not sent in the stream
+
+ImageSaturationCorrector:  # Correction of the charges and peak times of the saturated pixels, applied after the image extraction (`~cta...
+  integration_level: 0.2  # Fraction of the maximum defining the integration window of the saturated pulses
+  peak_time_level: 2500  # ADC (pedestal subtracted): the peak time of a saturated pulse is the middle of its R0 samples above this level
+
+R0R1Calibrator:  # R0 -> R1 calibration of the SST-1M telescopes: the corrections which do not need the pedestal events, so th...
+  calibration_file: [[type, '*', null]]  # HDF5 file with the calibration parameters (dc_to_pe, calib_flag) from the dark runs
+  window_transmittance_file: [[type, '*', null]]  # File with the transmittance correction factor of the camera window of each pixel (pixel_id, correction_fact...
+  flag_bad_calibration_pixels: true  # Flag the pixels with bad calibration parameters (calib_flag != 1), whose charge is interpolated
+  saturation_threshold: 3000  # ADC (pedestal subtracted) above which the maximum of a saturated pulse is
+  saturation_width_level: 2500  # ADC (pedestal subtracted) level used to compute the width of the saturated pulses
+  saturation_width_threshold: 5  # Minimum number of samples above saturation_width_level of a saturated pulse
+  bad_pixels: [[type, '*', []]]  # Ids of the pixels always flagged (e.g. broken pixels), whose charge is interpolated, for the observed and s...
+  pde_drop_factor: [[type, '*', null], [id, 21, null], [id, 22, null]]  # The charges are divided by this factor (factor of the camera calibration coefficients) to correct the simul...
+  calibrate_r0: [[type, '*', true], [id, 1, false], [id, 2, false]]  # Calibrate the R0 waveforms of the telescope (raw data)
+
+CameraCalibrator:  # Calibrator to handle the full camera calibration chain, in order to fill the DL1 data level in the event co...
+  image_extractor_type: LocalPeakWindowSum  # Name of the ImageExtractor subclass to be used
+  data_volume_reducer_type: NullDataVolumeReducer  # The name of a DataVolumeReducer subclass
+  invalid_pixel_handler_type: NeighborAverage  # Name of the InvalidPixelHandler to use
+  apply_peak_time_shift: [[type, '*', true]]  # Apply peak time shift corrections
+  apply_waveform_time_shift: [[type, '*', false]]  # Apply waveform time shift corrections
+
+LocalPeakWindowSum:  # Extractor which sums in a window about the peak in each pixel's waveform
+  apply_integration_correction: true  # Apply the integration window correction
+  window_shift: 3  # Define the shift of the integration windowfrom the peak_index (peak_index - shift)
+  window_width: 8  # Define the width of the integration window
+
+ImageProcessor:  # Takes DL1/Image data and cleans and parametrizes the images into DL1/parameters
+  image_cleaner_type: NSBImageCleaner  # The name of a ImageCleaner subclass
+  use_telescope_frame: true  # Whether to calculate parameters in the telescope or camera frame
+  apply_image_modifier: [[type, '*', false]]  # If true, apply ImageModifier to dl1 images
+
+TailcutsImageCleaner:  # Clean images using the standard picture/boundary technique
+  picture_threshold_pe: [[type, '*', 1800]]  # top-level threshold in photoelectrons
+  boundary_threshold_pe: [[type, '*', 1800]]  # second-level threshold in photoelectrons
+  min_picture_neighbors: [[type, '*', 2]]  # Minimum number of neighbors above threshold to consider
+  keep_isolated_pixels: [[type, '*', false]]  # If False, pixels with less neighbors than ``min_picture_neighbors`` areremoved
+
+NSBImageCleaner:  # Clean images based on lstchains image cleaning technique described in :cite:p:`lst1-crab-paper`
+  picture_threshold_pe: [[type, '*', 8]]  # top-level threshold in photoelectrons
+  boundary_threshold_pe: [[type, '*', 4]]  # second-level threshold in photoelectrons
+  min_picture_neighbors: [[type, '*', 2]]  # Minimum number of neighbors above threshold to consider
+  keep_isolated_pixels: false  # If False, pixels with less neighbors than ``min_picture_neighbors`` areremoved
+  time_limit: 8  # Time limit for the `apply_time_delta_cleaning`
+  time_num_neighbors: 1  # Used for `apply_time_delta_cleaning`
+  largest_island_only: false  # Set to true to get only largest island
+  pedestal_factor: 2.5  # Factor for interleaved pedestal cleaning
+  bright_cleaning_threshold: null  # Threshold parameter for `bright_cleaning`
+  bright_cleaning_fraction: [[type, '*', 0.03]]  # Fraction parameter for `bright_cleaning`
+  bright_cleaning_n_pixels: [[type, '*', 3]]  # Consider this number of the brightest pixels for calculating the mean charge
+
+DBSCANImageCleaner:  # An image cleaner based on the sklearn.cluster.DBSCAN algorithm
+  epsilon_r: [[type, '*', 38.0]]  # Scale parameter for spatial coordinates (in mm)
+  minimum_pe: [[type, '*', 30]]  # Minimum number of p.e. in cluster
+  picture_threshold_pe: [[type, '*', 0.0]]  # Minimum number of p.e. in the image the pixel
+
+TimeDBSCANImageCleaner:  # An image cleaner based on the sklearn.cluster.DBSCAN algorithm that uses the image and peak time image
+  epsilon_r: [[type, '*', 38.0]]  # Scale parameter for spatial coordinates (in mm)
+  epsilon_t: [[type, '*', 40.0]]  # Scale parameter for time (in ns)
+  minimum_pe: [[type, '*', 30]]  # Minimum number of p.e. in cluster
+  picture_threshold_pe: [[type, '*', 0.0]]  # Minimum number of p.e. in the image the pixel
+
+DBSCANTimeImageCleaner:  # An image cleaner based on the sklearn.cluster.DBSCAN algorithm that uses the peak time image distances weig...
+  epsilon_t: [[type, '*', 40.0]]  # Scale parameter for time (in ns)
+  minimum_pe: [[type, '*', 30]]  # Minimum number of p.e. in cluster
+  picture_threshold_pe: [[type, '*', 0.0]]  # Minimum number of p.e. in the image the pixel
+
+ImageQualityQuery:  # for configuring image-wise data checks
+  quality_criteria: [[size_greater_0, image.sum() > 0], [at_least_2_pixels, image.size > 1]]  # list of tuples of ('<description', 'expression string') to accept (select) a given data value
+
+DataWriter:  # Serialize a sequence of events into a HDF5 file, in the correct format
+  compression_level: 0  # compression level, 0=None, 9=maximum
+  write_dl1_images: false  # Store DL1 Images if available
+  write_dl1_parameters: true  # Store DL1 image parameters if available
+  overwrite: true  # overwrite output file if it exists
+  compression_type: blosc:zstd  # compressor algorithm to use
+  context_metadata: {}  # Additional metadata keywords and values that describe this data
+  image_dtype: int32
+  image_offset: 0
+  image_scale: 10.0
+  peak_time_dtype: int16
+  peak_time_offset: 0
+  peak_time_scale: 100.0
+  transform_image: false
+  transform_peak_time: false
+  transform_waveform: false
+  waveform_dtype: int32
+  waveform_offset: 0
+  waveform_scale: 1000.0
+  write_dl2: false  # Store DL2 stereo shower parameters if available
+  write_muon_parameters: false  # Store muon parameters if available
+  write_r0_waveforms: false  # Store R0 waveforms if available
+  write_r1_waveforms: false  # Store R1 waveforms if available
+
+NullDataVolumeReducer: {}  # Perform no data volume reduction
+
+NeighborAverage: {}
+
+ImageModifier:  # Component to tune simulated background to overserved NSB values
+  noise_bias_dim_pixels: [[type, '*', 0.0]]  # extra bias to add in dim pixels
+  noise_correct_bias: [[type, '*', true]]  # If True subtract the expected noise from the image
+  noise_level_bright_pixels: [[type, '*', 0.0]]  # expected extra noise in bright pixels
+  noise_level_dim_pixels: [[type, '*', 0.0]]  # expected extra noise in dim pixels
+  noise_transition_charge: [[type, '*', 0.0]]  # separation between dim and bright pixels
+  psf_smear_factor: [[type, '*', 0.0]]  # Fraction of light to move to each neighbor
+  rng_seed: 1337  # Seed for the random number generator
+
+HDF5TableWriter: {}  # A very basic table writer that can take a container (or more than one) and write it to an HDF5 file
+
+ZMQEventPublisher:  # Publish the processed events in a ZMQ stream (PUB socket connecting to ``url``): see the module
+  close_linger: 1.0  # maximum time (s) to send the queued messages when the publisher is closed
+  full_event_period: 1.0  # period (s) of the full events, with the waveforms and the images (0: all the events)
+  send_high_water_mark: 1000  # maximum number of messages queued for the subscriber (the others are dropped)
+  # source_name: computed at run time (name of this publisher in the messages (default: <host>:<pid>))
+  url: null  # ZMQ endpoint of the subscriber of the events (e.g. tcp://viewer-host:5561); none: no stream
+
+ShowerProcessor:  # Run the stereo event reconstruction on the input events
+  reconstructor_types: [HillasReconstructor]  # The stereo reconstructors to be used
+
+HillasReconstructor:  # class that reconstructs the direction of an atmospheric shower using a simple hillas parametrisation of the...
+  n_jobs: null  # Number of threads to use for the reconstruction if supported by the reconstructor
+
+StereoQualityQuery:  # Quality criteria for dl1 parameters checked for telescope events to enter into stereo reconstruction
+  quality_criteria:  # list of tuples of ('<description', 'expression string') to accept (select) a given data value
+    - ['> 50 phe', parameters.hillas.intensity > 50]
+    - [Positive width, parameters.hillas.width.value > 0]
+    - ['> 3 pixels', parameters.morphology.n_pixels > 3]

@@ -33,10 +33,10 @@ Usage
         --input SST1M1_20260120_merged.dl1.h5 \
         --input SST1M2_20260120_merged.dl1.h5 \
         --output SST1M_20260120_merged.stereo.dl1.h5 \
-        --config sst1mpipe/resources/config/sst1mpipe_data_config.json
+        --config sst1mpipe/resources/config/sst1mpipe_data_config.yaml
 
 ``sst1mpipe-stereo --help`` lists the options (``--help-all`` all the settings). The default settings
-are in ``sst1mpipe_data_config.json``.
+are in ``sst1mpipe_data_config.yaml``.
 
 .. warning::
 

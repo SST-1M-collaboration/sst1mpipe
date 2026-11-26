@@ -27,7 +27,7 @@ and ``neighbor_patch_matrix`` derived from it (TDSCAN).
 
 The ``sst1mpipe-trigger`` tool (``sst1mpipe/scripts/sst1mpipe_trigger_tool.py``)
 runs both emulators on a file. Configuration examples:
-``sst1mpipe/resources/config/sst1mpipe_trigger_emulator_{mc,data}.json``.
+``sst1mpipe/resources/config/sst1mpipe_trigger_emulator_{mc,data}.yaml``.
 """
 from abc import abstractmethod
 
@@ -185,7 +185,7 @@ class TriggerTDSCANEmulator(TriggerEmulator):
     ).tag(config=True)
     quantize_step = Dict(
         default_value=None, allow_none=True,
-        help="Fixed-point formats of the HLS core (see sst1mpipe_trigger_emulator_data.json), null for floating point",
+        help="Fixed-point formats of the HLS core (see sst1mpipe_trigger_emulator_data.yaml), null for floating point",
     ).tag(config=True)
     overflow_mode = CaselessStrEnum(["AP_SAT", "AP_WRAP"], default_value="AP_SAT", help="Fixed point only").tag(config=True)
     quantization_mode = CaselessStrEnum(["AP_TRN", "AP_RND"], default_value="AP_TRN", help="Fixed point only").tag(config=True)

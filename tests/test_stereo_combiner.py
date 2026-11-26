@@ -2,7 +2,6 @@
 StereoEventCombiner components (sst1mpipe.stereo): matching of the coincident events of the
 telescopes on made-up trigger tables, and combination of made-up events
 """
-import json
 
 import astropy.units as u
 import numpy as np
@@ -13,6 +12,7 @@ from ctapipe.containers import ArrayEventContainer, EventType, ImageParametersCo
 from traitlets.config import Config
 
 from sst1mpipe.io.containers import SST1MArrayEventContainer, to_sst1m_event
+from sst1mpipe.io import load_config
 from sst1mpipe.resources import DATA_CONFIG_FILE
 from sst1mpipe.stereo import (
     SlidingWindowCombiner,
@@ -54,7 +54,7 @@ def test_round_ns():
 
 def test_data_config_defaults():
     """the stereo settings of the data config are the defaults of the combiners"""
-    config = Config(json.loads(DATA_CONFIG_FILE.read_text()))
+    config = load_config(DATA_CONFIG_FILE)
     for cls in (WhiteRabbitClosestCombiner, SlidingWindowCombiner, SWATEventIdCombiner):
         configured, default = cls(config=config), cls()
         for name in cls.class_traits(config=True):

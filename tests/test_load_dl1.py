@@ -12,6 +12,7 @@ from astropy.time import Time
 from ctapipe.instrument import SubarrayDescription
 from ctapipe.io import read_table, write_table
 from ctapipe.io.hdf5dataformat import DL1_PIXEL_STATISTICS_GROUP
+from traitlets.config import Config
 
 from conftest import OBSERVATION_RUNS, monitoring_source_args, run_process
 from sst1mpipe.io import load_config, load_dl1_sst1m, read_trigger_time
@@ -73,15 +74,16 @@ def test_observation_parameters(observation_dl1):
 def test_scaled_intensity(observation_dl1):
     """the log of the intensity is computed from the scaled intensity"""
     config = deepcopy(load_config(DATA_CONFIG_FILE, ismc=False))
-    config["NsbCalibrator"]["intensity_correction"][TEL] = 2.0
+    config["NsbCalibrator"] = Config({"intensity_correction": {TEL: 2.0}})
     data = load_dl1_sst1m(str(observation_dl1), tel=TEL, config=config, scale_intensities=True)
     intensity = np.asarray(read_table(observation_dl1, f"/dl1/event/telescope/parameters/{TEL}")["hillas_intensity"])
     np.testing.assert_allclose(data["log_hillas_intensity"], np.log10(2 * intensity))
 
 
 def test_event_selection(observation_dl1):
-    """the event selection of the data configuration (telescope frame parameters)"""
+    """the event selection given in the configuration (telescope frame parameters)"""
     config = load_config(DATA_CONFIG_FILE, ismc=False)
+    config["event_selection"] = {"hillas_intensity": [50, 1000000], "leakage_intensity_width_2": [0, 0.7]}
     data = load_dl1_sst1m(str(observation_dl1), tel=TEL, config=config, quality_cuts=True)
     parameters = read_table(observation_dl1, f"/dl1/event/telescope/parameters/{TEL}")
     low, high = config["event_selection"]["hillas_intensity"]

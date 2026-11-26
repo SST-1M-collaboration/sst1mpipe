@@ -16,7 +16,7 @@ $> python sst1mpipe_night_summary.py
 --base-dir /data/
 --out-dir /outputs/
 --date 20240810
---config sst1mpipe_config.json
+--config sst1mpipe_data_config.yaml
 --sub-dir /v0.5.5/
 --source-catalog sst1m_source_catalog.json
 

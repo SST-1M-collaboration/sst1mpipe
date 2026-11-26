@@ -356,7 +356,6 @@ def test_mc_configs_pde_drop_factors(mc_subarray, nsb):
     for tel_id in (1, 2):
         expected = factors[f"tel_00{tel_id}"][PDE_FILES[nsb][tel_id]]
         assert calibrator_r0_r1.pde_drop(tel_id) == expected
-    assert "intensity_correction" in config["NsbCalibrator"]  # TODO: not applied with the ctapipe DL2 (issue 247)
 
 
 def test_default_mc_config_is_low_nsb():

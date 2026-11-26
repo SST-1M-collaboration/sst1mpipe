@@ -1,46 +1,86 @@
-# sst1mpipe-train-energy-regressor: models of sst1mpipe_mc_config_low_nsb.json (RF settings, features, cuts)
+# sst1mpipe-train-energy-regressor: models of sst1mpipe_mc_config_low_nsb.yaml (RF settings, features, cuts)
 # DL1 with telescope frame parameters: sst1mpipe-process ... --ImageProcessor.use_telescope_frame=True
 #   sst1mpipe-train-energy-regressor -i gamma_diffuse_train.dl1.h5 -o energy_regressor.pkl \
 #     --config sst1mpipe_train_energy_regressor.yaml --n-events 700000 --cv-output cv_energy.h5
-TrainEnergyRegressor:
-  random_seed: 42
-  EnergyRegressor:
-    model_cls: RandomForestRegressor
-    model_config:              # random_forest_regressor_args
-      n_estimators: 150
-      max_depth: 30
-      min_samples_leaf: 10
-      min_samples_split: 10
-      bootstrap: true
-      criterion: squared_error
-      random_state: 42
-    log_target: true           # sst1mpipe: log10(true_energy), ctapipe: ln(true_energy)
-    features:                  # energy_regression_features (telescope frame names)
-      - log_hillas_intensity
-      - hillas_width
-      - hillas_length
-      - hillas_wl
-      - hillas_skewness
-      - hillas_kurtosis
-      - timing_slope
-      - leakage_intensity_width_2
-      - hillas_fov_lon         # camera_frame_hillas_x
-      - hillas_fov_lat         # camera_frame_hillas_y
-      - cos_zenith             # pointing of the telescope (models of all the zenith angles)
-      # stereo models (sst1mpipe --stereo): add
-      # - HillasReconstructor_tel_impact_distance
-      # - HillasReconstructor_h_max
-    FeatureGenerator:          # sst1mpipe.utils.add_features
-      features:
-        - ["log_hillas_intensity", "log10(hillas_intensity)"]
-        - ["hillas_wl", "hillas_width / hillas_length"]
-        - ["cos_zenith", "sin(telescope_pointing_altitude)"]
-    MLQualityQuery:
-      quality_criteria:
-        # cuts of the SST-1M Crab paper (arXiv:2506.01733): intensity > 45 p.e., leakage2 < 0.7
-        - ["intensity", "(hillas_intensity > 45) & (hillas_intensity < 1e6)"]
-        - ["width", "hillas_width > 0"]
-        - ["length", "hillas_length > 0"]
-        - ["leakage", "leakage_intensity_width_2 < 0.7"]
-    StereoMeanCombiner:
-      weights: intensity       # stereo_reco_weights: hillas intensity
+#
+# Every configurable value of the components used is written (explicit, no reliance on the
+# defaults); the input and output files are given on the command line.
+
+TrainEnergyRegressor:  # ``ctapipe-train-energy-regressor`` with plots: feature importances, energy resolution, bias, migration
+  random_seed: 42  # Random seed for sampling training events
+  chunk_size: 100000  # How many subarray events to load at once before training on n_events
+  n_events: [[type, '*', null]]  # Number of events for training the model
+  n_jobs: null  # Number of threads to use for the reconstruction
+  overwrite: false
+
+Application: {}  # A singleton application with full configuration support
+
+EnergyRegressor:  # Use a scikit-learn regression model per telescope type to predict primary energy
+  model_cls: RandomForestRegressor  # Which scikit-learn regression model to use
+  model_config:  # random_forest_regressor_args
+    n_estimators: 150
+    max_depth: 30
+    min_samples_leaf: 10
+    min_samples_split: 10
+    bootstrap: true
+    criterion: squared_error
+    random_state: 42
+  log_target: true  # sst1mpipe: log10(true_energy), ctapipe: ln(true_energy)
+  features:  # energy_regression_features (telescope frame names)
+    - log_hillas_intensity
+    - hillas_width
+    - hillas_length
+    - hillas_wl
+    - hillas_skewness
+    - hillas_kurtosis
+    - timing_slope
+    - leakage_intensity_width_2
+    - hillas_fov_lon  # camera_frame_hillas_x
+    - hillas_fov_lat  # camera_frame_hillas_y
+    - cos_zenith  # pointing of the telescope (models of all the zenith angles)
+  n_jobs: null  # Number of threads to use for the reconstruction if supported by the reconstructor
+  prefix: RandomForestRegressor  # Prefix for the output of this model
+  stereo_combiner_cls: StereoMeanCombiner  # Which stereo combination method to use
+
+# stereo models (sst1mpipe --stereo): add
+# - HillasReconstructor_tel_impact_distance
+# - HillasReconstructor_h_max
+FeatureGenerator:  # sst1mpipe.utils.add_features
+  features:  # List of 2-Tuples of Strings: ('new_feature_name', 'expression to generate feature')
+    - [log_hillas_intensity, log10(hillas_intensity)]
+    - [hillas_wl, hillas_width / hillas_length]
+    - [cos_zenith, sin(telescope_pointing_altitude)]
+
+MLQualityQuery:  # Quality criteria for machine learning models with different defaults
+  quality_criteria:  # list of tuples of ('<description', 'expression string') to accept (select) a given data value
+    - [intensity, (hillas_intensity > 45) & (hillas_intensity < 1e6)]
+    - [width, hillas_width > 0]
+    - [length, hillas_length > 0]
+    - [leakage, leakage_intensity_width_2 < 0.7]
+
+StereoMeanCombiner:  # Calculate array-event prediction as (weighted) mean of telescope-wise predictions
+  weights: intensity  # stereo_reco_weights: hillas intensity
+  log_target: false  # If true, calculate exp(mean(log(values)))
+  prefix: RandomForestRegressor  # Prefix to be added to the output container / column names
+  property: ENERGY  # Which property is being combined
+
+TableLoader:  # Load telescope-event or subarray-event data from ctapipe HDF5 files
+  dl1_images: false  # load extracted images
+  dl1_muons: false  # load muon ring parameters
+  dl1_parameters: true  # load reconstructed image parameters
+  dl2: true  # load available dl2 stereo parameters
+  focal_length_choice: EFFECTIVE  # If both nominal and effective focal lengths are available, which one to use for the `~ctapipe.coordinates.C...
+  instrument: false  # join subarray instrument information to each event
+  observation_info: false  # join observation information to each event
+  pointing: true  # Load pointing information and interpolate / join to events
+  simulated: true  # load simulated shower information
+  true_images: false  # load simulated shower images
+  true_parameters: true  # load image parameters obtained from true images
+
+PointingInterpolator:  # Interpolator for pointing and pointing correction data
+  bounds_error: true  # If true, raises an exception when trying to extrapolate out of the given table
+  extrapolate: false  # If bounds_error is False, this flag will specify whether values outsidethe available values are filled with...
+
+CrossValidator:  # Class to train sklearn based reconstructors in a cross validation
+  n_cross_validations: 5  # Number of cross validation iterations
+  rng_seed: 1337  # Random seed for splitting the training data

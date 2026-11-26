@@ -4,55 +4,88 @@
 # Configuration for calculating G/H and spatial selection ("theta") cuts
 # ======================================================================
 
-EventSelectionOptimizer:
+#
+# Every configurable value of the components used is written (explicit, no reliance on the
+# defaults); the input and output files are given on the command line.
+
+EventSelectionOptimizer:  # Tool to create optimized cuts for IRF generation
   # with the sst1mpipe tools: CRAB_HEGRA is the Crab of MAGIC (--crab MAGIC, default), IRFDOC_PROTON_SPECTRUM
   # the protons + helium of DAMPE (--background p_he, default), see sst1mpipe.performance.irf_tools
-  gamma_target_spectrum: CRAB_HEGRA
-  proton_target_spectrum: IRFDOC_PROTON_SPECTRUM
-  electron_target_spectrum: IRFDOC_ELECTRON_SPECTRUM
-  obs_time: 50 hour
-  optimization_algorithm: "PointSourceSensitivityOptimizer" # Alternatives: "PointSourceSensitivityGhOptimizer", "PercentileCuts"
+  gamma_target_spectrum: CRAB_HEGRA  # Name of the spectrum used for weights of gamma events
+  proton_target_spectrum: IRFDOC_PROTON_SPECTRUM  # Name of the spectrum used for weights of proton events
+  electron_target_spectrum: IRFDOC_ELECTRON_SPECTRUM  # Name of the spectrum used for weights of electron events
+  obs_time: 50 hour  # Observation time in the form ``<value> <unit>``
+  optimization_algorithm: PointSourceSensitivityOptimizer  # Alternatives: "PointSourceSensitivityGhOptimizer", "PercentileCuts"
+  chunk_size: 100000  # How many subarray events to load at once when preselecting events
+  overwrite: false
 
-DL2EventPreprocessor:
-  energy_reconstructor: "RandomForestRegressor"
-  geometry_reconstructor: "disp"
-  gammaness_classifier: "RandomForestClassifier"
+SST1MEventSelectionOptimizer:  # ctapipe-optimize-event-selection with the spectra and cuts of the SST-1M Crab paper
+  background: p_he  # Proton spectrum of IRFDOC_PROTON_SPECTRUM: p_he (protons + helium of DAMPE) or protons
+  crab: MAGIC  # Crab Nebula spectrum of CRAB_HEGRA: MAGIC (log-parabola, SST-1M Crab paper) or HEGRA
+  # electron_target_spectrum: IRFDOC_ELECTRON_SPECTRUM  (from EventSelectionOptimizer)
+  # gamma_target_spectrum: CRAB_HEGRA  (from EventSelectionOptimizer)
+  # obs_time: 50 hour  (from EventSelectionOptimizer)
+  # optimization_algorithm: PointSourceSensitivityOptimizer  (from EventSelectionOptimizer)
+  overwrite: false
+  # proton_target_spectrum: IRFDOC_PROTON_SPECTRUM  (from EventSelectionOptimizer)
 
-  DL2EventQualityQuery:
-    quality_criteria:
-      - ["valid classifier", "RandomForestClassifier_is_valid"]
-      - ["valid geom reco", "disp_is_valid"]
-      - ["valid energy reco", "RandomForestRegressor_is_valid"]
+Application: {}  # A singleton application with full configuration support
 
-DefaultRecoEnergyBins:
-  reco_energy_min: 0.1 TeV
-  reco_energy_max: 1000 TeV
-  reco_energy_n_bins_per_decade: 5
+DL2EventPreprocessor:  # Defines pre-selection cuts and the necessary renaming of columns
+  energy_reconstructor: RandomForestRegressor  # Prefix of the reco `_energy` column
+  geometry_reconstructor: disp  # Prefix of the `_alt` and `_az` reco geometry columns
+  gammaness_classifier: RandomForestClassifier  # Prefix of the classifier `_prediction` column
+  allow_unsupported_pointing_frames: false  # Check whether the pointing is supported.For the moment, only pointing in altaz is supported.Divergent point...
+  apply_derived_columns: true  # Whether to compute derived columns
+  # columns_to_rename: computed at run time (Dictionary of columns to rename)
+  # output_table_schema: computed at run time (Schema definition for output event QTable)
 
-PointSourceSensitivityOptimizer:
-  min_background_fov_offset: 0.0 deg
-  max_background_fov_offset: 5.0 deg
-  max_gh_cut_efficiency: 0.8
-  gh_cut_efficiency_step: 0.1
-  alpha: 0.2
-  theta_min_angle: null
-  theta_max_angle: 0.5 deg
-  max_theta_cut_efficiency: 0.8
-  theta_cut_efficiency_step: 0.1
-  multiplicity_cuts: [2, 3, 4, 5, 6, 7, 8, 9, 10]
+DL2EventQualityQuery:  # Event pre-selection quality criteria for IRF computation with different defaults
+  quality_criteria:  # list of tuples of ('<description', 'expression string') to accept (select) a given data value
+    - [valid classifier, RandomForestClassifier_is_valid]
+    - [valid geom reco, disp_is_valid]
+    - [valid energy reco, RandomForestRegressor_is_valid]
 
-PointSourceSensitivityGhOptimizer:
-  initial_gh_cut_efficency: 0.4
+DefaultRecoEnergyBins:  # Base class for creating irfs or benchmarks binned in reconstructed energy
+  reco_energy_min: 0.1 TeV  # Minimum value for Reco Energy bins
+  reco_energy_max: 1000 TeV  # Maximum value for Reco Energy bins
+  reco_energy_n_bins_per_decade: 5  # Number of bins per decade for Reco Energy bins
 
-ThetaPercentileCutCalculator:
-  theta_min_angle: null
-  theta_max_angle: 0.5 deg
-  theta_fill_value: 0.5 deg
-  smoothing:
-  target_percentile: 68
-  min_counts: 10
+PointSourceSensitivityOptimizer:  # Optimize cuts for best point-source sensitivity
+  min_background_fov_offset: 0.0 deg  # Minimum distance from the fov center for background events to be taken into account
+  max_background_fov_offset: 5.0 deg  # Maximum distance from the fov center for background events to be taken into account
+  max_gh_cut_efficiency: 0.8  # Maximum gamma efficiency requested
+  gh_cut_efficiency_step: 0.1  # Stepsize used for scanning after optimal gammaness cut
+  alpha: 0.2  # Size ratio of on region / off region
+  theta_min_angle: null  # Smallest angular cut value allowed (None means no cut)
+  theta_max_angle: 0.5 deg  # Largest angular cut value allowed (None means no cut)
+  max_theta_cut_efficiency: 0.8  # Maximum gamma efficiency of the theta cut requested
+  theta_cut_efficiency_step: 0.1  # Efficiency-stepsize used for scanning after optimal theta cut
+  multiplicity_cuts: [2, 3, 4, 5, 6, 7, 8, 9, 10]  # Event-multiplicity cuts used for scanning after optimal cut
+  # reco_energy_max: 1000 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_min: 0.1 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_n_bins_per_decade: 5  (from DefaultRecoEnergyBins)
 
-GhPercentileCutCalculator:
-  target_percentile: 68
-  min_counts: 10
-  smoothing:
+PointSourceSensitivityGhOptimizer:  # Optimize gamma-hadron-separation cuts for best point-source sensitivity
+  initial_gh_cut_efficency: 0.4  # Start value of gamma efficiency before optimization
+  alpha: 0.2  # Size ratio of on region / off region
+  gh_cut_efficiency_step: 0.1  # Stepsize used for scanning after optimal gammaness cut
+  max_background_fov_offset: 5 deg  # Maximum distance from the fov center for background events to be taken into account
+  max_gh_cut_efficiency: 0.8  # Maximum gamma efficiency requested
+  min_background_fov_offset: 0 deg  # Minimum distance from the fov center for background events to be taken into account
+  # reco_energy_max: 1000 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_min: 0.1 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_n_bins_per_decade: 5  (from DefaultRecoEnergyBins)
+
+ThetaPercentileCutCalculator:  # Computes a percentile cut on theta
+  theta_min_angle: null  # Smallest angular cut value allowed (None means no cut)
+  theta_max_angle: 0.5 deg  # Largest angular cut value allowed (None means no cut)
+  theta_fill_value: 0.5 deg  # Angular cut value used for bins with too few events
+  smoothing: null  # When given, the width (in units of bins) of gaussian smoothing applied
+  target_percentile: 68  # Percent of events in each energy bin to keep after the theta cut
+  min_counts: 10  # Minimum number of events in a bin to attempt to find a cut value
+
+GhPercentileCutCalculator:  # Computes a percentile cut on gammaness
+  target_percentile: 68  # Percent of events in each energy bin to keep after the G/H cut
+  min_counts: 10  # Minimum number of events in a bin to attempt to find a cut value
+  smoothing: null  # When given, the width (in units of bins) of gaussian smoothing applied

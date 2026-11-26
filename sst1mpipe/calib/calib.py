@@ -205,7 +205,7 @@ class R0R1Calibrator(TelescopeComponent):
     is divided by it, i.e. the charges. The simulations use PDE files which include the drop for a
     given NSB level, while the observed data are corrected for it by the voltage drop correction:
     the factor must match the PDE file of the simulation (see ``mc_pde_correction_factors.json``
-    and the sst1mpipe_mc_config_low_nsb.json and sst1mpipe_mc_config_high_nsb.json configs).
+    and the sst1mpipe_mc_config_low_nsb.yaml and sst1mpipe_mc_config_high_nsb.yaml configs).
     ``null`` (the default, and for the real telescopes 21 and 22) applies no correction.
 
     All the parameters can be set per telescope,

@@ -1,0 +1,42 @@
+# sst1mpipe-trigger: trigger emulators on the SST-1M data:
+#   sst1mpipe-trigger -i SST1M1_20260120_1179.fits.fz -o trigger.h5 --config sst1mpipe_trigger_emulator_data.yaml
+#
+# Every configurable value of the components used is written (explicit, no reliance on the
+# defaults); the input and output files are given on the command line.
+
+TriggerTool:  # Emulate the SST-1M camera trigger (patch7 and TDSCAN) on R0 data, real or simulated, and write the trigger...
+  compare_camera: false  # Real data: compare the emulated patch7 output with the one recorded by the camera
+  max_events: null  # Maximum number of events to read
+  overwrite: false  # Overwrite the output file if it exists
+  progress_bar: false  # Show a progress bar during processing
+  save_outputs: false  # Also write the trigger outputs per patch and sample (432 x n_samples booleans per trigger)
+
+SST1MEventSource:  # Event source of the SST-1M raw data (R0) files
+  swapped_modules:  # Wrongly connected modules: the pixels of the two modules are swapped for the events of the telescope in the...
+    - {tel_id: 22, start: '2023-09-01T00:00:00', stop: '2024-07-18T00:00:00', modules: [59, 88]}
+    - {tel_id: 21, start: '2025-12-17T12:00:00', stop: '2026-01-15T12:00:00', modules: [8, 9]}
+  allowed_tels: null  # list of allowed tel_ids, others will be ignored
+  focal_length_choice: EQUIVALENT  # Which focal length to use for the camera frame transformations
+  max_events: null  # Maximum number of events that will be read from the file
+  pointing_dec: null  # Pointing declination in deg
+  pointing_ra: null  # Pointing right ascension in deg
+
+TriggerPatch7Emulator:  # patch7: sum of the 7 patches of each cluster (fewer at the camera edge)
+  threshold: [[type, '*', 350], [id, 21, 225]]  # patch7 fires when a 7-patch cluster sum is above this value (required)
+
+TriggerTDSCANEmulator:  # TDSCAN: 4-bit codes filtered in space (patch + neighbours) and time
+  threshold: 8.75  # TDSCAN fires when a filtered score is above this value
+  score_quantizer_edges: [16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128]  # Strictly increasing edges: the code of a sample is the number of edges it reaches
+  eps_t: 2  # Temporal half-width, the kernel spans 2 * eps_t + 1 samples
+  ring_weights: [[0.5, -0.0078125], [-0.5, -0.03125], [-0.5, -0.125], [0.5, 0.0625], [0.5, 0.25]]  # Weights, one row per time tap, [centre, neighbours]
+  quantize_step:  # Fixed-point formats of the HLS core (see sst1mpipe_trigger_emulator_data.yaml), null for floating point
+    input: UQ4.0
+    ring_weights: SQ1.7
+    convolution_accumulator: SQ5.2
+    convolution_rescale_shift: 3
+    temporal_accumulator: SQ5.2
+    temporal_rescale_shift: 3
+  overflow_mode: AP_SAT  # Fixed point only
+  quantization_mode: AP_TRN  # Fixed point only
+
+HDF5TableWriter: {}  # A very basic table writer that can take a container (or more than one) and write it to an HDF5 file

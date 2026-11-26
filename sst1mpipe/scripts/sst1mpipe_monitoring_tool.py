@@ -75,7 +75,7 @@ class MonitoringTool(Tool):
     description = __doc__
     examples = (
         "sst1mpipe-monitoring -i SST1M1_20260120_1179.fits.fz -o SST1M1_20260120_1179.monitoring.h5"
-        " --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.json"
+        " --config sst1mpipe/resources/config/sst1mpipe_monitoring_config.yaml"
     )
 
     output_path = Path(

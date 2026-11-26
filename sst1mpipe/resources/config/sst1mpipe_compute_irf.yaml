@@ -4,128 +4,164 @@
 # Configuration for calculating IRF with or without applying a spatial selection
 # ==============================================================================
 
-IrfTool:
+#
+# Every configurable value of the components used is written (explicit, no reliance on the
+# defaults); the input and output files are given on the command line.
+
+IrfTool:  # Tool to create IRF files in GADF format
   # with the sst1mpipe tools: CRAB_HEGRA is the Crab of MAGIC (--crab MAGIC, default), IRFDOC_PROTON_SPECTRUM
   # the protons + helium of DAMPE (--background p_he, default), see sst1mpipe.performance.irf_tools
-  gamma_target_spectrum: CRAB_HEGRA
-  proton_target_spectrum: IRFDOC_PROTON_SPECTRUM
-  electron_target_spectrum: IRFDOC_ELECTRON_SPECTRUM
-  obs_time: 50 hour
-  energy_dispersion_maker_name: "EnergyDispersion2dMaker"
-  effective_area_maker_name: "EffectiveArea2dMaker"
-  psf_maker_name: "PSF3DMaker"
-  background_maker_name: "BackgroundRate2dMaker"
-  angular_resolution_maker_name: "AngularResolution2dMaker"
-  energy_bias_resolution_maker_name: "EnergyBiasResolution2dMaker"
+  gamma_target_spectrum: CRAB_HEGRA  # Name of the spectrum used for weights of gamma events
+  proton_target_spectrum: IRFDOC_PROTON_SPECTRUM  # Name of the spectrum used for weights of proton events
+  electron_target_spectrum: IRFDOC_ELECTRON_SPECTRUM  # Name of the spectrum used for weights of electron events
+  obs_time: 50 hour  # Observation time in the form ``<value> <unit>``
+  energy_dispersion_maker_name: EnergyDispersion2dMaker  # The parameterization of the energy dispersion to be used
+  effective_area_maker_name: EffectiveArea2dMaker  # The parameterization of the effective area to be used
+  psf_maker_name: PSF3DMaker  # The parameterization of the point spread function to be used
+  background_maker_name: BackgroundRate2dMaker  # The parameterization of the background rate to be used
+  angular_resolution_maker_name: AngularResolution2dMaker  # The parameterization of the angular resolution benchmark
+  energy_bias_resolution_maker_name: EnergyBiasResolution2dMaker  # The parameterization of the bias and resolution benchmark for the energy prediction
   # Sensitivity2dMaker of ctapipe and the minimum statistics of the simulations (sst1mpipe.performance.irf_tools)
-  sensitivity_maker_name: "MinimumStatisticsSensitivity2dMaker"
+  sensitivity_maker_name: MinimumStatisticsSensitivity2dMaker  # The parameterization of the point source sensitivity benchmark
+  chunk_size: 100000  # How many subarray events to load at once while selecting
+  do_background: true  # Compute background rate using supplied files
+  overwrite: false
+  range_check_error: false  # Raise error if asking for IRFs outside range where cut optimisation is valid
+  spatial_selection_applied: false  # Compute an IRF after applying a direction cut (``SpatialSelection=RAD_MAX``)
 
-DL2EventPreprocessor:
-  energy_reconstructor: "RandomForestRegressor"
-  geometry_reconstructor: "disp"
-  gammaness_classifier: "RandomForestClassifier"
+SST1MIrfTool:  # ctapipe-compute-irf with the spectra of the SST-1M Crab paper
+  # angular_resolution_maker_name: AngularResolution2dMaker  (from IrfTool)
+  background: p_he  # Proton spectrum of IRFDOC_PROTON_SPECTRUM: p_he (protons + helium of DAMPE) or protons
+  # background_maker_name: BackgroundRate2dMaker  (from IrfTool)
+  crab: MAGIC  # Crab Nebula spectrum of CRAB_HEGRA: MAGIC (log-parabola, SST-1M Crab paper) or HEGRA
+  # effective_area_maker_name: EffectiveArea2dMaker  (from IrfTool)
+  # electron_target_spectrum: IRFDOC_ELECTRON_SPECTRUM  (from IrfTool)
+  # energy_bias_resolution_maker_name: EnergyBiasResolution2dMaker  (from IrfTool)
+  # energy_dispersion_maker_name: EnergyDispersion2dMaker  (from IrfTool)
+  # gamma_target_spectrum: CRAB_HEGRA  (from IrfTool)
+  # obs_time: 50 hour  (from IrfTool)
+  overwrite: false
+  # proton_target_spectrum: IRFDOC_PROTON_SPECTRUM  (from IrfTool)
+  # psf_maker_name: PSF3DMaker  (from IrfTool)
+  range_check_error: false  # Raise error if asking for IRFs outside range where cut optimisation is valid
+  # sensitivity_maker_name: MinimumStatisticsSensitivity2dMaker  (from IrfTool)
 
-  DL2EventQualityQuery:
-    quality_criteria:
-      - ["valid classifier", "RandomForestClassifier_is_valid"]
-      - ["valid geom reco", "disp_is_valid"]
-      - ["valid energy reco", "RandomForestRegressor_is_valid"]
+DL2EventPreprocessor:  # Defines pre-selection cuts and the necessary renaming of columns
+  energy_reconstructor: RandomForestRegressor  # Prefix of the reco `_energy` column
+  geometry_reconstructor: disp  # Prefix of the `_alt` and `_az` reco geometry columns
+  gammaness_classifier: RandomForestClassifier  # Prefix of the classifier `_prediction` column
+  allow_unsupported_pointing_frames: false  # Check whether the pointing is supported.For the moment, only pointing in altaz is supported.Divergent point...
+  apply_derived_columns: true  # Whether to compute derived columns
+  # columns_to_rename: computed at run time (Dictionary of columns to rename)
+  # output_table_schema: computed at run time (Schema definition for output event QTable)
 
+DL2EventQualityQuery:  # Event pre-selection quality criteria for IRF computation with different defaults
+  quality_criteria:  # list of tuples of ('<description', 'expression string') to accept (select) a given data value
+    - [valid classifier, RandomForestClassifier_is_valid]
+    - [valid geom reco, disp_is_valid]
+    - [valid energy reco, RandomForestRegressor_is_valid]
 
 # Using the following three components, default values for the reconstruced/true energy
 # and fov bins can be configured for all irf components and benchmarks.
 # These values are used, if the corresponding configuration options are not overwritten
 # in the configuration of the individual components/benchmarks themselves.
+DefaultRecoEnergyBins:  # Base class for creating irfs or benchmarks binned in reconstructed energy
+  reco_energy_min: 0.1 TeV  # Minimum value for Reco Energy bins
+  reco_energy_max: 1000 TeV  # Maximum value for Reco Energy bins
+  reco_energy_n_bins_per_decade: 5  # Number of bins per decade for Reco Energy bins
 
-DefaultRecoEnergyBins:
-  reco_energy_min: 0.1 TeV
-  reco_energy_max: 1000 TeV
-  reco_energy_n_bins_per_decade: 5
+DefaultTrueEnergyBins:  # Base class for creating irfs or benchmarks binned in true energy
+  true_energy_min: 0.1 TeV  # Minimum value for True Energy bins
+  true_energy_max: 1000 TeV  # Maximum value for True Energy bins
+  true_energy_n_bins_per_decade: 10  # Number of bins per decade for True Energy bins
 
-DefaultTrueEnergyBins:
-  true_energy_min: 0.1 TeV
-  true_energy_max: 1000 TeV
-  true_energy_n_bins_per_decade: 10
+DefaultFoVOffsetBins:  # Base class for creating radially symmetric irfs or benchmarks
+  fov_offset_min: 0 deg  # Minimum value for FoV Offset bins
+  fov_offset_max: 5 deg  # Maximum value for FoV offset bins
+  fov_offset_n_bins: 3  # Number of FoV offset bins
 
-DefaultFoVOffsetBins:
-  fov_offset_min: 0 deg
-  fov_offset_max: 5 deg
-  fov_offset_n_bins: 3
+EnergyDispersion2dMaker:  # Creates a radially symmetric parameterization of the energy dispersion in equidistant bins of logarithmic t...
+  energy_migration_min: 0.2  # Minimum value of energy migration ratio
+  energy_migration_max: 5  # Maximum value of energy migration ratio
+  energy_migration_n_bins: 30  # Number of bins for energy migration ratio
+  energy_migration_binning: logarithmic  # How energy bins are distributed between energy_migration_min and energy_migration_max
+  # fov_offset_max: 5 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_min: 0 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_n_bins: 3  (from DefaultFoVOffsetBins)
+  # true_energy_max: 1000 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_min: 0.1 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_n_bins_per_decade: 10  (from DefaultTrueEnergyBins)
 
-EnergyDispersion2dMaker:
-  # true_energy_min: 0.1 TeV
-  # true_energy_max: 1000 TeV
-  # true_energy_n_bins_per_decade: 10
-  energy_migration_min: 0.2
-  energy_migration_max: 5
-  energy_migration_n_bins: 30
-  # fov_offset_min: 0 deg
-  # fov_offset_max: 5 deg
-  # fov_offset_n_bins: 3
+PSF3DMaker:  # Creates a radially symmetric point spread function calculated in equidistant bins of source offset, logarit...
+  source_offset_min: 0.0 deg  # Minimum value for Source offset
+  source_offset_max: 1.0 deg  # Maximum value for Source offset
+  source_offset_n_bins: 100  # Number of bins for Source offset
+  # fov_offset_max: 5 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_min: 0 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_n_bins: 3  (from DefaultFoVOffsetBins)
+  # true_energy_max: 1000 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_min: 0.1 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_n_bins_per_decade: 10  (from DefaultTrueEnergyBins)
 
-PSF3DMaker:
-  # true_energy_min: 0.1 TeV
-  # true_energy_max: 1000 TeV
-  # true_energy_n_bins_per_decade: 10
-  source_offset_min: 0.0 deg
-  source_offset_max: 1.0 deg
-  source_offset_n_bins: 100
-  # fov_offset_min: 0 deg
-  # fov_offset_max: 5 deg
-  # fov_offset_n_bins: 3
+AngularResolution2dMaker:  # Calculates the angular resolution in bins of either true or reconstructed energy and fov offset
+  use_reco_energy: false  # Use reconstructed energy instead of true energy for energy binning
+  quantiles: [0.25, 0.5, 0.68, 0.95]  # Quantiles for which the containment radius should be calculated
+  # fov_offset_max: 5 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_min: 0 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_n_bins: 3  (from DefaultFoVOffsetBins)
+  # reco_energy_max: 1000 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_min: 0.1 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_n_bins_per_decade: 5  (from DefaultRecoEnergyBins)
+  # true_energy_max: 1000 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_min: 0.1 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_n_bins_per_decade: 10  (from DefaultTrueEnergyBins)
 
-# EffectiveArea2dMaker:
-#   true_energy_min: 0.1 TeV
-#   true_energy_max: 1000 TeV
-#   true_energy_n_bins_per_decade: 10
-#   fov_offset_min: 0 deg
-#   fov_offset_max: 5 deg
-#   fov_offset_n_bins: 3
-
-# BackgroundRate2dMaker:
-#   reco_energy_min: 0.1 TeV
-#   reco_energy_max: 1000 TeV
-#   reco_energy_n_bins_per_decade: 5
-#   fov_offset_min: 0 deg
-#   fov_offset_max: 5 deg
-#   fov_offset_n_bins: 3
-
-AngularResolution2dMaker:
-  use_reco_energy: False
-  quantiles: [0.25, 0.5, 0.68, 0.95]
-  # reco_energy_min: 0.1 TeV
-  # reco_energy_max: 1000 TeV
-  # reco_energy_n_bins_per_decade: 5
-  # true_energy_min: 0.1 TeV
-  # true_energy_max: 1000 TeV
-  # true_energy_n_bins_per_decade: 10
-  # fov_offset_min: 0 deg
-  # fov_offset_max: 5 deg
-  # fov_offset_n_bins: 3
-
-# EnergyBiasResolution2dMaker:
-#   true_energy_min: 0.1 TeV
-#   true_energy_max: 1000 TeV
-#   true_energy_n_bins_per_decade: 10
-#   fov_offset_min: 0 deg
-#   fov_offset_max: 5 deg
-#   fov_offset_n_bins: 3
-
-Sensitivity2dMaker:
-  alpha: 0.2
-  # reco_energy_min: 0.1 TeV
-  # reco_energy_max: 1000 TeV
-  # reco_energy_n_bins_per_decade: 5
+Sensitivity2dMaker:  # Calculates the point source sensitivity in bins of reconstructed energy and fov offset
+  alpha: 0.2  # Size ratio of on region / off region
   # background of the sensitivity: the gamma-like protons within 1.2 deg of the camera center (the on-axis
   # point source), as sst1mpipe < 0.9 (theta_cut_p) and the SST-1M Crab paper, scaled to the size of the ON
   # region; the background around the source, not the average over the field of view (0-5 deg: lower, as
   # the acceptance decreases with the offset). Only for the sensitivity: the IRFs keep DefaultFoVOffsetBins.
-  fov_offset_min: 0 deg
-  fov_offset_max: 1.2 deg
-  fov_offset_n_bins: 1
+  fov_offset_min: 0 deg  # Minimum value for FoV Offset bins
+  fov_offset_max: 1.2 deg  # Maximum value for FoV offset bins
+  fov_offset_n_bins: 1  # Number of FoV offset bins
+  # reco_energy_max: 1000 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_min: 0.1 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_n_bins_per_decade: 5  (from DefaultRecoEnergyBins)
 
 # sensitivity of an energy bin only with more than 10 simulated gammas (ON region) and 10 simulated protons
 # (background region) left after the cuts, as sst1mpipe < 0.9; NaN otherwise
-MinimumStatisticsSensitivity2dMaker:
-  min_simulated_signal: 10
-  min_simulated_background: 10
+MinimumStatisticsSensitivity2dMaker:  # ``Sensitivity2dMaker`` of ctapipe (pyirf ``calculate_sensitivity``: 5 sigma, excess of at least 10 weighted...
+  min_simulated_signal: 10  # Sensitivity of an energy bin only with more than this number of simulated gammas in the ON region
+  min_simulated_background: 10  # Sensitivity of an energy bin only with more than this number of simulated protons in the background region
+  # alpha: 0.2  (from Sensitivity2dMaker)
+  # fov_offset_max: 1.2 deg  (from Sensitivity2dMaker)
+  # fov_offset_min: 0 deg  (from Sensitivity2dMaker)
+  # fov_offset_n_bins: 1  (from Sensitivity2dMaker)
+  # reco_energy_max: 1000 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_min: 0.1 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_n_bins_per_decade: 5  (from DefaultRecoEnergyBins)
+
+BackgroundRate2dMaker: {}  # Creates a radially symmetric parameterization of the background rate in equidistant bins of logarithmic rec...
+  # fov_offset_max: 5 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_min: 0 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_n_bins: 3  (from DefaultFoVOffsetBins)
+  # reco_energy_max: 1000 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_min: 0.1 TeV  (from DefaultRecoEnergyBins)
+  # reco_energy_n_bins_per_decade: 5  (from DefaultRecoEnergyBins)
+
+EffectiveArea2dMaker: {}  # Creates a radially symmetric parameterization of the effective area in equidistant bins of logarithmic true...
+  # fov_offset_max: 5 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_min: 0 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_n_bins: 3  (from DefaultFoVOffsetBins)
+  # true_energy_max: 1000 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_min: 0.1 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_n_bins_per_decade: 10  (from DefaultTrueEnergyBins)
+
+EnergyBiasResolution2dMaker: {}  # Calculates the bias and the resolution of the energy prediction in bins of true energy and fov offset
+  # fov_offset_max: 5 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_min: 0 deg  (from DefaultFoVOffsetBins)
+  # fov_offset_n_bins: 3  (from DefaultFoVOffsetBins)
+  # true_energy_max: 1000 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_min: 0.1 TeV  (from DefaultTrueEnergyBins)
+  # true_energy_n_bins_per_decade: 10  (from DefaultTrueEnergyBins)
