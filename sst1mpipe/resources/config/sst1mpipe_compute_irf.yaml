@@ -17,7 +17,8 @@ IrfTool:
   background_maker_name: "BackgroundRate2dMaker"
   angular_resolution_maker_name: "AngularResolution2dMaker"
   energy_bias_resolution_maker_name: "EnergyBiasResolution2dMaker"
-  sensitivity_maker_name: "Sensitivity2dMaker"
+  # Sensitivity2dMaker of ctapipe and the minimum statistics of the simulations (sst1mpipe.performance.irf_tools)
+  sensitivity_maker_name: "MinimumStatisticsSensitivity2dMaker"
 
 DL2EventPreprocessor:
   energy_reconstructor: "RandomForestRegressor"
@@ -122,3 +123,9 @@ Sensitivity2dMaker:
   fov_offset_min: 0 deg
   fov_offset_max: 1.2 deg
   fov_offset_n_bins: 1
+
+# sensitivity of an energy bin only with more than 10 simulated gammas (ON region) and 10 simulated protons
+# (background region) left after the cuts, as sst1mpipe < 0.9; NaN otherwise
+MinimumStatisticsSensitivity2dMaker:
+  min_simulated_signal: 10
+  min_simulated_background: 10
