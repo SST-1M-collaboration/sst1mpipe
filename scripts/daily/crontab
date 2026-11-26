@@ -1,0 +1,7 @@
+# Daily analysis of the SST-1M data on Calculus (scripts/daily/run_daily.bash): the night before, every
+# morning at 10:17. SST1MPIPE_ROOT: the sst1mpipe directory (to edit). Log in ~/logs/sst1mpipe-daily.log.
+# Install (adds these lines to the crontab of the user):
+#   (crontab -l 2>/dev/null; grep -v '^#' scripts/daily/crontab) | crontab -
+# Check: crontab -l
+SST1MPIPE_ROOT=/home/USER/sst1mpipe
+17 10 * * * mkdir -p "$HOME/logs" && bash "$SST1MPIPE_ROOT/scripts/daily/run_daily.bash" >> "$HOME/logs/sst1mpipe-daily.log" 2>&1

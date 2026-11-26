@@ -8,29 +8,24 @@ SST-1M analysis workflow
 Automatic data processing
 -------------------------
 
-Raw data from both telescopes are processed automaticaly up to DL3 level 
-every morning after an observing night on **Calculus** with ``Daily analysis``
-pipeline:
+Raw data of both telescopes are processed up to DL3 every morning on **Calculus** by the scripts of
+``scripts/daily`` (see ``scripts/daily/README.md``), run by cron (``scripts/daily/crontab``) on the
+night before:
 
-``/mnt/nfs22_auger/jurysek/sst1mpipe/sst1mpipe/scripts/daily_analysis.py``
+.. code-block:: console
 
-Products of automatic processing (all data levels up to DL3) can be found in:
+    DATE=20260120 bash scripts/daily/run_daily.bash
 
-``/data/work/analysis/Daily_analysis/daily_data/``
+The steps run on one machine, with all its cores. The same steps run with SLURM on camk with
+``scripts/daily/submit_data.bash``. The products are in ``/data/work/analysis/Daily_analysis/daily_data/<DATE>/``
+(``lists``, ``logs``, ``monitoring``, ``dl1``, ``dl2``, ``dl3``). Each data level has a directory per
+telescope (``cs1``, ``cs2``) and one for the coincident events (``stereo``). The logs of each step and
+raw file are in ``logs/``.
 
-Those are sorted by date, source observed, and the telescope used (``cs1``, ``cs2`` and ``stereo`` for coincident events).
-All data level directories also contain configuration file and log file for each processed run, so 
-user can easily check if the processing went OK and which version of ``sst1mpipe`` was used. Random Forest models used in authomatic analysis 
-can be found in
+The models and IRFs are those of the simulations, processed on camk with ``scripts/camk/submit_mc.bash``
+and copied to ``/data/work/analysis/MC/``. The settings are in ``scripts/daily/daily.env``.
 
-``/data/work/analysis/MC/prod_january_2023/``
-
-for both mono and stereo regimes of observation, together with expected performances and sensitivity curves. IRFs used for DL3
-production can be found in
-
-``/data/work/analysis/IRFs/``
-
-DL3 products of the automatic processing can be further analyzed using standard tools 
+DL3 products can be further analyzed using standard tools 
 such as `gammapy <https://github.com/gammapy>`_, see :ref:`higher_level`.
 
 .. note::
