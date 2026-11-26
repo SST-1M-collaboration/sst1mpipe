@@ -1,6 +1,11 @@
 """
 ``sst1mpipe-apply-models``: ``ctapipe-apply-models`` (same options) for the SST-1M files. The output
-is the DL2 of ctapipe; the models can use the ``StereoMARSCombiner``.
+is the DL2 of ctapipe.
+
+The stereo combiner of the direction is the one of the disp model (chosen at the training), or
+``--ApplyModels.disp_stereo_combiner``: the same models applied with another combiner, e.g.
+``StereoDispSignClosestCombiner`` (SST-1M Crab paper), ``StereoDispSignCrossingCombiner`` (crossing of the
+major axes) or ``StereoMeanCombiner``.
 
     sst1mpipe-apply-models -i run.dl1.h5 -o run.dl2.h5 \\
         -r models/nsb100/energy_regressor.pkl -r models/nsb100/particle_classifier.pkl \\
@@ -18,11 +23,13 @@ import numpy as np
 from astropy.coordinates import AltAz, SkyCoord
 from astropy.time import Time
 from ctapipe.containers import CoordinateFrameType
-from ctapipe.core.traits import Int, IntTelescopeParameter, List
-from ctapipe.reco import Reconstructor
+from ctapipe.core.traits import ComponentName, Int, IntTelescopeParameter, List
+from ctapipe.reco import DispReconstructor, Reconstructor
+from ctapipe.reco.reconstructor import ReconstructionProperty
+from ctapipe.reco.stereo_combination import StereoCombiner
 from ctapipe.tools.apply_models import ApplyModels as CtapipeApplyModels
 
-import sst1mpipe.ml  # noqa: F401 (StereoMARSCombiner)
+import sst1mpipe.ml  # noqa: F401 (stereo combiners of sst1mpipe)
 
 #: Reconstructor.read of ctapipe (replaced during ApplyModels.setup)
 _read_reconstructor = Reconstructor.read
@@ -86,6 +93,17 @@ class ApplyModels(CtapipeApplyModels):
         help="Telescope of the models applied to each telescope of the input file (0: the same telescope id)",
     ).tag(config=True)
 
+    disp_stereo_combiner = ComponentName(
+        StereoCombiner,
+        default_value=None,
+        allow_none=True,
+        help=(
+            "Stereo combiner of the direction of the disp models instead of the one chosen at their training"
+            " (e.g. StereoDispSignClosestCombiner, StereoDispSignCrossingCombiner, StereoMeanCombiner), configured"
+            " by its own section (e.g. --StereoDispSignClosestCombiner.min_telescopes=2)"
+        ),
+    ).tag(config=True)
+
     def setup(self):
         with mock.patch.object(Reconstructor, "read", self._read_reconstructor):
             super().setup()
@@ -106,6 +124,12 @@ class ApplyModels(CtapipeApplyModels):
                 self.log.info("%s: models of telescope %d for telescope %d", type(reconstructor).__name__,
                               model_tel_id, tel_id)
         reconstructor.subarray = subarray
+        if self.disp_stereo_combiner is not None and isinstance(reconstructor, DispReconstructor):
+            reconstructor.stereo_combiner = StereoCombiner.from_name(
+                self.disp_stereo_combiner, prefix=reconstructor.prefix,
+                property=ReconstructionProperty.GEOMETRY, parent=self,
+            )
+            self.log.info("%s: stereo combiner %s", type(reconstructor).__name__, self.disp_stereo_combiner)
         return reconstructor
 
     def _apply(self, reconstructor, tel_tables, start, stop):

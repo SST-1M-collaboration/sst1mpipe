@@ -17,7 +17,8 @@ IrfTool:
   background_maker_name: "BackgroundRate2dMaker"
   angular_resolution_maker_name: "AngularResolution2dMaker"
   energy_bias_resolution_maker_name: "EnergyBiasResolution2dMaker"
-  sensitivity_maker_name: "Sensitivity2dMaker"
+  # Sensitivity2dMaker of ctapipe and the minimum statistics of the simulations (sst1mpipe.performance.irf_tools)
+  sensitivity_maker_name: "MinimumStatisticsSensitivity2dMaker"
 
 DL2EventPreprocessor:
   energy_reconstructor: "RandomForestRegressor"
@@ -115,6 +116,16 @@ Sensitivity2dMaker:
   # reco_energy_min: 0.1 TeV
   # reco_energy_max: 300 TeV
   # reco_energy_n_bins_per_decade: 5
-  # fov_offset_min: 0 deg
-  # fov_offset_max: 5 deg
-  # fov_offset_n_bins: 3
+  # background of the sensitivity: the gamma-like protons within 1.2 deg of the camera center (the on-axis
+  # point source), as sst1mpipe < 0.9 (theta_cut_p) and the SST-1M Crab paper, scaled to the size of the ON
+  # region; the background around the source, not the average over the field of view (0-5 deg: lower, as
+  # the acceptance decreases with the offset). Only for the sensitivity: the IRFs keep DefaultFoVOffsetBins.
+  fov_offset_min: 0 deg
+  fov_offset_max: 1.2 deg
+  fov_offset_n_bins: 1
+
+# sensitivity of an energy bin only with more than 10 simulated gammas (ON region) and 10 simulated protons
+# (background region) left after the cuts, as sst1mpipe < 0.9; NaN otherwise
+MinimumStatisticsSensitivity2dMaker:
+  min_simulated_signal: 10
+  min_simulated_background: 10
