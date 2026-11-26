@@ -63,6 +63,8 @@ settings are in `camk.env` (the camk paths, then `daily.env`), and the logs in `
   e.g. `data/raw/2023/10/12/SST1M1_20231012_0123.fits.fz`; both telescopes in the same list), e.g. the
   runs of a source. Without it, all the raw files of the night.
 
+A dataset (ECSV file of runs, e.g. the Crab paper): `scripts/dataset/submit_dataset.bash`.
+
 Several nights, `submit_nights.bash`: the nights of `NIGHTS`, or of the files of `RAW_LIST` (directories
 `YYYY/MM/DD`), each with `submit_data.bash`:
 

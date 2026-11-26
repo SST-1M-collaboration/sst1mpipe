@@ -44,5 +44,6 @@ for MAPPING in ${DATA_IRF_MODES}; do
   DL3="${DATA_DIRECTORY}/dl3/${ANALYSIS}"
   if compgen -G "${DL3}/*.dl3.fits.gz" > /dev/null; then
     create_hdu_indexes --input-files "${DL3}/*.dl3.fits.gz" --output-dir "${DL3}"
+    check_gadf "${DL3}" || true
   fi
 done
