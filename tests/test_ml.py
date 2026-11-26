@@ -237,6 +237,12 @@ def irfs(models, dl1_files, tmp_path_factory):
     assert u.Quantity(sensitivity["THETA_HI"]).ravel()[-1] == 1.2 * u.deg
     background = QTable.read(irf / "irf_point_like.fits.gz", hdu="BACKGROUND")
     assert u.Quantity(background["THETA_HI"]).ravel()[-1] == 5 * u.deg
+    # sensitivity only with more than 10 simulated gammas and protons (MinimumStatisticsSensitivity2dMaker)
+    n_signal = np.asarray(sensitivity["N_SIGNAL_SIMULATED"]).ravel()
+    n_background = np.asarray(sensitivity["N_BACKGROUND_SIMULATED"]).ravel()
+    relative = np.asarray(sensitivity["RELATIVE_SENSITIVITY"]).ravel()
+    enough = (n_signal > 10) & (n_background > 10)
+    assert np.all(np.isnan(relative[~enough])) and np.any(~enough)
     yield irf, dl2
     spectra.SPECTRA.update(saved_spectra)
 
