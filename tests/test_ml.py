@@ -348,6 +348,17 @@ def test_plot_irfs(models, dl1_files, tmp_path, ctapipe_spectra):
     # one theta cut for all the energies (GlobalThetaPercentileCuts), gammaness cut per energy bin
     rad_max = QTable.read(irf / "cuts.fits", hdu="RAD_MAX")["cut"]
     assert len(rad_max) > 1 and np.all(rad_max == rad_max[0])
+    # FixedThetaCuts: the same gammaness cuts, a fixed theta cut (0.2 deg by default)
+    import astropy.units as u
+
+    for theta_cut, options in ((0.2, []), (0.25, ["--FixedThetaCuts.theta_cut=0.25 deg"])):
+        output = irf / f"cuts_fixed_{theta_cut}.fits"
+        argv = [*configs, "--EventSelectionOptimizer.optimization_algorithm=FixedThetaCuts", *options,
+                "-g", str(dl2 / "gamma_point.dl2.h5"), "-p", str(dl2 / "proton_test.dl2.h5"), "-o", str(output)]
+        assert run_tool(SST1MEventSelectionOptimizer(), argv=argv, raises=True) == 0
+        fixed = QTable.read(output, hdu="RAD_MAX")["cut"]
+        assert len(fixed) == len(rad_max) and np.allclose(fixed.to_value(u.deg), theta_cut)
+        np.testing.assert_array_equal(QTable.read(output, hdu="GH_CUTS")["cut"], QTable.read(irf / "cuts.fits", hdu="GH_CUTS")["cut"])
     argv = [f"--config={CONFIG_DIR / 'sst1mpipe_compute_irf.yaml'}", "--cuts", str(irf / "cuts.fits"),
             "--gamma-file", str(dl2 / "gamma_point.dl2.h5"), "--proton-file", str(dl2 / "proton_test.dl2.h5"),
             "--do-background", "--spatial-selection-applied", "--DefaultFoVOffsetBins.fov_offset_n_bins=1",

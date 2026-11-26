@@ -5,7 +5,8 @@ and ``ctapipe-compute-irf`` with the spectra and cuts of the SST-1M Crab paper (
 - ``--crab MAGIC`` (default) or ``HEGRA``: Crab Nebula spectrum of ``CRAB_HEGRA`` in the configurations
 - ``--background p_he`` (default, protons weighted to protons + helium) or ``protons``: proton spectrum of
   ``IRFDOC_PROTON_SPECTRUM``
-- the cut algorithm ``GlobalThetaPercentileCuts`` (``sst1mpipe_irf_paper_cuts.yaml``)
+- the cut algorithms ``GlobalThetaPercentileCuts`` (``sst1mpipe_irf_paper_cuts.yaml``) and ``FixedThetaCuts``
+  (fixed theta cut, ``--EventSelectionOptimizer.optimization_algorithm=FixedThetaCuts``)
 
 The other options and configurations are those of the ctapipe tools::
 
@@ -18,9 +19,15 @@ from ctapipe.core.traits import CaselessStrEnum
 from ctapipe.tools.compute_irf import IrfTool
 from ctapipe.tools.optimize_event_selection import EventSelectionOptimizer
 
-from sst1mpipe.performance.irf_tools import BACKGROUND_SPECTRA, CRAB_SPECTRA, GlobalThetaPercentileCuts, use_spectra
+from sst1mpipe.performance.irf_tools import (
+    BACKGROUND_SPECTRA,
+    CRAB_SPECTRA,
+    FixedThetaCuts,
+    GlobalThetaPercentileCuts,
+    use_spectra,
+)
 
-__all__ = ["SST1MEventSelectionOptimizer", "SST1MIrfTool", "GlobalThetaPercentileCuts"]
+__all__ = ["SST1MEventSelectionOptimizer", "SST1MIrfTool", "FixedThetaCuts", "GlobalThetaPercentileCuts"]
 
 def _crab_trait():
     return CaselessStrEnum(
