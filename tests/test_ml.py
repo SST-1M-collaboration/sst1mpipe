@@ -353,6 +353,18 @@ def test_plot_irfs(models, dl1_files, tmp_path, ctapipe_spectra):
             "--do-background", "--spatial-selection-applied", "--DefaultFoVOffsetBins.fov_offset_n_bins=1",
             "--output", str(irf / "irf_point_like.fits.gz"), "--benchmark-output", str(irf / "benchmarks_point_like.fits.gz")]
     assert run_tool(SST1MIrfTool(), argv=argv, raises=True) == 0
+    # background of the sensitivity within 1.2 deg (Sensitivity2dMaker), the IRFs within 5 deg (DefaultFoVOffsetBins)
+    sensitivity = QTable.read(irf / "benchmarks_point_like.fits.gz", hdu="SENSITIVITY")
+    assert u.Quantity(sensitivity["THETA_LO"]).ravel()[0] == 0 * u.deg
+    assert u.Quantity(sensitivity["THETA_HI"]).ravel()[-1] == 1.2 * u.deg
+    background = QTable.read(irf / "irf_point_like.fits.gz", hdu="BACKGROUND")
+    assert u.Quantity(background["THETA_HI"]).ravel()[-1] == 5 * u.deg
+    # sensitivity only with more than 10 simulated gammas and protons (MinimumStatisticsSensitivity2dMaker)
+    n_signal = np.asarray(sensitivity["N_SIGNAL_SIMULATED"]).ravel()
+    n_background = np.asarray(sensitivity["N_BACKGROUND_SIMULATED"]).ravel()
+    relative = np.asarray(sensitivity["RELATIVE_SENSITIVITY"]).ravel()
+    enough = (n_signal > 10) & (n_background > 10)
+    assert np.all(np.isnan(relative[~enough])) and np.any(~enough)
 
     plot_irfs(["--irf", f"stereo={irf}", "--dl2", f"stereo={dl2}", "-o", str(tmp_path / "plots")])
     names = {path.stem for path in (tmp_path / "plots").glob("*.png")}

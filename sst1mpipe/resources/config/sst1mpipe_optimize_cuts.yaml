@@ -26,7 +26,7 @@ DL2EventPreprocessor:
 
 DefaultRecoEnergyBins:
   reco_energy_min: 0.1 TeV
-  reco_energy_max: 300 TeV
+  reco_energy_max: 1000 TeV
   reco_energy_n_bins_per_decade: 5
 
 PointSourceSensitivityOptimizer:
