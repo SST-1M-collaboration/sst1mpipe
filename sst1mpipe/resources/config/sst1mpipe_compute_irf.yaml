@@ -115,6 +115,10 @@ Sensitivity2dMaker:
   # reco_energy_min: 0.1 TeV
   # reco_energy_max: 300 TeV
   # reco_energy_n_bins_per_decade: 5
-  # fov_offset_min: 0 deg
-  # fov_offset_max: 5 deg
-  # fov_offset_n_bins: 3
+  # background of the sensitivity: the gamma-like protons within 1.2 deg of the camera center (the on-axis
+  # point source), as sst1mpipe < 0.9 (theta_cut_p) and the SST-1M Crab paper, scaled to the size of the ON
+  # region; the background around the source, not the average over the field of view (0-5 deg: lower, as
+  # the acceptance decreases with the offset). Only for the sensitivity: the IRFs keep DefaultFoVOffsetBins.
+  fov_offset_min: 0 deg
+  fov_offset_max: 1.2 deg
+  fov_offset_n_bins: 1
